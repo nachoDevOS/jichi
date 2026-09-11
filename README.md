@@ -1,59 +1,127 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Jichi
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema de recaudación, certificación y credenciales del **Gobierno Autónomo
+Departamental del Beni**, Bolivia.
 
-## About Laravel
+Gestiona el circuito completo de ventanilla: se recepciona un trámite, se cobra
+la tasa, se aprueba, se emite el documento en PDF con un código QR, y
+cualquier ciudadano puede verificar su autenticidad escaneando ese QR desde la
+calle, sin iniciar sesión.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Capa | Tecnología |
+| --- | --- |
+| Backend | Laravel 13 · PHP 8.3 |
+| Frontend | React 19 · Inertia 2 · TypeScript · Tailwind 4 |
+| Base de datos | PostgreSQL 18 (también corre en SQLite) |
+| Roles y permisos | spatie/laravel-permission |
+| PDF | barryvdh/laravel-dompdf |
+| Excel | maatwebsite/excel |
+| QR | simplesoftwareio/simple-qrcode |
+| Rutas en JS | tightenco/ziggy |
+| Gráficos | recharts |
 
-## Learning Laravel
+**No hay API REST.** Inertia conecta Laravel con React directamente: el
+controlador devuelve datos y React los recibe como props. Nunca se escribe
+`fetch()` ni `axios`. El detalle está en [docs/GUIA-INERTIA.md](docs/GUIA-INERTIA.md).
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Arranque rápido
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+```sh
+composer install
+npm install
 
-## Agentic Development
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+php artisan storage:link
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer run dev      # servidor + vite + cola + logs, todo junto
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Abrir <http://localhost:8000> y entrar con `admin@admin.com`. La contraseña es
+la de `JICHI_SEED_PASSWORD` en el `.env` (por defecto `password`).
 
-## Contributing
+La guía completa de instalación, incluida la de PostgreSQL en Windows, está en
+[docs/INSTALACION.md](docs/INSTALACION.md).
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## Las dos caras del sistema
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Todo está separado en dos mitades que no se mezclan nunca:
 
-## Security Vulnerabilities
+| | Panel de administración | Vista pública |
+| --- | --- | --- |
+| **Quién entra** | Funcionarios de la Gobernación | Cualquier ciudadano |
+| **Sesión** | Obligatoria | No pide login |
+| **URLs** | `/panel/...` | `/verificar/...` |
+| **Rutas** | `routes/panel.php` | `routes/publico.php` |
+| **Controladores** | `app/Http/Controllers/Panel/` | `app/Http/Controllers/Publico/` |
+| **Pantallas** | `resources/js/pages/panel/` | `resources/js/pages/publico/` |
+| **Componentes** | `resources/js/components/panel/` | `resources/js/components/publico/` |
+| **Marco visual** | `layouts/layout-panel.tsx` | `layouts/layout-publico.tsx` |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Esa división es deliberada: la pantalla pública se abre desde un teléfono en el
+río, con mala señal, y no puede mostrar ni una pista de la estructura interna.
+Con carpetas separadas nada del panel se filtra ahí por accidente.
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-"# surubiNet" 
+## Roles
+
+Los define el enum `app/Enums/RolSistema.php`, que es la única fuente de verdad
+de qué puede hacer cada quién.
+
+| Rol | Qué hace |
+| --- | --- |
+| Administrador | Control total: configuración, usuarios, tarifas. |
+| Supervisor | Aprueba y rechaza trámites, supervisa la recaudación, exporta reportes. |
+| Operador de Ventanilla | Recepciona trámites, cobra, entrega documentos. |
+| Solo Lectura | Consulta e informes, sin modificar nada. |
+
+---
+
+## Estado del proyecto
+
+**Funcionando:**
+
+- Inicio de sesión con bitácora de accesos (incluidos los intentos fallidos)
+- Panel principal con recaudación, gráficos y alertas de vencimiento
+- Módulo de Solicitantes completo (alta, edición, búsqueda, baja, foto)
+- Verificación pública de documentos por código QR
+
+**Pendiente:** Trámites, Documentos, Reportes y Configuración. Aparecen en
+gris en el menú lateral. La lista de qué falta en cada uno está en
+[docs/PENDIENTES.md](docs/PENDIENTES.md).
+
+El módulo **Solicitantes es la plantilla**: está comentado paso a paso para
+copiar su patrón en los otros cuatro.
+
+---
+
+## Documentación
+
+| Archivo | Para qué |
+| --- | --- |
+| [docs/INSTALACION.md](docs/INSTALACION.md) | Levantar el entorno de desarrollo |
+| [docs/ESTRUCTURA.md](docs/ESTRUCTURA.md) | Qué hay en cada carpeta y dónde va cada archivo nuevo |
+| [docs/GUIA-INERTIA.md](docs/GUIA-INERTIA.md) | Cómo Laravel habla con React, explicado desde cero |
+| [docs/PENDIENTES.md](docs/PENDIENTES.md) | Qué falta construir y en qué orden |
+
+---
+
+## Comandos útiles
+
+```sh
+php artisan test              # las pruebas automáticas
+./vendor/bin/pint             # formatea el PHP
+npx tsc --noEmit              # revisa los tipos de TypeScript
+npm run build                 # compila el frontend para producción
+php artisan migrate:fresh --seed   # rehace la base desde cero
+```

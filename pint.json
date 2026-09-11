@@ -1,0 +1,6 @@
+{
+    "preset": "laravel",
+    "notPath": [
+        "app/Http/Controllers/StorageController.php"
+    ]
+}

@@ -1,9 +1,312 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../views';
+@source '../js';
 
-@theme {
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Paleta institucional del Gobierno Autónomo Departamental del Beni.
+ * Azul oscuro #1e3a5f y dorado #c9a84c expresados en oklch para que las
+ * variantes claras y oscuras mantengan el mismo tono percibido.
+ */
+:root {
+    /*
+     * Le avisa al navegador de qué color es el fondo para que dibuje sus
+     * propios controles a juego: la lista que abre un <select>, el calendario
+     * de <input type="date"> y las barras de desplazamiento. Sin esto el
+     * navegador los pinta siempre claros y en modo oscuro el texto de las
+     * opciones queda gris sobre blanco, ilegible.
+     */
+    color-scheme: light;
+
+    --institucional-azul: oklch(0.34 0.062 251);
+    --institucional-azul-claro: oklch(0.46 0.075 251);
+    --institucional-dorado: oklch(0.75 0.107 86);
+    --institucional-dorado-oscuro: oklch(0.63 0.098 86);
+
+    --radius: 0.625rem;
+
+    --background: oklch(0.985 0.002 250);
+    --foreground: oklch(0.21 0.02 250);
+
+    --card: oklch(1 0 0);
+    --card-foreground: var(--foreground);
+    --popover: oklch(1 0 0);
+    --popover-foreground: var(--foreground);
+
+    --primary: var(--institucional-azul);
+    --primary-foreground: oklch(0.985 0.002 250);
+
+    --secondary: oklch(0.955 0.006 250);
+    --secondary-foreground: var(--institucional-azul);
+
+    --accent: var(--institucional-dorado);
+    --accent-foreground: oklch(0.24 0.03 86);
+
+    --muted: oklch(0.955 0.006 250);
+    --muted-foreground: oklch(0.52 0.017 250);
+
+    --destructive: oklch(0.577 0.245 27.3);
+    --destructive-foreground: oklch(0.985 0 0);
+
+    --success: oklch(0.62 0.15 152);
+    --warning: oklch(0.78 0.14 78);
+
+    --border: oklch(0.9 0.008 250);
+    --input: oklch(0.9 0.008 250);
+    --ring: var(--institucional-azul-claro);
+
+    --sidebar: var(--institucional-azul);
+    --sidebar-foreground: oklch(0.93 0.012 250);
+    --sidebar-primary: var(--institucional-dorado);
+    --sidebar-primary-foreground: oklch(0.24 0.03 86);
+    --sidebar-accent: oklch(0.4 0.062 251);
+    --sidebar-accent-foreground: oklch(0.98 0.002 250);
+    --sidebar-border: oklch(0.42 0.055 251);
+    --sidebar-ring: var(--institucional-dorado);
+
+    /* Serie categórica para los gráficos del dashboard. */
+    --grafico-1: oklch(0.46 0.075 251);
+    --grafico-2: var(--institucional-dorado);
+    --grafico-3: oklch(0.58 0.11 200);
+    --grafico-4: oklch(0.62 0.15 152);
+    --grafico-5: oklch(0.55 0.16 300);
+    --grafico-6: oklch(0.66 0.14 40);
+}
+
+/*
+ * Modo oscuro: fondos neutros (croma casi cero) para que se vea negro de
+ * verdad y no azul grisáceo. El color institucional queda reservado a los
+ * acentos —primario, dorado, gráficos—, que así resaltan sobre el carbón.
+ */
+.dark {
+    color-scheme: dark;
+
+    --background: oklch(0.14 0.003 250);
+    --foreground: oklch(0.96 0.003 250);
+
+    --card: oklch(0.18 0.004 250);
+    --card-foreground: var(--foreground);
+    --popover: oklch(0.18 0.004 250);
+    --popover-foreground: var(--foreground);
+
+    --primary: oklch(0.72 0.09 251);
+    --primary-foreground: oklch(0.15 0.01 250);
+
+    --secondary: oklch(0.23 0.005 250);
+    --secondary-foreground: oklch(0.95 0.003 250);
+
+    --accent: var(--institucional-dorado);
+    --accent-foreground: oklch(0.2 0.025 86);
+
+    --muted: oklch(0.23 0.005 250);
+    --muted-foreground: oklch(0.71 0.006 250);
+
+    --destructive: oklch(0.68 0.19 24);
+    --destructive-foreground: oklch(0.98 0 0);
+
+    --success: oklch(0.7 0.14 152);
+    --warning: oklch(0.82 0.13 78);
+
+    --border: oklch(0.27 0.004 250);
+    --input: oklch(0.3 0.004 250);
+    --ring: oklch(0.66 0.08 251);
+
+    --sidebar: oklch(0.165 0.004 250);
+    --sidebar-foreground: oklch(0.93 0.004 250);
+    --sidebar-primary: var(--institucional-dorado);
+    --sidebar-primary-foreground: oklch(0.2 0.025 86);
+    --sidebar-accent: oklch(0.25 0.006 250);
+    --sidebar-accent-foreground: oklch(0.97 0.002 250);
+    --sidebar-border: oklch(0.27 0.005 250);
+    --sidebar-ring: var(--institucional-dorado);
+
+    --grafico-1: oklch(0.68 0.09 251);
+    --grafico-2: oklch(0.8 0.1 86);
+    --grafico-3: oklch(0.7 0.1 200);
+    --grafico-4: oklch(0.72 0.13 152);
+    --grafico-5: oklch(0.68 0.14 300);
+    --grafico-6: oklch(0.75 0.13 40);
+}
+
+@theme inline {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    --color-grafico-1: var(--grafico-1);
+    --color-grafico-2: var(--grafico-2);
+    --color-grafico-3: var(--grafico-3);
+    --color-grafico-4: var(--grafico-4);
+    --color-grafico-5: var(--grafico-5);
+    --color-grafico-6: var(--grafico-6);
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-feature-settings: 'cv11', 'ss01';
+    }
+
+    /* El foco visible es requisito de accesibilidad en sistemas públicos. */
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-ring;
+    }
+
+    /*
+     * `color-scheme` alcanza en Chrome y Edge, pero Firefox deja el fondo de
+     * las opciones en blanco igual. Se les pone el color a mano para que la
+     * lista desplegable se lea en los dos.
+     */
+    option {
+        background-color: var(--card);
+        color: var(--foreground);
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Animaciones de la pantalla pública de verificación
+|--------------------------------------------------------------------------
+|
+| Solo las usa /verificar, la pantalla que se abre al escanear el QR de un
+| documento. Están acá y no como clases de Tailwind sueltas porque son
+| fotogramas propios, no utilidades.
+|
+| Las tres respetan `prefers-reduced-motion`: quien pidió menos movimiento en
+| su dispositivo ve el resultado quieto, sin perder ninguna información.
+|
+*/
+
+/* La tarjeta del resultado entra desde abajo. */
+@keyframes entrada-tarjeta {
+    from {
+        opacity: 0;
+        transform: translateY(28px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* La línea dorada que recorre el escudo mientras "verifica". */
+@keyframes escaneo {
+    0%,
+    100% {
+        top: 8%;
+    }
+    50% {
+        top: 88%;
+    }
+}
+
+/* El escudo late apenas, para que el splash no se vea congelado. */
+@keyframes latido {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.07);
+    }
+}
+
+.animar-entrada {
+    animation: entrada-tarjeta 0.7s cubic-bezier(0.18, 0.8, 0.22, 1) both;
+}
+
+.animar-escaneo {
+    animation: escaneo 1.4s ease-in-out infinite;
+}
+
+.animar-latido {
+    animation: latido 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animar-entrada,
+    .animar-escaneo,
+    .animar-latido {
+        animation: none;
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Impresión del acta de verificación
+|--------------------------------------------------------------------------
+|
+| Un inspector sin datos en el celular imprime o guarda en PDF la constancia
+| desde el navegador. Sin estas reglas saldría el fondo verde a página
+| completa —tinta desperdiciada y texto gris sobre gris— y el papel quedaría
+| encerrado en el ancho de un teléfono.
+|
+| `.papel-acta` es la hoja; `.solo-pantalla` es todo lo que existe únicamente
+| para la pantalla y no tiene sentido en papel: la franja tricolor de los
+| bordes, la marca de agua del fondo y el buscador de otro código.
+*/
+@media print {
+    .solo-pantalla {
+        display: none !important;
+    }
+
+    /*
+     * El degradado del fondo va en un atributo `style` —es un radial con
+     * varias paradas, no una utilidad de Tailwind— y un atributo gana a
+     * cualquier clase. Por eso acá hace falta !important: es la única forma de
+     * apagarlo al imprimir.
+     */
+    .fondo-escritorio {
+        background: #fff !important;
+    }
+
+    .papel-acta {
+        max-width: none;
+        box-shadow: none;
+        border-radius: 0;
+    }
 }

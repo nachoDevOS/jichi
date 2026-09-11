@@ -24,6 +24,16 @@
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="sqlite"/>
+        <!--
+            Las pruebas NUNCA escriben en la nube.
+
+            StorageController mira FILESYSTEM_DISK para decidir si sube a S3, y
+            sin esta linea las pruebas leian el .env real: cada corrida de
+            `php artisan test` dejaba archivos de prueba en el bucket de
+            DigitalOcean. Storage::fake('public') no lo impedia, porque el disco
+            falso reemplaza a 'public' y no a 's3'.
+        -->
+        <env name="FILESYSTEM_DISK" value="public"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
