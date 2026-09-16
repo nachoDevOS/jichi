@@ -1,418 +1,539 @@
-import { Head, Link } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    Banknote,
-    ExternalLink,
-    FileText,
-    IdCard,
-    Paperclip,
-    PencilLine,
-    QrCode,
-    TriangleAlert,
-    UserRound,
-} from 'lucide-react';
-import { AccionesTramite } from '@/components/panel/tramites/acciones-tramite';
-import { LineaTiempoTramite } from '@/components/panel/tramites/linea-tiempo-tramite';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Check, FileText, IdCard, Pencil, Printer, Receipt, Send, TriangleAlert, Truck, X } from 'lucide-react';
+import { useState } from 'react';
+import { DialogoImprimirCarnet } from '@/components/panel/carnets/dialogo-imprimir-carnet';
+import { ListaDepositos, ResumenDepositos } from '@/components/panel/tramites/depositos';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fechaHora } from '@/lib/utils';
-import type { TramiteDetalle } from '@/types/tramites';
+import { bs, fecha, fechaHora } from '@/lib/utils';
+import type { PageProps } from '@/types';
+import type { CarnetDelTramite, PagoDelTramite, ReciboDelTramite, TramiteFicha } from '@/types/tramites';
 
 /**
  * ============================================================================
- *  FICHA DEL TRÁMITE — revisar, aprobar, emitir y entregar
+ *  LA FICHA DEL EXPEDIENTE
  * ============================================================================
  *
- * Registrar el trámite en ventanilla es la mitad del trabajo. La otra mitad la
- * hace otra persona, en otro momento: alguien tiene que abrir los papeles que
- * se adjuntaron, comprobar que el pago está, y recién entonces aprobar y
- * emitir la credencial.
+ * Papeles, dinero y los botones del circuito:
  *
- * ----------------------------------------------------------------------------
- *  CÓMO ESTÁ REPARTIDA LA PANTALLA
- * ----------------------------------------------------------------------------
+ *     PENDIENTE ──[enviar]──▶ EN REVISIÓN ──┬──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
+ *     (borrador)                            └──▶ RECHAZADO
  *
- * A la izquierda, TODO lo que hay que mirar para decidir: quién es, qué pidió,
- * qué adjuntó y cuánto pagó. A la derecha, fija, la columna donde se decide:
- * por dónde va el trámite y los botones.
+ * De ahí sale qué botones ve el operador, y son dos juegos que no se mezclan:
  *
- * Está así y no al revés porque revisar es una lectura larga —hay que abrir
- * archivos— y decidir es un clic. La columna de decisión no puede quedar abajo
- * de todo, obligando a scrollear de vuelta después de leer.
+ *   PENDIENTE    Editar · Eliminar · Enviar a revisión.  Es el borrador.
+ *   EN REVISIÓN  Aprobar · Rechazar.  Ya está presentado: no se toca más.
+ *
+ * TODOS LOS `puede_*` LOS CALCULA EL SERVIDOR. La pantalla pregunta, no decide.
+ * La regla de qué salto vale desde cada estado vive en
+ * App\Enums\EstadoTramite; escrita otra vez acá, las dos versiones terminarían
+ * diciendo cosas distintas y el operador vería un botón que el servidor rechaza
+ * —o peor, no vería uno que sí puede usar—.
+ *
+ * Todas las acciones van por PATCH y no por POST: modifican parcialmente un
+ * expediente que ya existe. Lo que no pueden ser nunca es GET, porque un verbo
+ * de lectura que escribe se dispara solo con que el navegador precargue el
+ * enlace.
  */
-interface Props {
-    tramite: TramiteDetalle;
-}
-
-export default function VerTramite({ tramite }: Props) {
+export default function VerTramite({
+    tramite,
+    carnet,
+    pagos,
+    recibo,
+}: {
+    tramite: TramiteFicha;
+    carnet: CarnetDelTramite;
+    pagos: PagoDelTramite[];
+    recibo: ReciboDelTramite | null;
+}) {
     const { puede } = usePermisos();
+    const { institucion } = usePage<PageProps>().props;
+
+    const [rechazando, setRechazando] = useState(false);
+    const [imprimiendo, setImprimiendo] = useState(false);
+    const rechazo = useForm({ motivo_rechazo: '' });
 
     return (
         <LayoutPanel
-            titulo={`Trámite N° ${tramite.id}`}
-            descripcion={`${tramite.tipo.nombre} · ${tramite.tipo.area}`}
+            titulo={`Trámite #${tramite.id}`}
+            descripcion={`${tramite.tipo_etiqueta} · ${tramite.rubro ?? '—'} · carnet ${carnet.gestion}`}
             acciones={
                 <div className="flex flex-wrap gap-2">
-                    {/* Corregir solo mientras el expediente está en curso. La
-                        condición sale del servidor (`puede_editarse`), no de
-                        una lista de estados escrita acá. */}
-                    {tramite.puede_editarse && puede('tramites.editar') && (
-                        <Link href={route('tramites.edit', tramite.id)}>
-                            <Button variant="outline">
-                                <PencilLine className="size-4" />
-                                Corregir
-                            </Button>
-                        </Link>
+                    {tramite.puede_editar && puede('tramites.editar') && (
+                        <Button variant="outline" onClick={() => router.visit(route('tramites.edit', tramite.id))}>
+                            <Pencil className="size-4" />
+                            Editar trámite
+                        </Button>
                     )}
 
-                    <Link href={route('tramites.index')}>
-                        <Button variant="outline">
-                            <ArrowLeft className="size-4" />
-                            Volver al listado
+                    {/*
+                        ENVIAR A REVISIÓN — el paso obligatorio del circuito.
+
+                        Mientras está PENDIENTE el expediente se arma; al
+                        enviarlo, ventanilla declara que está completo y pasa a
+                        quien lo verifica y firma. Sin esto no se puede aprobar:
+                        el botón «Aprobar» no aparece hasta que el trámite está
+                        EN REVISIÓN.
+
+                        Va en `default` y no en `secondary`: en un expediente
+                        pendiente es LA acción que corresponde, y tiene que
+                        distinguirse de «Editar trámite», que es la otra.
+                    */}
+                    {tramite.puede_enviar && puede('tramites.editar') && (
+                        <Button onClick={() => router.patch(route('tramites.enviar', tramite.id))}>
+                            <Send className="size-4" />
+                            Enviar a revisión
                         </Button>
-                    </Link>
+                    )}
+
+                    {/*
+                        APROBAR SOLO APARECE CON EL MONTO CUBIERTO. El servidor lo
+                        vuelve a comprobar igual —consultando la suma de los pagos
+                        en el momento— pero esconder el botón evita que el
+                        supervisor lo apriete y se lleve un error.
+                    */}
+                    {tramite.puede_aprobar && puede('tramites.aprobar') && (
+                        <Button onClick={() => router.patch(route('tramites.aprobar', tramite.id))}>
+                            <Check className="size-4" />
+                            Aprobar
+                        </Button>
+                    )}
+
+                    {/*
+                        RECHAZAR NO APARECE EN PENDIENTE.
+
+                        No es que el botón estorbe: es que no hay nada que
+                        rechazar. Un expediente pendiente es un BORRADOR que la
+                        misma ventanilla está armando, y todavía no se lo
+                        presentó a nadie. Si no sirve —se cargó dos veces, con
+                        la persona equivocada— lo que corresponde es ELIMINARLO,
+                        que también pide su motivo.
+
+                        Rechazar es la respuesta a algo presentado, y por eso
+                        `puede_rechazar` llega en true recién desde EN REVISIÓN.
+                    */}
+                    {tramite.puede_rechazar && puede('tramites.rechazar') && (
+                        <Button variant="destructive" onClick={() => setRechazando((v) => !v)}>
+                            <X className="size-4" />
+                            Rechazar
+                        </Button>
+                    )}
+
+                    {/*
+                        EL RECIBO OFICIAL — el papel que se lleva el pescador.
+
+                        Aparece desde que el expediente pasó por revisión, que es
+                        cuando la plata entró. El servidor ya resolvió si
+                        corresponde: si `recibo` llegó, el botón va.
+
+                        `recibo.numero` en null significa «corresponde pero
+                        todavía no se emitió» —un expediente que cruzó revisión
+                        antes de que existiera este módulo—. Se emite al
+                        imprimirlo, y por eso el texto cambia: no se puede
+                        prometer un número que todavía no se asignó.
+
+                        Va como <a> y no como router.visit(): abre el PDF en otra
+                        pestaña, y una navegación de Inertia no sabe qué hacer con
+                        un archivo.
+
+                        Reimprimir sale SIEMPRE con el mismo número —el papel ya
+                        se entregó—, así que el botón no se esconde después de la
+                        primera vez: perder el recibo es justamente el caso en el
+                        que hay que volver a sacarlo.
+                    */}
+                    {recibo && puede('recibos.imprimir') && (
+                        <a
+                            href={route('tramites.recibo', tramite.id)}
+                            target="_blank"
+                            rel="noopener"
+                            className={buttonVariants({ variant: 'outline' })}
+                        >
+                            <Receipt className="size-4" />
+                            {recibo.numero ? `Recibo N° ${recibo.numero}` : 'Imprimir recibo'}
+                        </a>
+                    )}
+
+                    {/*
+                        EL CARNET — el plástico que se lleva la persona.
+
+                        Aparece recién cuando hay algo que imprimir, y eso NO es
+                        lo mismo que «el carnet existe»: la fila nace con el
+                        expediente en PENDIENTE, pero el rubro se habilita al
+                        APROBAR. Antes de eso el plástico saldría sin autorizar
+                        nada. Lo decide el servidor en `puede_imprimirse`.
+
+                        NO ABRE EL PDF DE UNA: muestra primero la vista
+                        previa. Lo que se imprime es un plástico que se troquela
+                        y se lamina, así que no se corrige — conviene mirarlo
+                        antes de mandarlo, sobre todo para descubrir la ficha sin
+                        foto. Ver DialogoImprimirCarnet.
+
+                        ABRIRLO NO MARCA NADA. Mirar el documento en pantalla no
+                        es haberlo sacado en la impresora de credenciales, y por
+                        eso «Marcar impreso» sigue siendo un botón aparte.
+                    */}
+                    {carnet.puede_imprimirse && puede('carnets.generar') && (
+                        <Button variant="outline" onClick={() => setImprimiendo(true)}>
+                            <IdCard className="size-4" />
+                            Imprimir carnet
+                        </Button>
+                    )}
+
+                    {tramite.puede_generar && puede('carnets.generar') && (
+                        <Button variant="dorado" onClick={() => router.patch(route('tramites.generar', tramite.id))}>
+                            <Printer className="size-4" />
+                            Marcar impreso
+                        </Button>
+                    )}
+
+                    {tramite.puede_entregar && puede('carnets.entregar') && (
+                        <Button variant="dorado" onClick={() => router.patch(route('tramites.entregar', tramite.id))}>
+                            <Truck className="size-4" />
+                            Marcar entregado
+                        </Button>
+                    )}
                 </div>
             }
         >
-            <Head title={`Trámite N° ${tramite.id}`} />
+            <Head title={`Trámite #${tramite.id}`} />
 
-            <div className="grid gap-6 lg:grid-cols-[1fr_20rem] lg:items-start">
-                {/* ===========================================================
-                    COLUMNA IZQUIERDA — lo que hay que revisar
-                    =========================================================== */}
-                <div className="space-y-4">
-                    <Card>
-                        <CardContent className="space-y-4 pt-6">
-                            <p className="flex items-center gap-1.5 text-sm font-semibold">
-                                <UserRound className="size-4" />
-                                Solicitante
+            <DialogoImprimirCarnet
+                abierto={imprimiendo}
+                carnetId={carnet.id}
+                registro={carnet.registro}
+                onCerrar={() => setImprimiendo(false)}
+            />
+
+            {/*
+                EL AVISO DE LO QUE FALTA.
+
+                Va ARRIBA DE TODO y no escondido junto a los adjuntos: es lo
+                único que impide avanzar con el expediente, así que el operador
+                tiene que verlo al abrir la ficha y no después de apretar un
+                botón que no funciona.
+
+                La lista la calcula el servidor —Tramite::faltantesParaRevision()—
+                y es la MISMA que usa el servicio para rechazar la operación. Si
+                la pantalla la recalculara por su cuenta, algún día diría una cosa
+                distinta de la que aplica el servidor.
+            */}
+            {tramite.faltantes.length > 0 && (
+                <Card className="mb-6 border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20">
+                    <CardContent className="flex gap-3 p-4 text-sm">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+
+                        <div className="space-y-1">
+                            <p className="font-medium">
+                                El expediente está incompleto: no se puede tomar para revisión.
                             </p>
 
-                            <div className="flex flex-wrap items-start justify-between gap-4">
-                                <div className="flex min-w-0 items-start gap-3">
-                                    <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-                                        {tramite.solicitante.foto_url ? (
-                                            <img
-                                                src={tramite.solicitante.foto_url}
-                                                alt=""
-                                                aria-hidden
-                                                className="size-full object-cover"
-                                            />
-                                        ) : (
-                                            <UserRound className="size-6 text-muted-foreground" />
-                                        )}
-                                    </span>
+                            <ul className="list-inside list-disc text-muted-foreground">
+                                {tramite.faltantes.map((falta) => (
+                                    <li key={falta}>Falta {falta}</li>
+                                ))}
+                            </ul>
 
-                                    <div className="min-w-0 space-y-1">
-                                        <p className="font-semibold">
-                                            {tramite.solicitante.nombreCompleto}
-                                        </p>
-                                        <p className="font-mono text-xs text-muted-foreground">
-                                            C.I. {tramite.solicitante.documento_identidad}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {[
-                                                tramite.solicitante.direccion,
-                                                tramite.solicitante.ciudad,
-                                                tramite.solicitante.provincia,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(' · ') || 'Sin domicilio cargado'}
-                                        </p>
-                                    </div>
-                                </div>
+                            <p className="text-muted-foreground">
+                                Se cargan con «Editar trámite».
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
-                                <Link href={route('solicitantes.show', tramite.solicitante.id)}>
-                                    <Button type="button" variant="ghost" size="sm">
-                                        <ExternalLink className="size-4" />
-                                        Ver ficha
-                                    </Button>
-                                </Link>
+            {/*
+                LA VENTANA DE RECHAZO.
+
+                Se dibuja acá pero se posiciona sobre toda la pantalla, así que el
+                lugar en el árbol no importa.
+
+                El motivo NO es burocracia: el pescador vuelve a ventanilla a
+                preguntar por qué le devolvieron los papeles, y sin el texto
+                guardado nadie puede responderle. Además es lo que le permite
+                presentar de nuevo con lo corregido.
+            */}
+            <ConfirmarConMotivo
+                abierto={rechazando}
+                titulo={`Rechazar el trámite #${tramite.id}`}
+                descripcion="El expediente se cierra y no se puede volver atrás. El beneficiario puede presentar de nuevo con los papeles corregidos."
+                etiquetaMotivo="Motivo del rechazo"
+                ayuda="Lo lee el beneficiario cuando vuelve a preguntar. Sea concreto: qué papel faltó o qué estaba mal."
+                placeholder="Ej.: la fotocopia del carnet está ilegible, no se lee el número."
+                textoConfirmar="Confirmar rechazo"
+                valor={rechazo.data.motivo_rechazo}
+                onCambiar={(v) => rechazo.setData('motivo_rechazo', v)}
+                error={rechazo.errors.motivo_rechazo}
+                procesando={rechazo.processing}
+                onConfirmar={() =>
+                    rechazo.patch(route('tramites.rechazar', tramite.id), {
+                        onSuccess: () => setRechazando(false),
+                    })
+                }
+                onCancelar={() => setRechazando(false)}
+            />
+
+            <div className="grid gap-6 lg:grid-cols-3">
+                {/* --------------------------------------------- Columna izquierda */}
+                <div className="space-y-6 lg:col-span-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Estado del expediente</CardTitle>
+                        </CardHeader>
+
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="flex flex-wrap gap-2">
+                                <Badge color={tramite.estado_color}>{tramite.estado_etiqueta}</Badge>
+                                <Badge color={tramite.tipo_color}>{tramite.tipo_etiqueta}</Badge>
                             </div>
-                        </CardContent>
-                    </Card>
 
-                    {/* Los campos propios del servicio: asociación y cupo en la
-                        cédula, embarcación y especies en los otros. Se recorren
-                        genéricamente porque cada servicio guarda los suyos. */}
-                    <Card>
-                        <CardContent className="space-y-4 pt-6">
-                            <p className="flex items-center gap-1.5 text-sm font-semibold">
-                                <FileText className="size-4" />
-                                Datos del servicio
-                            </p>
+                            {/*
+                                NO VA EL CARTEL DE «qué sigue». Se quitó a
+                                pedido: repetía en una frase lo que los botones
+                                de arriba ya dicen —si está el botón «Enviar a
+                                revisión», eso es lo que sigue— y empujaba los
+                                datos del expediente hacia abajo.
 
-                            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-                                <Dato etiqueta="Servicio" valor={tramite.tipo.nombre} />
-                                <Dato etiqueta="Vigencia" valor={tramite.tipo.vigencia} />
+                                El enum conserva `queSigue()` por si vuelve a
+                                hacer falta en otra pantalla.
+                            */}
+                            <Dato etiqueta="Beneficiario" valor={tramite.beneficiario} />
+                            <Dato etiqueta="Rubro solicitado" valor={tramite.rubro} />
 
-                                {Object.entries(tramite.datos_adicionales).map(
-                                    ([clave, valor]) => (
-                                        <Dato
-                                            key={clave}
-                                            etiqueta={etiquetar(clave)}
-                                            valor={textoDe(valor)}
-                                        />
-                                    ),
-                                )}
-                            </dl>
+                            {/*
+                                El cupo NO se imprime en el carnet —así se pidió—
+                                pero sí se muestra en el expediente: es el dato
+                                contra el que se contrastan las guías de
+                                transporte.
+
+                                `!== null` y no un truthy: un cupo de 0 daría
+                                falsy y el renglón mostraría «—» como si no se
+                                hubiera declarado nada.
+                            */}
+                            <Dato
+                                etiqueta="Capacidad autorizada"
+                                valor={
+                                    tramite.capacidad_kg !== null
+                                        ? `${tramite.capacidad_kg} Kg`
+                                        : null
+                                }
+                            />
+                            <Dato etiqueta="Presentado" valor={fechaHora(tramite.fecha_solicitud)} />
+                            <Dato etiqueta="Enviado a revisión" valor={fechaHora(tramite.fecha_revision)} />
+                            <Dato etiqueta="Aprobado" valor={fechaHora(tramite.fecha_aprobacion)} />
+                            <Dato etiqueta="Impreso" valor={fechaHora(tramite.fecha_generacion)} />
+                            <Dato etiqueta="Entregado" valor={fechaHora(tramite.fecha_entrega)} />
 
                             {tramite.observaciones && (
-                                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                                    <p className="text-xs text-muted-foreground">Observaciones</p>
-                                    <p className="text-sm">{tramite.observaciones}</p>
-                                </div>
+                                <p className="rounded-md bg-secondary/50 p-3 text-muted-foreground">
+                                    {tramite.observaciones}
+                                </p>
+                            )}
+
+                            {tramite.motivo_rechazo && (
+                                <p className="rounded-md bg-rose-50 p-3 text-rose-900 dark:bg-rose-500/10 dark:text-rose-200">
+                                    <strong>Motivo del rechazo: </strong>
+                                    {tramite.motivo_rechazo}
+                                </p>
                             )}
                         </CardContent>
                     </Card>
 
                     <Card>
-                        <CardContent className="space-y-4 pt-6">
-                            <p className="flex items-center gap-1.5 text-sm font-semibold">
-                                <Paperclip className="size-4" />
-                                Requisitos adjuntos
-                            </p>
+                        <CardHeader>
+                            <CardTitle>Respaldos</CardTitle>
+                        </CardHeader>
 
-                            {/* El enlace abre el archivo en otra pestaña: aprobar
-                                mirando solo el nombre del archivo no es revisar
-                                nada. Hay que poder leer la certificación. */}
-                            {tramite.requisitos.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Este trámite no lleva papeles adjuntos.
-                                </p>
-                            ) : (
-                                <ul className="space-y-2">
-                                    {tramite.requisitos.map((r) => (
-                                        <li key={r.campo}>
-                                            <a
-                                                href={r.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 hover:bg-accent/40"
-                                            >
-                                                <span className="min-w-0">
-                                                    <span className="block text-sm font-medium">
-                                                        {r.etiqueta}
-                                                    </span>
-                                                    <span className="block truncate font-mono text-xs text-muted-foreground">
-                                                        {r.archivo}
-                                                    </span>
-                                                </span>
-                                                <ExternalLink className="size-4 shrink-0 text-muted-foreground" />
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                        {/*
+                            SOLO LOS DOS ADJUNTOS DEL EXPEDIENTE.
+
+                            La fotografía del beneficiario NO va acá: es un campo
+                            de su ficha, no un respaldo de este trámite. Estuvo
+                            un rato y se sacó — mezclaba dos cosas que viven en
+                            tablas distintas y que se corrigen en pantallas
+                            distintas.
+
+                            Que falte se sigue avisando donde corresponde: la
+                            vista previa del carnet, al cargar la solicitud, dice
+                            «La ficha no tiene fotografía. El carnet se va a
+                            imprimir con el recuadro vacío».
+                        */}
+                        <CardContent className="grid gap-3 sm:grid-cols-2">
+                            <Adjunto titulo="Fotocopia de CI" url={tramite.ci_file_url} />
+                            <Adjunto
+                                titulo="Certificado de asociación"
+                                url={tramite.cert_asociacion_file_url}
+                            />
                         </CardContent>
                     </Card>
 
                     <Card>
-                        <CardContent className="space-y-4 pt-6">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="flex items-center gap-1.5 text-sm font-semibold">
-                                    <Banknote className="size-4" />
-                                    Pagos
-                                </p>
+                        <CardHeader>
+                            <CardTitle>Depósitos</CardTitle>
+                        </CardHeader>
 
-                                <p className="text-xs text-muted-foreground">
-                                    Cobrado{' '}
-                                    <span className="font-mono font-semibold text-foreground">
-                                        {bs(tramite.monto_pagado)}
-                                    </span>{' '}
-                                    de {bs(tramite.monto_total)}
-                                </p>
-                            </div>
+                        {/*
+                            ========================================================
+                             ACÁ LOS DEPÓSITOS SOLO SE MIRAN. NO HAY CÓMO CARGARLOS.
+                            ========================================================
 
-                            {/* El saldo se avisa acá y apaga el botón de emitir:
-                                una credencial emitida ya está en la calle, y el
-                                saldo se vuelve incobrable. */}
-                            {!tramite.esta_pagado && (
-                                <p className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                                    <TriangleAlert className="size-3.5 shrink-0" />
-                                    Queda un saldo pendiente de {bs(tramite.saldo_pendiente)}.
-                                </p>
-                            )}
+                            Ni formulario ni botón que lleve a uno. Se cargan
+                            desde «Editar trámite», que es el botón de la barra
+                            de arriba — el mismo con el que se reemplazan los
+                            adjuntos.
 
-                            {tramite.pagos.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No hay pagos registrados.
-                                </p>
-                            ) : (
-                                <ul className="space-y-2">
-                                    {tramite.pagos.map((p, i) => (
-                                        <li
-                                            key={i}
-                                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
-                                        >
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium">
-                                                    {p.forma_etiqueta}
-                                                    {p.banco && ` · ${p.banco}`}
-                                                </p>
-                                                <p className="font-mono text-xs text-muted-foreground">
-                                                    {p.nro_transaccion ?? 'Sin número de transacción'}
-                                                </p>
-                                            </div>
+                            Llegó a haber un enlace acá que decía «Registrar un
+                            depósito» y se sacó: aunque solo navegaba a la otra
+                            pantalla, en el medio de esta tarjeta se leía como si
+                            desde la ficha se pudiera cargar. Esta pantalla es de
+                            consulta; la de corrección es la que escribe.
+                        */}
+                        <CardContent className="space-y-4">
+                            <ResumenDepositos
+                                montoRequerido={tramite.monto_requerido}
+                                montoPagado={tramite.monto_pagado}
+                                saldoPendiente={tramite.saldo_pendiente}
+                                moneda={institucion.moneda}
+                            />
 
-                                            <div className="flex items-center gap-3">
-                                                <span className="font-mono text-sm font-semibold">
-                                                    {bs(p.monto)}
-                                                </span>
-
-                                                {p.url && (
-                                                    <a
-                                                        href={p.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-muted-foreground hover:text-foreground"
-                                                        aria-label={`Ver comprobante del pago ${i + 1}`}
-                                                    >
-                                                        <ExternalLink className="size-4" />
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                            <ListaDepositos
+                                pagos={pagos}
+                                moneda={institucion.moneda}
+                                vacio="Se cargan desde «Editar trámite»."
+                            />
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* ===========================================================
-                    COLUMNA DERECHA — dónde se decide
-                    =========================================================== */}
-                <aside className="space-y-4 lg:sticky lg:top-6">
-                    <Card>
-                        <CardContent className="space-y-4 pt-6">
-                            <div className="flex items-center justify-between gap-2">
-                                <p className="text-sm font-semibold">Estado</p>
-                                <Badge color={tramite.estado_color}>
-                                    {tramite.estado_etiqueta}
-                                </Badge>
-                            </div>
+                {/* ---------------------------------------------- Columna derecha */}
+                <Card className="h-fit">
+                    <CardHeader>
+                        <CardTitle>Carnet de la gestión {carnet.gestion}</CardTitle>
+                    </CardHeader>
 
-                            <LineaTiempoTramite tramite={tramite} />
-                        </CardContent>
-                    </Card>
+                    <CardContent className="space-y-3 text-sm">
+                        <div className="flex flex-wrap gap-2">
+                            <Badge color={carnet.estado_color}>{carnet.estado_etiqueta}</Badge>
+                            <Badge color="slate">Gestión {carnet.gestion}</Badge>
+                        </div>
 
-                    {/* El documento emitido, con su código de verificación. Es
-                        lo que el inspector comprueba en la orilla del río. */}
-                    {tramite.documento && (
-                        <Card>
-                            <CardContent className="space-y-3 pt-6">
-                                <div className="flex items-center justify-between gap-2">
-                                    <p className="flex items-center gap-1.5 text-sm font-semibold">
-                                        <IdCard className="size-4" />
-                                        Documento
-                                    </p>
-                                    <Badge color={tramite.documento.estado_color}>
-                                        {tramite.documento.estado_etiqueta}
-                                    </Badge>
-                                </div>
+                        <Dato etiqueta="Vence" valor={fecha(carnet.fecha_vencimiento)} />
 
-                                <dl className="space-y-2">
-                                    <Dato
-                                        etiqueta="Código de verificación"
-                                        valor={tramite.documento.codigo_verificacion}
-                                        mono
-                                    />
-                                    <Dato
-                                        etiqueta="Emitido"
-                                        valor={tramite.documento.fecha_emision ?? '—'}
-                                    />
-                                    <Dato
-                                        etiqueta="Vence"
-                                        valor={tramite.documento.fecha_vencimiento ?? 'Sin vencimiento'}
-                                    />
-                                </dl>
+                        <div>
+                            <p className="mb-2 text-muted-foreground">Rubros del carnet</p>
 
-                                <a
-                                    href={tramite.documento.url_verificacion}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    <Button type="button" variant="outline" className="w-full">
-                                        <QrCode className="size-4" />
-                                        Ver verificación pública
-                                    </Button>
-                                </a>
-                            </CardContent>
-                        </Card>
-                    )}
+                            {carnet.rubros.length === 0 ? (
+                                <p className="text-muted-foreground">
+                                    Ninguno todavía. La habilitación nace al aprobar este trámite.
+                                </p>
+                            ) : (
+                                <ul className="space-y-1">
+                                    {carnet.rubros.map((r) => (
+                                        <li key={r.nombre} className="flex items-center justify-between gap-2">
+                                            <span>{r.nombre}</span>
+                                            <Badge color={r.estado === 'habilitado' ? 'emerald' : 'rose'}>
+                                                {r.estado_etiqueta}
+                                            </Badge>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
 
-                    <Card>
-                        <CardContent className="space-y-4 pt-6">
-                            <p className="text-sm font-semibold">Acciones</p>
-                            <AccionesTramite tramite={tramite} />
-                        </CardContent>
-                    </Card>
-
-                    {tramite.modo_entrega && (
-                        <p className="px-1 text-xs text-muted-foreground">
-                            Entregado de forma{' '}
-                            {tramite.modo_entrega === 'fisica' ? 'física, en mano' : 'digital'}
-                            {tramite.hitos.entrega && ` el ${fechaHora(tramite.hitos.entrega.fecha)}`}
-                            .
-                        </p>
-                    )}
-                </aside>
+                        <Link
+                            href={route('carnets.show', carnet.id)}
+                            className="inline-block text-primary hover:underline"
+                        >
+                            Ver el carnet completo
+                        </Link>
+                    </CardContent>
+                </Card>
             </div>
         </LayoutPanel>
     );
 }
 
-/** Un dato con su etiqueta chica arriba. */
-function Dato({
-    etiqueta,
-    valor,
-    mono = false,
-}: {
-    etiqueta: string;
-    valor: string;
-    mono?: boolean;
-}) {
+/**
+ * ============================================================================
+ *  UN RESPALDO DEL EXPEDIENTE: CARGADO O NO
+ * ============================================================================
+ *
+ * La versión anterior distinguía las dos situaciones con un borde punteado
+ * contra uno sólido, y no alcanzaba: de reojo los tres recuadros se veían
+ * iguales, y el operador tenía que leer «: sin archivo» al final del renglón
+ * para darse cuenta.
+ *
+ * Acá el estado se ve por el COLOR y por el ícono antes de leer nada: verde con
+ * tilde si está, ámbar con signo si falta. Y si lo cargado es una imagen, se
+ * muestra la MINIATURA — que es la única forma de notar de un vistazo que se
+ * adjuntó el escaneo equivocado.
+ */
+function Adjunto({ titulo, url }: { titulo: string; url: string | null }) {
+    if (!url) {
+        return (
+            <div className="rounded-md border border-dashed border-destructive/50 bg-destructive/5 p-3">
+                <p className="flex items-center gap-1.5 text-[13px] font-medium">
+                    <TriangleAlert className="size-3.5 shrink-0 text-destructive" />
+                    {titulo}
+                </p>
+
+                {/* Los dos adjuntos son obligatorios para enviar a revisión —ver
+                    Tramite::faltantesParaRevision()—, así que el aviso va en
+                    rojo y dice qué se traba, no solo que falta. */}
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                    Falta — no se puede enviar a revisión
+                </p>
+            </div>
+        );
+    }
+
     return (
-        <div>
-            <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
-            <dd className={mono ? 'font-mono text-sm break-all' : 'text-sm'}>{valor}</dd>
-        </div>
+        <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-3 rounded-md border border-emerald-500/50 bg-emerald-50/60 p-3 transition-colors hover:bg-emerald-100/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40"
+        >
+            {esImagen(url) ? (
+                <img src={url} alt="" className="size-10 shrink-0 rounded object-cover" />
+            ) : (
+                <span className="flex size-10 shrink-0 items-center justify-center rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                    <FileText className="size-5" />
+                </span>
+            )}
+
+            <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-[13px] font-medium">
+                    <Check className="size-3.5 shrink-0 text-emerald-600" />
+                    <span className="truncate">{titulo}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">Abrir en otra pestaña</p>
+            </div>
+        </a>
     );
 }
 
 /**
- * Convierte la clave de la columna jsonb en algo legible.
+ * ¿La dirección apunta a una imagen?
  *
- * Los campos propios de cada servicio se guardan con el nombre del input
- * —`capacidad_kg`, `region_desde`—, y esta pantalla los recorre sin saber
- * cuáles son: cada servicio guarda los suyos y la lista crece. Traducir cada
- * clave a mano en un mapa obligaría a tocar este archivo cada vez que un
- * formulario suma un campo, y el día que alguien se olvidara, el dato
- * simplemente no aparecería.
+ * Se mira la extensión y no el tipo MIME porque acá solo se tiene la URL: el
+ * archivo vive en el disco o en s3 y no se descarga para preguntarle. Se corta
+ * en el `?` por si la dirección trae parámetros —las de s3 firmadas los traen—.
  */
-function etiquetar(clave: string): string {
-    const texto = clave.replaceAll('_', ' ');
+function esImagen(url: string): boolean {
+    const sinParametros = url.split('?')[0].toLowerCase();
 
-    return texto.charAt(0).toUpperCase() + texto.slice(1);
+    return /\.(jpg|jpeg|png|webp|gif)$/.test(sinParametros);
 }
 
-/** Lo que venga de la columna jsonb, dicho como texto. */
-function textoDe(valor: unknown): string {
-    if (valor === null || valor === undefined || valor === '') {
-        return '—';
-    }
-
-    if (Array.isArray(valor)) {
-        return valor.length === 0 ? '—' : `${valor.length} ítem(s)`;
-    }
-
-    if (typeof valor === 'object') {
-        return 'Ver expediente';
-    }
-
-    return String(valor);
+function Dato({ etiqueta, valor }: { etiqueta: string; valor: string | null | undefined }) {
+    return (
+        <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">{etiqueta}</span>
+            <span className="text-right font-medium">{valor || '—'}</span>
+        </div>
+    );
 }

@@ -1,284 +1,330 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, ExternalLink, LoaderCircle, Save } from 'lucide-react';
-import { type FormEvent } from 'react';
-import { CampoPagos } from '@/components/panel/tramites/campo-pagos';
-import { CampoRequisito } from '@/components/panel/tramites/campo-requisito';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { FileText } from 'lucide-react';
+import type { FormEvent } from 'react';
+import {
+    FormularioDeposito,
+    ListaDepositos,
+    ResumenDepositos,
+} from '@/components/panel/tramites/depositos';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import { Textarea } from '@/components/ui/textarea';
 import { useArchivos } from '@/hooks/use-archivos';
+import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import type {
-    CatalogosCedulaPescador,
-    FormularioCorreccionTramite,
-    TramiteDetalle,
-} from '@/types/tramites';
+import type { PageProps } from '@/types';
+import type { FormularioEdicion, PagoDelTramite } from '@/types/tramites';
 
 /**
  * ============================================================================
- *  CORREGIR UN TRÁMITE EN CURSO
+ *  EDITAR EL BORRADOR DEL EXPEDIENTE
  * ============================================================================
  *
- * Lo que se equivoca de verdad en ventanilla: un monto mal anotado, un número
- * de transacción cambiado, un escaneo que salió ilegible.
+ * Esta pantalla solo se abre en PENDIENTE. Una vez enviado a revisión el
+ * expediente queda como se presentó: el recibo oficial ya salió con ese monto y
+ * quien aprueba firma sobre estos papeles. Ver App\Enums\EstadoTramite.
+ *
+ * Se puede cambiar todo lo que es DATO del expediente: los dos papeles, la
+ * asociación, el cupo en kilos y las observaciones. Y acá se cargan los
+ * depósitos.
  *
  * ----------------------------------------------------------------------------
- *  ESTA PANTALLA NO REPITE EL ALTA
+ *  EL RUBRO Y EL BENEFICIARIO NO SE TOCAN
  * ----------------------------------------------------------------------------
  *
- * No están el solicitante, ni el servicio, ni el nombre, ni el domicilio, ni el
- * N° de registro. No es que falten: es que corregir esas cosas acá sería
- * corregirlas en el lugar equivocado.
+ * Cambiarlos no sería corregir este expediente sino convertirlo en otro:
  *
- *   - cambiar el solicitante o el servicio no es corregir un trámite, es otro
- *     trámite
- *   - nombre, cédula y domicilio son de la PERSONA y viven en su ficha; si se
- *     pudieran cambiar por trámite, la misma persona terminaría con datos
- *     distintos en cada credencial
- *   - el registro lo asigna el sistema, único; dejarlo editable sería devolver
- *     el problema que ese código vino a resolver
+ *   - el rubro define el COSTO, que ya se copió a `monto_requerido` y
+ *     posiblemente ya se cobró;
+ *   - el beneficiario define el CARNET del que cuelga el trámite, y con él la
+ *     gestión.
  *
- * Es la misma regla que sostiene el alta, y acá se sostiene igual.
+ * Por eso van arriba como datos de solo lectura, con el motivo escrito: que se
+ * vean pero no se editen es más claro que esconderlos y que el operador los
+ * busque. Si se pidió el rubro equivocado, lo que corresponde es eliminar el
+ * expediente y presentar uno nuevo.
  *
- * ----------------------------------------------------------------------------
- *  LOS PAPELES SON OPCIONALES ACÁ
- * ----------------------------------------------------------------------------
- *
- * En el alta son obligatorios porque no existe nada. Acá, no adjuntar nada
- * significa «dejá el que ya está», que es el caso normal: se corrige un monto y
- * no se vuelven a escanear los papeles. Cada uno muestra un enlace para abrir
- * el que está cargado, porque para decidir si hay que reemplazarlo primero hay
- * que poder mirarlo.
+ * Los dos adjuntos son OPCIONALES acá, a diferencia del alta: se reemplaza el
+ * que salió ilegible y el otro se deja como está.
  */
-interface Props {
-    tramite: TramiteDetalle;
-    catalogos: CatalogosCedulaPescador;
-}
+export default function EditarTramite({
+    tramite,
+    pagos,
+}: {
+    tramite: {
+        id: number;
+        rubro: string;
+        carnet_gestion: number;
+        beneficiario: string;
+        observaciones: string | null;
+        asociacion: string | null;
+        capacidad_kg: number | null;
+        ci_file_url: string | null;
+        cert_asociacion_file_url: string | null;
+        monto_requerido: number;
+        monto_pagado: number;
+        saldo_pendiente: number;
+        admite_pagos: boolean;
+    };
+    pagos: PagoDelTramite[];
+}) {
+    const { ayudaPeso } = useArchivos();
+    const { institucion } = usePage<PageProps>().props;
+    const { puede } = usePermisos();
 
-export default function EditarTramite({ tramite, catalogos }: Props) {
-    const archivos = useArchivos();
-
-    const esCedula = tramite.tipo.codigo === 'CAP';
-
-    const form = useForm<FormularioCorreccionTramite>({
-        asociacion: String(tramite.datos_adicionales.asociacion ?? ''),
-        capacidad_kg: String(tramite.datos_adicionales.capacidad_kg ?? ''),
+    const form = useForm<FormularioEdicion>({
+        ciFile: null,
+        certAsociacionFile: null,
+        asociacion: tramite.asociacion ?? '',
+        // A texto: el input lo devuelve así, y '' distingue «vacío» de cero.
+        capacidad_kg: tramite.capacidad_kg?.toString() ?? '',
         observaciones: tramite.observaciones ?? '',
-
-        certificacion_asociacion: null,
-        copia_ci: null,
-
-        /*
-         * Los pagos arrancan con los que ya están. `archivo_actual` lleva la
-         * ruta del comprobante guardado: si el operador solo corrige un monto,
-         * el pago conserva su papel sin tener que volver a adjuntarlo.
-         */
-        pagos: tramite.pagos.map((p) => ({
-            forma: p.forma ?? catalogos.formas_pago[0]?.value ?? 'transferencia',
-            nro_transaccion: p.nro_transaccion ?? '',
-            banco: p.banco ?? '',
-            monto: String(p.monto),
-            comprobante: null,
-            archivo_actual: p.archivo ?? '',
-            url_actual: p.url,
-        })),
+        // Campo oculto que convierte el POST en un PUT del lado de Laravel. Hace
+        // falta porque el formulario lleva archivos, y router.put() no los manda.
+        _method: 'put',
     });
-
-    const { data, setData, errors, processing } = form;
-
-    /*
-     * Un pago está completo si tiene monto, número —cuando la forma lo pide— y
-     * un comprobante: el que ya estaba o uno nuevo. Es la misma regla que
-     * comprueba el servidor; acá solo apaga el botón.
-     */
-    const pagosCompletos =
-        data.pagos.length > 0 &&
-        data.pagos.every((pago) => {
-            const forma = catalogos.formas_pago.find((f) => f.value === pago.forma);
-            const pideReferencia = forma?.requiere_referencia ?? true;
-
-            return (
-                (pago.comprobante !== null || Boolean(pago.archivo_actual)) &&
-                Number(pago.monto) > 0 &&
-                (!pideReferencia || pago.nro_transaccion.trim() !== '')
-            );
-        });
 
     function enviar(e: FormEvent) {
         e.preventDefault();
-
-        if (!pagosCompletos) {
-            return;
-        }
-
-        /*
-         * PUT es el verbo para reemplazar el registro, pero PHP no sabe leer
-         * archivos en una petición PUT: solo los procesa en POST. Se manda un
-         * POST con `_method: 'put'` y Laravel lo trata como PUT. Es el mismo
-         * truco que usa el formulario de solicitantes.
-         */
-        form.transform((datos) => ({ ...datos, _method: 'put' }));
         form.post(route('tramites.update', tramite.id), { forceFormData: true });
     }
 
     return (
         <LayoutPanel
-            titulo={`Corregir el trámite N° ${tramite.id}`}
-            descripcion={`${tramite.tipo.nombre} · ${tramite.solicitante.nombreCompleto}`}
-            acciones={
-                <Link href={route('tramites.show', tramite.id)}>
-                    <Button variant="outline">
-                        <ArrowLeft className="size-4" />
-                        Volver a la ficha
-                    </Button>
-                </Link>
-            }
+            titulo={`Editar trámite #${tramite.id}`}
+            descripcion={`${tramite.beneficiario} · ${tramite.rubro} · carnet ${tramite.carnet_gestion}`}
         >
-            <Head title={`Corregir el trámite N° ${tramite.id}`} />
+            <Head title={`Editar trámite #${tramite.id}`} />
 
-            <form onSubmit={enviar} className="max-w-3xl space-y-4">
-                {esCedula && (
+            {/*
+                DOS FORMULARIOS HERMANOS, NO UNO ADENTRO DEL OTRO.
+
+                Los papeles se guardan con un PUT al trámite; cada depósito se
+                guarda con un POST propio a `pagos.store`. Anidar formularios es
+                HTML inválido —el navegador cierra el de afuera al abrir el de
+                adentro— y ninguno de los dos enviaría bien.
+
+                Por eso el <div> envuelve y cada <form> es independiente: se puede
+                cargar un depósito sin guardar los papeles, y al revés.
+            */}
+            {/* Mismo ancho que el formulario de alta y que los de beneficiario:
+                max-w-7xl. Ver el comentario de pages/panel/tramites/crear.tsx
+                sobre por qué hay un tope y no ancho libre. */}
+            <div className="mx-auto max-w-7xl space-y-6">
+                {/*
+                    EL FORM LLEVA `id` PORQUE SU BOTÓN VIVE AFUERA.
+
+                    «Guardar cambios» está al final de la página, debajo de la
+                    tarjeta de depósitos, y esa tarjeta es OTRO formulario. Un
+                    <button type="submit"> suelto no pertenece a ningún form; el
+                    atributo `form` lo ata a este por id, que es la forma que el
+                    estándar HTML da para exactamente esto.
+                */}
+                <form id="form-tramite" onSubmit={enviar} className="space-y-6">
+                    {/*
+                        LO QUE NO SE PUEDE CAMBIAR, PERO SÍ SE VE.
+
+                        Mostrarlo en gris y explicar por qué es más claro que
+                        esconderlo: el operador confirma que está editando el
+                        expediente correcto y entiende de una por qué no hay
+                        dónde tocar el rubro.
+                    */}
                     <Card>
-                        <CardContent className="space-y-4 pt-6">
-                            <p className="text-sm font-semibold">Datos del servicio</p>
+                        <CardContent className="grid gap-3 pt-5 sm:grid-cols-3">
+                            <Fijo etiqueta="Beneficiario" valor={tramite.beneficiario} />
+                            <Fijo etiqueta="Rubro solicitado" valor={tramite.rubro} />
+                            <Fijo etiqueta="Gestión" valor={String(tramite.carnet_gestion)} />
 
+                            <p className="text-xs text-muted-foreground sm:col-span-3">
+                                El rubro y el beneficiario no se editan: cambiarlos sería
+                                otro trámite y no una corrección de este —el rubro define
+                                el costo ya cobrado, y el beneficiario, el carnet del que
+                                cuelga—. Si se pidió el rubro equivocado, elimine el
+                                expediente y presente uno nuevo.
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Datos del expediente</CardTitle>
+                        </CardHeader>
+
+                        <CardContent className="grid gap-4 sm:grid-cols-2">
                             <Campo
-                                etiqueta="Asociación"
+                                etiqueta="Asociación a la que pertenece"
                                 htmlFor="asociacion"
-                                error={errors.asociacion}
+                                error={form.errors.asociacion}
+                                ayuda="Tal como figura en el certificado. Se imprime en el carnet."
                             >
                                 <Input
                                     id="asociacion"
-                                    list="asociaciones-pesca"
-                                    value={data.asociacion}
-                                    onChange={(e) => setData('asociacion', e.target.value)}
-                                    placeholder="SOC. IBARE - MAMORÉ"
+                                    value={form.data.asociacion}
+                                    onChange={(e) => form.setData('asociacion', e.target.value)}
                                 />
-                                <datalist id="asociaciones-pesca">
-                                    {catalogos.asociaciones.map((a) => (
-                                        <option key={a} value={a} />
-                                    ))}
-                                </datalist>
                             </Campo>
 
                             <Campo
-                                etiqueta="Cupo autorizado (Kg)"
+                                etiqueta="Capacidad autorizada (Kg)"
                                 htmlFor="capacidad_kg"
-                                error={errors.capacidad_kg}
+                                error={form.errors.capacidad_kg}
+                                ayuda="Uso interno: no se imprime en el carnet."
                             >
                                 <Input
                                     id="capacidad_kg"
                                     type="number"
-                                    min="0"
-                                    value={data.capacidad_kg}
-                                    onChange={(e) => setData('capacidad_kg', e.target.value)}
-                                    placeholder="600"
-                                    className="sm:max-w-40"
+                                    step="0.01"
+                                    min="0.01"
+                                    value={form.data.capacidad_kg}
+                                    onChange={(e) => form.setData('capacidad_kg', e.target.value)}
                                 />
                             </Campo>
                         </CardContent>
                     </Card>
-                )}
 
-                <Card>
-                    <CardContent className="space-y-4 pt-6">
-                        <div className="space-y-1">
-                            <p className="text-sm font-semibold">Requisitos</p>
-                            <p className="text-xs text-muted-foreground">
-                                Adjunte un papel solo si hay que reemplazarlo. Lo que no se
-                                toque queda como está.
-                            </p>
-                        </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Respaldos</CardTitle>
+                        </CardHeader>
 
-                        {tramite.requisitos.map((r) => (
-                            <div key={r.campo} className="space-y-2">
-                                <CampoRequisito
-                                    id={r.campo}
-                                    etiqueta={r.etiqueta}
-                                    ayuda={`Solo si hay que reemplazarlo. PDF o foto, ${archivos.ayudaPeso}.`}
-                                    error={errors[r.campo as keyof typeof errors]}
-                                    archivo={
-                                        data[
-                                            r.campo as
-                                                | 'certificacion_asociacion'
-                                                | 'copia_ci'
-                                        ]
-                                    }
-                                    onCambio={(archivo) =>
-                                        setData(
-                                            r.campo as
-                                                | 'certificacion_asociacion'
-                                                | 'copia_ci',
-                                            archivo,
-                                        )
-                                    }
-                                />
-
-                                {/* Para decidir si hay que reemplazarlo, primero
-                                    hay que poder mirarlo. */}
-                                <a
-                                    href={r.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        <CardContent className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <Campo
+                                    etiqueta="Fotocopia de carnet de identidad"
+                                    htmlFor="ciFile"
+                                    ayuda={`Déjelo vacío para conservar el actual. PDF o imagen, ${ayudaPeso}.`}
                                 >
-                                    <ExternalLink className="size-3.5 shrink-0" />
-                                    Ver el que está cargado
-                                </a>
+                                    <SelectorArchivo
+                                        id="ciFile"
+                                        archivo={form.data.ciFile}
+                                        onElegir={(a) => form.setData('ciFile', a)}
+                                        error={form.errors.ciFile}
+                                    />
+                                </Campo>
+
+                                <EnlaceActual url={tramite.ci_file_url} />
                             </div>
-                        ))}
-                    </CardContent>
-                </Card>
 
+                            <div className="space-y-2">
+                                <Campo
+                                    etiqueta="Certificado de la asociación"
+                                    htmlFor="certAsociacionFile"
+                                    ayuda={`Déjelo vacío para conservar el actual. PDF o imagen, ${ayudaPeso}.`}
+                                >
+                                    <SelectorArchivo
+                                        id="certAsociacionFile"
+                                        archivo={form.data.certAsociacionFile}
+                                        onElegir={(a) => form.setData('certAsociacionFile', a)}
+                                        error={form.errors.certAsociacionFile}
+                                    />
+                                </Campo>
+
+                                <EnlaceActual url={tramite.cert_asociacion_file_url} />
+                            </div>
+
+                            <Campo
+                                etiqueta="Observaciones"
+                                htmlFor="observaciones"
+                                error={form.errors.observaciones}
+                                className="sm:col-span-2"
+                            >
+                                <Textarea
+                                    id="observaciones"
+                                    rows={3}
+                                    value={form.data.observaciones}
+                                    onChange={(e) => form.setData('observaciones', e.target.value)}
+                                />
+                            </Campo>
+                        </CardContent>
+                    </Card>
+
+                </form>
+
+                {/* ==================================================== Depósitos
+                    ACÁ es donde se cargan. La ficha del trámite los muestra pero
+                    no deja cargarlos: tenerlo en las dos pantallas hacía que no
+                    quedara claro cuál era el lugar. */}
                 <Card>
-                    <CardContent className="space-y-4 pt-6">
-                        <CampoPagos
-                            pagos={data.pagos}
-                            formas={catalogos.formas_pago}
-                            montoTasa={tramite.monto_total}
-                            errores={errors as unknown as Record<string, string>}
-                            onCambio={(pagos) => setData('pagos', pagos)}
+                    <CardHeader>
+                        <CardTitle>Depósitos</CardTitle>
+                    </CardHeader>
+
+                    <CardContent className="space-y-4">
+                        <ResumenDepositos
+                            montoRequerido={tramite.monto_requerido}
+                            montoPagado={tramite.monto_pagado}
+                            saldoPendiente={tramite.saldo_pendiente}
+                            moneda={institucion.moneda}
                         />
-                    </CardContent>
-                </Card>
 
-                <Card>
-                    <CardContent className="space-y-4 pt-6">
-                        <Campo
-                            etiqueta="Observaciones"
-                            htmlFor="observaciones"
-                            error={errors.observaciones}
-                            ayuda="Uso interno: no se imprime en el documento."
-                        >
-                            <Textarea
-                                id="observaciones"
-                                rows={3}
-                                value={data.observaciones}
-                                onChange={(e) => setData('observaciones', e.target.value)}
+                        <ListaDepositos
+                            pagos={pagos}
+                            moneda={institucion.moneda}
+                            vacio="Cargue las boletas acá abajo."
+                        />
+
+                        {tramite.admite_pagos && puede('pagos.registrar') && (
+                            <FormularioDeposito
+                                tramiteId={tramite.id}
+                                moneda={institucion.moneda}
                             />
-                        </Campo>
+                        )}
                     </CardContent>
                 </Card>
 
-                <div className="flex flex-wrap items-center justify-end gap-3">
-                    <Link href={route('tramites.show', tramite.id)}>
-                        <Button type="button" variant="ghost">
-                            Cancelar
-                        </Button>
-                    </Link>
+                {/*
+                    GUARDAR, AL FINAL DE TODO.
 
-                    <Button type="submit" disabled={processing || !pagosCompletos}>
-                        {processing ? (
-                            <LoaderCircle className="size-4 animate-spin" />
-                        ) : (
-                            <Save className="size-4" />
-                        )}
-                        Guardar correcciones
+                    Va acá y no entre las tarjetas porque el operador baja
+                    leyendo: primero los datos que no se tocan, después los que
+                    sí, los papeles, y por último los depósitos. El botón cierra
+                    ese recorrido.
+
+                    `form="form-tramite"` lo ata al formulario de arriba aunque
+                    esté fuera de él. Sin ese atributo no enviaría nada: entre el
+                    botón y su form está la tarjeta de depósitos, que es otro
+                    formulario, y anidarlos sería HTML inválido.
+
+                    Los depósitos tienen su propio botón adentro de su tarjeta:
+                    se registran de a uno y no dependen de este.
+                */}
+                <div className="flex justify-end border-t border-border pt-4">
+                    <Button type="submit" form="form-tramite" disabled={form.processing}>
+                        {form.processing ? 'Guardando…' : 'Guardar cambios'}
                     </Button>
                 </div>
-            </form>
+            </div>
         </LayoutPanel>
+    );
+}
+
+/** Un dato del expediente que se muestra pero no se edita. */
+function Fijo({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+    return (
+        <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</p>
+            <p className="font-medium">{valor}</p>
+        </div>
+    );
+}
+
+function EnlaceActual({ url }: { url: string | null }) {
+    if (!url) {
+        return <p className="text-xs text-muted-foreground">No hay archivo cargado.</p>;
+    }
+
+    return (
+        <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+        >
+            <FileText className="size-3.5" />
+            Ver el archivo actual
+        </a>
     );
 }

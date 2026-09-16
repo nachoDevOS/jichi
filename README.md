@@ -1,12 +1,27 @@
 # Jichi
 
-Sistema de recaudación, certificación y credenciales del **Gobierno Autónomo
+Sistema de gestión de **carnets, rubros y trámites** del **Gobierno Autónomo
 Departamental del Beni**, Bolivia.
 
-Gestiona el circuito completo de ventanilla: se recepciona un trámite, se cobra
-la tasa, se aprueba, se emite el documento en PDF con un código QR, y
-cualquier ciudadano puede verificar su autenticidad escaneando ese QR desde la
-calle, sin iniciar sesión.
+Gestiona el circuito completo de ventanilla: una persona pide que se le habilite
+una actividad, presenta sus papeles y sus depósitos, un supervisor aprueba, y el
+carnet queda habilitado para ese rubro. Cualquier inspector puede verificar su
+autenticidad escaneando el QR impreso, desde la calle y sin iniciar sesión.
+
+### La regla que ordena todo el sistema
+
+> **Una persona tiene como máximo UN carnet por gestión (año).**
+
+De ahí salen los dos únicos tipos de trámite, y el sistema los decide solo:
+
+| Situación de la persona | Tipo de trámite | Qué pasa |
+| --- | --- | --- |
+| No tiene carnet de este año | **Emisión inicial** | Se crea el carnet y se habilita el rubro pedido |
+| Ya tiene carnet de este año | **Adición de rubro** | Se reutiliza ese carnet y se le suma el rubro |
+
+El operador de ventanilla nunca elige el tipo: lo determina el servidor mirando
+la base, con la fila bloqueada, dentro de la misma transacción que registra el
+trámite. Ver `app/Services/SolicitudCarnetService.php`.
 
 ---
 
@@ -80,10 +95,16 @@ de qué puede hacer cada quién.
 
 | Rol | Qué hace |
 | --- | --- |
-| Administrador | Control total: configuración, usuarios, tarifas. |
-| Supervisor | Aprueba y rechaza trámites, supervisa la recaudación, exporta reportes. |
-| Operador de Ventanilla | Recepciona trámites, cobra, entrega documentos. |
-| Solo Lectura | Consulta e informes, sin modificar nada. |
+| Administrador | Control total: beneficiarios, trámites, pagos, carnets, rubros y configuración. |
+
+**Por ahora hay un solo rol, y es a propósito.** Supervisor, operador de
+ventanilla y solo-lectura se agregarán cuando la unidad defina quién firma qué;
+inventar roles que nadie usa solo obliga a mantenerlos.
+
+Lo que **sí** queda armado es la lista de permisos, y cada ruta exige el suyo
+(`->middleware('permiso:tramites.aprobar')`). Esa parte no se saca aunque hoy el
+único rol los tenga todos: el día que aparezca el segundo rol, se agrega un
+`case` al enum y las rutas ya están protegidas.
 
 ---
 
@@ -92,16 +113,19 @@ de qué puede hacer cada quién.
 **Funcionando:**
 
 - Inicio de sesión con bitácora de accesos (incluidos los intentos fallidos)
-- Panel principal con recaudación, gráficos y alertas de vencimiento
-- Módulo de Solicitantes completo (alta, edición, búsqueda, baja, foto)
-- Verificación pública de documentos por código QR
+- Panel principal con recaudación, carnets por rubro y aviso de cierre de gestión
+- **Beneficiarios** — alta, edición, búsqueda, baja lógica, fotografía
+- **Trámites** — el circuito completo: solicitud → aprobación → impresión → entrega
+- **Pagos** — uno o varios depósitos por trámite, con su boleta escaneada
+- **Carnets** — consulta, suspensión de un rubro suelto, anulación
+- **Rubros** — catálogo de actividades con su tarifa vigente
+- Verificación pública por código QR, protegida con firma de validación
 
-**Pendiente:** Trámites, Documentos, Reportes y Configuración. Aparecen en
-gris en el menú lateral. La lista de qué falta en cada uno está en
-[docs/PENDIENTES.md](docs/PENDIENTES.md).
+**Pendiente:** Reportes y Configuración. Aparecen en gris en el menú lateral. La
+lista de qué falta está en [docs/PENDIENTES.md](docs/PENDIENTES.md).
 
-El módulo **Solicitantes es la plantilla**: está comentado paso a paso para
-copiar su patrón en los otros cuatro.
+El módulo **Beneficiarios es la plantilla**: está comentado paso a paso para
+copiar su patrón en los que falten.
 
 ---
 

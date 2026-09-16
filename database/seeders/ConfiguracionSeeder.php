@@ -22,15 +22,19 @@ class ConfiguracionSeeder extends Seeder
 
             // Sistema
             ['sistema.nombre', 'Jichi', 'string', 'general', 'Nombre del sistema', true],
-            ['sistema.descripcion', 'Sistema de recaudación, certificación y credenciales del sector pesquero', 'string', 'general', 'Descripción', true],
+            ['sistema.descripcion', 'Sistema de gestión de carnets, rubros y trámites del sector pesquero', 'string', 'general', 'Descripción', true],
             ['sistema.logo_path', 'institucional/logo-jichi.png', 'archivo', 'general', 'Logo de Jichi', true],
             ['sistema.url_verificacion', 'https://jichi.soluciondigital.dev/verificar', 'string', 'general', 'URL base de verificación pública', true],
 
             // Documentos
             ['documentos.firmante_nombre', 'Lic. Responsable de Recaudaciones', 'string', 'documentos', 'Nombre del firmante', false],
             ['documentos.firmante_cargo', 'Jefe de Unidad de Recaudaciones', 'string', 'documentos', 'Cargo del firmante', false],
-            ['documentos.pie_legal', 'Documento emitido electrónicamente. Verifique su autenticidad escaneando el código QR.', 'string', 'documentos', 'Pie de página legal', true],
-            ['documentos.dias_alerta_vencimiento', '30', 'number', 'documentos', 'Días de anticipación para alertar vencimientos', false],
+            ['documentos.pie_legal', 'Carnet emitido electrónicamente. Verifique su autenticidad escaneando el código QR.', 'string', 'documentos', 'Pie de página legal', true],
+            // El «Lugar y Fecha» del RECIBO OFICIAL. Sale de acá y no escrito en
+            // la plantilla porque la misma unidad puede atender desde otra
+            // oficina, y entonces se cambia desde el panel.
+            ['documentos.lugar_emision', 'Trinidad - Beni', 'string', 'documentos', 'Lugar de emisión de recibos', false],
+            ['documentos.dias_alerta_vencimiento', '30', 'number', 'documentos', 'Días de anticipación para alertar el cierre de gestión', false],
 
             // Moneda. Vivía en el grupo 'caja'; cuando el arqueo se sacó del
             // sistema se mudó acá, porque la moneda es de todo el sistema y no

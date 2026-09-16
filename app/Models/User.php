@@ -4,11 +4,9 @@ namespace App\Models;
 
 use App\Enums\RolSistema;
 use App\Traits\Auditable;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -19,8 +17,18 @@ use Spatie\Permission\Traits\HasRoles;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use Auditable, HasFactory, HasRoles, Notifiable, SoftDeletes;
+    /*
+     * NO LLEVA HasFactory, y su UserFactory se borró.
+     *
+     * Las cuentas del sistema no se generan al azar: las crea el administrador
+     * desde el panel, y la única que se siembra —admin@admin.com— la escribe
+     * UsuarioSeeder con `updateOrCreate`. El único que usaba `User::factory()`
+     * era el juego de pruebas, que se eliminó el 14/09/2026.
+     *
+     * `Beneficiario` sí conserva la suya: DemoSeeder la usa para poblar el
+     * padrón de prueba.
+     */
+    use Auditable, HasRoles, Notifiable, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.

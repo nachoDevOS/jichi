@@ -16,12 +16,12 @@ import { inicializarApariencia } from '@/hooks/use-apariencia';
  *
  * EL RECORRIDO COMPLETO, DE PRINCIPIO A FIN
  *
- *   1. El navegador pide /solicitantes
- *   2. Laravel atiende con SolicitanteController@index
- *   3. El controlador devuelve Inertia::render('solicitantes/index', [...])
+ *   1. El navegador pide /panel/beneficiarios
+ *   2. Laravel atiende con BeneficiarioController@index
+ *   3. El controlador devuelve Inertia::render('panel/beneficiarios/index', [...])
  *   4. Laravel pinta resources/views/app.blade.php, que carga ESTE archivo
- *   5. Inertia lee el nombre 'solicitantes/index' y llama a resolve()
- *   6. resolve() carga resources/js/pages/solicitantes/index.tsx
+ *   5. Inertia lee el nombre 'panel/beneficiarios/index' y llama a resolve()
+ *   6. resolve() carga resources/js/pages/panel/beneficiarios/index.tsx
  *   7. React lo dibuja dentro del <div id="app"> del Blade
  *
  * A partir de ahí, al navegar dentro del sistema los pasos 4 a 7 se repiten
@@ -46,7 +46,7 @@ const nombreApp = import.meta.env.VITE_APP_NAME || 'Jichi';
 const paginas = import.meta.glob<{ default: ComponentType<any> }>('./pages/**/*.tsx');
 
 createInertiaApp({
-    // Título de la pestaña: "Solicitantes — Jichi".
+    // Título de la pestaña: "Beneficiarios — Jichi".
     title: (titulo) => (titulo ? `${titulo} — ${nombreApp}` : nombreApp),
 
     // Traduce el nombre que mandó PHP al archivo que le corresponde.

@@ -1,0 +1,77 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Models\Beneficiario;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * @extends Factory<Beneficiario>
+ */
+class BeneficiarioFactory extends Factory
+{
+    protected $model = Beneficiario::class;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $genero = fake()->randomElement(['masculino', 'femenino']);
+
+        return [
+            /*
+             * La cédula se arma con unique() y no con un número al azar.
+             *
+             * La tabla tiene un índice único parcial sobre (ci_nit,
+             * complemento): dos números repetidos en una tanda de 40 haría
+             * fallar el seeder con un error de base de datos, y con números al
+             * azar de 7 dígitos la repetición es más probable de lo que parece.
+             */
+            'ci_nit' => (string) fake()->unique()->numberBetween(1000000, 9999999),
+            // En mayúscula, igual que lo guarda el formulario: el complemento se
+            // normaliza en GuardarBeneficiarioRequest::prepareForValidation(), y
+            // la factory no pasa por ahí. Sin el strtoupper, los datos sembrados
+            // muestran «8112684-8z» donde el sistema real muestra «8112684-8Z».
+            'complemento' => fake()->boolean(15) ? strtoupper(fake()->bothify('#?')) : null,
+            'expedido' => fake()->randomElement(array_keys(config('jichi.expedido'))),
+
+            'primerNombre' => fake()->firstName($genero === 'masculino' ? 'male' : 'female'),
+            // Mucha gente no tiene segundo nombre: se refleja en los datos de
+            // prueba para que las pantallas se vean con y sin él.
+            'segundoNombre' => fake()->boolean(60) ? fake()->firstName() : null,
+            'apellidoPaterno' => fake()->lastName(),
+            'apellidoMaterno' => fake()->boolean(80) ? fake()->lastName() : null,
+            'apellidoCasado' => null,
+
+            'fechaNacimiento' => fake()->dateTimeBetween('-70 years', '-18 years')->format('Y-m-d'),
+            'genero' => $genero,
+            'nacionalidad' => 'Boliviana',
+
+            'direccion' => fake()->streetAddress(),
+            'ciudad' => fake()->randomElement(['Trinidad', 'Riberalta', 'Guayaramerín', 'San Borja', 'Rurrenabaque']),
+            'provincia' => fake()->randomElement(config('jichi.provincias')),
+            'telefono' => fake()->numerify('7#######'),
+            'email' => fake()->boolean(40) ? fake()->safeEmail() : null,
+            'foto' => null,
+        ];
+    }
+
+    /**
+     * Una mujer casada, con el apellido del esposo.
+     *
+     * Existe como estado propio porque el apellido de casada cambia cómo se arma
+     * `nombreCompleto` —le agrega el «de»— y hay que poder ver esa variante en
+     * las pantallas sin depender de la suerte.
+     */
+    public function casada(): static
+    {
+        return $this->state(fn (): array => [
+            'genero' => 'femenino',
+            'primerNombre' => fake()->firstName('female'),
+            // Se guarda SIN el «de»: lo agrega el modelo al armar el nombre. Ver
+            // Beneficiario::nombreCompleto().
+            'apellidoCasado' => fake()->lastName(),
+        ]);
+    }
+}

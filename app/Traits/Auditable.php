@@ -16,6 +16,29 @@ use Illuminate\Support\Facades\Auth;
  */
 trait Auditable
 {
+    /**
+     * ========================================================================
+     *  EL PORQUÉ DEL PRÓXIMO MOVIMIENTO
+     * ========================================================================
+     *
+     * Los eventos automáticos de abajo registran QUÉ cambió, pero no POR QUÉ. En
+     * casi todos los casos alcanza; en los que son decisiones —eliminar un
+     * expediente, anular un carnet— el motivo es lo único que sirve después.
+     *
+     * Quien va a hacer la operación deja el motivo acá antes:
+     *
+     *     $tramite->motivoAuditoria = $motivo;
+     *     $tramite->delete();
+     *
+     * y la fila de `auditorias` sale con su descripción. Sin esto habría que
+     * escribir una segunda fila a mano, y quedarían dos registros del mismo
+     * hecho: uno con el dato y otro con la explicación.
+     *
+     * ES ESPECIALMENTE ÚTIL AL BORRAR. Después del delete la fila ya no existe:
+     * si el motivo no viajó con el evento, no hay dónde colgarlo.
+     */
+    public ?string $motivoAuditoria = null;
+
     public static function bootAuditable(): void
     {
         static::created(fn (Model $modelo) => $modelo->registrarAuditoria('creado'));
@@ -64,6 +87,10 @@ trait Auditable
     public function registrarAuditoria(string $evento, ?array $cambios = null, ?string $descripcion = null): void
     {
         $nuevos = $cambios ?? array_diff_key($this->attributesToArray(), array_flip($this->columnasNoAuditables()));
+
+        // El motivo dejado por quien hizo la operación, si no se pasó uno
+        // explícito. Ver $motivoAuditoria.
+        $descripcion ??= $this->motivoAuditoria;
 
         Auditoria::create([
             'user_id' => Auth::id(),

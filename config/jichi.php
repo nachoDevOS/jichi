@@ -71,7 +71,7 @@ return [
     | Las ocho provincias del Beni.
     |
     | Viven acá y no en cada formulario porque las piden dos pantallas —la
-    | ficha del solicitante y la cédula de pescador— y tenían que decir lo
+    | ficha del beneficiario y el formulario de trámite— y tenían que decir lo
     | mismo. Escritas dos veces, tarde o temprano una se queda sin actualizar.
     */
     'provincias' => [
@@ -119,6 +119,19 @@ return [
         */
         'extensiones_imagen' => ['jpg', 'jpeg', 'png', 'webp'],
         'mimes_imagen' => 'image/jpeg,image/png,image/webp',
+
+        /*
+        | NO HAY `prefijo_s3` ACÁ, Y SE SACÓ A PROPÓSITO.
+        |
+        | La carpeta raíz dentro del bucket sale de AWS_ROOT, pero la aplica el
+        | disco: config/filesystems.php declara `'root' => env('AWS_ROOT')` y
+        | Flysystem la antepone solo en cada operación.
+        |
+        | Antes existía además esta clave y StorageController la pegaba a mano al
+        | armar la dirección. Eso significaba que la misma carpeta se agregaba dos
+        | veces —`dev/dev/tramites/...`— y bastaba con que alguien mirara el
+        | bucket para no entender nada. Una sola fuente, la del disco.
+        */
     ],
 
 ];

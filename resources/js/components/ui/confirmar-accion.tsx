@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 
 /**
  * Ventana de confirmación para acciones que no se pueden deshacer:
- * dar de baja un solicitante, anular un pago, anular un documento.
+ * dar de baja un beneficiario, anular un carnet, suspender un rubro.
  *
  * POR QUÉ NO SE USA window.confirm()
  *
@@ -21,10 +21,10 @@ import { Button } from '@/components/ui/button';
  *
  *   <ConfirmarAccion
  *       abierto={confirmar}
- *       titulo="¿Dar de baja al solicitante?"
+ *       titulo="¿Dar de baja al beneficiario?"
  *       descripcion="Dejará de aparecer en los listados."
  *       onCancelar={() => setConfirmar(false)}
- *       onConfirmar={() => router.delete(route('solicitantes.destroy', id))}
+ *       onConfirmar={() => router.delete(route('beneficiarios.destroy', id))}
  *   />
  */
 export function ConfirmarAccion({

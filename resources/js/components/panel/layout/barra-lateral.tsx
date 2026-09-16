@@ -1,24 +1,37 @@
-import { Link, router, usePage } from '@inertiajs/react';
-import { LogOut, X } from 'lucide-react';
-import { MarcaJichi } from '@/components/comunes/logo-jichi';
-import { NAVEGACION, type ItemNavegacion } from '@/components/panel/layout/navegacion';
-import { ToggleApariencia } from '@/components/comunes/toggle-apariencia';
-import { cn, iniciales } from '@/lib/utils';
+import { Link, usePage } from '@inertiajs/react';
+import { ChevronsLeft, ChevronsRight, X } from 'lucide-react';
+import { Fragment } from 'react';
+import { LogoJichi, MarcaJichi } from '@/components/comunes/logo-jichi';
+import { moduloActual, NAVEGACION, type ItemNavegacion } from '@/components/panel/layout/navegacion';
+import { cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
 /**
- * Barra lateral azul institucional: marca, menú, usuario y salida.
+ * Barra lateral azul institucional: la marca arriba y el menú debajo.
  *
- * En pantallas grandes está siempre visible. En celular se esconde fuera de la
- * pantalla y entra deslizándose cuando se toca el botón del menú; por eso
- * recibe `abierto` y `onCerrar` desde el layout, que es quien guarda ese estado.
+ * ----------------------------------------------------------------------------
+ *  TRES ESTADOS, NO DOS
+ * ----------------------------------------------------------------------------
+ *
+ * En pantallas grandes está siempre visible y puede estar ANCHA —icono más
+ * texto— o ANGOSTA —solo los iconos—. En celular no existe ninguno de los dos:
+ * está fuera de la pantalla y entra deslizándose, y ahí siempre va ancha,
+ * porque un menú de iconos sueltos en un teléfono no se entiende.
+ *
+ * Por eso recibe `abierto` (celular) y `angosto` (escritorio) por separado, y
+ * los dos los guarda el layout: el botón que los cambia vive en el encabezado,
+ * que es otro componente.
  */
 export function BarraLateral({
     abierto,
+    angosto,
     onCerrar,
+    onAlternarAngosto,
 }: {
     abierto: boolean;
+    angosto: boolean;
     onCerrar: () => void;
+    onAlternarAngosto: () => void;
 }) {
     /*
      * usePage() da acceso a las props COMPARTIDAS: las que el middleware
@@ -38,20 +51,39 @@ export function BarraLateral({
     const rutaExiste = (nombre: string) =>
         Boolean((ziggy?.routes as Record<string, unknown>)?.[nombre]);
 
-    // Marca el ítem activo comparando la URL actual con el prefijo de la ruta:
-    // 'solicitantes.index' -> 'solicitantes' -> ¿la URL contiene 'solicitantes'?
-    const esRutaActual = (nombre: string) =>
-        ziggy?.location?.includes(nombre.split('.')[0] ?? '');
+    // Cuál es el módulo abierto. El cálculo vive en navegacion.ts porque las
+    // migas de pan del encabezado necesitan exactamente el mismo.
+    const actual = moduloActual(ziggy?.location);
 
     return (
         <aside
             className={cn(
-                'fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform lg:translate-x-0',
+                'fixed inset-y-0 left-0 z-40 flex flex-col bg-sidebar text-sidebar-foreground transition-[transform,width] duration-200 lg:translate-x-0',
+                // En celular la barra va SIEMPRE ancha: `angosto` es una
+                // decisión de escritorio y acá solo estorbaría.
+                angosto ? 'w-64 lg:w-16' : 'w-64',
                 abierto ? 'translate-x-0' : '-translate-x-full',
             )}
         >
-            <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
-                <MarcaJichi sigla={institucion?.sigla} />
+            {/*
+                La franja de la marca mide lo mismo que el encabezado (h-14) y va
+                un tono más oscura: así las dos barras arrancan a la misma altura
+                y la esquina superior izquierda se lee como una sola pieza.
+            */}
+            <div className="flex h-14 shrink-0 items-center justify-between bg-black/15 px-4">
+                {/* Angosta queda solo el escudo; el nombre no entra en 64 px. */}
+                <span className={cn(angosto && 'lg:hidden')}>
+                    <MarcaJichi sigla={institucion?.sigla} />
+                </span>
+
+                <span
+                    className={cn(
+                        'hidden size-8 items-center justify-center rounded-md bg-white p-0.5',
+                        angosto && 'lg:flex',
+                    )}
+                >
+                    <LogoJichi className="size-full" />
+                </span>
 
                 <button
                     type="button"
@@ -63,44 +95,100 @@ export function BarraLateral({
                 </button>
             </div>
 
-            <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-                {items.map((item) => (
-                    <ItemMenu
-                        key={item.ruta}
-                        item={item}
-                        habilitado={rutaExiste(item.ruta)}
-                        activo={Boolean(esRutaActual(item.ruta))}
-                    />
+            <nav className="flex-1 overflow-x-hidden overflow-y-auto py-2">
+                {items.map((item, i) => (
+                    // Fragment porque cada vuelta puede dibujar DOS cosas —el
+                    // rótulo del grupo y el ítem— y JSX no deja devolver dos
+                    // elementos sueltos desde un map.
+                    <Fragment key={item.ruta}>
+                        {/*
+                            El rótulo se dibuja solo cuando el grupo cambia
+                            respecto del ítem anterior. Así la lista de arriba es
+                            la única fuente: no hay una lista de grupos aparte que
+                            se pueda desincronizar.
+                        */}
+                        {item.grupo && item.grupo !== items[i - 1]?.grupo && (
+                            <RotuloGrupo titulo={item.grupo} angosto={angosto} />
+                        )}
+
+                        <ItemMenu
+                            item={item}
+                            habilitado={rutaExiste(item.ruta)}
+                            activo={actual?.ruta === item.ruta}
+                            angosto={angosto}
+                        />
+                    </Fragment>
                 ))}
             </nav>
 
-            <PiePerfil nombre={auth.user?.name ?? ''} cargo={auth.user?.cargo ?? null} />
+            <PieBarra angosto={angosto} onAlternarAngosto={onAlternarAngosto} />
         </aside>
     );
 }
 
 /**
+ * El rótulo de una sección: «Ventanilla», «Registro», «Administración».
+ *
+ * Angosta la barra, el texto no entra, pero el grupo sigue existiendo: se
+ * reemplaza por una línea divisoria para que los iconos no queden como una
+ * columna continua sin ninguna agrupación.
+ */
+function RotuloGrupo({ titulo, angosto }: { titulo: string; angosto: boolean }) {
+    return (
+        <>
+            <p
+                className={cn(
+                    'px-4 pt-5 pb-1.5 text-[11px] font-semibold tracking-wider uppercase opacity-50',
+                    angosto && 'lg:hidden',
+                )}
+            >
+                {titulo}
+            </p>
+
+            <hr
+                aria-hidden
+                className={cn('mx-3 my-3 hidden border-sidebar-border', angosto && 'lg:block')}
+            />
+        </>
+    );
+}
+
+/**
  * Un renglón del menú. Si el módulo todavía no existe se dibuja apagado.
+ *
+ * LA FILA VA A TODO EL ANCHO y sin esquinas redondeadas, y el ítem activo se
+ * marca con una barra dorada pegada al borde izquierdo. Es lo que hace que la
+ * columna se lea como una lista y no como una pila de botones sueltos: la marca
+ * está siempre en la misma coordenada, así que el ojo la encuentra sin buscar.
  */
 function ItemMenu({
     item,
     habilitado,
     activo,
+    angosto,
 }: {
     item: ItemNavegacion;
     habilitado: boolean;
     activo: boolean;
+    angosto: boolean;
 }) {
     const Icono = item.icono;
+
+    // Angosta la barra el texto desaparece, así que el nombre pasa al globito
+    // del navegador. Sin esto quedan ocho iconos sin ninguna forma de saber
+    // cuál es cuál.
+    const rotulo = angosto ? item.titulo : undefined;
+
+    const base = 'flex items-center gap-3 border-l-[3px] px-4 py-2.5 text-sm font-medium';
 
     if (!habilitado) {
         return (
             <span
-                title="Módulo aún no habilitado"
-                className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium opacity-40"
+                title={rotulo ? `${item.titulo} — aún no habilitado` : 'Módulo aún no habilitado'}
+                className={cn(base, 'cursor-not-allowed border-transparent opacity-40')}
             >
                 <Icono className="size-4 shrink-0" />
-                {item.titulo}
+                <span className={cn('truncate', angosto && 'lg:hidden')}>{item.titulo}</span>
             </span>
         );
     }
@@ -111,54 +199,47 @@ function ItemMenu({
             // ruta de Laravel en su URL. Si mañana la URL cambia en
             // routes/panel.php, acá no hay que tocar nada.
             href={route(item.ruta)}
+            title={rotulo}
+            aria-current={activo ? 'page' : undefined}
             className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                base,
+                'transition-colors',
                 activo
-                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                    : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    ? 'border-sidebar-primary bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'border-transparent opacity-80 hover:bg-sidebar-accent hover:opacity-100',
             )}
         >
             <Icono className="size-4 shrink-0" />
-            {item.titulo}
+            <span className={cn('truncate', angosto && 'lg:hidden')}>{item.titulo}</span>
         </Link>
     );
 }
 
 /**
- * Pie de la barra: quién está conectado, el selector de tema y el botón salir.
+ * Pie de la barra: el botón que la angosta, y nada más.
+ *
+ * QUIÉN ESTÁ CONECTADO NO VA ACÁ, va en el encabezado. Es a propósito: angosta
+ * la barra mide 64 px y ahí no entra un nombre, así que el dato desaparecería
+ * justo en la configuración en la que el operador ya no ve los rótulos del menú
+ * y más necesita saber con qué sesión está trabajando. El encabezado, en
+ * cambio, mide siempre lo mismo.
  */
-function PiePerfil({ nombre, cargo }: { nombre: string; cargo: string | null }) {
+function PieBarra({
+    angosto,
+    onAlternarAngosto,
+}: {
+    angosto: boolean;
+    onAlternarAngosto: () => void;
+}) {
     return (
-        <div className="border-t border-sidebar-border p-3">
-            <div className="mb-3 flex items-center gap-3 px-1">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-                    {iniciales(nombre)}
-                </div>
-
-                <div className="min-w-0 leading-tight">
-                    <p className="truncate text-sm font-medium">{nombre}</p>
-                    <p className="truncate text-xs opacity-70">{cargo}</p>
-                </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-                <ToggleApariencia />
-
-                {/*
-                    Cerrar sesión tiene que ser POST, no un enlace GET. Si fuera
-                    un enlace, cualquier sitio externo podría hacer que el
-                    navegador lo visite y cerrarte la sesión sin querer. Además
-                    router.post() adjunta el token CSRF automáticamente.
-                */}
-                <button
-                    type="button"
-                    onClick={() => router.post(route('logout'))}
-                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-sidebar-accent"
-                >
-                    <LogOut className="size-4" />
-                    Salir
-                </button>
-            </div>
-        </div>
+        <button
+            type="button"
+            onClick={onAlternarAngosto}
+            aria-label={angosto ? 'Ensanchar el menú' : 'Angostar el menú'}
+            className="hidden shrink-0 items-center justify-center gap-2 bg-black/15 py-3 text-xs font-medium opacity-60 transition-opacity hover:opacity-100 lg:flex"
+        >
+            {angosto ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+            <span className={cn(angosto && 'lg:hidden')}>Angostar</span>
+        </button>
     );
 }

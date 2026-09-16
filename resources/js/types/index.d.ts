@@ -8,9 +8,13 @@ import type { Config as ZiggyConfig } from 'ziggy-js';
  * Acá va SOLO lo que usan varias pantallas a la vez. Lo que pertenece a un
  * módulo concreto vive en su propio archivo:
  *
- *   types/index.d.ts       <- este archivo: lo común
- *   types/dashboard.ts     <- tipos del panel principal
- *   types/solicitantes.ts  <- tipos del módulo Solicitantes
+ *   types/index.d.ts        <- este archivo: lo común
+ *   types/dashboard.ts      <- tipos del panel principal
+ *   types/beneficiarios.ts  <- tipos del módulo Beneficiarios
+ *   types/tramites.ts       <- tipos del módulo Trámites
+ *   types/carnets.ts        <- tipos del módulo Carnets
+ *   types/rubros.ts         <- tipos del catálogo de rubros
+ *   types/pagos.ts          <- tipos del libro de caja
  *
  * ¿Para qué sirven los tipos? Describen la forma exacta de los datos que
  * manda Laravel. Si en PHP se renombra una clave y acá no, el editor lo marca
@@ -30,9 +34,9 @@ export interface Usuario {
     name: string;
     email: string;
     cargo: string | null;
-    /** Nombres de rol: 'administrador', 'supervisor', 'operador', 'solo_lectura'. */
+    /** Nombres de rol. Por ahora el sistema tiene uno solo: 'administrador'. */
     roles: string[];
-    /** Permisos ya expandidos: 'solicitantes.crear', 'pagos.registrar'... */
+    /** Permisos ya expandidos: 'beneficiarios.crear', 'pagos.registrar'... */
     permisos: string[];
 }
 
@@ -98,8 +102,8 @@ export interface PageProps {
  *
  * <T> es un "genérico": el tipo de las filas se indica al usarlo.
  *
- *   Paginado<SolicitanteFila>  -> data es SolicitanteFila[]
- *   Paginado<PagoFila>         -> data es PagoFila[]
+ *   Paginado<BeneficiarioFila>  -> data es BeneficiarioFila[]
+ *   Paginado<PagoFila>          -> data es PagoFila[]
  *
  * Así el componente de paginación sirve para cualquier listado sin perder la
  * verificación de tipos de las filas.
@@ -128,17 +132,46 @@ export interface Paginado<T> {
 /**
  * Espejo de App\Enums\EstadoTramite.
  *
- * Son cuatro y no seis: «recibido» y «emitido» se retiraron. Todo trámite nace
- * en revisión, y que el documento esté impreso se sabe mirando si existe el
- * documento, no por el estado del trámite.
+ *     pendiente ──▶ en_revision ──▶ aprobado
+ *         │              │
+ *         └──────────────┴─────────▶ rechazado
+ *
+ * Son CUATRO y no seis: «generado» y «entregado» no son estados sino hechos con
+ * fecha, y viven en las columnas `fecha_generacion` y `fecha_entrega`. Un estado
+ * obliga a mantener sincronizadas dos cosas que pueden discrepar; una fecha en
+ * NULL dice «todavía no pasó» sin posibilidad de contradicción.
+ *
+ * Qué salto vale desde dónde NO se decide acá: lo dice el enum de PHP, y llega a
+ * la pantalla como los campos `puede_*` de la ficha.
  */
-export type EstadoTramite = 'en_revision' | 'aprobado' | 'entregado' | 'rechazado';
+export type EstadoTramite = 'pendiente' | 'en_revision' | 'aprobado' | 'rechazado';
 
-/** Espejo de App\Enums\EstadoDocumento. */
-export type EstadoDocumento = 'vigente' | 'vencido' | 'anulado';
+/**
+ * Espejo de App\Enums\TipoTramite.
+ *
+ * No lo elige el operador: lo decide el sistema según la persona ya tenga o no
+ * carnet de la gestión en curso.
+ */
+export type TipoTramite = 'emision_inicial' | 'adicion_rubro';
 
-/** Espejo de App\Enums\FormaPago. */
-export type FormaPago = 'efectivo' | 'qr' | 'transferencia';
+/** Espejo de App\Enums\EstadoCarnet. */
+export type EstadoCarnet = 'vigente' | 'vencido' | 'anulado';
+
+/** Espejo de App\Enums\EstadoHabilitacion — el estado de un rubro EN un carnet. */
+export type EstadoHabilitacion = 'habilitado' | 'suspendido';
+
+/** Espejo de App\Enums\EstadoRubro. */
+export type EstadoRubro = 'activo' | 'inactivo';
+
+/**
+ * Una opción de catálogo tal como la devuelven los `::opciones()` de los enums
+ * de PHP. La usan los selectores de filtro de todos los listados.
+ */
+export interface OpcionEnum {
+    value: string;
+    label: string;
+    color: string;
+}
 
 /* ==========================================================================
    DECLARACIONES GLOBALES
@@ -148,7 +181,7 @@ declare global {
     /**
      * route() convierte el nombre de una ruta de Laravel en su URL:
      *
-     *   route('solicitantes.show', 42)  ->  '/solicitantes/42'
+     *   route('beneficiarios.show', 42)  ->  '/panel/beneficiarios/42'
      *
      * No hace falta importarla: la inyecta la directiva @routes de Ziggy en
      * resources/views/app.blade.php, y está disponible en cualquier archivo.

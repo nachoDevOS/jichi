@@ -2,158 +2,87 @@
 
 namespace Database\Seeders;
 
-use App\Enums\CategoriaDocumento;
-use App\Enums\EstadoDocumento;
-use App\Enums\EstadoTramite;
-use App\Enums\FormaPago;
-use App\Models\Documento;
-use App\Models\Pago;
-use App\Models\Solicitante;
-use App\Models\TipoTramite;
-use App\Models\Tramite;
-use App\Models\User;
-use App\Services\CorrelativoService;
-use App\Services\EmisionDocumentoService;
+use App\Models\Beneficiario;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 /**
- * Datos de prueba para desarrollo: solicitantes, trámites en todos los estados,
- * pagos y documentos emitidos. No debe ejecutarse en producción.
+ * ============================================================================
+ *  DATOS DE PRUEBA — no debe correr en producción
+ * ============================================================================
+ *
+ * Siembra ÚNICAMENTE el padrón: fichas de beneficiarios. Nada de carnets,
+ * trámites, pagos ni recibos.
+ *
+ * ----------------------------------------------------------------------------
+ *  POR QUÉ SOLO PERSONAS
+ * ----------------------------------------------------------------------------
+ *
+ * Este seeder llegó a fabricar también doce carnets con sus trámites, pagos y
+ * habilitaciones, siguiendo un guion de casos. Se sacó todo eso y conviene
+ * entender por qué, para no volver a agregarlo sin pensarlo:
+ *
+ *   1. ESCRIBÍA EL RESULTADO DE LAS REGLAS A MANO. No pasaba por
+ *      SolicitudCarnetService —que exige `UploadedFile` de verdad—, así que
+ *      copiaba lo que el servicio hace: qué tipo de trámite corresponde, cuándo
+ *      nace la fila en `carnet_rubro`, cómo se suman los pagos. Una copia de
+ *      reglas de negocio en un archivo que nadie mira al cambiarlas, y las
+ *      copias se quedan viejas.
+ *
+ *   2. FABRICABA DINERO Y DOCUMENTOS QUE NO EXISTEN. Los pagos venían con
+ *      números de transacción inventados y rutas de boletas que no apuntan a
+ *      ningún archivo —`pagos/demo/boleta-{uuid}.pdf`—, así que cada enlace
+ *      «Ver boleta» daba 404. Cuarenta y siete rutas así había en la base.
+ *
+ *   3. EL CIRCUITO SE PRUEBA MEJOR RECORRIÉNDOLO. Cargar una solicitud desde la
+ *      pantalla, cobrarla, tomarla para revisión y aprobarla toma dos minutos, y
+ *      pasa por las reglas de verdad —incluida la que exige los papeles
+ *      completos antes de revisar—. Un expediente sembrado a mano se salta
+ *      justamente lo que hay que probar.
+ *
+ * Lo que sí hace falta sembrado es el PADRÓN: tipear treinta personas a mano
+ * para probar el buscador, la paginación o el orden alfabético no prueba nada y
+ * cuesta una tarde.
+ *
+ * ----------------------------------------------------------------------------
+ *  LAS FICHAS NO TRAEN FOTOGRAFÍA
+ * ----------------------------------------------------------------------------
+ *
+ * `BeneficiarioFactory` deja `foto` en NULL, y es correcto: una foto de prueba
+ * sería un archivo falso más en `storage/app/public` que nadie limpia.
+ *
+ * Consecuencia a tener presente: un trámite cargado sobre una de estas fichas
+ * **no va a poder pasar a EN REVISIÓN** hasta que se le suba una fotografía
+ * desde la ficha del beneficiario. No es una falla del seeder — es la regla de
+ * `Tramite::faltantesParaRevision()` haciendo su trabajo, y probarla es parte de
+ * recorrer el circuito.
  */
 class DemoSeeder extends Seeder
 {
-    public function __construct(private readonly CorrelativoService $correlativos) {}
+    /**
+     * Cuántas fichas se siembran.
+     *
+     * Treinta alcanza para ver el padrón con varias páginas —el listado muestra
+     * quince por defecto— sin que buscar un caso concreto se vuelva incómodo.
+     */
+    private const FICHAS = 30;
+
+    /**
+     * Cuántas de esas llevan apellido de casada.
+     *
+     * No se dejan al azar: el apellido de casada cambia cómo se arma
+     * `nombreCompleto` —le agrega el «de»— y hay que poder ver esa variante en
+     * pantalla sin depender de la suerte. Ver Beneficiario::nombreCompleto().
+     */
+    private const CASADAS = 4;
 
     public function run(): void
     {
-        $operador = User::where('email', 'ventanilla1@beni.gob.bo')->firstOrFail();
-        $supervisor = User::where('email', 'supervisor@beni.gob.bo')->firstOrFail();
+        Beneficiario::factory(self::FICHAS - self::CASADAS)->create();
+        Beneficiario::factory(self::CASADAS)->casada()->create();
 
-        $solicitantes = Solicitante::factory(40)->create()
-            ->merge(Solicitante::factory(8)->casada()->create());
-
-        $tipos = TipoTramite::with('area')->get();
-
-        foreach (range(1, 60) as $i) {
-            $tipo = $tipos->random();
-            $solicitante = $solicitantes->random();
-            $monto = (float) $tipo->monto ?: 100.0;
-            $creado = now()->subDays(random_int(0, 45))->setTime(random_int(8, 17), random_int(0, 59));
-
-            $estado = $this->estadoPonderado();
-
-            $tramite = Tramite::create([
-                'solicitante_id' => $solicitante->id,
-                'tipo_tramite_id' => $tipo->id,
-                'user_id' => $operador->id,
-                'estado' => $estado,
-                'monto_total' => $monto,
-                'fecha_recepcion' => $creado,
-                'created_at' => $creado,
-                'updated_at' => $creado,
-            ]);
-
-            if ($estado === EstadoTramite::Rechazado) {
-                $tramite->update([
-                    'motivo_rechazo' => 'Documentación incompleta: falta certificado de afiliación.',
-                    'revisado_por' => $supervisor->id,
-                    'fecha_revision' => $creado->copy()->addHours(2),
-                ]);
-
-                continue;
-            }
-
-            // Todo trámite que pasó de la revisión ya fue cobrado en ventanilla.
-            if ($estado !== EstadoTramite::EnRevision) {
-                $forma = collect(FormaPago::cases())->random();
-
-                Pago::create([
-                    'nro_comprobante' => $this->correlativos->siguiente('PAG', (int) $creado->format('Y')),
-                    'tramite_id' => $tramite->id,
-                    'user_id' => $operador->id,
-                    'monto_bruto' => $monto,
-                    'descuento' => 0,
-                    'monto' => $monto,
-                    'forma_pago' => $forma,
-                    'referencia' => $forma->requiereReferencia() ? strtoupper(Str::random(10)) : null,
-                    'fecha_pago' => $creado->copy()->addMinutes(15),
-                    'estado' => 'pagado',
-                    'created_at' => $creado,
-                    'updated_at' => $creado,
-                ]);
-
-                $tramite->recalcularPagado();
-            }
-
-            /*
-             * El documento existe desde que se aprueba: emitirlo dejó de ser
-             * un estado del trámite y pasó a ser una fila en `documentos`.
-             */
-            if (in_array($estado, [EstadoTramite::Aprobado, EstadoTramite::Entregado], true)) {
-                $emision = $creado->copy()->addDay();
-                $vencimiento = $tipo->vigencia_dias
-                    ? $emision->copy()->addDays($tipo->vigencia_dias)
-                    : null;
-
-                Documento::create([
-                    'codigo_verificacion' => $this->codigoDePrueba(),
-                    'tramite_id' => $tramite->id,
-                    'tipo' => $tipo->categoria_documento ?? CategoriaDocumento::Permiso,
-                    'fecha_emision' => $emision->toDateString(),
-                    'fecha_vencimiento' => $vencimiento?->toDateString(),
-                    'estado' => $vencimiento && $vencimiento->isPast()
-                        ? EstadoDocumento::Vencido
-                        : EstadoDocumento::Vigente,
-                    'emitido_por' => $supervisor->id,
-                    'created_at' => $emision,
-                    'updated_at' => $emision,
-                ]);
-
-                $tramite->update([
-                    'aprobado_por' => $supervisor->id,
-                    'fecha_aprobacion' => $creado->copy()->addHours(6),
-                    'fecha_emision' => $emision,
-                    'fecha_entrega' => $estado === EstadoTramite::Entregado ? $emision->copy()->addDay() : null,
-                    'entregado_por' => $estado === EstadoTramite::Entregado ? $operador->id : null,
-                    'modo_entrega' => $estado === EstadoTramite::Entregado ? 'fisica' : null,
-                ]);
-            }
-        }
-
-    }
-
-    /**
-     * Un código de verificación con la misma forma que los de verdad.
-     *
-     * Sale del alfabeto y el largo que usa EmisionDocumentoService, y no de
-     * `Str::random()`, por dos motivos: los códigos reales no llevan I, O, 0
-     * ni 1 —se dictan por teléfono—, y el formulario público exige el largo
-     * exacto. Con códigos de prueba de otra forma, probar la pantalla pública
-     * con datos sembrados daría «el código no tiene 16 caracteres».
-     */
-    private function codigoDePrueba(): string
-    {
-        $alfabeto = EmisionDocumentoService::ALFABETO;
-        $codigo = '';
-
-        for ($i = 0; $i < EmisionDocumentoService::LARGO_CODIGO; $i++) {
-            $codigo .= $alfabeto[random_int(0, strlen($alfabeto) - 1)];
-        }
-
-        return $codigo;
-    }
-
-    /**
-     * Distribución realista: la mayoría de los trámites llegan a entregado.
-     */
-    private function estadoPonderado(): EstadoTramite
-    {
-        return match (random_int(1, 100)) {
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 => EstadoTramite::EnRevision,
-            16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 => EstadoTramite::Aprobado,
-            31, 32, 33, 34, 35 => EstadoTramite::Rechazado,
-            default => EstadoTramite::Entregado,
-        };
+        $this->command?->info(sprintf(
+            'Demo: %d beneficiarios sembrados. Los carnets y trámites se cargan desde el panel.',
+            Beneficiario::count(),
+        ));
     }
 }

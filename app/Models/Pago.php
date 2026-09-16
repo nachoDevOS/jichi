@@ -2,46 +2,50 @@
 
 namespace App\Models;
 
-use App\Enums\FormaPago;
+use App\Support\Archivos;
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Un depósito bancario aplicado a un trámite.
+ *
+ * ----------------------------------------------------------------------------
+ *  UNO A VARIOS, Y POR QUÉ
+ * ----------------------------------------------------------------------------
+ *
+ * El pescador puede depositar todo junto o en cuotas, y cada depósito llega con
+ * su propia boleta del banco. Un solo campo `monto_pagado` en el trámite
+ * obligaría a que el operador sumara a mano antes de escribir, y perdería el
+ * comprobante de cada parte: cuando alguien reclame, no habría forma de mostrar
+ * qué boleta respalda qué monto.
+ *
+ * NO SE ANULAN NI SE BORRAN. La tabla no tiene `estado` ni `deleted_at` a
+ * propósito: una boleta cargada mal se corrige editando la fila, y el trait
+ * Auditable deja registrado el valor anterior, quién lo cambió y cuándo. Un
+ * pago «anulado» que sigue en la lista solo invita a sumarlo por error.
+ */
+#[Appends(['comprobante_url'])]
 #[Fillable([
-    'nro_comprobante',
     'tramite_id',
-    'user_id',
-    'monto_bruto',
-    'descuento',
+    'nro_transaccion',
     'monto',
-    'forma_pago',
-    'referencia',
-    'banco',
+    'urlFile',
     'fecha_pago',
-    'estado',
-    'pdf_path',
     'observaciones',
-    'anulado_por',
-    'anulado_at',
-    'motivo_anulacion',
 ])]
 class Pago extends Model
 {
-    use Auditable, HasFactory, SoftDeletes;
+    use Auditable;
 
     protected function casts(): array
     {
         return [
-            'monto_bruto' => 'decimal:2',
-            'descuento' => 'decimal:2',
             'monto' => 'decimal:2',
-            'forma_pago' => FormaPago::class,
             'fecha_pago' => 'datetime',
-            'anulado_at' => 'datetime',
         ];
     }
 
@@ -50,41 +54,15 @@ class Pago extends Model
         return $this->belongsTo(Tramite::class);
     }
 
-    public function cajero(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'user_id');
-    }
-
-    public function anuladoPor(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'anulado_por');
-    }
-
-    public function estaAnulado(): bool
-    {
-        return $this->estado === 'anulado';
-    }
-
-    /*
-     * Los scopes califican sus columnas porque los reportes cruzan pagos con
-     * tramites, y ambas tablas tienen `estado`.
+    /**
+     * La dirección para abrir la boleta escaneada.
+     *
+     * Pasa por Archivos::url() y no por Storage::url() porque la columna guarda
+     * una ruta cuando el disco es local y una dirección completa cuando es s3, y
+     * las dos formas conviven en la misma tabla.
      */
-
-    public function scopeVigentes(Builder $query): Builder
+    protected function comprobanteUrl(): Attribute
     {
-        return $query->where($query->qualifyColumn('estado'), 'pagado');
-    }
-
-    public function scopeEntreFechas(Builder $query, string $desde, string $hasta): Builder
-    {
-        return $query->whereBetween($query->qualifyColumn('fecha_pago'), [
-            $desde.' 00:00:00',
-            $hasta.' 23:59:59',
-        ]);
-    }
-
-    public function scopeDelDia(Builder $query, ?string $fecha = null): Builder
-    {
-        return $query->whereDate($query->qualifyColumn('fecha_pago'), $fecha ?? now()->toDateString());
+        return Attribute::get(fn (): ?string => Archivos::url($this->urlFile));
     }
 }

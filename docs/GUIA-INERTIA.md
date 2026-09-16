@@ -2,7 +2,7 @@
 
 Guía para quien sabe Laravel y Blade pero recién arranca con React.
 
-Todo lo que se explica acá está aplicado en el módulo **Solicitantes**, que es
+Todo lo que se explica acá está aplicado en el módulo **Beneficiarios**, que es
 la plantilla del sistema. Conviene leer esta guía con esos archivos al lado.
 
 ---
@@ -12,13 +12,13 @@ la plantilla del sistema. Conviene leer esta guía con esos archivos al lado.
 Con Blade el controlador pasa variables a una vista `.blade.php`:
 
 ```php
-return view('solicitantes.index', ['solicitantes' => $solicitantes]);
+return view('beneficiarios.index', ['beneficiarios' => $beneficiarios]);
 ```
 
 Con Inertia el controlador pasa variables a un componente `.tsx`:
 
 ```php
-return Inertia::render('panel/solicitantes/index', ['solicitantes' => $solicitantes]);
+return Inertia::render('panel/beneficiarios/index', ['beneficiarios' => $beneficiarios]);
 ```
 
 **Es la misma idea.** Cambia el motor que dibuja el HTML, nada más.
@@ -45,28 +45,28 @@ es justamente el sentido de Inertia.
 
 ## 2. El viaje completo de una petición
 
-Sigamos qué pasa cuando alguien entra a `/panel/solicitantes`.
+Sigamos qué pasa cuando alguien entra a `/panel/beneficiarios`.
 
 ```
  NAVEGADOR                LARAVEL                        REACT
      │
-     │  GET /panel/solicitantes
+     │  GET /panel/beneficiarios
      ├───────────────────────►
      │                    routes/panel.php
      │                    encuentra la ruta
      │                         │
-     │                    SolicitanteController@index
+     │                    BeneficiarioController@index
      │                    consulta la base con Eloquent
      │                         │
      │                    Inertia::render(
-     │                      'panel/solicitantes/index',
-     │                      ['solicitantes' => ...]
+     │                      'panel/beneficiarios/index',
+     │                      ['beneficiarios' => ...]
      │                    )
      │                         │
      │  ◄──────────────────────┤
      │   nombre de pantalla + datos
      │                                          resources/js/pages/
-     │                                          panel/solicitantes/index.tsx
+     │                                          panel/beneficiarios/index.tsx
      │                                          recibe los datos como props
      │                                                  │
      │  ◄───────────────────────────────────────────────┤
@@ -76,10 +76,10 @@ Sigamos qué pasa cuando alguien entra a `/panel/solicitantes`.
 **El paso clave es la traducción del nombre:**
 
 ```
-Inertia::render('panel/solicitantes/index')
+Inertia::render('panel/beneficiarios/index')
                  └──────────┬───────────┘
                             ▼
-    resources/js/pages/panel/solicitantes/index.tsx
+    resources/js/pages/panel/beneficiarios/index.tsx
 ```
 
 El texto es la ruta del archivo dentro de `resources/js/pages/`, sin `.tsx`.
@@ -93,31 +93,31 @@ automáticamente con `import.meta.glob`.
 El array que se pasa como segundo argumento **es** el objeto de props que llega
 a React. Clave por clave, con el mismo nombre.
 
-**En PHP** (`app/Http/Controllers/Panel/SolicitanteController.php`):
+**En PHP** (`app/Http/Controllers/Panel/BeneficiarioController.php`):
 
 ```php
-return Inertia::render('panel/solicitantes/index', [
-    'solicitantes' => $solicitantes,
+return Inertia::render('panel/beneficiarios/index', [
+    'beneficiarios' => $beneficiarios,
     'filtros'      => $filtros,
-    'tipos'        => TipoSolicitante::opciones(),
+    'tipos'        => EstadoRubro::opciones(),
 ]);
 ```
 
-**En React** (`resources/js/pages/panel/solicitantes/index.tsx`):
+**En React** (`resources/js/pages/panel/beneficiarios/index.tsx`):
 
 ```tsx
-export default function IndiceSolicitantes({ solicitantes, filtros, tipos }: Props) {
+export default function IndiceBeneficiarios({ beneficiarios, filtros, tipos }: Props) {
     // ...
 }
 ```
 
 Las llaves `{ }` alrededor de los nombres son **desestructuración**: en vez de
-recibir un objeto `props` y escribir `props.solicitantes`, se sacan las claves
+recibir un objeto `props` y escribir `props.beneficiarios`, se sacan las claves
 directo por su nombre. Es equivalente a esto, pero más corto:
 
 ```tsx
-export default function IndiceSolicitantes(props: Props) {
-    const solicitantes = props.solicitantes;
+export default function IndiceBeneficiarios(props: Props) {
+    const beneficiarios = props.beneficiarios;
     const filtros = props.filtros;
 }
 ```
@@ -153,7 +153,7 @@ const form = useForm({ nombres: '', apellidos: '' });
 
 function enviar(e) {
     e.preventDefault();                    // sin esto el navegador recarga
-    form.post(route('solicitantes.store'));
+    form.post(route('beneficiarios.store'));
 }
 
 <form onSubmit={enviar}>
@@ -182,8 +182,8 @@ Qué da `useForm`:
 
 No hay que escribir NADA para conectar la validación:
 
-1. El formulario hace POST a `/panel/solicitantes`
-2. Laravel ejecuta `GuardarSolicitanteRequest` antes del controlador
+1. El formulario hace POST a `/panel/beneficiarios`
+2. Laravel ejecuta `GuardarBeneficiarioRequest` antes del controlador
 3. Si falla, Laravel redirige de vuelta con los errores en la sesión
 4. Inertia los detecta y los deja en `form.errors`
 5. React los muestra
@@ -194,8 +194,8 @@ Es exactamente el `$errors` de Blade, con otro nombre.
 
 ```php
 return redirect()
-    ->route('solicitantes.show', $solicitante)
-    ->with('exito', 'Solicitante registrado correctamente.');
+    ->route('beneficiarios.show', $beneficiario)
+    ->with('exito', 'Beneficiario registrado correctamente.');
 ```
 
 Inertia espera un redirect, igual que un formulario de Blade. Devolver JSON
@@ -210,10 +210,10 @@ Laravel interpreta como PUT:
 
 ```tsx
 form.transform((datos) => ({ ...datos, _method: 'put' }));
-form.post(route('solicitantes.update', id), { forceFormData: true });
+form.post(route('beneficiarios.update', id), { forceFormData: true });
 ```
 
-Está aplicado en `components/panel/solicitantes/formulario-solicitante.tsx`.
+Está aplicado en `components/panel/beneficiarios/formulario-beneficiario.tsx`.
 
 ---
 
@@ -241,7 +241,7 @@ una etiqueta HTML común y no dibuja nada.
 Blade:
 
 ```blade
-@foreach ($solicitantes as $s)
+@foreach ($beneficiarios as $s)
     <tr><td>{{ $s->nombre_completo }}</td></tr>
 @endforeach
 ```
@@ -249,7 +249,7 @@ Blade:
 React:
 
 ```tsx
-{solicitantes.map((s) => (
+{beneficiarios.map((s) => (
     <tr key={s.id}><td>{s.nombre_completo}</td></tr>
 ))}
 ```
@@ -318,7 +318,7 @@ Se lee así:
 - **El `return`** es la limpieza. React lo llama ANTES de volver a correr el
   efecto y al desmontar el componente.
 
-Ese ejemplo es el buscador de solicitantes: cada tecla cancela el temporizador
+Ese ejemplo es el buscador de beneficiarios: cada tecla cancela el temporizador
 anterior y arranca uno nuevo, así que solo sobrevive el último. Sin eso, escribir
 "perez" dispararía cinco consultas a la base en vez de una.
 
@@ -333,7 +333,7 @@ Dentro del sistema **siempre** se usa `<Link>` de Inertia, nunca `<a>`:
 ```tsx
 import { Link } from '@inertiajs/react';
 
-<Link href={route('solicitantes.show', 42)}>Ver ficha</Link>
+<Link href={route('beneficiarios.show', 42)}>Ver ficha</Link>
 ```
 
 `<Link>` pide solo los datos nuevos y cambia el contenido sin recargar: no
@@ -344,7 +344,7 @@ Para acciones sin formulario se usa `router`:
 ```tsx
 import { router } from '@inertiajs/react';
 
-router.delete(route('solicitantes.destroy', 42));
+router.delete(route('beneficiarios.destroy', 42));
 router.post(route('logout'));
 ```
 
@@ -353,7 +353,7 @@ router.post(route('logout'));
 Convierte el nombre de la ruta de Laravel en su URL:
 
 ```tsx
-route('solicitantes.show', 42)   // '/panel/solicitantes/42'
+route('beneficiarios.show', 42)   // '/panel/beneficiarios/42'
 ```
 
 Es la misma función `route()` de Blade. La inyecta la directiva `@routes` en
@@ -367,50 +367,65 @@ importarla.
 
 ## 7. Agregar un módulo nuevo, paso a paso
 
-Ejemplo: el módulo de **Trámites**. Es exactamente el patrón de Solicitantes.
+Ejemplo: el módulo de **Reportes**. Es exactamente el patrón de Beneficiarios.
 
 ### Backend
 
-**1. El controlador** — `app/Http/Controllers/Panel/TramiteController.php`
+**1. El controlador** — `app/Http/Controllers/Panel/ReporteController.php`
 
-Copiar `SolicitanteController.php` y adaptar. Los métodos son siempre los mismos:
+Copiar `BeneficiarioController.php` y adaptar. Los métodos son siempre los mismos:
 `index`, `create`, `store`, `show`, `edit`, `update`, `destroy`.
 
-**2. La validación** — `app/Http/Requests/Panel/GuardarTramiteRequest.php`
+**2. La validación** — `app/Http/Requests/Panel/GuardarReporteRequest.php`
 
 **3. Las rutas** — en `routes/panel.php`, dentro del grupo que ya existe:
 
 ```php
-Route::middleware('permiso:tramites.ver')->group(function () {
-    Route::get('/tramites', [TramiteController::class, 'index'])
-        ->name('tramites.index');
+Route::middleware('permiso:reportes.ver')->group(function () {
+    Route::get('/reportes', [ReporteController::class, 'index'])
+        ->name('reportes.index');
 });
 ```
 
-> Acordate del orden: `/tramites/crear` ANTES que `/tramites/{tramite}`.
+> Acordate del orden: `/reportes/crear` ANTES que `/reportes/{reporte}`.
 
-Los permisos (`tramites.ver`, `tramites.crear`, ...) ya existen en
+Los permisos (`reportes.ver`, `reportes.exportar`, ...) ya existen en
 `app/Enums/RolSistema.php`. No hay que crearlos.
+
+### ¿Y si el módulo tiene reglas de negocio de verdad?
+
+Entonces NO van en el controlador, ni siquiera «por ahora». Van en un servicio
+de `app/Services/`, y el controlador se limita a traducir la petición, llamarlo
+y convertir el resultado en un `redirect()`.
+
+El ejemplo completo es `SolicitudCarnetService`: decide el tipo de trámite,
+crea el carnet si hace falta, registra el expediente y sus pagos, todo dentro de
+una transacción. El controlador que lo usa —`TramiteController::store()`— tiene
+quince líneas, y esa es la señal de que está bien repartido.
+
+El motivo es concreto: el mismo caso de uso lo necesitan el formulario del
+panel, un comando de consola y las pruebas automáticas. Escrito adentro del
+controlador, los otros dos tienen que copiarlo, y las copias se quedan viejas.
 
 ### Frontend
 
-**4. Los tipos** — `resources/js/types/tramites.ts`
+**4. Los tipos** — `resources/js/types/reportes.ts`
 
-**5. Las pantallas** — `resources/js/pages/panel/tramites/`
+**5. Las pantallas** — `resources/js/pages/panel/reportes/`
 
 ```
 index.tsx    crear.tsx    editar.tsx    ver.tsx
 ```
 
-**6. Los componentes** — `resources/js/components/panel/tramites/`
+**6. Los componentes** — `resources/js/components/panel/reportes/`
 
 ```
-tabla-tramites.tsx    filtros-tramites.tsx    formulario-tramite.tsx
+tabla-reportes.tsx    filtros-reportes.tsx    formulario-reporte.tsx
 ```
 
 ### Y ya está
 
-El ítem "Trámites" del menú lateral **se enciende solo**. Ya está declarado en
+El ítem "Reportes" del menú lateral **se enciende solo**. Ya está declarado en
 `components/panel/layout/navegacion.ts` y se muestra en gris únicamente porque
 la ruta todavía no existe. En cuanto se declare, pasa a ser un enlace.
 
@@ -433,7 +448,7 @@ Hay que llamarla antes de cambiar el estado de cualquier trámite.
 
 | Síntoma | Causa | Solución |
 | --- | --- | --- |
-| Página en blanco al navegar | El nombre de `Inertia::render()` no coincide con la ruta del archivo | Revisar que `'panel/solicitantes/index'` apunte a `pages/panel/solicitantes/index.tsx` |
+| Página en blanco al navegar | El nombre de `Inertia::render()` no coincide con la ruta del archivo | Revisar que `'panel/beneficiarios/index'` apunte a `pages/panel/beneficiarios/index.tsx` |
 | "A component is changing an uncontrolled input to be controlled" | Un campo del formulario empezó en `undefined` | Declarar TODOS los campos en `useForm({...})`, aunque sean `''` |
 | Warning `Each child should have a unique "key"` | Falta `key` en un `.map()` | Agregar `key={item.id}` |
 | Aparece un `0` suelto en la pantalla | `{cantidad && <p>}` con `cantidad = 0` | Escribir `{cantidad > 0 && <p>}` |

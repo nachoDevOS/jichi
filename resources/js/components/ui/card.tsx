@@ -38,9 +38,9 @@ export const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes
 );
 CardContent.displayName = 'CardContent';
 
-export const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-    ({ className, ...props }, ref) => (
-        <div ref={ref} className={cn('flex items-center p-5 pt-0', className)} {...props} />
-    ),
-);
-CardFooter.displayName = 'CardFooter';
+/*
+ * NO HAY `CardFooter`. Lo traía el juego original de shadcn y ninguna pantalla
+ * del sistema lo usó nunca: las tarjetas de acá terminan en su contenido, y los
+ * botones viven en la barra de acciones del layout, no al pie de cada tarjeta.
+ * Se quitó al limpiar código sin uso.
+ */

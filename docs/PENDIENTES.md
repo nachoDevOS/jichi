@@ -1,381 +1,345 @@
-# Pendientes
+# Qué falta y qué sigue abierto
 
-Qué falta construir, en qué orden, y qué problemas conocidos quedan abiertos.
-
----
-
-## Módulos que faltan
-
-Los cuatro aparecen en gris en el menú lateral. **El patrón a copiar es
-Solicitantes**, que está comentado paso a paso justamente para eso. El
-procedimiento completo está en [GUIA-INERTIA.md](GUIA-INERTIA.md#7-agregar-un-módulo-nuevo-paso-a-paso).
-
-> **El circuito de estados ya está construido.** La ficha del trámite
-> (`TramiteController::show()`), los pasos de revisar, aprobar, rechazar,
-> emitir y entregar, y la emisión del documento con su correlativo y su código
-> de verificación (`EmisionDocumentoService`). Lo que sigue faltando de esta
-> lista es lo marcado más abajo: la checklist de requisitos por tipo, las
-> exenciones, el PDF del documento y el módulo de cobro.
-
-### 1. Trámites ← empezar por acá
-
-Es el corazón del sistema: todo lo demás depende de que exista un trámite.
+Estado al **15 de septiembre de 2026**, después de agregar la impresión del carnet.
 
 ---
 
-#### LAS REGLAS DEL NEGOCIO — leer esto antes de escribir una línea
+## Lo que ya funciona
 
-Confirmadas con el responsable del sistema el 10/09/2026. Son la razón de ser
-del módulo: sin ellas el CRUD que sigue no sirve de nada.
-
-**El orden no se puede saltear.**
-
-```
-  Solicitante registrado
-          ↓
-  Credencial (Cédula de Pescador)    ← vigente
-          ↓
-  ┌───────────────┬────────────────────────────┐
-  │ Permiso por   │ Guía Única de Transporte   │
-  │ Faena         │                            │
-  └───────────────┴────────────────────────────┘
-```
-
-**1. Nadie pide nada sin estar en el padrón.** La ficha de solicitante es el
-punto de partida. Eso ya está construido.
-
-**2. La credencial es la llave.** Ningún otro servicio se puede solicitar sin
-ella. Para emitirla hay que adjuntar tres papeles, imagen o PDF, y son
-bloqueantes:
-
-- Certificación emitida por su asociación
-- Fotocopia de carnet simple
-- Comprobante de pago de la cédula
-
-(Ya construido: ver `formulario-cedula-pescador.tsx` y la validación de
-`TramiteController::store()`.)
-
-**3. La credencial vale por GESTIÓN, no por días corridos.** Vence al terminar
-el año en que se emitió, sin importar el mes: sacada en enero dura casi doce
-meses, sacada en diciembre dura unas semanas. Las dos vencen el mismo día.
-
-> ✅ **CONSTRUIDO.** `tipos_tramite` tiene ahora `vigencia_tipo`
-> (`dias | gestion | sin_vencimiento`), y la cuenta vive en el enum
-> `App\Enums\VigenciaTipo`. La credencial figuraba como 730 días —dos años— y
-> se corrigió a `gestion`.
->
-> Si la gestión de la Gobernación no coincide con el año calendario, se cambia
-> en un solo lugar: el `case Gestion` de ese enum.
-
-**3.bis La credencial pasa por revisión antes de habilitar.** Pedirla no
-alcanza: el trámite entra, pasa a *En Revisión*, un supervisor lo aprueba y
-recién ahí se emite el documento. Entre medio el pescador no puede sacar faena
-ni guía.
-
-> ✅ **CONSTRUIDO.** La compuerta busca un documento EMITIDO, así que un
-> trámite en revisión no habilita nada. Y se distingue «nunca la sacó» de «ya
-> la pidió y está en revisión», porque son dos acciones distintas en
-> ventanilla: en el primer caso hay que cargarla, en el segundo cargarla otra
-> vez sería duplicar el trámite.
-
-**4. La compuerta.** Al iniciar un trámite de faena o de guía, el sistema tiene
-que preguntar una sola cosa:
-
-> ¿Este solicitante tiene credencial **vigente hoy**?
-
-- **Sí** → se registra únicamente el servicio pedido. No se toca la credencial.
-- **No** → el servicio no se puede registrar todavía. Primero se le emite o
-  renueva la credencial; recién después el servicio.
-
-Cada faena es un trámite nuevo. Haber tenido faenas antes no habilita nada: lo
-único que habilita es la credencial vigente **al momento de pedir**.
-
-> ✅ **CONSTRUIDA.** Vive en `TipoTramite::habilitacionPara()` y devuelve un
-> `App\Support\Habilitacion`, no un booleano: el operador tiene al pescador
-> enfrente y necesita saber qué falta y cómo resolverlo.
->
-> Se comprueba en TRES lugares del servidor —al listar el catálogo, al entrar
-> al formulario de cada servicio y al guardar—, porque las tarjetas viven en el
-> navegador del operador y una dirección escrita a mano las saltea enteras.
->
-> El alta de trámite empieza ahora eligiendo al SOLICITANTE y no al servicio:
-> hasta no saber de quién se trata, el sistema no puede decir qué puede pedir.
-
-**5. Vigencia de cada servicio.**
-
-| Servicio | Vigencia | Uso |
-|---|---|---|
-| Cédula de Pescador | la gestión (hasta el 31 de diciembre) | habilita a pedir los otros |
-| Permiso por Faena | 1 mes desde la emisión | **una sola vez** |
-| Guía Única de Transporte | *(pendiente de definir)* | *(pendiente)* |
-
-La faena se agota por lo que pase primero: que se use, o que pase el mes.
-
-La guía sigue **exactamente el mismo flujo** que la faena —también exige
-credencial vigente—, solo cambia su vigencia, que está pendiente de definir.
-
-**6. Los dos servicios ya están sembrados.** `PPF` (Permiso por Faena) y `GUT`
-(Guía Única de Transporte) se agregaron a `AreaSeeder` y el catálogo de la
-pantalla sale ahora de la tabla `tipos_tramite`.
-
-Lo único que quedó escrito a mano en el controlador son los membretes, el
-encabezado legal y las leyendas al pie: son textos impresos en los talonarios
-del SEDAG y solo sirven para dibujar la vista previa del documento.
-
-#### Preguntas abiertas sobre estas reglas
-
-Ninguna impide empezar, pero todas cambian el código:
-
-- **El mes de la faena:** ¿30 días exactos, o el mismo día del mes siguiente?
-  (Emitida el 31 de enero, ¿vence el 28 de febrero o el 2 de marzo?)
-- **El uso único de la faena:** ¿alguien marca en el sistema que se usó, o en la
-  práctica solo vence al mes y el "una sola vez" es una regla del papel?
-- **Renovar la credencial:** ¿es otro trámite del mismo tipo, con los dos
-  papeles otra vez, o el trámite de renovación pide menos?
-- **Credencial vencida con faena vigente:** si la credencial vence mientras el
-  permiso por faena sigue vigente, ¿la faena sigue valiendo? (Lo razonable es
-  que sí: se emitió cuando correspondía.)
+| Módulo | Estado | Dónde mirar |
+| --- | --- | --- |
+| Acceso y bitácora | Completo | `AuthenticatedSessionController`, tabla `accesos` |
+| Panel principal | Completo | `DashboardController` |
+| **Beneficiarios** | Completo — es la plantilla del sistema | `BeneficiarioController` |
+| **Trámites** | Completo: solicitud → aprobación → impresión → entrega | `SolicitudCarnetService` |
+| **Pagos** | Completo: 1 a N depósitos por trámite | `PagoTramiteService` |
+| **Recibos** | Completo: el talonario del SEDAG en PDF | `ReciboTramiteService` |
+| **Carnets** | Completo: consulta, suspensión de rubro, anulación, **impresión del plástico** | `CarnetController`, `CarnetImpresionController` |
+| **Rubros** | Completo: catálogo con tarifa vigente | `RubroController` |
+| Verificación pública | Completo, con firma de validación | `VerificacionController` |
 
 ---
 
-#### Lo que hay que construir
+## Módulo 1 — Reportes
 
-- CRUD completo siguiendo el patrón de Solicitantes
-- **Máquina de estados.** Ya está escrita en `app/Enums/EstadoTramite.php` pero
-  nadie la usa todavía. Antes de cambiar el estado de un trámite hay que
-  preguntarle:
+Aparece en gris en el menú. No existe ni la ruta ni el controlador.
 
-  ```php
-  if (! $tramite->estado->puedePasarA($nuevoEstado)) {
-      abort(422, 'Transición de estado no permitida.');
-  }
-  ```
+**Qué debería tener:**
 
-- Numeración con `CorrelativoService::siguiente('TRA-'.$area->codigo)`
-- Checklist de requisitos: el tipo de trámite los trae en su columna `requisitos`
-- Aplicar exenciones al calcular el monto (`Exencion::descuentoSobre()`)
-- Aprobar y rechazar: solo con permiso `tramites.aprobar` / `tramites.rechazar`
+- Recaudación por rubro y por periodo, exportable a Excel.
+- Padrón de carnets vigentes de una gestión, para imprimir.
+- Trámites rechazados con su motivo: sirve para detectar qué requisito falla más
+  seguido y corregir el instructivo de ventanilla.
+- Carnets con rubros suspendidos.
 
-El cobro de la tasa también entra acá, porque ya no hay un módulo de Caja
-aparte:
-
-- Registrar el pago contra el trámite como fila de la tabla `pagos`, con
-  permiso `pagos.registrar`
-- QR y transferencia exigen número de referencia: lo dice
-  `FormaPago::requiereReferencia()`
-- Comprobante de pago en PDF
-- Anular pagos (permiso `pagos.anular`) y recalcular con
-  `Tramite::recalcularPagado()`
-
-> **El pago de la cédula ya se captura, pero todavía no es una fila de
-> `pagos`.** El alta de la Cédula de Pescador acepta uno o varios comprobantes
-> —cada uno con su forma, su número de transacción, su banco, su monto y su
-> archivo— y los guarda como JSON en `tramites.requisitos_validados['pagos']`,
-> además de escribir la suma en `tramites.monto_pagado`. Alcanza para que no se
-> pierda un pago en ventanilla, pero no reemplaza al módulo de cobro: falta el
-> número de comprobante correlativo, el recibo en PDF y la anulación. Ver
-> `TramiteController::registrarPagos()`.
->
-> **Hoy solo se acepta transferencia bancaria.** El efectivo y el pago por QR
-> están fuera de `FormaPago::disponibles()` hasta que se defina cómo se rinde la
-> caja del día y quién concilia el QR. Los tres casos siguen en el enum para
-> poder leer pagos viejos; habilitarlos es agregarlos a esa lista, sin tocar la
-> pantalla ni las reglas de validación.
->
-> **La fotografía del titular no es un adjunto del trámite.** Es un dato
-> personal del padrón y vive en `solicitantes.foto`. Si la ficha ya la tiene, el
-> formulario de la cédula ni la muestra. Si no la tiene, el campo aparece,
-> es obligatorio, y lo que se cargue se guarda en la FICHA —misma carpeta que el
-> alta del solicitante—, no en la carpeta del trámite. Reemplazar una foto ya
-> cargada sigue siendo cosa de la ficha: desde el trámite se completa, nunca se
-> pisa. Ver `TramiteController::completarFichaDelSolicitante()`.
->
-> **Lo mismo vale para el domicilio.** Ciudad, provincia y dirección se
-> muestran de solo lectura en el formulario de la cédula y se imprimen tal como
-> figuran en la ficha: al guardar, `TramiteController::datosDeLaFicha()` los
-> vuelve a leer del padrón y pisa lo que haya llegado en la petición, junto con
-> el nombre y la cédula de identidad. Si la ficha viene incompleta, los campos
-> que falten se piden en el trámite y se guardan en `solicitantes`.
-
-> **Caja se eliminó del sistema, y ya no queda nada de ella.** Además de
-> haber salido del menú y de los permisos (`caja.abrir`, `caja.cerrar` y
-> `caja.arquear` se quitaron de `RolSistema`), se borraron el enum
-> `EstadoCaja`, el modelo `CierreCaja`, la migración de `cierres_caja`, la
-> columna `pagos.cierre_caja_id`, `FormaPago::columnaCierre()`,
-> `User::cierresCaja()` y `User::cajaAbierta()`.
->
-> Las migraciones se editaron en su lugar en vez de agregar una que deshace,
-> porque el sistema todavía no está en producción y la base se vuelve a
-> sembrar entera. Si en algún momento hace falta arqueo, se construye de
-> nuevo: no quedó media implementación estorbando.
->
-> Las cuatro configuraciones `caja.*` también se fueron, con una excepción:
-> la moneda y su símbolo pasaron al grupo `general` (`general.moneda` y
-> `general.simbolo_moneda`), porque no eran del arqueo sino de todo el
-> sistema — `HandleInertiaRequests` lee el símbolo para escribir «Bs» en los
-> montos del panel.
-
-### 2. Documentos
-
-Acá entran las tres librerías que hoy están instaladas y sin usar.
-
-- Emitir el documento cuando el trámite llega a "aprobado"
-- Numeración con `CorrelativoService::siguiente($tipo->serieDocumento())`
-- Generar el PDF con **dompdf**, usando la plantilla que devuelve
-  `CategoriaDocumento::plantilla()`. Faltan crear esas vistas Blade:
-
-  ```
-  resources/views/documentos/certificacion.blade.php
-  resources/views/documentos/credencial.blade.php
-  resources/views/documentos/permiso.blade.php
-  resources/views/documentos/licencia.blade.php
-  ```
-
-  Las credenciales van en formato tarjeta CR80 — el tamaño ya lo devuelve
-  `CategoriaDocumento::formatoPagina()`.
-
-- Insertar el QR con **simple-qrcode**, apuntando a
-  `$documento->url_verificacion`
-- Guardar `datos_snapshot`: la copia inmutable de lo que se imprimió
-- Calcular el hash SHA-256 del PDF y guardarlo en `hash_pdf`
-- Anular documentos (permiso `documentos.anular`)
-
-### 3. Reportes
-
-- Recaudación por período, por área y por operador
-- Trámites por estado
-- Documentos emitidos y por vencer
-- Exportar a Excel con **maatwebsite/excel** (permiso `reportes.exportar`)
-
-### 4. Configuración
-
-- Editar los valores de la tabla `configuraciones` desde el panel
-- Gestión de usuarios: alta, baja, cambio de rol
-- ABM de áreas, tipos de trámite y tarifas
-- Consulta de la bitácora de auditoría (permiso `auditoria.ver`)
+**Por dónde empezar:** copiar el patrón de `BeneficiarioController::index()`
+—filtros + `Paginacion` + `through()`— y agregar una acción de exportación con
+`maatwebsite/excel`, que ya está instalado.
 
 ---
 
-## Falta un comando de vencimiento
+## Módulo 2 — Configuración
 
-**Es lo más urgente después de Trámites.**
+Aparece en gris en el menú. La tabla `configuraciones` existe y está sembrada;
+falta la pantalla para editarla.
 
-Hoy ningún proceso marca los documentos como vencidos. La consecuencia:
-`Documento::estadoEfectivo()` calcula bien el estado al mostrar un documento
-suelto, pero los conteos del panel usan la columna `estado`, que nunca se
-actualiza. El indicador "Documentos vencidos" del dashboard reporta de menos.
+**Qué debería tener:**
 
-Hay que crear:
+- Editar los valores de la tabla `configuraciones` agrupados por `grupo`.
+- Subir el logo y el escudo (son del tipo `archivo`).
+- Alta y edición de usuarios: `GuardarUsuarioRequest` ya está escrito y
+  comentado, pero **no tiene ruta ni controlador todavía**.
 
-```
-app/Console/Commands/MarcarDocumentosVencidos.php
-```
+---
+
+## Problemas conocidos que siguen abiertos
+
+### 1. ~~El carnet no se imprime en PDF~~ — RESUELTO
+
+Se hizo: `GET /panel/carnets/{carnet}/imprimir` dibuja el plástico en CR80
+(243 × 153 pt), una sola carilla, **calcando la cédula de papel**. La vista
+previa del panel —`components/panel/tramites/vista-previa-carnet.tsx`, el
+recuadro «ASÍ VA A SALIR EL CARNET» del paso 3— muestra ese mismo molde, así que
+lo que el operador ve mientras carga el trámite es lo que sale impreso. Ver
+[modulos/CARNETS.md](modulos/CARNETS.md).
+
+Tres cosas que este punto daba por sentadas y no eran así:
+
+- **`simplesoftwareio/simple-qrcode` no sirve en este servidor.** Su salida PNG
+  exige la extensión `imagick`, que no está instalada (`php -m` lista `gd`). El
+  QR lo arma `App\Support\CodigoQr`, con la matriz de BaconQrCode —la librería
+  que ese paquete trae adentro— pintada con `gd`. El paquete queda instalado y
+  sin usar.
+- **La dirección del QR ya no la arma `CarnetController`**, sino
+  `Carnet::urlVerificacion()`: la necesitan la ficha del panel y la impresión, y
+  escrita dos veces un día dirían cosas distintas.
+- **Imprimir no marca impreso.** `tramites.fecha_generacion` la sigue escribiendo
+  `PATCH /tramites/{tramite}/generar`, que es otro botón. Abrir la vista previa
+  no es haber sacado el plástico, y si esta ruta marcara alcanzaría con que el
+  navegador precargara el enlace.
+
+**EL CARNET NO LLEVA QR: se sacó a pedido.** Y conviene tenerlo presente,
+porque es lo que dejó a la credencial sin poder verificarse desde la calle: la
+pantalla pública y la firma de validación siguen existiendo, pero quien tiene el
+plástico en la mano ya no tiene forma de llegar a ellas. Es la misma limitación
+que tenía la cédula de papel.
+
+`App\Support\CodigoQr` queda **escrito y sin usar**, igual que quedó
+`CorrelativoService` en su momento: el día que el QR vuelva, la parte difícil ya
+está resuelta. Lo que hay que saber es que `simplesoftwareio/simple-qrcode` —el
+paquete instalado justamente para esto— NO sirve en este servidor: su salida PNG
+exige `imagick`, que no está.
+
+### 2. Nadie marca los carnets como vencidos
+
+`EstadoCarnet::Vencido` nunca se escribe solo. Falta el comando programado que
+recorra los carnets de gestiones cerradas y actualice la columna.
+
+**Mientras tanto el sistema no miente**, porque `Carnet::estaVigente()` compara
+además contra `fecha_vencimiento`. Lo que sí queda mal es el filtro por estado
+del listado, que muestra como «vigentes» carnets del año pasado hasta que el
+comando exista.
+
+### 3. ~~`StorageController` devuelve URL completa cuando el disco es s3~~ — RESUELTO
+
+Se hizo lo que este mismo punto proponía: **`StorageController` devuelve siempre
+la ruta, y la URL se arma al leer** en `Archivos::url()`, con el disco que el
+sistema tenga configurado en ese momento.
+
+Se descubrió porque con `FILESYSTEM_DISK=s3` los adjuntos abrían en
+`http://jichi.test/storage/...`: `Archivos::url()` estaba clavado en
+`disk('public')` e ignoraba el disco activo.
+
+Con el cambio se arreglan tres cosas de una:
+
+- **Se pueden borrar.** Con la ruta se borra del disco activo; desde una URL no
+  había forma de volver a la clave del objeto.
+- **El dominio deja de estar congelado.** Cambiar de bucket, endpoint o poner un
+  CDN es cambiar el `.env`; antes había que reescribir filas.
+- **Una sola forma en la columna.** Ya no conviven rutas y direcciones.
+
+`Archivos::url()` conserva la rama que devuelve tal cual lo que empieza con
+`http`, por las filas viejas. Se puede sacar el día que no queden.
+
+También se retiró `jichi.archivos.prefijo_s3`: el disco ya lleva
+`'root' => env('AWS_ROOT')` y Flysystem lo antepone solo. Tenerlo en los dos
+lados duplicaba la carpeta —`dev/dev/tramites/...`—.
+
+### 3b. El enlace `public/storage` apuntaba a OTRO PROYECTO
+
+`public/storage` era un enlace a `surubiNet/storage/app/public`, no a `jichi`.
+Un `storage:link` mal hecho o heredado de otro proyecto. Se rehízo.
+
+Con el disco en s3 casi no se notaba; el día que se pase a disco local, habría
+servido los archivos del proyecto equivocado.
+
+### 3c. `APP_URL` no coincide con cómo se accede — ABIERTO
+
+`.env` dice `APP_URL=http://jichi.test`, pero el sistema se usa en
+`http://127.0.0.1:8000`, y `jichi.test` no resuelve.
+
+Con el disco en s3 ya no afecta a los adjuntos, pero `APP_URL` la usan las rutas
+absolutas, Ziggy y cualquier enlace que se mande por correo. **Hay que ponerlo en
+la dirección real de cada entorno** —o crear el host `jichi.test` en Laragon—.
+
+No se cambió desde el código: es configuración del entorno de cada máquina.
+
+### 4. Solo hay un rol
+
+`RolSistema` tiene un único `case`: `administrador`, con todos los permisos. Es
+una decisión, no un olvido —ver el comentario del enum—, pero significa que hoy
+**cualquier usuario del sistema puede aprobar sus propios trámites**.
+
+Los permisos ya están repartidos por bloque dentro del enum (`$lectura`,
+`$operacion`, `$supervision`, `$administracion`), así que agregar el rol de
+ventanilla es escribir una línea:
 
 ```php
-Documento::query()
-    ->where('estado', EstadoDocumento::Vigente)
-    ->whereNotNull('fecha_vencimiento')
-    ->whereDate('fecha_vencimiento', '<', now())
-    ->update(['estado' => EstadoDocumento::Vencido]);
+self::Operador => [...$lectura, ...$operacion],
 ```
 
-Y programarlo en `routes/console.php` para que corra todos los días:
+Y las rutas ya lo respetan, porque cada una declara su `permiso:`.
 
-```php
-Schedule::command('documentos:marcar-vencidos')->dailyAt('00:30');
-```
+### 5. `GuardarUsuarioRequestTest` se eliminó
 
----
+Probaba escenarios de cuatro roles —degradar al último administrador, por
+ejemplo— que hoy no pueden ocurrir. Se borró al dejar un solo rol. Cuando el
+módulo de Usuarios se construya, hay que volver a escribirlo como pruebas HTTP
+contra sus rutas.
 
-## Problemas conocidos, sin arreglar
+### 6. `DemoSeeder` no pasa por el servicio
 
-Ordenados por importancia. Ninguno rompe nada hoy, pero todos van a morder
-cuando crezca el sistema.
+Escribe los carnets, trámites y pagos a mano en vez de llamar a
+`SolicitudCarnetService`. El motivo está anotado en el archivo: el servicio exige
+`UploadedFile` de verdad, y sembrar 100 trámites por ahí dejaría ~300 archivos
+falsos en `storage/app/public` en cada `migrate:fresh`.
 
-### `Pago` y `Tramite` usan textos sueltos en vez de un enum
+**Consecuencia:** si una regla del servicio cambia, hay que tocar el seeder
+también. Está anotado, pero es una copia y las copias se quedan viejas.
 
-`app/Models/Pago.php` y `Tramite::recalcularPagado()` comparan contra los textos
-`'pagado'` y `'anulado'` escritos a mano:
+### 7. No hay edición ni anulación de pagos
 
-```php
-public function scopeVigentes(Builder $query): Builder
-{
-    return $query->where($query->qualifyColumn('estado'), 'pagado');
-}
-```
+Una boleta cargada con el monto equivocado no se puede corregir desde la
+pantalla. La tabla no tiene `estado` ni `deleted_at` a propósito —un pago
+«anulado» que sigue en la lista invita a sumarlo por error— pero falta la
+pantalla de edición, que sí correspondería: el trait `Auditable` ya guardaría el
+valor anterior.
 
-Todo el resto del sistema usa enums. Falta crear `app/Enums/EstadoPago.php` con
-los casos `Pagado` y `Anulado`, castearlo en el modelo y reemplazar los textos.
-Con un texto suelto, un `'pagdo'` mal escrito no da error: devuelve cero filas
-en silencio, y en el cobro de tasas eso significa plata que no aparece.
+### 8. ~~Un rubro suspendido no se puede volver a tramitar~~ — RESUELTO
 
-### `Configuracion::guardar()` falla sin avisar
+El comportamiento sigue siendo el mismo —un rubro suspendido bloquea, porque la
+habilitación existe y volver a tramitarla sería cobrar dos veces— pero ahora el
+mensaje lo explica y dice qué hacer: `SolicitudInvalidaException::rubroSuspendido()`.
 
-```php
-public static function guardar(string $clave, mixed $valor): void
-{
-    static::query()->where('clave', $clave)->update([...]);
-}
-```
+Además el formulario ya no lo ofrece: el selector de rubros deshabilita los que
+el carnet tiene, y la tarjeta de situación los muestra con su estado.
 
-Si la clave no existe, actualiza cero filas y no dice nada. Debería usar
-`updateOrCreate()` o lanzar una excepción. Importa cuando se construya el módulo
-de Configuración.
+### 9. ~~`CorrelativoService` quedó sin usar~~ — RESUELTO
 
-### `WithoutModelEvents` se aplica de forma despareja
+Se lo había conservado con el argumento de que «el día que haga falta un número
+correlativo —de recibo, de resolución— ya está escrito y probado contra
+concurrencia». Ese día llegó: el **módulo de Recibos** lo usa para numerar el
+talonario, serie `RECIBO`, reiniciada cada gestión.
 
-`DatabaseSeeder` usa el trait `WithoutModelEvents`, que apaga los eventos de
-modelo durante todo el sembrado. Las pruebas, en cambio, llaman a los seeders
-sueltos y SÍ disparan eventos.
+Se le extrajo `siguienteNumero()`, que devuelve el entero crudo — el recibo
+necesita el número pelado (`0016`) y guardarlo como entero para poder ordenarlo,
+cosa que con el código formateado no se podía. El bloqueo sigue viviendo en un
+solo lugar.
 
-Hoy no rompe nada —`Solicitante` ya no tiene ningún hook `saving`: el nombre
-completo pasó a calcularse al vuelo—, pero sigue siendo frágil: cualquier
-seeder nuevo que dependa de un evento de modelo va a fallar solo en
-producción, porque en las pruebas sí se dispara.
+### 11. El recibo no se puede anular
 
-### `Tramite::documento()` no hace lo que dice su comentario
+En el talonario de papel se anulaba escribiendo «ANULADO» sobre las tres copias
+y archivándolas. La versión digital no tiene el equivalente: una vez emitido, el
+recibo queda.
 
-```php
-/**
- * Documento vigente emitido por este trámite (el último no anulado).
- */
-public function documento(): HasOne
-{
-    return $this->hasOne(Documento::class)->latestOfMany();
-}
-```
+No es urgente —el número nunca se reusa y el rastro está completo— pero el día
+que se cobre mal y haya que dejar constancia, hace falta. Está sin definir con la
+unidad qué debería pasar con la plata en ese caso, y por eso no se construyó
+adivinando.
 
-El comentario promete filtrar los anulados; el código no lo hace. Hay que
-agregar `->whereNot('estado', EstadoDocumento::Anulado)` o corregir el
-comentario. Importa cuando exista el módulo de Documentos.
+### 12. No hay libro de recibos
 
----
+La tabla `recibos` ya tiene el índice `['gestion', 'fecha_emision']` preparado
+para el listado, pero no existe la pantalla. Contabilidad lo va a pedir junto con
+Reportes: es el equivalente a revisar el talonario para cuadrar contra caja.
 
-## Ya corregido (para referencia)
+### 13. Las boletas de pago no se borran con el trámite — BUG
 
-Cuatro problemas que sí se arreglaron, por si aparecen dudas de por qué el
-código está escrito así:
+`SolicitudCarnetService::rutasDeAdjuntos()` hace
+`$tramite->pagos->pluck('comprobante')`, pero la columna de `pagos` se llama
+**`urlFile`**; `comprobante` no existe como atributo —el accesor es
+`comprobante_url`— así que devuelve `null` por cada pago y `descartar()` los
+filtra en silencio.
 
-| Problema | Dónde está la corrección |
+**Efecto:** al borrar un expediente, sus dos adjuntos propios sí se borran, pero
+**cada boleta escaneada queda huérfana en el disco para siempre**. Nada se rompe
+y nadie se entera.
+
+Se arregla cambiando `pluck('comprobante')` por `pluck('urlFile')`. Las pruebas
+de borrado verifican filas, no disco, por eso no lo detectaron.
+
+### 14. Dos N+1 silenciosos — BUG
+
+Los dos calculan en PHP lo que el comentario dice que se calcula en SQL:
+
+- **`DashboardController::resumenDelDia()`**, en `listos_para_aprobar`: hace
+  `Tramite::abiertos()->get()` sin `withSum` y después llama a `estaPagado()` por
+  fila, o sea una consulta agregada por trámite abierto. Es la pantalla de
+  entrada del sistema. Se arregla agregando `->withSum('pagos', 'monto')` antes
+  del `get()` — el propio archivo ya lo hace bien en `ultimosTramites()`.
+
+- **`Beneficiario::deudaTotal()`**: su docblock dice «la resta se hace en SQL y no
+  trayendo las filas a PHP», y el código hace exactamente lo contrario. Lo llama
+  `BeneficiarioController::show()`.
+
+### 15. `CarnetImpresionController::filas()` es código muerto que además no compila
+
+Nadie la llama —el PDF sale de `datos()`— y adentro invoca `$this->celda()`, un
+método **que no existe en la clase**. Es el sobrante de la versión 2 del diseño,
+la que tenía siete renglones con GESTIÓN y VENCE compartiendo uno. Si alguien la
+llamara, error fatal; y como nada la llama, nada lo avisa.
+
+Lo que la vuelve una trampa y no solo basura es su docblock: encabeza «LOS SIETE
+RENGLONES DE LA TARJETA» y explica el reparto de GESTIÓN + VENCE. Hoy la tarjeta
+tiene **seis** renglones y el segundo par es GESTIÓN, sin VENCE. Quien entre a
+tocar los renglones de la tarjeta encuentra primero ese comentario, que describe
+una tarjeta que no existe.
+
+Se arregla borrando el método y su docblock. Se dejó para no mezclarlo con el
+cambio de diseño del 15/09/2026.
+
+### 16. ~~El tablero se corría de costado en el celular~~ — RESUELTO
+
+La tabla de últimos trámites mide 675 px —seis columnas— y vivía dentro de un
+elemento de grilla. Un elemento de grilla arranca con `min-width: auto`, que le
+prohíbe encogerse por debajo de su contenido, así que la tarjeta se estiraba a
+675 px aunque la pantalla midiera 375. El `overflow-x-auto` que la tabla ya tenía
+no servía de nada: el que quedaba desplazable era **el documento entero**, y en
+un celular había que correr de costado la pantalla completa —menú, encabezado y
+todo— para leer una columna.
+
+Se arregló con `min-w-0` en la tarjeta (`tabla-ultimos-tramites.tsx`). Medido en
+390, 768 y 1440 px: el documento ya no desborda en ninguno, y la tabla se
+desplaza sola dentro de su tarjeta.
+
+No se notaba porque el tablero se prueba en el escritorio, donde sobra ancho.
+Los otros cinco listados se revisaron y **no** tienen el problema: son los únicos
+que no están dentro de una grilla. La trampa quedó anotada en CLAUDE.md.
+
+### 10. NO HAY PRUEBAS AUTOMÁTICAS — de nada
+
+El **14 de septiembre de 2026** se vació `tests/Feature/` por pedido del
+responsable del proyecto. Eran **143 pruebas** y cubrían el backend entero.
+Frontend nunca hubo.
+
+**Qué dejó de estar cubierto**, que es lo que importa de este punto:
+
+| Regla | Qué pasa si se rompe y nadie avisa |
 | --- | --- |
-| Los índices únicos no bloqueaban nada por incluir `deleted_at` (se podían crear dos solicitantes con el mismo CI, y dos cajas abiertas el mismo día) | migración `2026_09_08_100000` |
-| `veces_verificado` era `smallint`: se desbordaba a las 32.767 consultas y tumbaba la página pública | migración `2026_09_08_100100` |
-| Cada escaneo de QR escribía además una fila de auditoría, y la ruta pública no tenía límite de peticiones | `Documento::registrarVerificacion()` y `routes/publico.php` |
-| `UsuarioSeeder` leía `env()` fuera de `config/`: con `config:cache` los cuatro usuarios institucionales quedaban con la contraseña por defecto sin avisar | `config/jichi.php` |
+| Un carnet por persona y gestión | Se emiten dos documentos a la misma persona |
+| No aprobar sin cobrar | Un rubro queda habilitado sin que entre la plata |
+| El recibo conserva su número al reimprimir | Contabilidad recibe dos comprobantes por un pago |
+| El recibo queda congelado | Una reimpresión dice algo distinto al papel entregado |
+| Todo archivo pasa por `StorageController` | Alguien sube sin el tope de 3 MB ni el nombre aleatorio |
+| Los saltos de estado válidos | Un expediente resuelto vuelve atrás |
 
-Cada uno tiene su explicación completa comentada en el archivo correspondiente.
+El más difícil de reemplazar es el último de la tabla: `SubidaArchivosTest`
+**leía el código fuente** y fallaba si aparecía un `->store()` nuevo. Esa clase
+de regla no se detecta mirando la pantalla, porque no es un error de hoy sino un
+atajo de mañana.
+
+**Mientras tanto, cada cambio se verifica abriendo la pantalla y probando el caso
+a mano.** `npx tsc --noEmit` y `pint` siguen revisando tipos y formato; de la
+lógica de negocio no dicen nada.
+
+**El andamiaje quedó en su lugar** —`phpunit.xml`, `tests/TestCase.php` y las
+dependencias de PHPUnit—, así que volver a escribir una prueba es crear un solo
+archivo, sin instalar nada.
+
+**Por dónde volver a empezar, si algún día se retoma.** En este orden, que es el
+de mayor daño posible:
+
+1. `SolicitudCarnetTest` — la Regla A es la que sostiene todo el dominio.
+2. `PagoTramiteTest` — es dinero.
+3. `SubidaArchivosTest` — es la única forma de proteger el embudo de archivos.
+4. `ReciboTramiteTest` — el recibo es un papel numerado que se entrega.
+
+Y del frontend, lo más barato: `resources/js/lib/utils.ts` —`fecha()`,
+`edadEnAnios()`, `bs()`— son funciones puras y se probarían en veinte líneas con
+vitest. `fecha()` ya costó un error real: mostraba todas las fechas un día antes
+por la zona horaria, y se descubrió mirando la pantalla.
 
 ---
 
-## Antes de poner esto en producción
+## Orden sugerido
 
-- [ ] Cambiar `JICHI_SEED_PASSWORD` y las contraseñas de los cuatro usuarios
-- [ ] `APP_DEBUG=false` y `APP_ENV=production`
-- [ ] `JICHI_URL_VERIFICACION` apuntando al dominio real (es lo que se
-      imprime dentro del QR)
-- [ ] Actualizar `sistema.url_verificacion` en la tabla `configuraciones`
-- [ ] `php artisan storage:link` en el servidor
-- [ ] Verificar que `DemoSeeder` NO corra: `DatabaseSeeder` ya lo bloquea con
-      `app()->isProduction()`, pero conviene confirmarlo
-- [ ] Configurar el respaldo de la base de datos
-- [ ] Programar el comando de vencimiento (ver más arriba)
+1. **Los dos bugs (13 y 14)** — son de media hora entre los dos y uno pierde
+   archivos en silencio.
+2. El comando de vencimiento de carnets (problema 2) — es de una tarde y arregla
+   un dato que ya se muestra mal.
+3. ~~El PDF del carnet (problema 1)~~ — hecho el 15/09/2026.
+4. Reportes — la unidad de recaudación los pide todos los meses. Va junto con el
+   libro de recibos (problema 12).
+5. Usuarios y roles (problema 4) — antes de poner el sistema en manos de varias
+   personas.
+6. Configuración.

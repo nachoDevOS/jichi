@@ -12,7 +12,7 @@ use Illuminate\Validation\Validator;
 /**
  * Reglas de validación para crear y editar un FUNCIONARIO del sistema.
  *
- * Es el hermano de GuardarSolicitanteRequest, pero del otro lado del
+ * Es el hermano de GuardarBeneficiarioRequest, pero del otro lado del
  * mostrador: aquel valida al ciudadano que viene a hacer un trámite, este
  * valida a la persona de la Gobernación que lo atiende y que va a tener una
  * cuenta con contraseña.
@@ -68,7 +68,7 @@ class GuardarUsuarioRequest extends FormRequest
              * que dos peticiones simultáneas podrían colar la misma cédula.
              * Con un solo administrador cargando usuarios a mano eso no pasa,
              * pero conviene saberlo: el día que se agregue el índice, se copia
-             * el índice PARCIAL de solicitantes (migración 2026_09_08_100000),
+             * el índice PARCIAL de beneficiarios (ver su migración),
              * nunca uno que incluya `deleted_at`.
              *
              * whereNull('deleted_at') deja fuera a los funcionarios dados de
@@ -104,7 +104,7 @@ class GuardarUsuarioRequest extends FormRequest
              *
              * Para que un correo se pueda reutilizar hay que cambiar primero
              * el índice de la base por uno parcial, como se hizo con
-             * solicitantes. Mientras tanto: restaurar al funcionario dado de
+             * beneficiarios. Mientras tanto: restaurar al funcionario dado de
              * baja en vez de crear uno nuevo.
              */
             'email' => [
@@ -273,7 +273,7 @@ class GuardarUsuarioRequest extends FormRequest
     }
 
     /**
-     * Normaliza ANTES de validar, por el mismo motivo que en solicitantes:
+     * Normaliza ANTES de validar, por el mismo motivo que en beneficiarios:
      * quien carga escribe con espacios de más y mayúsculas sueltas.
      */
     protected function prepareForValidation(): void

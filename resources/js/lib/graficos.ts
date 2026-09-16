@@ -7,8 +7,14 @@
  * que los gráficos cambian solos entre el modo claro y el oscuro.
  */
 
-/** Serie de colores para categorías (áreas departamentales, tipos de documento...). */
-export const SERIE_GRAFICOS = [
+/**
+ * Serie de colores para categorías.
+ *
+ * NO se exporta: quien necesite un color pide `colorSerie(i)`, que además
+ * resuelve qué pasa cuando hay más categorías que colores. Exportada, cada
+ * gráfico podría indexarla por su cuenta y salirse del arreglo.
+ */
+const SERIE_GRAFICOS = [
     'var(--grafico-1)',
     'var(--grafico-2)',
     'var(--grafico-3)',

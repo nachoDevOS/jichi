@@ -21,8 +21,8 @@ use Illuminate\Http\Request;
  *
  * Porque es una regla de seguridad, y una regla de seguridad escrita en cuatro
  * lugares es una regla que tarde o temprano queda distinta en uno de ellos.
- * Los listados de solicitantes y de trámites la usan hoy; los de documentos y
- * pagos la van a usar mañana.
+ * Los listados de beneficiarios, trámites, carnets y pagos la usan; los de
+ * reportes la van a usar mañana.
  */
 class Paginacion
 {

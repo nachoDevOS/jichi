@@ -24,7 +24,32 @@ class CorrelativoService
     {
         $anio ??= (int) now()->format('Y');
 
-        $numero = DB::transaction(function () use ($serie, $anio): int {
+        return $this->formatear($serie, $anio, $this->siguienteNumero($serie, $anio));
+    }
+
+    /**
+     * Reserva el siguiente número y lo devuelve CRUDO, sin formatear.
+     *
+     * ------------------------------------------------------------------------
+     *  POR QUÉ EXISTEN LAS DOS FORMAS
+     * ------------------------------------------------------------------------
+     *
+     * `siguiente()` devuelve el código completo —SERIE-2026-0001— que es lo que
+     * quiere quien necesita un identificador legible y único por sí solo.
+     *
+     * Los RECIBOS no: el talonario de papel trae el número pelado arriba a la
+     * derecha —0016— y el recibo digital tiene que decir lo mismo. Además lo
+     * guarda como entero para poder ordenarlo y sacar el último de la serie,
+     * cosa que con el código formateado no se puede.
+     *
+     * La reserva —el bloqueo de la fila del contador— es la misma para los dos,
+     * y vive acá adentro una sola vez.
+     */
+    public function siguienteNumero(string $serie, ?int $anio = null): int
+    {
+        $anio ??= (int) now()->format('Y');
+
+        return DB::transaction(function () use ($serie, $anio): int {
             $correlativo = Correlativo::query()
                 ->where('serie', $serie)
                 ->where('anio', $anio)
@@ -53,8 +78,6 @@ class CorrelativoService
 
             return $correlativo->ultimo_numero;
         });
-
-        return $this->formatear($serie, $anio, $numero);
     }
 
     /**

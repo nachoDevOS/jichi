@@ -1,35 +1,47 @@
+import type { EstadoCarnet } from '@/types';
+
 /**
- * Tipos de la parte pública (verificación de documentos por QR).
+ * Tipos de la parte pública (verificación de carnets por QR).
  *
  * Lo arma App\Http\Controllers\Publico\VerificacionController.
  *
  * REGLA DE ORO DE ESTA PARTE DEL SISTEMA: acá solo puede aparecer lo mínimo
- * para constatar que un documento es auténtico. Nunca el CI completo, ni la
- * dirección, ni el teléfono del titular. Cualquiera con el código puede ver
- * esta pantalla, así que cada campo que se agregue queda expuesto al público.
+ * para constatar que un carnet es auténtico. Nunca el CI completo, ni la
+ * dirección, ni el teléfono del titular. Cualquiera que levante un carnet del
+ * suelo puede ver esta pantalla, así que cada campo que se agregue queda
+ * expuesto al público.
  */
 
-import type { EstadoDocumento } from '@/types';
-
-/** Lo que se muestra de un documento en la pantalla pública. */
-export interface DocumentoPublico {
-    codigo_verificacion: string;
-    titular: string;
+/** Lo que se muestra de un carnet en la pantalla pública. */
+export interface CarnetPublico {
+    /**
+     * El número impreso en el carnet: 000013. Es lo que el inspector compara
+     * contra el plástico; la firma no se imprime, va solo dentro del QR.
+     */
+    registro: string;
+    titular: string | null;
     /** Enmascarado: solo los últimos 3 dígitos ('••••779'). */
     documento_titular: string;
-    tipo_documento: string;
-    categoria: string;
-    area: string;
-    icono_area: string | null;
-    fecha_emision: string;
+    gestion: number;
+    fecha_emision: string | null;
     fecha_vencimiento: string | null;
-    /** Estado REAL, ya recalculado contra la fecha de vencimiento. */
-    estado: EstadoDocumento;
+    estado: EstadoCarnet;
     estado_etiqueta: string;
     estado_color: string;
-    /** Frase para el ciudadano: "Documento válido y vigente." */
+    /**
+     * NO es lo mismo que estado === 'vigente'. Se calcula además contra la
+     * fecha, porque el estado lo escribe un comando programado que corre una vez
+     * al día. Ver Carnet::estaVigente().
+     */
+    vigente: boolean;
+    /** Frase para el inspector: «Carnet auténtico y vigente...». */
     mensaje: string;
-    es_valido: boolean;
+    /**
+     * Solo los rubros HABILITADOS, sin los suspendidos. Un rubro suspendido no
+     * autoriza a trabajar, y mostrarlo —aunque fuera en rojo— arriesga que el
+     * inspector lea la fila y no el color.
+     */
+    rubros: string[];
 }
 
 /** Datos institucionales que se muestran en el encabezado y el pie. */

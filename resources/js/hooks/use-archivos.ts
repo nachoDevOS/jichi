@@ -15,7 +15,7 @@ import type { PageProps } from '@/types';
  * aviso es instantáneo y no se sube ni un byte.
  *
  * La regla de verdad sigue estando en el servidor. Ver
- * `TramiteController::validarAdjuntos()` y `GuardarSolicitanteRequest`.
+ * `RegistrarSolicitudRequest` y `GuardarBeneficiarioRequest`.
  *
  * ----------------------------------------------------------------------------
  *  EL NÚMERO NO ESTÁ ESCRITO ACÁ

@@ -90,8 +90,11 @@ function BotonPagina({
     titulo: string;
     children: React.ReactNode;
 }) {
+    // Mismo alto que los botones del sistema (`h-8` en button.tsx). Se repite
+    // acá y no se usa buttonVariants porque estos no son botones: son enlaces de
+    // navegación y necesitan su propio estado «activo» y «deshabilitado».
     const estilo = cn(
-        'inline-flex h-9 min-w-9 items-center justify-center rounded-md px-2.5 text-sm transition-colors',
+        'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2.5 text-[13px] transition-colors',
         activo
             ? 'bg-primary font-medium text-primary-foreground'
             : 'text-muted-foreground hover:bg-secondary hover:text-foreground',

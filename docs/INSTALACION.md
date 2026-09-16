@@ -70,10 +70,16 @@ php artisan db:seed
 php artisan storage:link
 ```
 
-El seeder crea roles, permisos, configuración institucional, las 6 áreas con
-sus tipos de trámite y tarifas, y 4 usuarios (uno por rol). Fuera de
-producción también carga datos de prueba: 48 solicitantes, 60 trámites en
-todos los estados, pagos y documentos emitidos.
+El seeder crea el rol `administrador` con todos sus permisos, la configuración
+institucional, los dos rubros del catálogo —Pescador y Comercializador— y la
+cuenta `admin@admin.com`.
+
+Fuera de producción carga además datos de prueba, a propósito POCOS: 16
+beneficiarios (4 de ellos sin carnet), 12 carnets y 15 trámites. No se siembran
+al azar sino siguiendo un guion fijo, de modo que estén representadas todas las
+situaciones que el sistema tiene que poder mostrar —aprobado, pendiente con pago
+parcial, rechazado, rubro suspendido, carnet anulado, carnet de la gestión
+anterior— una vez cada una. Ver `database/seeders/DemoSeeder.php`.
 
 ### Usuarios sembrados
 
@@ -83,9 +89,10 @@ Contraseña común: la de `JICHI_SEED_PASSWORD` en `.env`
 | Rol | Correo |
 | --- | --- |
 | Administrador | admin@admin.com |
-| Supervisor | supervisor@beni.gob.bo |
-| Operador de Ventanilla | ventanilla1@beni.gob.bo |
-| Solo Lectura | consulta@beni.gob.bo |
+
+Por ahora hay una sola cuenta y un solo rol. Supervisor, operador de ventanilla y
+solo-lectura se agregarán cuando la unidad defina quién firma qué; los permisos
+que van a usar ya están repartidos por bloque en `app/Enums/RolSistema.php`.
 
 ## 4. Levantar
 
@@ -110,5 +117,5 @@ Los módulos Trámites, Documentos, Reportes y Configuración todavía no
 están construidos: aparecen en gris en el menú lateral. El detalle de qué
 implica cada uno está en [PENDIENTES.md](PENDIENTES.md).
 
-El módulo **Solicitantes** ya está completo y sirve de plantilla comentada para
+El módulo **Beneficiarios** ya está completo y sirve de plantilla comentada para
 los otros cuatro.

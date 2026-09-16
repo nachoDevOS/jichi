@@ -2,35 +2,54 @@
 
 namespace App\Enums;
 
+/**
+ * Los roles del sistema y qué puede hacer cada uno.
+ *
+ * ----------------------------------------------------------------------------
+ *  POR AHORA HAY UN SOLO ROL, Y ES A PROPÓSITO
+ * ----------------------------------------------------------------------------
+ *
+ * El módulo de carnets arranca con `administrador` haciendo todo. Supervisor,
+ * operador de ventanilla y solo-lectura se agregarán cuando la unidad defina
+ * quién firma qué; mientras tanto, inventar roles que nadie usa solo obliga a
+ * mantenerlos.
+ *
+ * LO QUE SÍ QUEDA ARMADO es la lista de permisos, y las rutas los exigen uno por
+ * uno (ver el middleware `permiso:` en routes/panel.php). Esa parte no se saca
+ * aunque hoy el único rol los tenga todos: el día que aparezca el segundo rol,
+ * se agrega un `case` acá con su lista y las rutas ya están protegidas. Si en
+ * cambio se quitara el middleware «porque total el admin puede todo», habría que
+ * volver a repartir permisos ruta por ruta, que es justamente donde se olvida
+ * uno y queda un agujero.
+ *
+ * Este enum es la ÚNICA fuente de verdad. De acá los lee RolPermisoSeeder para
+ * crearlos en la base, y contra estos nombres comprueba el middleware.
+ */
 enum RolSistema: string
 {
     case Administrador = 'administrador';
-    case Supervisor = 'supervisor';
-    case Operador = 'operador';
-    case SoloLectura = 'solo_lectura';
 
     public function etiqueta(): string
     {
         return match ($this) {
             self::Administrador => 'Administrador',
-            self::Supervisor => 'Supervisor',
-            self::Operador => 'Operador de Ventanilla',
-            self::SoloLectura => 'Solo Lectura',
         };
     }
 
     public function descripcion(): string
     {
         return match ($this) {
-            self::Administrador => 'Control total del sistema, configuración y usuarios.',
-            self::Supervisor => 'Aprueba o rechaza trámites y supervisa la recaudación.',
-            self::Operador => 'Recepciona trámites, registra pagos y entrega documentos.',
-            self::SoloLectura => 'Consulta información y reportes sin modificar datos.',
+            self::Administrador => 'Control total del sistema: beneficiarios, carnets, rubros, trámites, pagos y configuración.',
         };
     }
 
     /**
      * Permisos asignados al rol durante el seeding.
+     *
+     * Los bloques están separados por área aunque hoy el único rol se los lleve
+     * todos. Es lo que permite que agregar un rol mañana sea escribir una línea
+     * —`self::Operador => [...$lectura, ...$operacion]`— en vez de volver a
+     * clasificar veinte permisos sueltos.
      *
      * @return array<int, string>
      */
@@ -38,55 +57,75 @@ enum RolSistema: string
     {
         $lectura = [
             'dashboard.ver',
-            'solicitantes.ver',
+            'beneficiarios.ver',
+            'carnets.ver',
+            'rubros.ver',
             'tramites.ver',
             'pagos.ver',
-            'documentos.ver',
             'reportes.ver',
         ];
 
         $operacion = [
-            'solicitantes.crear',
-            'solicitantes.editar',
+            'beneficiarios.crear',
+            'beneficiarios.editar',
             'tramites.crear',
             'tramites.editar',
-            // No hay 'tramites.revisar': el paso de «tomar para revisar» se
-            // retiró junto con el estado «recibido». Todo trámite nace en
-            // revisión, así que no queda nada que ese permiso proteja.
             'pagos.registrar',
-            'documentos.emitir',
-            'documentos.entregar',
+            // Imprimir el carnet y entregarlo en mano son dos hechos distintos y
+            // quedan registrados con su propia fecha, por eso son dos permisos.
+            'carnets.generar',
+            'carnets.entregar',
+            // El RECIBO OFICIAL que se le entrega al pescador en el mostrador.
+            // Es de ventanilla y no de supervisión: lo imprime quien atiende, no
+            // quien aprueba. Sigue el mismo criterio que `carnets.generar`.
+            'recibos.imprimir',
         ];
 
         $supervision = [
+            /*
+             * NO HAY `tramites.revisar`, y se quitó a propósito.
+             *
+             * Existía para el paso PENDIENTE ──▶ EN REVISIÓN cuando ese paso
+             * significaba «un supervisor toma el expediente para mirarlo». Hoy
+             * significa lo contrario: es ventanilla la que ENVÍA el expediente
+             * cuando terminó de armarlo, así que esa ruta pide `tramites.editar`
+             * —el permiso de quien lo arma— y no uno de supervisión.
+             *
+             * Lo que sí es de supervisión es lo que viene después: aprobar y
+             * rechazar. Y ahí está el punto de la separación de funciones —
+             * quien arma no firma.
+             */
             'tramites.aprobar',
             'tramites.rechazar',
-            'pagos.anular',
-            'documentos.anular',
+            // Suspender una habilitación y anular un carnet son medidas
+            // sancionatorias: el día que exista el rol de ventanilla, no las
+            // tendrá.
+            'habilitaciones.suspender',
+            'carnets.anular',
             'reportes.exportar',
             'auditoria.ver',
         ];
 
         $administracion = [
-            'solicitantes.eliminar',
+            'beneficiarios.eliminar',
             'tramites.eliminar',
             'usuarios.gestionar',
             'roles.gestionar',
-            'areas.gestionar',
-            'tipos_tramite.gestionar',
+            // El catálogo de rubros y sus tarifas cambia por ordenanza.
+            'rubros.gestionar',
             'configuracion.gestionar',
         ];
 
         return match ($this) {
-            self::SoloLectura => $lectura,
-            self::Operador => [...$lectura, ...$operacion],
-            self::Supervisor => [...$lectura, ...$operacion, ...$supervision],
             self::Administrador => [...$lectura, ...$operacion, ...$supervision, ...$administracion],
         };
     }
 
     /**
      * Catálogo completo de permisos del sistema.
+     *
+     * Sale del rol administrador porque es el que los tiene todos: escribir la
+     * lista otra vez acá sería una segunda copia que puede quedar corta.
      *
      * @return array<int, string>
      */

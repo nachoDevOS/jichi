@@ -1,7 +1,12 @@
 <?php
 
+use App\Http\Controllers\Panel\BeneficiarioController;
+use App\Http\Controllers\Panel\CarnetController;
+use App\Http\Controllers\Panel\CarnetImpresionController;
 use App\Http\Controllers\Panel\DashboardController;
-use App\Http\Controllers\Panel\SolicitanteController;
+use App\Http\Controllers\Panel\PagoController;
+use App\Http\Controllers\Panel\ReciboController;
+use App\Http\Controllers\Panel\RubroController;
 use App\Http\Controllers\Panel\TramiteController;
 use Illuminate\Support\Facades\Route;
 
@@ -13,17 +18,26 @@ use Illuminate\Support\Facades\Route;
 | Todo lo de este archivo está dentro del middleware 'auth': si no hay sesión,
 | Laravel redirige al login antes de ejecutar nada.
 |
-| Además cada ruta declara QUÉ PERMISO exige, con el middleware 'permiso'.
-| Ese alias apunta a spatie/laravel-permission y está registrado en
-| bootstrap/app.php. Los permisos salen del enum App\Enums\RolSistema, que es
-| la única fuente de verdad: ahí se define qué puede hacer cada rol.
+| Además cada ruta declara QUÉ PERMISO exige, con el middleware 'permiso'. Ese
+| alias apunta a spatie/laravel-permission y está registrado en
+| bootstrap/app.php. Los permisos salen del enum App\Enums\RolSistema, que es la
+| única fuente de verdad.
 |
-|   'permiso:solicitantes.crear'  -> el usuario debe tener ese permiso
-|   'rol:administrador'           -> el usuario debe tener ese rol
+|   'permiso:beneficiarios.crear'  -> el usuario debe tener ese permiso
 |
-| Todas las URLs de acá cuelgan de /panel: /panel/dashboard, /panel/solicitantes.
-| La parte pública vive fuera de ese prefijo (routes/publico.php), así queda
-| claro de un vistazo qué es administración y qué ve el ciudadano.
+| HOY EL ÚNICO ROL ES `administrador` Y LOS TIENE TODOS. El middleware igual va
+| en cada ruta, y no es trabajo de más: el día que exista el rol de ventanilla,
+| se agrega su lista al enum y las rutas ya están protegidas. Al revés —quitarlo
+| ahora «porque total el admin puede todo» y volver a ponerlo después— es donde
+| se olvida uno y queda un agujero.
+|
+| ESCONDER UN BOTÓN EN REACT NO ES SEGURIDAD. usePermisos() sirve para que la
+| pantalla no ofrezca lo que no se puede hacer; quien realmente bloquea es este
+| middleware. Van siempre los dos.
+|
+| Todas las URLs cuelgan de /panel. La parte pública vive fuera de ese prefijo
+| (routes/publico.php), así queda claro de un vistazo qué es administración y
+| qué ve el ciudadano.
 |
 | No hay auto-registro de usuarios: las cuentas las crea el administrador.
 |
@@ -37,178 +51,319 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    // El controlador es "invocable" (tiene un único método __invoke), por eso
-    // se pasa la clase sola en vez del par [Clase::class, 'metodo'].
+    // El controlador es "invocable" (tiene un único método __invoke), por eso se
+    // pasa la clase sola en vez del par [Clase::class, 'metodo'].
     Route::get('/dashboard', DashboardController::class)
         ->middleware('permiso:dashboard.ver')
         ->name('dashboard');
 
     /*
     |--------------------------------------------------------------------------
-    | Solicitantes — pescadores, comerciantes y empresas que hacen trámites
+    | Beneficiarios — las personas que sacan el carnet
     |--------------------------------------------------------------------------
     |
     | OJO CON EL ORDEN DE LAS RUTAS. Laravel las evalúa de arriba hacia abajo y
-    | se queda con la primera que coincide. Por eso 'solicitantes/crear' tiene
-    | que ir ANTES que 'solicitantes/{solicitante}': si estuviera después,
-    | Laravel tomaría la palabra "crear" como si fuera el id del solicitante,
-    | no encontraría ningún registro con ese id y respondería 404.
+    | se queda con la primera que coincide. Por eso 'beneficiarios/crear' tiene
+    | que ir ANTES que 'beneficiarios/{beneficiario}': si estuviera después,
+    | Laravel tomaría la palabra «crear» como si fuera el id, no encontraría
+    | ningún registro y respondería 404.
     |
     */
 
-    // --- Lectura: la puede hacer cualquiera que tenga solicitantes.ver
-    Route::middleware('permiso:solicitantes.ver')->group(function () {
-        Route::get('/solicitantes', [SolicitanteController::class, 'index'])
-            ->name('solicitantes.index');
+    Route::middleware('permiso:beneficiarios.ver')->group(function () {
+        Route::get('/beneficiarios', [BeneficiarioController::class, 'index'])
+            ->name('beneficiarios.index');
+
+        // Autocompletado del formulario de trámite. Devuelve JSON, no una
+        // pantalla: se consulta mientras el operador escribe y ahí no se quiere
+        // navegar a ningún lado. Va antes del comodín por lo mismo que 'crear'.
+        Route::get('/beneficiarios/buscar', [BeneficiarioController::class, 'buscar'])
+            ->name('beneficiarios.buscar');
     });
 
-    // --- Alta: solo quien tenga solicitantes.crear
-    Route::middleware('permiso:solicitantes.crear')->group(function () {
-        Route::get('/solicitantes/crear', [SolicitanteController::class, 'create'])
-            ->name('solicitantes.create');
+    Route::middleware('permiso:beneficiarios.crear')->group(function () {
+        Route::get('/beneficiarios/crear', [BeneficiarioController::class, 'create'])
+            ->name('beneficiarios.create');
 
-        Route::post('/solicitantes', [SolicitanteController::class, 'store'])
-            ->name('solicitantes.store');
+        Route::post('/beneficiarios', [BeneficiarioController::class, 'store'])
+            ->name('beneficiarios.store');
     });
 
-    // --- Edición: solo quien tenga solicitantes.editar
-    Route::middleware('permiso:solicitantes.editar')->group(function () {
-        Route::get('/solicitantes/{solicitante}/editar', [SolicitanteController::class, 'edit'])
-            ->name('solicitantes.edit');
+    Route::middleware('permiso:beneficiarios.editar')->group(function () {
+        Route::get('/beneficiarios/{beneficiario}/editar', [BeneficiarioController::class, 'edit'])
+            ->name('beneficiarios.edit');
 
-        // PUT es el verbo para "reemplazar este registro". Como los formularios
-        // HTML solo saben hacer GET y POST, Inertia manda un POST con un campo
-        // oculto _method=PUT y Laravel lo interpreta. En React esto se resuelve
-        // solo: ver el comentario en pages/panel/solicitantes/editar.tsx.
-        Route::put('/solicitantes/{solicitante}', [SolicitanteController::class, 'update'])
-            ->name('solicitantes.update');
+        // PUT es el verbo para «reemplazar este registro». Como los formularios
+        // HTML solo saben GET y POST, Inertia manda un POST con un campo oculto
+        // _method=PUT y Laravel lo interpreta.
+        Route::put('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'update'])
+            ->name('beneficiarios.update');
     });
 
-    // --- Baja: solo quien tenga solicitantes.eliminar (administrador)
-    Route::delete('/solicitantes/{solicitante}', [SolicitanteController::class, 'destroy'])
-        ->middleware('permiso:solicitantes.eliminar')
-        ->name('solicitantes.destroy');
+    Route::delete('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'destroy'])
+        ->middleware('permiso:beneficiarios.eliminar')
+        ->name('beneficiarios.destroy');
 
-    // --- Ficha individual. Va al final a propósito: '{solicitante}' es un
-    //     comodín y se comería a '/solicitantes/crear' si estuviera más arriba.
-    Route::get('/solicitantes/{solicitante}', [SolicitanteController::class, 'show'])
-        ->middleware('permiso:solicitantes.ver')
-        ->name('solicitantes.show');
+    // La ficha va AL FINAL a propósito: '{beneficiario}' es un comodín y se
+    // comería '/beneficiarios/crear' y '/beneficiarios/buscar' si estuviera
+    // más arriba.
+    Route::get('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'show'])
+        ->middleware('permiso:beneficiarios.ver')
+        ->name('beneficiarios.show');
 
     /*
     |--------------------------------------------------------------------------
-    | Trámites
+    | Rubros — el catálogo de actividades
     |--------------------------------------------------------------------------
     |
-    | El circuito completo, en el orden en que ocurre en ventanilla:
-    |
-    |     recepción  →  revisión  →  aprobación  →  emisión  →  entrega
-    |
-    | Cada paso tiene SU permiso, y no son los mismos: quien atiende en
-    | ventanilla recepciona y entrega, pero no aprueba. Esa separación es la
-    | razón de que haya cinco rutas y no un único «cambiar estado» con el
-    | destino en el cuerpo de la petición — con eso, un operador podría
-    | aprobarse a sí mismo el trámite que acaba de cargar.
-    |
-    | Qué salto es válido desde cada estado lo decide EstadoTramite, no estas
-    | rutas: el permiso dice QUIÉN puede, el enum dice DESDE DÓNDE.
+    | No hay DELETE. Un rubro no se borra nunca: los carnets históricos apuntan a
+    | él y desaparecerlo haría que un carnet del año pasado dejara de mostrar una
+    | actividad que en su momento estuvo autorizada. Se pasa a 'inactivo' desde
+    | el formulario de edición.
     |
     */
 
-    Route::middleware('permiso:tramites.ver')->group(function () {
-        Route::get('/tramites', [TramiteController::class, 'index'])
-            ->name('tramites.index');
+    Route::get('/rubros', [RubroController::class, 'index'])
+        ->middleware('permiso:rubros.ver')
+        ->name('rubros.index');
+
+    Route::middleware('permiso:rubros.gestionar')->group(function () {
+        Route::get('/rubros/crear', [RubroController::class, 'create'])->name('rubros.create');
+        Route::post('/rubros', [RubroController::class, 'store'])->name('rubros.store');
+        Route::get('/rubros/{rubro}/editar', [RubroController::class, 'edit'])->name('rubros.edit');
+        Route::put('/rubros/{rubro}', [RubroController::class, 'update'])->name('rubros.update');
     });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Trámites — el circuito del expediente
+    |--------------------------------------------------------------------------
+    |
+    |     PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
+    |         │              │
+    |         └──────────────┴─────────▶ RECHAZADO
+    |
+    */
+
+    Route::get('/tramites', [TramiteController::class, 'index'])
+        ->middleware('permiso:tramites.ver')
+        ->name('tramites.index');
 
     Route::middleware('permiso:tramites.crear')->group(function () {
         // 'crear' va antes que cualquier '{tramite}', por lo mismo que en
-        // solicitantes: el comodín se comería la palabra.
-
-        // Paso 1: elegir el servicio.
+        // beneficiarios: el comodín se comería la palabra.
+        //
+        // Un solo formulario para los dos tipos de trámite: el operador carga
+        // siempre lo mismo y el sistema decide si es emisión inicial o adición.
         Route::get('/tramites/crear', [TramiteController::class, 'create'])
             ->name('tramites.create');
-
-        // Paso 2: un formulario por servicio. Cada uno es su propio archivo
-        // porque los formularios en papel no se parecen en nada entre sí.
-        Route::get('/tramites/crear/permiso-faena', [TramiteController::class, 'crearPermisoFaena'])
-            ->name('tramites.crear.permiso-faena');
-
-        Route::get('/tramites/crear/guia-transporte', [TramiteController::class, 'crearGuiaTransporte'])
-            ->name('tramites.crear.guia-transporte');
-
-        Route::get('/tramites/crear/cedula-pescador', [TramiteController::class, 'crearCedulaPescador'])
-            ->name('tramites.crear.cedula-pescador');
 
         Route::post('/tramites', [TramiteController::class, 'store'])
             ->name('tramites.store');
     });
 
-    /*
-     * La ficha de un trámite.
-     *
-     * Va DESPUÉS del bloque de arriba y no antes: '/tramites/crear' tiene que
-     * declararse primero, o el comodín {tramite} se come la palabra «crear» y
-     * la trata como un id. Es la misma trampa que en solicitantes.
-     */
-    Route::middleware('permiso:tramites.ver')->group(function () {
-        Route::get('/tramites/{tramite}', [TramiteController::class, 'show'])
-            ->name('tramites.show');
-    });
+    Route::get('/tramites/{tramite}', [TramiteController::class, 'show'])
+        ->middleware('permiso:tramites.ver')
+        ->name('tramites.show');
 
     /*
-     * Corregir un expediente en curso.
-     *
-     * Va acá arriba, antes de los pasos del circuito, porque '/editar' es una
-     * palabra fija y el comodín {tramite} de más abajo no la alcanza igual —el
-     * de show() ya se declaró—. Solo funciona mientras el trámite está recibido
-     * o en revisión; la regla la decide EstadoTramite::permiteEdicion().
+     * Corregir un expediente en curso: se reemplaza el papel que salió ilegible.
+     * Funciona mientras el expediente siga abierto —PENDIENTE o EN REVISIÓN—,
+     * que es el caso más frecuente: el revisor abre el trámite, ve que el
+     * escaneo salió ilegible y el operador lo vuelve a cargar sin que haya que
+     * rechazar y empezar de nuevo. La regla la decide
+     * EstadoTramite::permiteEdicion().
      */
     Route::middleware('permiso:tramites.editar')->group(function () {
         Route::get('/tramites/{tramite}/editar', [TramiteController::class, 'edit'])
             ->name('tramites.edit');
 
-        // PUT es el verbo para «reemplazar este registro». Como los formularios
-        // HTML solo saben GET y POST, Inertia manda un POST con _method=PUT.
         Route::put('/tramites/{tramite}', [TramiteController::class, 'update'])
             ->name('tramites.update');
     });
 
     /*
-     * Los pasos del circuito. Todos POST: cambian el estado del expediente, y
-     * un GET que modifica datos se dispara solo con que el navegador precargue
-     * el enlace.
+     * BORRAR UN EXPEDIENTE — solo pendiente o en revisión.
+     *
+     * Permiso propio y del grupo de ADMINISTRACIÓN, no del de operación: borrar
+     * no es corregir. El operador de ventanilla que se equivocó al cargar puede
+     * editar los adjuntos con `tramites.editar`; hacer desaparecer el
+     * expediente entero —con sus pagos y sus archivos— es otra cosa.
+     *
+     * El estado no se comprueba acá: lo decide EstadoTramite::permiteEliminacion()
+     * y lo aplica el servicio. El middleware cubre QUIÉN puede; el servicio,
+     * CUÁNDO se puede.
      */
-    Route::post('/tramites/{tramite}/aprobar', [TramiteController::class, 'aprobar'])
+    Route::delete('/tramites/{tramite}', [TramiteController::class, 'destroy'])
+        ->middleware('permiso:tramites.eliminar')
+        ->name('tramites.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Los pasos del circuito
+    |--------------------------------------------------------------------------
+    |
+    |     PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
+    |         │              │
+    |         └──────────────┴─────────▶ RECHAZADO
+    |
+    | TODOS SON PATCH. Cambian parcialmente un recurso que ya existe, que es
+    | exactamente lo que significa PATCH.
+    |
+    | Lo que NO pueden ser nunca es GET. Un verbo de lectura que escribe se
+    | dispara solo: alcanza con que el navegador precargue el enlace, que un
+    | antivirus corporativo lo visite o que alguien comparta la URL por chat y la
+    | vista previa la abra. Un trámite aprobado por el prefetch del navegador es
+    | un problema que no se puede explicar después.
+    |
+    | Cada paso tiene SU ruta y SU permiso, en vez de un único «cambiar estado»
+    | con el destino en el cuerpo de la petición. Con eso, quien recepciona
+    | podría aprobarse a sí mismo el trámite que acaba de cargar.
+    |
+    | Qué salto vale desde cada estado lo decide App\Enums\EstadoTramite, no
+    | estas rutas: el permiso dice QUIÉN puede, el enum dice DESDE DÓNDE.
+    |
+    */
+
+    /*
+     * ENVIAR EL EXPEDIENTE A REVISIÓN — el paso OBLIGATORIO del circuito.
+     *
+     * Sin pasar por acá no se puede aprobar: `EstadoTramite::siguientes()` ya no
+     * permite el salto PENDIENTE ──▶ APROBADO. El motivo es de control, no de
+     * comodidad — con ese atajo, quien cargaba la solicitud en ventanilla podía
+     * aprobarla sin que nadie más la tocara.
+     *
+     * Lleva el permiso de ventanilla (`tramites.editar`) y no el de supervisión:
+     * enviar es el último acto de quien ARMA el expediente. Aprobar, que es lo
+     * que sigue, exige `tramites.aprobar`, y así los dos actos quedan en manos
+     * distintas el día que exista el rol de ventanilla.
+     */
+    Route::patch('/tramites/{tramite}/enviar', [TramiteController::class, 'enviar'])
+        ->middleware('permiso:tramites.editar')
+        ->name('tramites.enviar');
+
+    Route::patch('/tramites/{tramite}/aprobar', [TramiteController::class, 'aprobar'])
         ->middleware('permiso:tramites.aprobar')
         ->name('tramites.aprobar');
 
-    Route::post('/tramites/{tramite}/rechazar', [TramiteController::class, 'rechazar'])
+    Route::patch('/tramites/{tramite}/rechazar', [TramiteController::class, 'rechazar'])
         ->middleware('permiso:tramites.rechazar')
         ->name('tramites.rechazar');
 
-    // Emitir y entregar son permisos de DOCUMENTOS y no de trámites: lo que se
-    // emite y se entrega es el documento, y quien lo hace no es necesariamente
-    // quien aprobó el expediente.
-    Route::post('/tramites/{tramite}/emitir', [TramiteController::class, 'emitir'])
-        ->middleware('permiso:documentos.emitir')
-        ->name('tramites.emitir');
+    // Imprimir y entregar son permisos de CARNETS y no de trámites: lo que se
+    // imprime y se entrega es el documento, y quien lo hace no es
+    // necesariamente quien aprobó el expediente.
+    Route::patch('/tramites/{tramite}/generar', [TramiteController::class, 'generar'])
+        ->middleware('permiso:carnets.generar')
+        ->name('tramites.generar');
 
-    Route::post('/tramites/{tramite}/entregar', [TramiteController::class, 'entregar'])
-        ->middleware('permiso:documentos.entregar')
+    Route::patch('/tramites/{tramite}/entregar', [TramiteController::class, 'entregar'])
+        ->middleware('permiso:carnets.entregar')
         ->name('tramites.entregar');
+
+    /*
+     * EL RECIBO OFICIAL — el talonario verde que se lleva el pescador.
+     *
+     * Es la ÚNICA ruta del circuito que es GET, y no es una excepción a la regla
+     * de arriba: esta no escribe nada. El recibo ya se emitió solo, dentro de la
+     * transacción que pasó el expediente a EN REVISIÓN (ver
+     * SolicitudCarnetService::enviarARevision); acá únicamente se dibuja el
+     * PDF. Que el navegador precargue el enlace no cambia ningún dato ni consume
+     * ningún número de la serie.
+     *
+     * Reimprimir sale siempre con el MISMO número: el papel ya está en manos de
+     * alguien, y un segundo recibo por el mismo pago dejaría a Contabilidad con
+     * dos comprobantes que no puede cuadrar.
+     */
+    Route::get('/tramites/{tramite}/recibo', [ReciboController::class, 'imprimir'])
+        ->middleware('permiso:recibos.imprimir')
+        ->name('tramites.recibo');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pagos — Regla C
+    |--------------------------------------------------------------------------
+    |
+    | El alta cuelga del trámite porque un pago sin expediente no significa nada:
+    | no habría contra qué compararlo ni a quién acreditárselo.
+    |
+    | El listado general sí es suelto: es el libro de caja, y lo que se quiere
+    | ahí es justamente mirarlos todos juntos para cuadrar contra el banco.
+    |
+    | NO HAY ANULACIÓN DE PAGOS. Una boleta cargada mal se corrige, y el trait
+    | Auditable deja el valor anterior registrado. Un pago «anulado» que sigue en
+    | la lista solo invita a sumarlo por error.
+    |
+    */
+
+    Route::get('/pagos', [PagoController::class, 'index'])
+        ->middleware('permiso:pagos.ver')
+        ->name('pagos.index');
+
+    Route::post('/tramites/{tramite}/pagos', [PagoController::class, 'store'])
+        ->middleware('permiso:pagos.registrar')
+        ->name('pagos.store');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Carnets — consulta y sanciones
+    |--------------------------------------------------------------------------
+    |
+    | NO HAY ALTA. Un carnet nace dentro de SolicitudCarnetService cuando la
+    | Regla A determina que la persona no tenía uno de esta gestión. Un botón de
+    | «crear carnet» suelto permitiría emitir documentos sin expediente que los
+    | respalde, y sin cobrar.
+    |
+    */
+
+    Route::middleware('permiso:carnets.ver')->group(function () {
+        Route::get('/carnets', [CarnetController::class, 'index'])->name('carnets.index');
+        Route::get('/carnets/{carnet}', [CarnetController::class, 'show'])->name('carnets.show');
+    });
+
+    /*
+     * IMPRIMIR EL CARNET — el plástico que se lleva la persona.
+     *
+     * Es GET y NO es una excepción a la regla de que los pasos del circuito van
+     * por PATCH: esta ruta no escribe nada. Dibuja el PDF a partir de la fila
+     * del carnet y lo manda al navegador; que alguien la precargue o comparta el
+     * enlace no cambia ningún dato.
+     *
+     * MARCAR EL TRÁMITE COMO IMPRESO SIGUE SIENDO OTRA COSA
+     * —`PATCH /tramites/{tramite}/generar`—. Son dos actos distintos: abrir la
+     * vista previa no es haber sacado el plástico en la impresora de
+     * credenciales, y si esta ruta marcara, alcanzaría con mirar el documento
+     * para que el expediente declarara un carnet que nunca existió.
+     *
+     * Lleva `carnets.generar` —el permiso de ventanilla, el mismo que marca
+     * impreso— y no `carnets.ver`: consultar un carnet en pantalla y sacar el
+     * documento con validez no son la misma atribución.
+     */
+    Route::get('/carnets/{carnet}/imprimir', [CarnetImpresionController::class, 'imprimir'])
+        ->middleware('permiso:carnets.generar')
+        ->name('carnets.imprimir');
+
+    Route::post('/carnets/{carnet}/anular', [CarnetController::class, 'anular'])
+        ->middleware('permiso:carnets.anular')
+        ->name('carnets.anular');
+
+    // Suspender o rehabilitar un rubro suelto del carnet. La medida es por
+    // actividad y no por documento: a un pescador se le puede cortar el
+    // transporte sin quitarle la pesca.
+    Route::post('/habilitaciones/{habilitacion}/alternar', [CarnetController::class, 'alternarHabilitacion'])
+        ->middleware('permiso:habilitaciones.suspender')
+        ->name('habilitaciones.alternar');
 
     /*
     |--------------------------------------------------------------------------
     | Módulos pendientes
     |--------------------------------------------------------------------------
     |
-    | Documentos, Reportes y Configuración todavía no existen.
-    | Aparecen en el menú lateral en gris, porque el layout de React comprueba
-    | si la ruta está declarada antes de convertirla en enlace.
+    | Reportes y Configuración todavía no existen. Aparecen en el menú lateral en
+    | gris, porque el layout de React comprueba si la ruta está declarada antes
+    | de convertirla en enlace (ver barra-lateral.tsx).
     |
-    | Para construir cualquiera de ellos: copiar el patrón de Solicitantes.
-    | El paso a paso está en docs/GUIA-INERTIA.md y la lista completa de lo
-    | que falta en docs/PENDIENTES.md.
+    | Para construir cualquiera de ellos: copiar el patrón de Beneficiarios.
     |
     */
 });

@@ -13,7 +13,7 @@ import type { PageProps } from '@/types';
  *
  *   const { puede } = usePermisos();
  *
- *   {puede('solicitantes.crear') && <Button>Nuevo solicitante</Button>}
+ *   {puede('beneficiarios.crear') && <Button>Nuevo beneficiario</Button>}
  *
  * ADVERTENCIA IMPORTANTE
  *
