@@ -4,6 +4,40 @@ Reemplaza al talonario verde de tres copias que la unidad venía llenando a mano
 Es el papel que el pescador se lleva del mostrador cuando entrega sus documentos
 y paga.
 
+> ## ⚠️ NO HAY TABLA `recibos`
+>
+> La hubo, y buena parte de este documento fue escrita cuando existía. Se retiró
+> a pedido del responsable: toda la información del comprobante ya vive en
+> `beneficiarios`, `carnets`, `rubros`, `tramites` y `pagos`, así que duplicarla
+> era mantener el mismo dato en dos lugares.
+>
+> **Hoy el recibo se ARMA al vuelo**, cada vez que alguien lo imprime, en
+> `ReciboTramiteService::armar()`. El objeto que devuelve es
+> `App\Support\ReciboArmado`, de solo lectura.
+>
+> | Dato | De dónde sale ahora |
+> | --- | --- |
+> | Número | El **id del trámite**, con ceros: `0016` |
+> | Fecha | `tramites.fecha_revision` — el día en que se cobró de verdad |
+> | Nombre y CI | `beneficiarios`, en vivo |
+> | Concepto | `rubros.nombre` + la gestión del carnet |
+> | Monto | Suma de `pagos`, o `tramites.monto_requerido` si no hay ninguno |
+> | Casilla DESCRIPCIÓN | `ConceptoRecibo::desdeTramite()` |
+>
+> **LO QUE SE PERDIÓ, que hay que saber antes de tocar el módulo:**
+>
+> 1. **El recibo ya no es inmutable.** Corregir una tilde del apellido o un
+>    dígito de la cédula cambia los comprobantes ya entregados.
+> 2. **Borrar el trámite se lleva el recibo.** Antes quedaba huérfano pero
+>    legible, con `ON DELETE SET NULL`.
+> 3. **La serie tiene huecos.** No todo trámite emite recibo —nace al pasar a EN
+>    REVISIÓN— así que el talonario va 0012, 0015, 0016, 0019.
+>
+> Si algún día Contabilidad exige una serie sin saltos, hay que volver a guardar
+> el número: `CorrelativoService` quedó escrito y sin usar justamente para eso.
+>
+> Lo que sigue abajo describe el diseño del papel, que **no cambió**.
+
 ---
 
 ## 1. Cuándo nace, y por qué ahí
@@ -20,6 +54,11 @@ PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──�
 El motivo es de mostrador, no de código: ese es el momento en que el pescador ya
 entregó los papeles y la plata, y se tiene que ir con un comprobante en la mano
 mientras la unidad revisa. Antes no hay nada que respaldar; después ya se fue.
+
+Sin tabla, «nacer» significa otra cosa: el recibo EXISTE desde que el trámite
+tiene `fecha_revision`. Lo decide `ReciboTramiteService::corresponde()`, que mira
+esa fecha y no el estado — un trámite rechazado conserva su comprobante, porque
+la plata entró igual.
 
 Lo dispara `SolicitudCarnetService::tomarParaRevision()`, **dentro de su misma
 transacción**. Si la toma para revisión se deshace, el recibo tampoco queda y el

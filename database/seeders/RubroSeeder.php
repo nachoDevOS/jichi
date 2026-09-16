@@ -63,6 +63,9 @@ class RubroSeeder extends Seeder
                 'descripcion' => 'Permiso por faena. Habilita la captura de productos hidrobiológicos '
                     .'en el río Mamoré, Ibare y afluentes, con artes de pesca artesanal.',
                 'costo' => 80.00,
+                // La pesca se autoriza POR VOLUMEN: el carnet lleva el cupo en
+                // kilos impreso y se contrasta contra las guías de transporte.
+                'requiere_capacidad' => true,
                 'estado' => EstadoRubro::Activo,
             ],
             [
@@ -70,6 +73,9 @@ class RubroSeeder extends Seeder
                 'descripcion' => 'Guía única de transporte. Habilita el traslado y la venta de '
                     .'pescado fresco o congelado dentro del departamento del Beni.',
                 'costo' => 120.00,
+                // La comercialización habilita a trasladar y vender, sin tope
+                // propio: el carnet de este rubro NO lleva renglón de cupo.
+                'requiere_capacidad' => false,
                 'estado' => EstadoRubro::Activo,
             ],
         ];

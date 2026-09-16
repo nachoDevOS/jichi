@@ -31,7 +31,9 @@ class RubroController extends Controller
             'rubros' => Rubro::query()
                 // Cuántos carnets dependen de cada rubro. Es el dato que le dice
                 // al administrador qué tan grave sería desactivarlo.
-                ->withCount('habilitaciones')
+                // Cuántos carnets se emitieron para esta actividad. Sale de
+                // `carnets` directo: el pivote `carnet_rubro` ya no existe.
+                ->withCount('carnets')
                 ->withCount('tramites')
                 ->orderBy('nombre')
                 ->get()
@@ -40,10 +42,11 @@ class RubroController extends Controller
                     'nombre' => $r->nombre,
                     'descripcion' => $r->descripcion,
                     'costo' => (float) $r->costo,
+                    'requiere_capacidad' => $r->requiereCapacidad(),
                     'estado' => $r->estado->value,
                     'estado_etiqueta' => $r->estado->etiqueta(),
                     'estado_color' => $r->estado->color(),
-                    'habilitaciones_count' => $r->habilitaciones_count,
+                    'carnets_count' => $r->carnets_count,
                     'tramites_count' => $r->tramites_count,
                 ])
                 ->all(),
@@ -75,6 +78,7 @@ class RubroController extends Controller
                 'nombre' => $rubro->nombre,
                 'descripcion' => $rubro->descripcion,
                 'costo' => (float) $rubro->costo,
+                'requiere_capacidad' => $rubro->requiereCapacidad(),
                 'estado' => $rubro->estado->value,
             ],
             'estados' => EstadoRubro::opciones(),

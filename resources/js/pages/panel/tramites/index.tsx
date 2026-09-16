@@ -99,7 +99,7 @@ export default function IndiceTramites({
     return (
         <LayoutPanel
             titulo="Trámites"
-            descripcion="Expedientes de emisión de carnet y adición de rubros."
+            descripcion="Expedientes de emisión y actualización de carnets."
             acciones={
                 puede('tramites.crear') && (
                     <Button onClick={() => router.visit(route('tramites.create'))}>

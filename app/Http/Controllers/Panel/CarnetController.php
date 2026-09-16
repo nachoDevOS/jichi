@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Enums\EstadoCarnet;
-use App\Enums\EstadoHabilitacion;
 use App\Http\Controllers\Controller;
 use App\Models\Carnet;
-use App\Models\CarnetRubro;
+use App\Models\Rubro;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +21,7 @@ use Inertia\Response;
  * permitiría emitir documentos sin expediente que los respalde —y sin cobrar—.
  *
  * Lo que sí se hace acá es lo que pasa DESPUÉS de emitido: consultarlo,
- * suspender un rubro y anular el documento entero.
+ * suspender el carnet y anularlo.
  */
 class CarnetController extends Controller
 {
@@ -32,12 +31,21 @@ class CarnetController extends Controller
             'buscar' => $request->string('buscar')->trim()->value() ?: null,
             'estado' => $request->string('estado')->trim()->value() ?: null,
             'gestion' => $request->integer('gestion') ?: null,
+            // Con un carnet por actividad, «mostrame los de Pescador» pasó a ser
+            // una pregunta corriente de ventanilla.
+            'rubro' => $request->integer('rubro') ?: null,
             'por_pagina' => Paginacion::filas($request),
         ];
 
         $carnets = Carnet::query()
-            ->with(['beneficiario:id,ci_nit,complemento,expedido,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'])
-            ->withCount('habilitaciones')
+            ->with([
+                'beneficiario:id,ci_nit,complemento,expedido,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                // El rubro ES el carnet desde el modelo nuevo: sin esto el
+                // listado no puede decir de qué actividad es cada documento,
+                // que es lo primero que se busca con dos carnets de la misma
+                // persona en pantalla.
+                'rubro:id,nombre',
+            ])
 
             // Se califica la columna con el nombre de la tabla porque
             // `carnets`, `beneficiarios` y `rubros` tienen todas una columna
@@ -45,6 +53,7 @@ class CarnetController extends Controller
             // responde «column reference "estado" is ambiguous».
             ->when($filtros['estado'], fn ($q, $e) => $q->where('carnets.estado', $e))
             ->when($filtros['gestion'], fn ($q, $g) => $q->where('gestion', $g))
+            ->when($filtros['rubro'], fn ($q, $r) => $q->where('carnets.rubro_id', $r))
             /*
              * La búsqueda acepta tres cosas, porque son las tres por las que se
              * pregunta en ventanilla:
@@ -85,7 +94,8 @@ class CarnetController extends Controller
                 'estado_etiqueta' => $c->estado->etiqueta(),
                 'estado_color' => $c->estado->color(),
                 'vigente' => $c->estaVigente(),
-                'rubros_count' => $c->habilitaciones_count,
+                'rubro' => $c->rubro?->nombre,
+                'capacidad' => $c->capacidadLegible(),
                 'fecha_emision' => $c->fecha_emision?->toDateString(),
                 'fecha_vencimiento' => $c->fecha_vencimiento?->toDateString(),
             ]);
@@ -95,6 +105,10 @@ class CarnetController extends Controller
             'filtros' => $filtros,
             'estados' => EstadoCarnet::opciones(),
             'gestiones' => Carnet::query()->distinct()->orderByDesc('gestion')->pluck('gestion')->all(),
+            // Para el selector del filtro. Se listan TODOS y no solo los
+            // activos: un rubro dado de baja sigue teniendo carnets emitidos
+            // que alguien va a querer buscar.
+            'rubros' => Rubro::query()->orderBy('nombre')->get(['id', 'nombre'])->all(),
             'opcionesPorPagina' => Paginacion::OPCIONES,
         ]);
     }
@@ -103,7 +117,7 @@ class CarnetController extends Controller
     {
         $carnet->load([
             'beneficiario',
-            'habilitaciones.rubro:id,nombre,descripcion',
+            'rubro:id,nombre,descripcion,requiere_capacidad',
             'tramites.rubro:id,nombre',
         ]);
 
@@ -115,7 +129,31 @@ class CarnetController extends Controller
                 'estado_etiqueta' => $carnet->estado->etiqueta(),
                 'estado_color' => $carnet->estado->color(),
                 'vigente' => $carnet->estaVigente(),
-                'admite_adiciones' => $carnet->admiteAdiciones(),
+                'admite_tramites' => $carnet->admiteTramites(),
+
+                /*
+                 * LA ACTIVIDAD DEL CARNET Y SU CUPO.
+                 *
+                 * Ocupan el lugar que tenía la lista `habilitaciones`: con un
+                 * carnet por rubro no hay lista que mostrar, hay UN rubro y UN
+                 * cupo, y los dos van impresos en el plástico.
+                 */
+                'rubro' => $carnet->rubro?->nombre,
+                'rubro_descripcion' => $carnet->rubro?->descripcion,
+                'capacidad_kg' => $carnet->capacidad_kg !== null ? (float) $carnet->capacidad_kg : null,
+                'capacidad' => $carnet->capacidadLegible(),
+
+                /*
+                 * Si esta actividad se autoriza por volumen. La ficha esconde el
+                 * bloque del cupo cuando no: mostrar «Cupo autorizado: sin
+                 * definir» en un carnet de Comercializador no informa nada, y
+                 * sugiere que falta cargar un dato que no existe.
+                 */
+                'requiere_capacidad' => $carnet->rubro?->requiereCapacidad() ?? false,
+
+                // Si se puede suspender o levantar la suspensión desde la ficha.
+                'puede_suspenderse' => $carnet->estado === EstadoCarnet::Vigente,
+                'puede_rehabilitarse' => $carnet->estado->esReversible(),
                 'fecha_emision' => $carnet->fecha_emision?->toDateString(),
                 'fecha_vencimiento' => $carnet->fecha_vencimiento?->toDateString(),
 
@@ -146,23 +184,6 @@ class CarnetController extends Controller
                 'fechaNacimiento' => $carnet->beneficiario?->fechaNacimiento?->toDateString(),
             ],
 
-            'habilitaciones' => $carnet->habilitaciones->map(fn (CarnetRubro $h): array => [
-                'id' => $h->id,
-                'rubro' => $h->rubro?->nombre,
-                'descripcion' => $h->rubro?->descripcion,
-                'estado' => $h->estado->value,
-                'estado_etiqueta' => $h->estado->etiqueta(),
-                'estado_color' => $h->estado->color(),
-                'fecha_habilitacion' => $h->fecha_habilitacion?->toDateString(),
-
-                // El cupo autorizado para ESTE rubro. No sale en el plástico
-                // —se decidió no imprimirlo— pero sí acá, que es donde la
-                // unidad lo consulta y lo contrasta contra las guías.
-                'capacidad_kg' => $h->capacidad_kg !== null
-                    ? (float) $h->capacidad_kg
-                    : null,
-            ])->all(),
-
             'tramites' => $carnet->tramites->map(fn ($t): array => [
                 'id' => $t->id,
                 'rubro' => $t->rubro?->nombre,
@@ -177,39 +198,62 @@ class CarnetController extends Controller
     }
 
     /**
-     * SUSPENDER O REHABILITAR UN RUBRO — POST /panel/habilitaciones/{habilitacion}/alternar
+     * ========================================================================
+     *  SUSPENDER O LEVANTAR UN CARNET — POST /panel/carnets/{carnet}/suspender
+     * ========================================================================
      *
-     * La medida es por rubro y no por carnet: a un pescador se le puede cortar
-     * el transporte sin quitarle la pesca, y el carnet sigue valiendo para lo
-     * demás.
+     * LA MEDIDA SIGUE SIENDO POR ACTIVIDAD, aunque ahora se aplique al carnet.
+     * A un pescador se le puede cortar el transporte sin quitarle la pesca: son
+     * dos carnets distintos y se suspende uno. Antes esto se hacía sobre la fila
+     * de `carnet_rubro`; con un carnet por rubro, suspender el carnet ES
+     * suspender esa actividad, y los demás carnets de la persona no se enteran.
      *
-     * La fila NO se borra al suspender. Borrarla dejaría al carnet como si ese
-     * rubro nunca se hubiera habilitado, y se perdería el dato de que estuvo
-     * autorizado hasta tal fecha —que es lo que un inspector necesita saber
-     * cuando revisa una infracción del mes pasado—.
+     * EL CARNET NO SE BORRA NI SE ANULA AL SUSPENDER. Borrarlo dejaría al
+     * sistema como si esa actividad nunca se hubiera habilitado, y se perdería
+     * el dato de que estuvo autorizada hasta tal fecha —que es lo que un
+     * inspector necesita saber cuando revisa una infracción del mes pasado—.
+     * Anularlo sería definitivo, y una suspensión por definición no lo es.
+     *
+     * ------------------------------------------------------------------------
+     *  ES UN INTERRUPTOR, PERO NO SE PUEDE ENCENDER DESDE CUALQUIER LADO
+     * ------------------------------------------------------------------------
+     *
+     * Solo van y vuelven VIGENTE y SUSPENDIDO. Un carnet anulado o vencido no se
+     * suspende —ya no habilita— ni se «levanta» a vigente, porque eso
+     * resucitaría un documento que caducó o que se dio de baja por una sanción.
+     * Quién puede pasar a qué lo dice `EstadoCarnet`, no este método.
      */
-    public function alternarHabilitacion(Request $request, CarnetRubro $habilitacion): RedirectResponse
+    public function suspender(Request $request, Carnet $carnet): RedirectResponse
     {
-        $suspender = $habilitacion->estaHabilitado();
+        $suspender = $carnet->estado === EstadoCarnet::Vigente;
 
-        $habilitacion->update([
-            'estado' => $suspender ? EstadoHabilitacion::Suspendido : EstadoHabilitacion::Habilitado,
+        if (! $suspender && ! $carnet->estado->esReversible()) {
+            return back()->with(
+                'error',
+                "El carnet está {$carnet->estado->etiqueta()} y ese estado no se revierte desde acá.",
+            );
+        }
+
+        $carnet->update([
+            'estado' => $suspender ? EstadoCarnet::Suspendido : EstadoCarnet::Vigente,
         ]);
 
         // El trait Auditable ya registró el cambio con el usuario y la IP. Se le
         // agrega el motivo como descripción porque el «por qué» de una sanción
         // no está en los valores antes/después.
         if (filled($request->input('motivo'))) {
-            $habilitacion->registrarAuditoria(
+            $carnet->registrarAuditoria(
                 $suspender ? 'suspendido' : 'rehabilitado',
                 null,
                 trim((string) $request->input('motivo')),
             );
         }
 
+        $rubro = $carnet->rubro?->nombre ?? 'el rubro';
+
         return back()->with('exito', $suspender
-            ? "Rubro «{$habilitacion->rubro?->nombre}» suspendido en el carnet de {$habilitacion->carnet?->gestion}."
-            : "Rubro «{$habilitacion->rubro?->nombre}» rehabilitado.");
+            ? "Carnet de «{$rubro}» de la gestión {$carnet->gestion} suspendido."
+            : "Carnet de «{$rubro}» rehabilitado.");
     }
 
     /**
@@ -220,10 +264,14 @@ class CarnetController extends Controller
      * borrar; un registro que desaparece deja un hueco en la serie que nadie
      * puede explicar después.
      *
-     * Anulado sigue ocupando su lugar en la gestión, así que la persona TAMPOCO
-     * puede sacar otro este año: el índice único (beneficiario, gestión) no lo
-     * permitiría. Es lo correcto —anular es una sanción, no un trámite de
-     * reposición— pero conviene tenerlo presente antes de apretar el botón.
+     * Anulado sigue ocupando su lugar, así que la persona TAMPOCO puede sacar
+     * otro carnet DEL MISMO RUBRO este año: el índice único
+     * (beneficiario, rubro, gestión) no lo permitiría. Es lo correcto —anular es
+     * una sanción, no un trámite de reposición— pero conviene tenerlo presente
+     * antes de apretar el botón.
+     *
+     * Sus OTRAS actividades no se tocan: anular el carnet de Comercializador
+     * deja intacto el de Pescador. Para cortar todo hay que anular cada uno.
      */
     public function anular(Request $request, Carnet $carnet): RedirectResponse
     {

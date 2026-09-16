@@ -34,6 +34,10 @@ export function FormularioRubroComponente({
         nombre: rubro?.nombre ?? '',
         descripcion: rubro?.descripcion ?? '',
         costo: rubro?.costo !== undefined ? String(rubro.costo) : '',
+        // Por defecto NO lleva cupo: un rubro nuevo no se autoriza por volumen
+        // hasta que alguien diga que sí. Al revés, el que se olvide de
+        // destildarlo obliga a ventanilla a inventar un número para guardar.
+        requiere_capacidad: rubro?.requiere_capacidad ?? false,
         estado: rubro?.estado ?? 'activo',
         ...(editando ? { _method: 'put' as const } : {}),
     });
@@ -89,6 +93,41 @@ export function FormularioRubroComponente({
                                 onChange={(e) => form.setData('costo', e.target.value)}
                                 aria-invalid={Boolean(form.errors.costo)}
                             />
+                        </Campo>
+
+                        {/*
+                            ¿ESTA ACTIVIDAD LLEVA CUPO EN KILOS?
+
+                            De esta casilla dependen tres cosas: que el
+                            formulario de trámite pida el cupo, que la ficha del
+                            carnet lo muestre, y que el plástico imprima el
+                            renglón CUPO o le dé la tira entera al nombre del
+                            rubro.
+
+                            Es una casilla y no una regla escrita en código
+                            porque el catálogo lo edita la unidad: el mismo rubro
+                            figura como «Pescador» o como «Faena» según quién lo
+                            cargó, y los que vengan por ordenanza tienen que
+                            poder configurarse sin tocar el sistema.
+                        */}
+                        <Campo
+                            etiqueta="Cupo autorizado"
+                            htmlFor="requiere_capacidad"
+                            error={form.errors.requiere_capacidad}
+                            ayuda="Marque solo si la actividad se autoriza por volumen, como la pesca. La comercialización no lleva cupo."
+                        >
+                            <label className="flex items-center gap-2 text-sm">
+                                <input
+                                    id="requiere_capacidad"
+                                    type="checkbox"
+                                    checked={form.data.requiere_capacidad}
+                                    onChange={(e) =>
+                                        form.setData('requiere_capacidad', e.target.checked)
+                                    }
+                                    className="size-4 rounded border-input accent-primary"
+                                />
+                                Esta actividad se autoriza por kilos
+                            </label>
                         </Campo>
 
                         <Campo

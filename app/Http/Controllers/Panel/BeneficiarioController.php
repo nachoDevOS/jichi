@@ -186,26 +186,36 @@ class BeneficiarioController extends Controller
             /*
              * EL DATO QUE DECIDE EL PRÓXIMO TRÁMITE — Regla A.
              *
-             * La pantalla necesita saber si esta persona ya tiene carnet de la
-             * gestión, porque de eso depende el cartel que muestra: «emitir
-             * carnet» o «agregar rubro». El sistema lo vuelve a calcular al
+             * Qué ACTIVIDADES tiene cubiertas esta persona este año, porque de
+             * eso depende lo que la pantalla ofrece: los rubros que ya tienen
+             * carnet no se pueden volver a pedir, y los que no, sí.
+             *
+             * Es una LISTA y no un objeto, y ese es el cambio del modelo nuevo:
+             * antes había un carnet por persona y gestión, así que la pregunta
+             * tenía una sola respuesta. El sistema lo vuelve a calcular al
              * registrar, con la fila bloqueada; esto es solo para la vista.
              */
-            'carnetGestion' => $this->resumirCarnet($beneficiario->carnetDeGestion($gestion)),
+            'carnetsGestion' => $beneficiario->carnetsDeGestion($gestion)
+                ->map($this->resumirCarnet(...))
+                ->values()
+                ->all(),
 
             /*
-             * Los carnets se cargan con with() para traer sus rubros en pocas
-             * consultas. Sin eso, pintar 5 carnets serían 6 consultas.
+             * EL HISTORIAL COMPLETO, de todas las gestiones.
+             *
+             * Se cargan con with() para traer el rubro de cada uno en pocas
+             * consultas. Sin eso, pintar 5 carnets serían 6 consultas — y con un
+             * carnet por actividad la lista creció: una persona con tres rubros
+             * y dos años de antigüedad tiene seis filas acá.
              */
             'carnets' => $beneficiario->carnets()
-                ->with('rubros:id,nombre')
+                ->with('rubro:id,nombre')
                 ->withCount('tramites')
                 ->orderByDesc('gestion')
                 ->get()
                 ->map(fn ($c): array => [
                     ...$this->resumirCarnet($c),
                     'tramites_count' => $c->tramites_count,
-                    'rubros' => $c->rubros->pluck('nombre')->all(),
                 ])
                 ->all(),
         ]);
@@ -303,7 +313,7 @@ class BeneficiarioController extends Controller
         return Beneficiario::query()
             ->buscar($termino)
             /*
-             * Se traen los carnets de la gestión CON sus habilitaciones y el
+             * Se traen los carnets de la gestión CON su rubro y el
              * nombre de cada rubro, todo en la misma tanda de consultas.
              *
              * Sin esto, armar la situación de diez personas serían veintiuna
@@ -312,7 +322,7 @@ class BeneficiarioController extends Controller
              */
             ->with([
                 'carnets' => fn ($q) => $q->where('gestion', $gestion),
-                'carnets.habilitaciones.rubro:id,nombre',
+                'carnets.rubro:id,nombre',
             ])
             ->ordenAlfabetico()
             ->limit(10)
@@ -360,16 +370,17 @@ class BeneficiarioController extends Controller
      *
      * @return array<string, mixed>|null
      */
-    private function resumirCarnet(?Carnet $carnet): ?array
+    private function resumirCarnet(Carnet $carnet): array
     {
-        if ($carnet === null) {
-            return null;
-        }
-
         return [
             'id' => $carnet->id,
             // El número impreso en el carnet: 000013. Ver Carnet::registro().
             'registro' => $carnet->registro(),
+            // La actividad que habilita. Con un carnet por rubro es lo primero
+            // que hay que mostrar: sin esto, dos carnets de la misma persona se
+            // ven idénticos en la ficha.
+            'rubro' => $carnet->rubro?->nombre,
+            'capacidad' => $carnet->capacidadLegible(),
             'gestion' => $carnet->gestion,
             'estado' => $carnet->estado->value,
             'estado_etiqueta' => $carnet->estado->etiqueta(),

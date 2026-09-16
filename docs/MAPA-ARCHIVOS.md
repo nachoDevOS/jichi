@@ -16,10 +16,9 @@ decisiones que acá solo se nombran.
 | Archivo | Ln | Qué es | No obvio |
 | --- | --- | --- | --- |
 | `EstadoTramite.php` | 261 | `pendiente → en_revision → aprobado \| rechazado` | **Única fuente de verdad de las transiciones.** `siguientes()` decide qué salto vale. Se puede aprobar directo desde pendiente. `abiertos()` agrupa pendiente + en revisión |
-| `EstadoCarnet.php` | 73 | `vigente \| vencido \| anulado` | `vencido` lo escribiría un comando programado que **no existe todavía** |
-| `EstadoHabilitacion.php` | 49 | `habilitado \| suspendido` — un rubro DENTRO de un carnet | Suspendido **bloquea igual** que habilitado: la habilitación existe |
+| `EstadoCarnet.php` | 137 | `vigente \| suspendido \| vencido \| anulado` | Absorbió al enum `EstadoHabilitacion`: con un carnet por rubro, suspender la actividad es suspender el carnet. `vencido` lo escribiría un comando programado que **no existe todavía** |
 | `EstadoRubro.php` | 48 | `activo \| inactivo` | Un rubro nunca se borra |
-| `TipoTramite.php` | 74 | `emision_inicial \| adicion_rubro` | **Lo decide el sistema, no el operador** |
+| `TipoTramite.php` | 92 | `emision_inicial \| actualizacion` | **Lo decide el sistema, no el operador**. «Adición de rubro» ya no existe: pedir otro rubro emite otro carnet |
 | `RolSistema.php` | 124 | Roles y **todos** sus permisos | Un solo rol hoy (`administrador`). Los permisos ya están en cuatro bloques para poder agregar el segundo en una línea |
 | `FormaPago.php` | 52 | `deposito \| efectivo` | Son las dos casillas del recibo de papel |
 | `ConceptoRecibo.php` | 110 | Las seis casillas de DESCRIPCIÓN del recibo | Puente rubro→casilla **por nombre**, con caída a `Otros`: el catálogo y el talonario evolucionan por separado |
@@ -31,8 +30,8 @@ decisiones que acá solo se nombran.
 | `SolicitudCarnetService.php` | 1053 | **El caso de uso central.** Reglas A, B y C + todo el circuito | El archivo más importante del sistema. Ver el desglose abajo |
 | `PagoTramiteService.php` | 223 | Pagos parciales, 1 a N | Los métodos vienen **de a pares**: uno recibe `UploadedFile`, el otro `...ConRuta`. No es duplicación — ver §2.4 de ARQUITECTURA |
 | `ArchivoTramiteService.php` | 107 | Subir/descartar adjuntos alrededor de una transacción | `descartar()` **no propaga errores**: se llama desde un `catch` y taparía la excepción original |
-| `ReciboTramiteService.php` | 194 | Emite el RECIBO OFICIAL | `emitir()` es **idempotente**: reimprimir no gasta otro número |
-| `CorrelativoService.php` | 103 | Números correlativos por serie y año | `SELECT ... FOR UPDATE`. Estuvo **sin usar** hasta que llegaron los recibos |
+| `ReciboTramiteService.php` | 200 | **Arma** el RECIBO OFICIAL, no lo guarda | `armar()` lo reconstruye desde el trámite. No hay tabla `recibos` |
+| `CorrelativoService.php` | 120 | Números correlativos por serie y año | `SELECT ... FOR UPDATE`. **Sin usar otra vez**: llegó con los recibos y quedó libre al retirarse esa tabla |
 
 ### Desglose de `SolicitudCarnetService`
 
@@ -40,7 +39,7 @@ decisiones que acá solo se nombran.
 | --- | --- | --- |
 | `registrar()` | Alta completa, todo o nada | 4 pasos; el orden archivos/transacción es la parte importante |
 | `tomarParaRevision()` | `pendiente → en_revision` | **Acá nace el recibo**, dentro de la misma transacción |
-| `aprobar()` | `→ aprobado` + nace `carnet_rubro` | No aprueba sin cobrar. Único lugar donde nace una habilitación |
+| `aprobar()` | `→ aprobado` + consolida el carnet | No aprueba sin cobrar. Copia cupo y asociación al carnet; lo que viene en blanco NO pisa lo que ya había |
 | `rechazar()` | `→ rechazado` | Motivo obligatorio. El carnet recién creado **no se borra** |
 | `eliminar()` | Borra de verdad (sin `deleted_at`) | Orden **inverso** al de registrar. Borra el carnet si quedó vacío |
 | `generar()` / `entregar()` | Escriben las fechas de impreso/entregado | No son estados |
@@ -58,7 +57,6 @@ decisiones que acá solo se nombran.
 | `Tramite.php` | 310 | Cuelga del **carnet**. `montoPagado()` reusa `pagos_sum_monto` si el listado hizo `withSum`. Las 5 fechas van en `#[Fillable]` aunque ningún formulario las mande — `update()` las descartaría |
 | `CarnetRubro.php` | 71 | Pivote **con modelo propio**, porque `attach()` no dispara eventos y `Auditable` no registraría nada |
 | `Pago.php` | 68 | La columna es **`urlFile`**, el accesor es `comprobante_url`. No se anulan ni se borran |
-| `Recibo.php` | 156 | Todo es **copia congelada**. `montoEnLetras()` usa `Number::spell(locale: 'es')` (requiere `intl`) |
 | `Rubro.php` | 70 | `Auditable` pero **sin** `SoftDeletes`: no se borra, se inactiva |
 | `Configuracion.php` | 63 | Cache `rememberForever`, invalidada en `saved`/`deleted` |
 | `Correlativo.php` | 18 | Solo la tabla del contador |

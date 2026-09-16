@@ -27,18 +27,21 @@ PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
 
 ## El dominio en cinco líneas
 
-Un **beneficiario** saca un **carnet**, que es anual. Sobre ese carnet se
-habilitan **rubros** (actividades). Para habilitar un rubro se presenta un
-**trámite**, que se cubre con uno o varios **pagos**. Al aprobarlo nace la fila
-en `carnet_rubro`, y recién ahí la persona queda habilitada.
+Un **beneficiario** saca un **carnet** por cada **rubro** (actividad) que
+ejerce, y cada carnet es anual. Para obtenerlo presenta un **trámite**, que se
+cubre con uno o varios **pagos**. Al aprobarlo, el carnet queda habilitado y
+recién ahí la persona puede trabajar en esa actividad.
+
+Quien pesca y además comercializa tiene **dos carnets** en la misma gestión, con
+dos plásticos, dos firmas de validación y dos cupos autorizados.
 
 El expediente recorre este circuito:
 
 ```
 PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
 (borrador)                   │                         │
-                             │                         └── nace carnet_rubro
-                             ├── nace el RECIBO OFICIAL
+                             │                         └── el carnet queda habilitado
+                             ├── queda habilitado el RECIBO OFICIAL
                              └──[rechazar]──▶ RECHAZADO
 ```
 
@@ -74,30 +77,71 @@ Impreso y entregado no son estados sino fechas: `fecha_generacion` y
 `fecha_entrega`. Un estado obliga a sincronizar dos cosas que pueden discrepar;
 una fecha en NULL dice «todavía no pasó» sin posibilidad de contradicción.
 
-Al pasar a EN REVISIÓN se emite el **RECIBO OFICIAL** —el talonario verde del
-SEDAG— dentro de la misma transacción: es el momento en que el pescador entregó
-los papeles y la plata, y se va con su comprobante. Ver
-[docs/modulos/RECIBOS.md](docs/modulos/RECIBOS.md).
+Al pasar a EN REVISIÓN queda habilitado el **RECIBO OFICIAL** —el talonario
+verde del SEDAG—: es el momento en que el pescador entregó los papeles y la
+plata, y se va con su comprobante.
 
-Al aprobar nace la habilitación, y recién ahí el carnet se puede IMPRIMIR:
+> **NO HAY TABLA `recibos`.** Se retiró a pedido: toda su información ya vive en
+> `beneficiarios`, `carnets`, `rubros`, `tramites` y `pagos`, así que el
+> comprobante se **arma al vuelo** cada vez que alguien lo imprime. Su número es
+> el id del trámite y su fecha es `tramites.fecha_revision` —el dato que ya
+> estaba guardado, y por eso una reimpresión de marzo sigue diciendo marzo—.
+>
+> Lo que eso cuesta, y hay que tenerlo presente: **el recibo dejó de ser
+> inmutable**. Corregir un apellido en la ficha cambia los comprobantes ya
+> entregados, borrar el trámite se lleva el recibo, y la serie tiene huecos
+> porque no todo trámite emite uno. Está explicado en
+> `App\Support\ReciboArmado`.
+
+Ver [docs/modulos/RECIBOS.md](docs/modulos/RECIBOS.md).
+
+Al aprobar, el carnet queda habilitado, y recién ahí se puede IMPRIMIR:
 `GET /panel/carnets/{carnet}/imprimir` dibuja el plástico —una carilla, CR80,
 calcando la cédula de papel—. **La maqueta impresa y `vista-previa-carnet.tsx`
 son el mismo diseño escrito dos veces**: ese componente es el recuadro «así va a
 salir el carnet» del paso 3 del formulario, así que si se toca una hay que tocar
 la otra, o la vista previa pasa a prometer algo que el PDF no cumple. La tarjeta
 NO lleva QR —se sacó a pedido— así que `App\Support\CodigoQr` queda escrito y
-sin usar. Ver [docs/modulos/CARNETS.md](docs/modulos/CARNETS.md). Ver [docs/modulos/CARNETS.md](docs/modulos/CARNETS.md).
+sin usar.
 
-> **LA REGLA QUE ORDENA TODO: una persona tiene como máximo UN carnet por
-> gestión.**
+**El plástico SÍ lleva el rubro y el cupo**, al revés de lo que valía con el
+modelo anterior: son seis renglones y tres de ellos comparten dos pares
+—RUBRO + CUPO, CIUDAD + PROV., REGISTRO + GESTIÓN—. Ver
+[docs/modulos/CARNETS.md](docs/modulos/CARNETS.md).
 
-De ahí salen los dos únicos tipos de trámite, y **los decide el sistema, no el
-operador**:
+> **EL CUPO NO LO LLEVAN TODAS LAS ACTIVIDADES.** La pesca se autoriza por
+> volumen —tantos kilos, contrastables contra una guía de transporte—; la
+> comercialización no. Lo dice la columna `rubros.requiere_capacidad`, NUNCA un
+> `match` sobre el nombre: el mismo rubro figura como «Pescador» o como «Faena»
+> según quién lo cargó, y los que vengan por ordenanza entran sin pasar por
+> código.
+>
+> De esa bandera cuelgan cuatro cosas: el formulario muestra u oculta el campo,
+> la validación lo exige o lo **prohíbe**, la ficha del carnet lo muestra o no, y
+> el plástico imprime el renglón CUPO o le da la tira entera al nombre del rubro.
+> Ver `Rubro::requiereCapacidad()` y `CarnetImpresionController::renglonRubro()`.
+
+> **LA REGLA QUE ORDENA TODO: una persona tiene como máximo UN carnet por RUBRO
+> y por gestión.**
+
+La garantiza el índice único `(beneficiario_id, rubro_id, gestion)` de la tabla
+`carnets`. De ahí salen los dos únicos tipos de trámite, y **los decide el
+sistema, no el operador**:
 
 | Situación | Tipo | Qué hace |
 | --- | --- | --- |
-| No tiene carnet de este año | `emision_inicial` | Crea el carnet y cuelga el trámite |
-| Ya tiene carnet de este año | `adicion_rubro` | Reutiliza ese carnet |
+| No tiene carnet **de ese rubro** este año | `emision_inicial` | Crea el carnet y cuelga el trámite |
+| Ya lo tiene | `actualizacion` | Reutiliza ese carnet; al aprobar, consolida cupo y asociación |
+
+> **NO EXISTE LA «ADICIÓN DE RUBRO».** Existió, y la pregunta vuelve cada vez
+> que alguien lee código viejo. Con el modelo anterior el carnet era uno por
+> persona y los rubros se le colgaban en una tabla `carnet_rubro`: sumar una
+> actividad hacía CRECER ese carnet, y eso era la adición. Hoy cada actividad es
+> un documento propio, así que pedir un rubro más no agranda nada — emite otro
+> carnet, y eso ya se llama emisión inicial.
+>
+> `carnet_rubro` y el enum `EstadoHabilitacion` **fueron eliminados**: el carnet
+> ES la habilitación. Suspender una actividad es suspender su carnet.
 
 Todo eso vive en `app/Services/SolicitudCarnetService.php`, en una transacción,
 con la fila del beneficiario bloqueada. **No se replica en el controlador ni en
@@ -157,9 +201,11 @@ React.**
 8. **SQL específico de motor va en `app/Support/Sql.php`.** El sistema tiene que
    correr igual en PostgreSQL y en SQLite.
 
-9. **Scopes con `qualifyColumn()`.** `tramites`, `carnets`, `rubros` y
-   `carnet_rubro` tienen todas una columna `estado`, y los reportes las cruzan
-   con `join`.
+9. **Scopes con `qualifyColumn()`.** `tramites`, `carnets` y `rubros` tienen
+   todas una columna `estado`, y los reportes las cruzan con `join`. Desde que
+   el carnet tiene `rubro_id`, `carnets` y `tramites` comparten además esa
+   columna: un `where('rubro_id', ...)` sin calificar sobre una consulta con
+   join responde «column reference is ambiguous».
 
 10. **Las reglas de negocio van en `app/Services/`, no en el controlador.** El
     mismo caso de uso lo necesitan el formulario del panel, un comando de
@@ -356,6 +402,17 @@ Los cuatro tienen que pasar.
   que alguien intenta verificar un carnet en la calle. El QR se arma con
   `App\Support\CodigoQr`, que pide la matriz a BaconQrCode —la librería que ese
   paquete trae adentro— y la pinta con `gd`.
+- **Un PNG de PALETA devuelve ÍNDICES, no colores.** `imagecolorat()` sobre una
+  imagen de paleta no da el RGB sino la posición en la tabla, así que medir
+  brillo o transparencia con esos números da resultados absurdos —el sello del
+  recibo daba «luminancia 27, oscuro» cuando en realidad era casi blanco—. Hay
+  que pasar por `imagecolorsforindex()`, o convertir primero con
+  `imagepalettetotruecolor()`. `imageistruecolor()` dice cuál de los dos es.
+- **El sello de agua del recibo se aclara u oscurece REGENERANDO EL PNG**, no con
+  CSS: `opacity` no es confiable en DomPDF. Se mezcla `sedag.png` contra blanco
+  con un factor —0,25 hoy— y se guarda **en paleta**, o el archivo se cuadruplica
+  y va embebido en cada recibo. La receta está en el comentario de `.sello` de
+  `recibo-oficial.blade.php`.
 - **`rgba()` en DomPDF: la 3.1.6 SÍ lo respeta, comprobado.** La regla vieja
   —«depende de la versión»— sigue valiendo como advertencia, pero no como
   prohibición: se midió el PDF y el relleno del cuadro del SEDAG sale mezclado
@@ -387,6 +444,13 @@ Los cuatro tienen que pasar.
   leerse, que es lo contrario de lo que el contorno viene a hacer. Por eso
   tampoco sirve `-webkit-text-stroke` en la vista previa: su trazo va CENTRADO
   sobre el contorno, así que la mitad se come el relleno.
+- **En el carnet, el RÓTULO del segundo par también tiene un ancho fijo, y nadie
+  lo mide.** El cálculo de encogido de `texto()` protege a los VALORES: si un
+  nombre no entra, se achica. Los rótulos no pasan por ahí —son constantes— así
+  que uno largo se desborda en silencio sobre lo que tenga al lado. Pasó con
+  «PROVINCIA»: a 6,1 pt bold mide 33,2 pt en una caja de 32, y en el PDF salía
+  «PROVINCIACercado» pegado. Se abrevia a «PROV.». Antes de agregar un rótulo al
+  segundo par, medirlo: **caracteres × 0,605 × cuerpo**.
 - **`ANCHO_POR_CARACTER` del carnet está atado al GRUESO de la letra de la
   tira.** Es el número con el que `CarnetImpresionController::texto()` decide si
   un nombre entra o hay que achicarlo, y hay que moverlo si ese grueso cambia.
@@ -396,7 +460,11 @@ Los cuatro tienen que pasar.
   que pasarse, porque lo que no entra lo recorta el `overflow: hidden` de la tira
   y ahí se pierden apellidos.
 - **En CSS el `padding` SUMA al `width`**, y en una maqueta de coordenadas fijas
-  eso descoloca sin avisar. Las tiras del carnet declaraban los 130 pt que tenían
+  eso descoloca sin avisar. **Volvió a morder al partir un renglón en dos:** la
+  tira del rubro se declaró de 71 pt pensando que cerraba en 118,5, y con sus
+  4 pt de relleno cerraba en 122,5 — así que el rótulo «CUPO», plantado en 121,
+  salió impreso ENCIMA de la tira blanca. Al plantar una caja con coordenadas,
+  el ancho declarado es el que se ocupa menos el relleno. Las tiras del carnet declaraban los 130 pt que tenían
   que ocupar MÁS 4 de relleno, así que terminaban 4 pt más allá de su columna:
   la tarjeta quedaba a 2,4 pt del borde derecho y a 8,5 del izquierdo. Nadie lo
   vio durante seis versiones porque las seis tiras desbordaban lo mismo —un error
@@ -441,12 +509,23 @@ Los cuatro tienen que pasar.
   si su contenedor no es `position: relative`: sin contenedor posicionado se mide
   contra la página y aterriza encima de lo anterior. Por eso la carilla del
   carnet es un `.carilla` relativo aunque hoy haya una sola.
-- **Lo que se imprime en un documento tiene que ser lo que NO cambia.** El
-  plástico del carnet no lleva los rubros ni el cupo en kilos, y no es por falta
-  de lugar: el carnet es uno por persona y por gestión, y una adición posterior
-  dejaría vieja cualquier lista impresa —el documento diría MENOS de lo que la
-  persona puede hacer—. Eso se consulta escaneando el QR. Mismo criterio que la
-  copia congelada del recibo, mirado desde el otro lado.
+- **Lo que se imprime en un documento tiene que ser lo que NO cambia.** Es el
+  criterio, y conviene ver cómo se aplicó en los dos sentidos, porque la
+  respuesta se dio vuelta con el cambio de modelo.
+
+  Con el carnet viejo —uno por persona, con los rubros colgados— el plástico NO
+  llevaba ni los rubros ni el cupo: una adición posterior dejaba vieja la lista
+  impresa y el documento pasaba a decir MENOS de lo que la persona podía hacer.
+  Hoy el carnet es de UN rubro que es parte de su llave y no cambia nunca, así
+  que **los dos van impresos** — y hacen falta, porque sin el rubro dos carnets
+  de la misma persona son plásticos idénticos.
+
+  Lo que sigue sin imprimirse es el ESTADO: un carnet se suspende o se anula
+  después de impreso y la tarjeta no se entera. Mismo criterio que la copia
+  congelada del recibo, mirado desde el otro lado.
+
+  **La lección no es «imprimir todo» ni «imprimir poco»: es preguntarse qué
+  puede cambiar después de que el plástico salga de la impresora.**
 
 ---
 

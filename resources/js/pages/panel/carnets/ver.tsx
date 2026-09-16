@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fecha } from '@/lib/utils';
-import type { CarnetFicha, Habilitacion, TitularCarnet, TramiteDelCarnet } from '@/types/carnets';
+import type { CarnetFicha, TitularCarnet, TramiteDelCarnet } from '@/types/carnets';
 
 /**
  * La ficha del carnet: lo que se imprime y lo que se sanciona.
@@ -26,12 +26,10 @@ import type { CarnetFicha, Habilitacion, TitularCarnet, TramiteDelCarnet } from 
 export default function VerCarnet({
     carnet,
     beneficiario,
-    habilitaciones,
     tramites,
 }: {
     carnet: CarnetFicha;
     beneficiario: TitularCarnet;
-    habilitaciones: Habilitacion[];
     tramites: TramiteDelCarnet[];
 }) {
     const { puede } = usePermisos();
@@ -40,8 +38,11 @@ export default function VerCarnet({
 
     return (
         <LayoutPanel
-            titulo={`Carnet ${carnet.gestion}`}
-            descripcion={`Gestión ${carnet.gestion} · ${beneficiario.nombreCompleto ?? '—'}`}
+            // El rubro va en el TÍTULO y no en la descripción: una persona
+            // puede tener tres carnets del mismo año y sin la actividad las tres
+            // pestañas del navegador se llaman igual.
+            titulo={`Carnet de ${carnet.rubro ?? '—'} · ${carnet.gestion}`}
+            descripcion={beneficiario.nombreCompleto ?? '—'}
             acciones={
                 <div className="flex flex-wrap gap-2">
                     {/*
@@ -78,7 +79,9 @@ export default function VerCarnet({
                 </div>
             }
         >
-            <Head title={`Carnet ${carnet.gestion}`} />
+            {/* El rubro también en la pestaña: una persona puede tener tres carnets
+                del mismo año abiertos a la vez. */}
+            <Head title={`Carnet de ${carnet.rubro ?? "—"} ${carnet.gestion}`} />
 
             <DialogoImprimirCarnet
                 abierto={imprimiendo}
@@ -163,72 +166,95 @@ export default function VerCarnet({
                     </CardContent>
                 </Card>
 
-                {/* ----------------------------------------------- Rubros e historial */}
+                {/* ------------------------------------ Autorización e historial */}
                 <div className="space-y-6 lg:col-span-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Rubros habilitados</CardTitle>
+                            <CardTitle>Actividad autorizada</CardTitle>
                         </CardHeader>
 
-                        <CardContent>
-                            {habilitaciones.length === 0 ? (
-                                <p className="py-4 text-sm text-muted-foreground">
-                                    El carnet no tiene ningún rubro habilitado. Se habilitan al aprobar
-                                    cada trámite.
-                                </p>
-                            ) : (
-                                <ul className="divide-y divide-border">
-                                    {habilitaciones.map((h) => (
-                                        <li key={h.id} className="flex flex-wrap items-center gap-3 py-3">
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-medium">{h.rubro}</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Habilitado el {fecha(h.fecha_habilitacion)}
-                                                    {/*
-                                                        El cupo va acá y no en el
-                                                        carnet impreso: el plástico
-                                                        no lo lleva. Esta ficha es
-                                                        donde la unidad lo consulta.
+                        <CardContent className="space-y-4">
+                            {/*
+                                ACÁ HABÍA UNA LISTA, Y AHORA HAY UN DATO.
+                                El carnet habilita UNA actividad —es parte de la
+                                llave que lo identifica— así que no hay nada que
+                                recorrer: quien tiene dos rubros tiene dos carnets,
+                                cada uno con su ficha como esta.
+                            */}
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-lg font-semibold">{carnet.rubro ?? '—'}</p>
 
-                                                        Se compara contra null y no
-                                                        con un truthy suelto: un
-                                                        cupo de 0 es falsy y
-                                                        desaparecería del renglón
-                                                        sin que nadie lo note.
-                                                    */}
-                                                    {h.capacidad_kg !== null && (
-                                                        <> · Cupo {h.capacidad_kg} Kg</>
-                                                    )}
-                                                </p>
-                                            </div>
+                                    {carnet.rubro_descripcion && (
+                                        <p className="text-sm text-muted-foreground">
+                                            {carnet.rubro_descripcion}
+                                        </p>
+                                    )}
+                                </div>
 
-                                            <Badge color={h.estado_color}>{h.estado_etiqueta}</Badge>
+                                <Badge color={carnet.estado_color}>{carnet.estado_etiqueta}</Badge>
+                            </div>
 
-                                            {puede('habilitaciones.suspender') && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        router.post(route('habilitaciones.alternar', h.id))
-                                                    }
-                                                >
-                                                    {h.estado === 'habilitado' ? (
-                                                        <>
-                                                            <ShieldOff className="size-4" />
-                                                            Suspender
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <ShieldCheck className="size-4" />
-                                                            Rehabilitar
-                                                        </>
-                                                    )}
-                                                </Button>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
+                            {/*
+                                EL CUPO AUTORIZADO, SOLO SI LA ACTIVIDAD LO LLEVA.
+
+                                No todas se autorizan por volumen: la pesca sí, la
+                                comercialización no. Mostrar «Cupo autorizado: sin
+                                definir» en un carnet de Comercializador no informa
+                                nada y sugiere que falta cargar un dato que no
+                                existe — y alguien va a ir a buscar cómo cargarlo.
+
+                                Cuando sí lleva, se compara contra null y no con un
+                                truthy suelto: un cupo de 0 es falsy y
+                                desaparecería del renglón sin que nadie lo note.
+                            */}
+                            {carnet.requiere_capacidad && (
+                                <div className="rounded-md border border-border p-3">
+                                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                        Cupo autorizado
+                                    </p>
+                                    <p className="text-lg font-semibold tabular-nums">
+                                        {carnet.capacidad_kg !== null
+                                            ? carnet.capacidad
+                                            : 'Sin definir'}
+                                    </p>
+                                </div>
                             )}
+
+                            {/*
+                                SUSPENDER O LEVANTAR.
+
+                                Reemplaza al botón que estaba en cada fila de
+                                rubros. La medida sigue siendo por actividad: este
+                                carnet es una, y los otros carnets de la persona no
+                                se enteran.
+
+                                Los dos `puede_*` los decide el servidor
+                                (EstadoCarnet), no esta pantalla: un carnet vencido
+                                o anulado no se suspende ni se levanta, y dejar el
+                                botón a la vista sería ofrecer algo que va a
+                                rebotar.
+                            */}
+                            {puede('carnets.suspender') &&
+                                (carnet.puede_suspenderse || carnet.puede_rehabilitarse) && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => router.post(route('carnets.suspender', carnet.id))}
+                                    >
+                                        {carnet.puede_suspenderse ? (
+                                            <>
+                                                <ShieldOff className="size-4" />
+                                                Suspender el carnet
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ShieldCheck className="size-4" />
+                                                Levantar la suspensión
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
                         </CardContent>
                     </Card>
 

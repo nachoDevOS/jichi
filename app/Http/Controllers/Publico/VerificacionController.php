@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Publico;
 
+use App\Enums\EstadoCarnet;
 use App\Http\Controllers\Controller;
 use App\Models\Carnet;
 use App\Models\Configuracion;
@@ -133,7 +134,7 @@ class VerificacionController extends Controller
         return Carnet::query()
             ->with([
                 'beneficiario:id,ci_nit,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
-                'habilitaciones.rubro:id,nombre',
+                'rubro:id,nombre',
             ])
             ->where('firma_validacion', $normalizada)
             ->first();
@@ -196,15 +197,20 @@ class VerificacionController extends Controller
             'mensaje' => $this->mensajePublico($carnet, $vigente),
 
             /*
-             * SOLO LOS RUBROS HABILITADOS, sin los suspendidos.
+             * LA ACTIVIDAD QUE ESTE CARNET AUTORIZA, Y SU CUPO.
              *
-             * Un rubro suspendido no autoriza a trabajar, así que mostrarlo en
-             * la lista —aunque fuera marcado en rojo— arriesga que el inspector
-             * lea la fila y no el color. Lo que no habilita, no aparece.
+             * Es UNA, no una lista: el carnet es de un solo rubro. Antes acá
+             * viajaba el arreglo de rubros habilitados del carnet, filtrando los
+             * suspendidos; hoy si el carnet está suspendido no hay nada que
+             * filtrar —el documento entero no habilita— y el campo va en null.
+             *
+             * SE MANDA NULL Y NO EL NOMBRE cuando el carnet no está vigente, por
+             * el mismo motivo de siempre: mostrar la actividad —aunque fuera
+             * marcada en rojo— arriesga que el inspector lea la fila y no el
+             * color. Lo que no habilita, no aparece.
              */
-            'rubros' => $vigente
-                ? $carnet->rubrosHabilitados()->pluck('nombre')->all()
-                : [],
+            'rubro' => $vigente ? $carnet->rubro?->nombre : null,
+            'capacidad' => $vigente ? $carnet->capacidadLegible() : null,
         ];
     }
 
@@ -214,8 +220,15 @@ class VerificacionController extends Controller
             return 'Carnet auténtico y vigente, emitido por la Gobernación del Beni.';
         }
 
-        return match ($carnet->estado->value) {
-            'anulado' => 'Este carnet fue ANULADO por la autoridad competente y no habilita ninguna actividad.',
+        return match ($carnet->estado) {
+            EstadoCarnet::Anulado => 'Este carnet fue ANULADO por la autoridad competente y no habilita ninguna actividad.',
+
+            // La suspensión es temporal y reversible, y el texto lo dice: quien
+            // lo presenta puede estar esperando que se la levanten, y no es lo
+            // mismo que un documento dado de baja.
+            EstadoCarnet::Suspendido => 'Este carnet está SUSPENDIDO por la autoridad competente. '.
+                'Mientras dure la suspensión no habilita la actividad.',
+
             default => sprintf(
                 'Este carnet venció el %s. Corresponde tramitar el de la gestión en curso.',
                 $carnet->fecha_vencimiento?->format('d/m/Y') ?? '—',

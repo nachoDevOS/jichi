@@ -26,23 +26,32 @@
   Es la misma limitación que tenía la credencial de papel, que era su problema
   central: quien la miraba tenía que creerle.
 
-  SE SACÓ EL RENGLÓN DE LOS KILOS. Es un tope POR ACTIVIDAD y el carnet es uno
-  solo para todas: con dos rubros habría dos cupos y un único renglón donde
-  ponerlos, y cambia con cada adición. Se sigue guardando —está en el trámite y
-  en la habilitación— pero es dato de control interno, para cruzar contra las
-  guías de transporte, y se consulta desde el panel. Es lo que ya decía la
-  migración de `carnet_rubro`: «No se imprime».
+  AHORA SÍ VAN EL RUBRO Y EL CUPO, y este comentario decía lo contrario hasta
+  el cambio de modelo. Conviene entender por qué, porque el motivo viejo era
+  bueno y lo que cambió no fue la opinión sino el sistema.
+
+  El carnet era UNO por persona y gestión, con los rubros colgados en una tabla
+  aparte: quien era pescador en febrero podía sumar comercializador en octubre
+  sin que el plástico cambiara. Impresa, la lista de rubros quedaba vieja ese
+  mismo día, y el documento pasaba a decir MENOS de lo que la persona estaba
+  autorizada a hacer — que es peor que no decir nada. Con el cupo pasaba algo
+  parecido: era un tope POR ACTIVIDAD, así que con dos rubros había dos cupos y
+  un solo renglón donde ponerlos.
+
+  Hoy el carnet es de UN rubro y ese rubro es parte de la llave que lo
+  identifica: no cambia nunca, y sumar una actividad emite otro carnet con su
+  propio plástico. No queda nada que pueda dejar vieja la impresión, y el cupo
+  es uno solo. Los dos comparten el segundo renglón.
+
+  Y es más que una posibilidad: es necesario. Dos carnets de la misma persona en
+  la misma gestión son dos plásticos con el mismo nombre, la misma foto y el
+  mismo domicilio. Sin el rubro impreso, nada los distingue a simple vista.
 
   TAMPOCO VA LA FECHA DE VENCIMIENTO. Todos los carnets de una gestión vencen el
   mismo día, así que el año del registro ya lo dice; y si la pregunta es si HOY
   vale, la fecha impresa nunca fue la respuesta, porque un carnet puede estar
-  anulado con su fecha intacta: eso se consulta en el panel.
-
-  Y NO SE IMPRIMEN LOS RUBROS. Quien hoy es pescador puede sumar comercializador
-  en octubre con una adición, y el plástico no cambia: mismo carnet, mismo
-  registro, misma firma. Impresa, la lista quedaría vieja ese mismo día y el
-  documento diría MENOS de lo que la persona está autorizada a hacer. El QR
-  Los rubros habilitados se consultan en la ficha del carnet, en el panel.
+  anulado o suspendido con su fecha intacta. Como la tarjeta tampoco lleva QR,
+  eso solo se consulta desde el panel.
 
   --------------------------------------------------------------------------
   ESPEJO DE LA VISTA PREVIA DEL PANEL
@@ -330,17 +339,18 @@
            versiones de DomPDF. Con `opacity` o filtros la tarjeta salía distinta
            según el servidor.
 
-           DICE «CÉDULA» A SECAS, y no «CÉDULA DE PESCADOR» como el plástico
-           de papel. Es a pedido, y es coherente con el resto de la tarjeta: el
-           carnet es UNO para todos los rubros, así que nombrar una actividad en
-           el título diría algo que el documento no es — el mismo motivo por el
-           que no se imprimen los rubros. Qué habilita se lee escaneando el QR.
+           AHORA DICE «CÉDULA DE PESCADOR», con el rubro adentro.
+
+           Decía «CÉDULA» a secas, y el motivo se dio vuelta con el cambio de
+           modelo: el carnet era UNO para todas las actividades de una persona,
+           así que nombrar una en el título habría dicho algo que el documento
+           no era. Hoy el carnet es de UN rubro que no cambia nunca, y el título
+           es lo que se lee de lejos —antes que cualquier renglón—.
+
+           El texto y su clase de tamaño los arma
+           CarnetImpresionController::titulo(); sin rubro cargado vuelve a
+           «CÉDULA» a secas.
         --------------------------------------------------------------- */
-        /* EL TÍTULO Y TODO LO DE ABAJO ESTÁN ATADOS AL ALTO DEL ENCABEZADO.
-           Con los dos bloques apilados, el de arriba cierra en 52 en vez de 31,
-           así que el título bajó a 53 y con él los renglones (66), la foto (66)
-           y la cédula (115). Si el encabezado vuelve a cambiar de alto, estas
-           cuatro coordenadas se mueven juntas. Ver su tabla. */
         .titulo { top: 53pt; left: 0; width: 243pt; height: 11pt; }
 
         .titulo span {
@@ -376,6 +386,27 @@
         .titulo .e4 { top: -0.45pt; left: -0.45pt; }
         .titulo .cara { top: 0; left: 0; color: #a01717; }
 
+        /* ---------------------------------------------------------------
+           EL TÍTULO LARGO — para un rubro que no entra a cuerpo pleno
+
+           Desde que el título lleva el rubro adentro, su largo lo decide el
+           catálogo. «CÉDULA DE COMERCIALIZADOR» entra holgado; un rubro de
+           más de treinta caracteres se pasaría de los 243 pt de la tarjeta.
+
+           BAJAN LAS TRES MEDIDAS JUNTAS, y eso es lo importante: el cuerpo,
+           el interletrado y el corrimiento del contorno. Achicar solo la
+           letra dejaría un borde de 0,45 pt sobre un cuerpo de 7,6 — un 6%
+           pasa a ser un 9% y el contorno engorda la letra hasta cerrarle los
+           huecos, que es justo lo que el perfilado viene a evitar.
+
+           Quién la pone: CarnetImpresionController::titulo().
+           --------------------------------------------------------------- */
+        .titulo.largo span { font-size: 7.6pt; letter-spacing: 0.5pt; }
+        .titulo.largo .e1 { top: 0.36pt; left: 0.36pt; }
+        .titulo.largo .e2 { top: 0.36pt; left: -0.36pt; }
+        .titulo.largo .e3 { top: -0.36pt; left: 0.36pt; }
+        .titulo.largo .e4 { top: -0.36pt; left: -0.36pt; }
+
         /* --- La foto y la cédula ------------------------------------------ */
 
         /* ---------------------------------------------------------------
@@ -399,7 +430,7 @@
            PROVINCIA.
         --------------------------------------------------------------- */
         .documento {
-            top: 115pt;
+            top: 125pt;
             left: 8.5pt;
             width: 43.6pt;
             padding: 1pt 2pt 0 2pt;
@@ -414,6 +445,41 @@
         /* Sin cédula cargada, atenuada — igual que los renglones. */
         .documento.molde { color: #8a8f85; }
 
+        /* ---------------------------------------------------------------
+           EL RENGLÓN PARTIDO EN TRES — REGISTRO + GESTIÓN + CUPO
+
+           Solo lo usa el último renglón, y solo cuando la actividad lleva
+           cupo. Sin cupo el renglón vuelve al reparto de dos de arriba.
+
+           El reparto, medido sobre los 176 pt de la tira de datos:
+
+               rótulo REGISTRO   0 -> 44      valor  47,5 -> 75,5
+               rótulo GESTIÓN   78 -> 108     valor 111,5 -> 134,5
+               valor  CUPO                          137   -> 176,5
+
+           LA CAJA DEL RÓTULO «GESTIÓN» ES DE 30 pt Y NO DE 27, y costó una
+           vuelta: con 27 la palabra se montaba sobre la tira del año y en el
+           PDF salía «GESTIÓN2026» pegado. El cálculo de encogido de `texto()`
+           protege a los VALORES; los rótulos son constantes y nadie los mide,
+           así que uno largo se desborda en silencio. Es la misma trampa que ya
+           había aparecido con «PROVINCIA».
+
+           EL CUPO NO LLEVA RÓTULO —«800 KG» se lee solo— y por eso se queda
+           con la tira más ancha de las tres: es el único que puede crecer, con
+           un cupo de cinco dígitos y separador de miles.
+
+           OJO CON EL RELLENO: `.campo .valor` lleva `padding: 1pt 2pt`, y en
+           CSS eso SUMA al ancho declarado. Los anchos ÚTILES que salen de acá
+           —24-4, 20-4 y 37,5-4— son los que el controlador tiene escritos en
+           ANCHO_TRIPLE_*. Si se toca una medida hay que tocar la otra, o el
+           cálculo de encogido mide contra una caja que no existe.
+           --------------------------------------------------------------- */
+        .campo.triple .valor.angosto { width: 24pt; }
+        .campo.triple .rotulo.segundo { left: 78pt; width: 30pt; }
+        .campo.triple .dospuntos.segundo { left: 108pt; }
+        .campo.triple .valor.segundo { left: 111.5pt; width: 19pt; }
+        .campo.triple .valor.tercero { left: 137pt; width: 35.5pt; }
+
         /*
          * El recuadro va SIEMPRE, con foto o sin ella. Es lo que hacía la unidad
          * con la cédula de papel cuando la persona traía la foto después: se
@@ -424,8 +490,25 @@
          * se dibuja a su proporción real desbordando, y acá se la recorta. El
          * estilo lo calcula CarnetImpresionController::fotoEmbebida().
          */
+        /* ---------------------------------------------------------------
+           LA FOTO ARRANCA MÁS ABAJO QUE LOS RENGLONES, a pedido.
+
+           Estaba en 66, la misma altura que NOMBRE, y la columna izquierda
+           terminaba 23 pt antes que la derecha: la foto y la cédula cerraban en
+           122,5 y el último renglón en 145,5. Bajándola 10 pt las dos columnas
+           quedan parejas a la vista.
+
+           EL RECUADRO ES CUADRADO Y TIENE QUE SEGUIR SIÉNDOLO: 46 × 46, más
+           0,8 de borde por lado. En DomPDF el borde SUMA al ancho declarado
+           —como el padding— así que ocupa 47,6 × 47,6: sigue cuadrado porque
+           los dos lados crecen igual. Tocar uno solo lo deforma.
+
+           La foto de adentro NO se estira para llenarlo: se dibuja a su
+           proporción real desbordando el recuadro y este la recorta con
+           `overflow: hidden`. Ver fotoEmbebida(), que calcula el corrimiento.
+           --------------------------------------------------------------- */
         .foto {
-            top: 66pt;
+            top: 76pt;
             left: 8.5pt;
             width: 46pt;
             height: 46pt;
@@ -588,6 +671,7 @@
         .campo .rotulo.segundo { left: 96pt; width: 32pt; }
         .campo .dospuntos.segundo { left: 128pt; }
         .campo .valor.segundo { left: 131.5pt; width: 41pt; }
+
     </style>
 </head>
 <body>
@@ -619,8 +703,10 @@
         <div class="l2">SEDAG - BENI</div>
     </div>
 
-    <div class="bloque titulo">
-        @include('documentos.partes.texto-perfilado', ['texto' => 'CÉDULA'])
+    {{-- El titulo lleva el rubro adentro: «CÉDULA DE PESCADOR». La clase de
+         tamaño la elige CarnetImpresionController::titulo() según el largo. --}}
+    <div class="bloque titulo {{ $titulo['clase'] }}">
+        @include('documentos.partes.texto-perfilado', ['texto' => $titulo['texto']])
     </div>
 
     <div class="bloque foto">
@@ -635,24 +721,38 @@
          style="font-size: {{ $documento['cuerpo'] }}pt;">{{ $documento['valor'] !== '' ? $documento['valor'] : $documento['molde'] }}</div>
 
     {{--
-        Los seis renglones. El `top` se calcula acá y no en la hoja de estilos
-        porque son seis coordenadas que solo se diferencian en un salto fijo:
-        escritas a mano, agregar un renglón obligaba a recorrer las de abajo.
+        Los renglones. El `top` se calcula acá y no en la hoja de estilos porque
+        son coordenadas que solo se diferencian en un salto: escritas a mano,
+        agregar un renglón obligaba a recorrer todas las de abajo.
+
+        SIEMPRE SON SEIS, para cualquier actividad: el rubro lo dice el título
+        y el cupo va en la columna de la foto. Por eso el salto volvió a ser
+        fijo — con siete renglones había que apretarlo a 12 pt.
     --}}
     @foreach ($campos as $i => $campo)
-        <div class="bloque campo" style="top: {{ 66 + $i * 14 }}pt;">
+        <div class="bloque campo @isset($campo['reparto']) {{ $campo['reparto'] }} @endisset"
+             style="top: {{ 66 + $i * 14 }}pt;">
             <span class="rotulo">{{ $campo['rotulo'] }}</span>
             <span class="dospuntos">:</span>
             <div class="valor @if ($campo['valor'] === '') molde @endif @isset($campo['segundo']) angosto @endisset"
                  style="font-size: {{ $campo['cuerpo'] }}pt; height: {{ $campo['alto'] }}pt;">{{ $campo['valor'] !== '' ? $campo['valor'] : $campo['molde'] }}</div>
 
-            {{-- El renglón del registro lleva la gestión al lado. Ver la hoja
-                 de estilos: es el único que hoy trae un segundo par. --}}
+            {{-- Solo el último renglón lleva acompañantes: GESTIÓN siempre, y el
+                 CUPO cuando la actividad se autoriza por volumen. Con cupo el
+                 renglón usa el reparto `triple` —ver la hoja de estilos— porque
+                 tres valores no entran en dos mitades. --}}
             @isset ($campo['segundo'])
                 <span class="rotulo segundo">{{ $campo['segundo']['rotulo'] }}</span>
                 <span class="dospuntos segundo">:</span>
                 <div class="valor segundo @if ($campo['segundo']['valor'] === '') molde @endif"
                      style="font-size: {{ $campo['segundo']['cuerpo'] }}pt; height: {{ $campo['segundo']['alto'] }}pt;">{{ $campo['segundo']['valor'] !== '' ? $campo['segundo']['valor'] : $campo['segundo']['molde'] }}</div>
+            @endisset
+
+            {{-- El TERCER valor va SIN rótulo: es el cupo, y «800 KG» se lee
+                 solo. Ver CarnetImpresionController::renglonRegistro(). --}}
+            @isset ($campo['tercero'])
+                <div class="valor tercero @if ($campo['tercero']['valor'] === '') molde @endif"
+                     style="font-size: {{ $campo['tercero']['cuerpo'] }}pt; height: {{ $campo['tercero']['alto'] ?? 9.5 }}pt;">{{ $campo['tercero']['valor'] !== '' ? $campo['tercero']['valor'] : $campo['tercero']['molde'] }}</div>
             @endisset
         </div>
     @endforeach

@@ -99,15 +99,24 @@ export function BuscadorBeneficiario({
                 </div>
 
                 {/*
-                    Se le adelanta al operador qué tipo de trámite va a salir. La
-                    decisión REAL la toma el servidor al registrar, con la fila
-                    bloqueada; esto es solo para que no se sorprenda.
+                    ACÁ YA NO SE PUEDE ADELANTAR EL TIPO DE TRÁMITE, y no es una
+                    simplificación: es que la pregunta cambió de dueño.
 
-                    El detalle completo —qué carnet, qué rubros ya tiene— lo pinta
-                    <SituacionBeneficiarioCard> justo debajo.
+                    Con un carnet por persona, saber si era emisión o adición
+                    dependía solo de la persona, así que se podía decidir apenas
+                    se la elegía. Hoy depende del RUBRO —alguien con carnet de
+                    Pescador hace una emisión inicial si pide Comercializador y
+                    una actualización si pide Pescador— y el rubro se elige
+                    después, en el paso siguiente del formulario.
+
+                    Así que acá se muestra cuántas actividades tiene cubiertas, y
+                    el tipo lo resuelve el paso del rubro. El detalle completo lo
+                    pinta <SituacionBeneficiarioCard> justo debajo.
                 */}
                 <Badge color={seleccionado.situacion.tiene_carnet ? 'violet' : 'sky'}>
-                    {seleccionado.situacion.tiene_carnet ? 'Adición de rubro' : 'Emisión inicial'}
+                    {seleccionado.situacion.carnets.length === 0
+                        ? 'Sin carnets este año'
+                        : `${seleccionado.situacion.carnets.length} carnet(s) ${seleccionado.situacion.gestion}`}
                 </Badge>
 
                 <button
@@ -162,21 +171,28 @@ export function BuscadorBeneficiario({
                                     </p>
 
                                     {/*
-                                        El carnet y sus rubros, en la fila misma.
-                                        Con dos personas del mismo apellido —que en
-                                        el padrón son muchas— esto es lo que permite
-                                        elegir a la correcta sin abrir cada ficha.
+                                        Las actividades que ya tiene, en la fila
+                                        misma. Con dos personas del mismo apellido
+                                        —que en el padrón son muchas— esto es lo que
+                                        permite elegir a la correcta sin abrir cada
+                                        ficha.
+
+                                        Ya no se muestra el número de registro: con
+                                        varios carnets por persona habría que elegir
+                                        cuál, y el que identifica en ventanilla es el
+                                        RUBRO, no el número.
                                     */}
-                                    {s.situacion.carnet && (
+                                    {rubrosVigentes(s) && (
                                         <p className="truncate text-xs text-muted-foreground">
-                                            Carnet Nº {s.situacion.carnet.registro}
-                                            {rubrosHabilitados(s) && ` · ${rubrosHabilitados(s)}`}
+                                            {rubrosVigentes(s)}
                                         </p>
                                     )}
                                 </div>
 
                                 <Badge color={s.situacion.tiene_carnet ? 'violet' : 'sky'}>
-                                    {s.situacion.tiene_carnet ? 'Tiene carnet' : 'Sin carnet'}
+                                    {s.situacion.carnets.length === 0
+                                        ? 'Sin carnet'
+                                        : `${s.situacion.carnets.length} carnet(s)`}
                                 </Badge>
                             </button>
                         </li>
@@ -188,16 +204,22 @@ export function BuscadorBeneficiario({
 }
 
 /**
- * Los rubros que de verdad habilitan, en texto corto para la fila.
+ * Las actividades que de verdad habilitan hoy, en texto corto para la fila.
  *
- * Se dejan afuera los SUSPENDIDOS: en una línea de treinta caracteres no entra
- * el estado de cada uno, y listar un rubro cortado como si estuviera vigente es
- * peor que no listarlo. El detalle con estados va en la tarjeta de situación.
+ * Se dejan afuera los carnets SUSPENDIDOS, ANULADOS y VENCIDOS: en una línea de
+ * treinta caracteres no entra el estado de cada uno, y listar una actividad
+ * cortada como si estuviera vigente es peor que no listarla. El detalle con
+ * estados va en la tarjeta de situación, justo debajo.
+ *
+ * Se filtra por `vigente` y no por `estado === 'vigente'` porque ese campo lo
+ * calcula el servidor mirando TAMBIÉN la fecha: el estado `vencido` lo escribe
+ * un comando que corre una vez al día y puede estar desfasado. Ver
+ * Carnet::estaVigente().
  */
-function rubrosHabilitados(sugerido: BeneficiarioSugerido): string {
-    return (sugerido.situacion.carnet?.rubros ?? [])
-        .filter((rubro) => rubro.estado === 'habilitado')
-        .map((rubro) => rubro.nombre)
+function rubrosVigentes(sugerido: BeneficiarioSugerido): string {
+    return sugerido.situacion.carnets
+        .filter((carnet) => carnet.vigente)
+        .map((carnet) => carnet.rubro)
         .filter(Boolean)
         .join(', ');
 }

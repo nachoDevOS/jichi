@@ -71,6 +71,27 @@
            cuando lo ignora el sello sale a pleno color tapando el texto. Ver el
            comentario de ReciboController::pdf().
 
+           CÓMO SE REGENERA, porque no se toca con CSS. El PNG sale de mezclar
+           `public/image/sedag.png` contra BLANCO con un factor:
+
+               255 - factor * (255 - canal)    por cada canal, pixel a pixel
+
+           El factor es la única palanca de visibilidad:
+
+               0,08  el primero. Casi invisible: la tinta más oscura daba
+                     luminancia 234 sobre 255, un 8% de contraste
+               0,25  el actual. La tinta llega a 192 y el sello se lee
+                     sin tapar el texto negro que le pasa por encima
+
+           Dos cosas que hay que respetar al rehacerlo:
+
+             - GUARDARLO EN PALETA (`imagetruecolortopalette`). En truecolor el
+               archivo pasa de 10 KB a 40, y este PNG va EMBEBIDO en base64 en
+               cada recibo: el peso se paga en cada impresión.
+             - MEDIR EL PDF DESPUÉS. Subir el factor oscurece el fondo por donde
+               cruzan «Nombre y Apellido», «La suma de» y «Concepto»; impreso con
+               poco tóner, un sello muy marcado se come esos renglones.
+
            Centrado sobre el marco: (592-190)/2 = 201, más los 10pt del
            margen = 211. Lo mismo en vertical.
         --------------------------------------------------------------- */
@@ -262,13 +283,31 @@
     {{-- ==============================================================
          ENCABEZADO — escudo a la izquierda, entidad centrada
          ============================================================== --}}
+    {{--
+        EL ESCUDO CRECIÓ DE 50 A 62 pt, y eso obligó a mover dos cosas más.
+
+        No es un `width` suelto: el encabezado son tres bloques plantados con
+        coordenadas fijas y el escudo los toca a los dos.
+
+          - A LA DERECHA está el bloque de la entidad. Arrancaba en 62 pt, que
+            es justo donde terminaba el escudo viejo (8 + 54). Con 62 pt de
+            escudo la caja llega a 74, así que la entidad se corrió allí y se le
+            descontó el ancho para no pasarse del borde: 530 - 74 = 456.
+
+          - ABAJO está el título «RECIBO OFICIAL», que empezaba en 60 pt cuando
+            el escudo terminaba en 56. Ahora el escudo baja hasta 65, así que el
+            título se corrió a 70 pt. Tiene lugar de sobra: el renglón de «Lugar
+            y Fecha» recién empieza en 98.
+
+        Si se vuelve a tocar el tamaño, hay que rehacer esas dos cuentas.
+    --}}
     @if ($escudo)
-        <div class="bloque" style="top: 6pt; left: 8pt; width: 54pt;">
-            <img src="{{ $escudo }}" style="width: 50pt;" alt="">
+        <div class="bloque" style="top: 3pt; left: 8pt; width: 66pt;">
+            <img src="{{ $escudo }}" style="width: 62pt;" alt="">
         </div>
     @endif
 
-    <div class="bloque entidad" style="top: 8pt; left: 62pt; width: 468pt;">
+    <div class="bloque entidad" style="top: 8pt; left: 74pt; width: 456pt;">
         <div class="l1">GOBIERNO AUTÓNOMO DEPARTAMENTAL DEL BENI</div>
         <div class="l2">SECRETARÍA DE DESARROLLO PRODUCTIVO Y ECONOMÍA PLURAL</div>
         <div class="l3">PROGRAMA: FOMENTO A LA ACTIVIDAD PISCÍCOLA Y PESQUERA DPTO. DEL BENI</div>
@@ -278,7 +317,7 @@
     {{-- ==============================================================
          TÍTULO + NÚMERO
          ============================================================== --}}
-    <div class="bloque" style="top: 60pt; left: 14pt;">
+    <div class="bloque" style="top: 70pt; left: 14pt;">
         <table cellspacing="0" cellpadding="0">
             <tr>
                 <td class="titulo" valign="middle">RECIBO OFICIAL</td>
@@ -332,7 +371,7 @@
     {{-- La suma de ... -00/100
          El «-00/100» del talonario es la forma clásica de cerrar un importe
          escrito a mano para que nadie le agregue centavos después. Acá ya viene
-         dentro del texto en letras. Ver Recibo::montoEnLetras(). --}}
+         dentro del texto en letras. Ver ReciboArmado::montoEnLetras(). --}}
     <div class="bloque" style="top: 154pt; left: 14pt; width: 348pt;">
         <table width="100%" cellspacing="0" cellpadding="0">
             <tr>
@@ -439,8 +478,15 @@
     </div>
 
     {{-- Firmas. Van a esta altura porque es donde están en el talonario: a la
-         derecha, más o menos al nivel del final de la lista de DESCRIPCIÓN. --}}
-    <div class="bloque" style="top: 268pt; left: 378pt; width: 200pt;">
+         derecha, más o menos al nivel del final de la lista de DESCRIPCIÓN.
+
+         CORRIDAS 20 pt A LA IZQUIERDA respecto del cuadro de importes, a pedido:
+         apoyadas en 378 quedaban demasiado pegadas al borde derecho.
+
+         358 ES EL PISO. La lista de DESCRIPCIÓN, a esta misma altura, ocupa de
+         14 a 344; con 14 pt de aire entre las dos. Correrlas más las mete abajo
+         de «Guía única de Transporte». --}}
+    <div class="bloque" style="top: 268pt; left: 358pt; width: 200pt;">
         <table width="100%" cellspacing="0" cellpadding="0">
             <tr>
                 <td class="firma" width="46%">Firma Cliente</td>
@@ -450,7 +496,9 @@
         </table>
     </div>
 
-    <div class="bloque" style="top: 296pt; left: 378pt; width: 120pt;">
+    {{-- La cédula del titular acompaña a «Firma Cliente»: es SU documento, así
+         que se corre lo mismo o queda colgada debajo de la otra firma. --}}
+    <div class="bloque" style="top: 296pt; left: 358pt; width: 120pt;">
         <table width="100%" cellspacing="0" cellpadding="0">
             <tr>
                 <td class="rotulo" valign="bottom" width="24">C.I.:</td>

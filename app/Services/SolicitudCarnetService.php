@@ -3,13 +3,11 @@
 namespace App\Services;
 
 use App\Enums\EstadoCarnet;
-use App\Enums\EstadoHabilitacion;
 use App\Enums\EstadoTramite;
 use App\Enums\TipoTramite;
 use App\Exceptions\SolicitudInvalidaException;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
-use App\Models\CarnetRubro;
 use App\Models\Configuracion;
 use App\Models\Rubro;
 use App\Models\Tramite;
@@ -28,16 +26,22 @@ use Throwable;
  * significa dos cosas distintas según lo que ya haya en la base.
  *
  * ----------------------------------------------------------------------------
- *  REGLA A — un carnet por persona y por gestión
+ *  REGLA A — un carnet por persona, POR RUBRO y por gestión
  * ----------------------------------------------------------------------------
  *
- *      ¿tiene carnet de la gestión en curso?
+ *      ¿tiene carnet DE ESTE RUBRO en la gestión en curso?
  *
  *          NO ──▶ se CREA el carnet          ──▶ tipo = EMISIÓN INICIAL
- *          SÍ ──▶ se REUTILIZA el que tiene  ──▶ tipo = ADICIÓN DE RUBRO
+ *          SÍ ──▶ se REUTILIZA el que tiene  ──▶ tipo = ACTUALIZACIÓN
  *
  * El tipo NO lo elige el operador: lo decide esta pregunta. Ver el comentario de
  * App\Enums\TipoTramite sobre por qué.
+ *
+ * LA PREGUNTA LLEVA EL RUBRO, y eso es lo que cambió respecto del modelo viejo.
+ * Antes el carnet era uno por persona y año, y pedir otra actividad lo hacía
+ * crecer. Hoy cada actividad es un documento propio: un pescador que además
+ * comercializa termina con DOS carnets en 2026, cada uno con su plástico, su
+ * firma de validación y su cupo autorizado.
  *
  * ----------------------------------------------------------------------------
  *  REGLA B — el trámite y sus respaldos
@@ -47,9 +51,12 @@ use Throwable;
  * rubro, en estado PENDIENTE y con las rutas de los dos adjuntos obligatorios
  * (fotocopia de CI y certificado de la asociación).
  *
- * LO QUE NO PASA ACÁ: el rubro NO se escribe todavía en `carnet_rubro`. Esa
- * fila nace recién al aprobar. Si se escribiera al solicitar, el pescador
- * quedaría habilitado por el solo hecho de haber presentado papeles.
+ * LO QUE NO PASA ACÁ: el carnet todavía NO habilita a nadie. La fila existe
+ * —hay que crearla para poder colgarle el trámite— pero el cupo autorizado se
+ * consolida recién al APROBAR, y hasta entonces ningún trámite del carnet está
+ * aprobado, que es lo que `Carnet::puedeImprimirse()` exige para dejar sacar el
+ * plástico. Si el carnet habilitara desde el alta, el pescador quedaría
+ * autorizado por el solo hecho de haber presentado papeles.
  *
  * ----------------------------------------------------------------------------
  *  REGLA C — pagos parciales
@@ -94,7 +101,6 @@ class SolicitudCarnetService
     public function __construct(
         private readonly ArchivoTramiteService $archivos,
         private readonly PagoTramiteService $pagos,
-        private readonly ReciboTramiteService $recibos,
     ) {}
 
     // ==================================================================
@@ -122,7 +128,7 @@ class SolicitudCarnetService
      * @param  array{ciFile: UploadedFile, certAsociacionFile: UploadedFile}  $adjuntos
      * @param  array<int, array{nro_transaccion: string, monto: float|string, comprobante: UploadedFile, fecha_pago?: string|null, observaciones?: string|null}>  $pagosIniciales
      * @param  string|null  $asociacion  La que certifica al beneficiario, según el papel adjunto.
-     * @param  float|string|null  $capacidadKg  Cupo autorizado en kilos. Null si todavía no se definió.
+     * @param  float|string|null  $capacidadKg  Cupo SOLICITADO en kilos. Pasa a ser el autorizado recién al aprobar. Null si todavía no se definió.
      *
      * @throws SolicitudInvalidaException
      */
@@ -192,8 +198,8 @@ class SolicitudCarnetService
                  *
                  * Bloqueando la fila del beneficiario, la segunda petición
                  * espera, y cuando entra ya ve el carnet que creó la primera: en
-                 * vez de fallar, registra correctamente una ADICIÓN DE RUBRO,
-                 * que es lo que corresponde.
+                 * vez de fallar, registra correctamente una ACTUALIZACIÓN, que
+                 * es lo que corresponde.
                  *
                  * Se bloquea al beneficiario y no al carnet porque el caso a
                  * proteger es justamente cuando el carnet todavía no existe: no
@@ -204,29 +210,49 @@ class SolicitudCarnetService
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                // --- REGLA A -------------------------------------------------
-                $carnet = $beneficiario->carnetDeGestion($gestion);
+                /*
+                 * --- REGLA A ------------------------------------------------
+                 *
+                 * La pregunta lleva el RUBRO además de la gestión. Sin él la
+                 * consulta devolvería «el primer carnet del año» y el sistema
+                 * colgaría un trámite de Comercializador del carnet de Pescador
+                 * —sin violar ningún índice, y por lo tanto sin que nada
+                 * avisara—.
+                 */
+                $carnet = $beneficiario->carnetDeRubroEnGestion($rubro->id, $gestion);
 
                 if ($carnet === null) {
-                    // La asociación se le pasa al carnet: es lo que se imprime en
-                    // la tarjeta, y queda congelada con la que certificó ESTA
-                    // emisión. Ver la migración de `carnets`.
-                    $carnet = $this->crearCarnet($beneficiario, $gestion, $asociacion);
+                    /*
+                     * EL CARNET NACE VACÍO: sin cupo y sin asociación.
+                     *
+                     * Los dos datos ya viajan en el trámite, y el carnet los
+                     * recibe recién al APROBAR —ver consolidarCarnet()—. Es la
+                     * misma idea que hace que el carnet no se pueda imprimir
+                     * hasta que alguien firme: mientras el expediente está
+                     * pendiente, el documento existe pero no autoriza nada, y
+                     * un cupo escrito ahí sería una autorización sin firma y
+                     * sin cobrar.
+                     */
+                    $carnet = $this->crearCarnet($beneficiario, $rubro, $gestion);
                     $tipo = TipoTramite::EmisionInicial;
                 } else {
-                    $this->verificarCarnetAdmiteAdiciones($carnet);
-                    $this->verificarRubroNoRepetido($carnet, $rubro);
-                    $tipo = TipoTramite::AdicionRubro;
+                    $this->verificarCarnetAdmiteTramites($carnet);
+                    $tipo = TipoTramite::Actualizacion;
                 }
 
                 // Vale para los dos casos: en una emisión inicial el carnet
                 // acaba de nacer y no puede tener trámites, así que la consulta
                 // devuelve vacío sin costo.
-                $this->verificarSinSolicitudEnCurso($carnet, $rubro);
+                $this->verificarSinSolicitudEnCurso($carnet);
 
                 // --- REGLA B -------------------------------------------------
                 $tramite = $carnet->tramites()->create([
-                    'rubro_id' => $rubro->id,
+                    // El MISMO rubro del carnet, siempre. Son dos columnas que
+                    // tienen que coincidir y la base no lo impide; este servicio
+                    // es el único que escribe las dos, y por eso lo toma del
+                    // carnet en vez de del parámetro. Ver la migración de
+                    // `tramites`.
+                    'rubro_id' => $carnet->rubro_id,
                     'tipo_tramite' => $tipo,
                     'estado' => EstadoTramite::Pendiente,
                     'ciFile' => $rutas['ciFile'],
@@ -305,19 +331,17 @@ class SolicitudCarnetService
      * usuario, la IP y el valor anterior del estado. Ver App\Traits\Auditable.
      *
      * ------------------------------------------------------------------------
-     *  ACÁ NACE EL RECIBO OFICIAL
+     *  ACÁ QUEDA HABILITADO EL RECIBO OFICIAL
      * ------------------------------------------------------------------------
      *
-     * Y es el único lugar donde nace. El motivo es de mostrador, no de código:
-     * este es el momento en que el pescador ya entregó los papeles y la plata, y
-     * se tiene que ir con un comprobante en la mano mientras la unidad revisa.
+     * Pero no se escribe ninguna fila. La tabla `recibos` se retiró: el
+     * comprobante se ARMA al vuelo con los datos del expediente cada vez que
+     * alguien lo imprime. Ver App\Services\ReciboTramiteService.
      *
-     * Va DENTRO de la misma transacción para que las dos cosas sean una sola: si
-     * el envío se deshace, el recibo tampoco queda y el número vuelve al
-     * contador. Un recibo numerado colgando de un trámite que figura sin
-     * presentar sería un papel entregado que el sistema no puede explicar.
-     *
-     * Ver App\Services\ReciboTramiteService.
+     * Lo que este paso hace es marcar `fecha_revision`, y esa fecha ES la del
+     * recibo: el momento en que el pescador entregó los papeles y la plata y se
+     * fue con su comprobante. Por eso una reimpresión de marzo sigue diciendo
+     * marzo aunque el papel ya no esté guardado en ningún lado.
      *
      * @throws SolicitudInvalidaException
      */
@@ -350,13 +374,6 @@ class SolicitudCarnetService
                 'fecha_revision' => now(),
             ]);
 
-            // El comprobante que se lleva el pescador. Se emite sobre la copia
-            // bloqueada, con el carnet y el rubro cargados: el recibo copia el
-            // nombre, la cédula y el concepto, y los lee de ahí.
-            $bloqueado->loadMissing(['carnet.beneficiario', 'rubro']);
-
-            $this->recibos->emitir($bloqueado);
-
             // Se refresca el modelo que trajo QUIEN LLAMÓ, no el bloqueado. Ver
             // el comentario de bloquear() sobre por qué esa distinción importa.
             return $tramite->refresh();
@@ -364,10 +381,37 @@ class SolicitudCarnetService
     }
 
     /**
-     * Aprueba el trámite y HABILITA el rubro en el carnet.
+     * ========================================================================
+     *  APRUEBA EL TRÁMITE Y CONSOLIDA LO AUTORIZADO EN EL CARNET
+     * ========================================================================
      *
-     * Este es el único momento en que nace una fila en `carnet_rubro`. Antes de
-     * acá el pescador presentó papeles; a partir de acá está autorizado.
+     * Antes de acá el pescador presentó papeles; a partir de acá está
+     * autorizado. Es el único momento en que el carnet pasa a habilitar.
+     *
+     * ------------------------------------------------------------------------
+     *  QUÉ SIGNIFICA «CONSOLIDAR», Y POR QUÉ REEMPLAZÓ AL INSERT DEL PIVOTE
+     * ------------------------------------------------------------------------
+     *
+     * Con el modelo viejo este método insertaba una fila en `carnet_rubro` con
+     * el cupo y el estado «habilitado». Esa tabla ya no existe, porque el carnet
+     * ES la habilitación. Lo que queda es COPIAR al carnet lo que el expediente
+     * autorizó —el cupo en kilos y la asociación— y dejarlo vigente.
+     *
+     * ES EL ÚNICO LUGAR QUE ESCRIBE ESAS DOS COLUMNAS, y esa es la regla:
+     *
+     *   - en una EMISIÓN INICIAL el carnet nació con las dos en NULL, así que
+     *     acá es donde se llenan por primera vez. Antes de este momento el
+     *     documento existe pero no autoriza ningún cupo, que es exactamente lo
+     *     que es un expediente sin aprobar;
+     *
+     *   - en una ACTUALIZACIÓN el carnet ya traía valores de su aprobación
+     *     anterior, y acá se reemplazan por los nuevos. Hasta este momento sigue
+     *     rigiendo el cupo viejo — que es lo correcto: es lo último que la
+     *     unidad autorizó.
+     *
+     * Por eso `tramites.capacidad_kg` NO es una copia redundante de
+     * `carnets.capacidad_kg`: una guarda lo PEDIDO y la otra lo AUTORIZADO, y
+     * entre el registro y la aprobación valen cosas distintas.
      *
      * ------------------------------------------------------------------------
      *  SE PUEDE APROBAR DESDE «PENDIENTE» Y DESDE «EN REVISIÓN»
@@ -405,44 +449,16 @@ class SolicitudCarnetService
                  * El estado se comprobó arriba, FUERA de la transacción: entre
                  * aquella lectura y esta, otro supervisor con la misma ficha
                  * abierta puede haberlo aprobado. Sin esta segunda lectura, los
-                 * dos escribirían la habilitación y el segundo se estrellaría
-                 * contra el índice único de `carnet_rubro` con un error de base
-                 * de datos en vez de un mensaje entendible.
+                 * dos consolidarían el carnet y el segundo pisaría al primero
+                 * sin que nada lo avisara.
                  */
                 $bloqueado = $this->bloquear($tramite);
 
                 $this->verificarTransicion($bloqueado, EstadoTramite::Aprobado);
 
-                // La habilitación. Se crea como modelo y no con attach() porque
-                // attach() no dispara eventos de Eloquent, y sin eventos el
-                // trait Auditable no registra nada: quedaría sin rastro de quién
-                // habilitó el rubro. Ver App\Models\CarnetRubro.
-                CarnetRubro::create([
-                    'carnet_id' => $bloqueado->carnet_id,
-                    'rubro_id' => $bloqueado->rubro_id,
-                    // La fecha de habilitación es HOY y no la de emisión del
-                    // carnet: una adición de junio se habilita en junio sobre un
-                    // carnet emitido en febrero.
-                    'fecha_habilitacion' => now()->toDateString(),
-
-                    /*
-                     * El cupo se COPIA del trámite a la habilitación.
-                     *
-                     * Duplicarlo tiene sentido acá porque son dos preguntas
-                     * distintas: el trámite responde «cuánto se pidió y se
-                     * autorizó en este expediente», la habilitación responde
-                     * «cuánto tiene autorizado HOY para este rubro». Leerlo
-                     * siempre del trámite obligaría a remontar cuál de todos
-                     * habilitó el rubro, y a corregir el histórico cada vez que
-                     * la unidad ajuste un cupo.
-                     *
-                     * Es por rubro: el mismo carnet puede tener Pescador con un
-                     * cupo y Comercializador con otro.
-                     */
-                    'capacidad_kg' => $bloqueado->capacidad_kg,
-
-                    'estado' => EstadoHabilitacion::Habilitado,
-                ]);
+                // Lo que el expediente autorizó pasa al carnet. Reemplaza al
+                // INSERT en `carnet_rubro` que hacía este mismo método antes.
+                $this->consolidarCarnet($bloqueado);
 
                 $bloqueado->update([
                     'estado' => EstadoTramite::Aprobado,
@@ -593,9 +609,9 @@ class SolicitudCarnetService
                  *
                  * Entre la comprobación de arriba y esta, otro supervisor con la
                  * misma ficha abierta puede haberlo aprobado. Sin esta segunda
-                 * lectura se borraría un expediente aprobado —con su habilitación
-                 * ya escrita en `carnet_rubro`— y la persona quedaría habilitada
-                 * sin ningún papel que lo respalde.
+                 * lectura se borraría un expediente aprobado —con su cupo ya
+                 * consolidado en el carnet— y la persona quedaría habilitada sin
+                 * ningún papel que lo respalde.
                  */
                 if (! $bloqueado->estado->permiteEliminacion()) {
                     throw SolicitudInvalidaException::tramiteNoSePuedeEliminar($bloqueado->estado);
@@ -666,19 +682,27 @@ class SolicitudCarnetService
      * ========================================================================
      *
      * Borrar una EMISIÓN INICIAL deja atrás el carnet que ese mismo trámite
-     * creó. Y un carnet sin trámites no es solo basura: OCUPA EL LUGAR de la
-     * persona en esa gestión. El índice único (beneficiario, gestión) impediría
-     * que vuelva a presentar la solicitud ese año, y el operador vería un error
-     * de «ya tiene carnet» señalando un carnet que nadie pidió.
+     * creó. Y un carnet sin trámites no es solo basura: OCUPA EL LUGAR de esa
+     * persona en ese rubro y esa gestión. El índice único (beneficiario, rubro,
+     * gestión) impediría que vuelva a presentar la solicitud ese año, y el
+     * operador vería un error de «ya tiene carnet de Pescador» señalando un
+     * carnet que nadie pidió.
      *
-     * Por eso se borra, pero solo si quedó realmente vacío:
+     * Por eso se borra, pero solo si quedó realmente vacío: sin otros trámites.
+     * Una actualización borrada deja el carnet en pie, lo sostiene la emisión
+     * inicial que sigue ahí.
      *
-     *   - sin otros trámites — una adición borrada deja el carnet en pie, lo
-     *     sostiene la emisión inicial que sigue ahí;
-     *   - sin habilitaciones — no debería haberlas, porque solo nacen al
-     *     aprobar y un trámite aprobado no llega hasta acá. Se comprueba igual:
-     *     si alguna vez existiera, borrar el carnet se llevaría en cascada una
-     *     habilitación vigente y dejaría a alguien sin su rubro.
+     * ------------------------------------------------------------------------
+     *  YA NO SE CUENTAN LAS HABILITACIONES, Y NO HACE FALTA
+     * ------------------------------------------------------------------------
+     *
+     * La versión anterior comprobaba además que el carnet no tuviera filas en
+     * `carnet_rubro`, como red por si alguna vez llegaba acá un carnet con un
+     * rubro habilitado. Esa tabla ya no existe, y la red la cubre el mismo
+     * conteo de trámites: un carnet solo habilita cuando alguno de sus trámites
+     * está APROBADO, y un trámite aprobado no puede llegar hasta acá —
+     * `permiteEliminacion()` lo rechaza—. Sin trámites no hay aprobación
+     * posible, así que no hay nada que perder.
      *
      * ES LA EXCEPCIÓN A «EL CARNET NO SE BORRA», no una contradicción. Al
      * RECHAZAR el carnet se conserva porque el expediente existió y se resolvió
@@ -686,8 +710,8 @@ class SolicitudCarnetService
      * que colgaba de él tampoco.
      *
      * El hueco en la secuencia de ids es el precio, y es aceptable: ese carnet
-     * nunca se imprimió —no tenía ningún rubro habilitado— así que no hay
-     * número circulando en la calle que quede sin respaldo.
+     * nunca se imprimió —no tenía ningún trámite aprobado— así que no hay número
+     * circulando en la calle que quede sin respaldo.
      */
     private function borrarCarnetSiQuedoVacio(?Carnet $carnet): void
     {
@@ -702,10 +726,7 @@ class SolicitudCarnetService
          * borrar —la colección no se entera—, así que la comprobación diría
          * «tiene trámites» siempre y el carnet no se limpiaría nunca.
          */
-        $tieneTramites = $carnet->tramites()->exists();
-        $tieneHabilitaciones = $carnet->habilitaciones()->exists();
-
-        if (! $tieneTramites && ! $tieneHabilitaciones) {
+        if (! $carnet->tramites()->exists()) {
             $carnet->delete();
         }
     }
@@ -871,27 +892,60 @@ class SolicitudCarnetService
     }
 
     /**
-     * Crea el carnet de la gestión: firma de validación y vencimiento.
+     * Crea el carnet de esta persona para ESTE rubro y esta gestión.
      *
      * No se escribe ningún número: el de registro que se imprime es el `id`
      * que asigna la base. Ver Carnet::registro().
      *
      * Se llama solo desde dentro de la transacción de registrar(), y solo
-     * cuando la Regla A determinó que la persona no tiene carnet este año.
+     * cuando la Regla A determinó que la persona no tiene carnet de este rubro
+     * este año.
+     *
+     * ------------------------------------------------------------------------
+     *  NACE SIN CUPO Y SIN ASOCIACIÓN, Y ESO ES LO IMPORTANTE
+     * ------------------------------------------------------------------------
+     *
+     * Las dos columnas quedan en NULL hasta que alguien APRUEBE el trámite;
+     * las escribe `consolidarCarnet()` y nadie más.
+     *
+     * Escribirlas acá parece inofensivo —el dato ya está en el trámite, total
+     * es copiarlo— pero cambia lo que el carnet SIGNIFICA. `carnets.capacidad_kg`
+     * responde «cuánto tiene autorizado HOY esta persona en esta actividad», y
+     * un expediente pendiente no autorizó nada: no se pagó y nadie lo firmó. Con
+     * el valor escrito desde el alta, una actualización que pide subir de 600 a
+     * 850 kg dejaría al carnet diciendo 850 antes de cobrar — y la ficha del
+     * panel lo mostraría como «cupo autorizado».
+     *
+     * Es la misma línea que ya separa `Carnet::puedeImprimirse()`: el carnet
+     * existe desde PENDIENTE, pero no habilita —ni autoriza un cupo, ni se
+     * imprime— hasta que hay un trámite aprobado.
+     *
+     * La vista previa del formulario no se resiente: muestra lo que el operador
+     * está tecleando, y solo cae al valor del carnet cuando el campo está vacío
+     * sobre un carnet que ya existe.
      */
-    private function crearCarnet(Beneficiario $beneficiario, int $gestion, ?string $asociacion = null): Carnet
-    {
+    private function crearCarnet(
+        Beneficiario $beneficiario,
+        Rubro $rubro,
+        int $gestion,
+    ): Carnet {
         return $beneficiario->carnets()->create([
-            'asociacion' => $asociacion,
+            // La actividad que habilita este carnet. Es la columna que define el
+            // modelo: junto con el beneficiario y la gestión forma el índice
+            // único que impide duplicados.
+            'rubro_id' => $rubro->id,
+
             /*
              * La firma es lo ÚNICO que identifica al carnet: no hay columna
              * `codigo`. Se genera al azar y se comprueba contra la base antes de
              * usarla; el índice único de la columna es la garantía final. Ver
              * Carnet::nuevaFirma().
              *
-             * Se genera UNA VEZ, al crear el carnet. Las adiciones de rubro
-             * posteriores no la tocan: si cambiara, el QR ya impreso dejaría de
-             * funcionar y habría que reimprimir el plástico.
+             * Se genera UNA VEZ, al crear el carnet, y no se vuelve a tocar: si
+             * cambiara, el QR ya impreso dejaría de funcionar y habría que
+             * reimprimir el plástico. Dos carnets de la misma persona en la
+             * misma gestión tienen firmas DISTINTAS, y es correcto: son dos
+             * documentos.
              */
             'firma_validacion' => Carnet::nuevaFirma(),
             'gestion' => $gestion,
@@ -901,6 +955,73 @@ class SolicitudCarnetService
             'fecha_vencimiento' => Carnet::vencimientoDeGestion($gestion)->toDateString(),
             'estado' => EstadoCarnet::Vigente,
         ]);
+    }
+
+    /**
+     * ========================================================================
+     *  PASA AL CARNET LO QUE EL EXPEDIENTE AUTORIZÓ
+     * ========================================================================
+     *
+     * Se llama al aprobar, dentro de la transacción y con el trámite ya
+     * bloqueado. Es lo que reemplazó al INSERT en `carnet_rubro`: el carnet ES
+     * la habilitación, así que consolidar es escribirle el cupo y la asociación
+     * que el trámite trae, y dejarlo vigente.
+     *
+     * ------------------------------------------------------------------------
+     *  LO QUE VIENE EN BLANCO NO PISA LO QUE YA HABÍA
+     * ------------------------------------------------------------------------
+     *
+     * Un trámite de actualización presentado solo para corregir la asociación
+     * no tiene por qué traer el cupo, y si lo trae vacío no significa «borralo»
+     * sino «no lo estoy tocando». Borrar el cupo autorizado por no repetirlo
+     * dejaría al carnet sin el número contra el que se contrastan las guías de
+     * transporte, y nadie se enteraría hasta un control en el río.
+     *
+     * ------------------------------------------------------------------------
+     *  EL ESTADO SOLO SE TOCA SI EL CARNET ESTÁ «SANO»
+     * ------------------------------------------------------------------------
+     *
+     * Suspender y anular son decisiones de un supervisor SOBRE EL DOCUMENTO, y
+     * no le corresponde deshacerlas a la aprobación de un trámite. No deberían
+     * llegar acá —verificarCarnetAdmiteTramites() los rechaza al registrar—
+     * pero entre el registro y la aprobación pueden pasar días, y en el medio
+     * alguien pudo haber suspendido el carnet.
+     *
+     * Vencido tampoco se toca: un carnet de la gestión pasada no vuelve a
+     * vigente porque se apruebe un expediente atrasado.
+     *
+     * Se escribe con `update()` sobre la relación y no con `save()` sobre una
+     * instancia suelta para que el trait Auditable registre el cambio: quién
+     * consolidó qué cupo tiene que quedar en `auditorias`.
+     */
+    private function consolidarCarnet(Tramite $tramite): void
+    {
+        $carnet = $tramite->carnet;
+
+        if ($carnet === null) {
+            return;
+        }
+
+        $datos = [];
+
+        if (filled($tramite->capacidad_kg)) {
+            $datos['capacidad_kg'] = $tramite->capacidad_kg;
+        }
+
+        if (filled($tramite->asociacion)) {
+            $datos['asociacion'] = $tramite->asociacion;
+        }
+
+        // Solo desde vigente hacia vigente, o desde nada. Ver el comentario.
+        if ($carnet->estado === EstadoCarnet::Vigente) {
+            $datos['estado'] = EstadoCarnet::Vigente;
+        }
+
+        if ($datos === []) {
+            return;
+        }
+
+        $carnet->update($datos);
     }
 
     /**
@@ -1040,74 +1161,60 @@ class SolicitudCarnetService
     }
 
     /**
+     * ¿Se le puede presentar un trámite a este carnet?
+     *
+     * Anulado, suspendido o vencido, no. Lo del vencimiento casi no pasa dentro
+     * de la misma gestión —vence el 31 de diciembre—, pero un trámite cargado el
+     * 31 a las 23:50 entraría en ese caso, y es correcto que no se le pueda
+     * presentar nada.
+     *
+     * OJO CON LO QUE ESTO NO RESUELVE: un carnet anulado sigue ocupando su lugar
+     * en el índice único (beneficiario, rubro, gestión), así que la persona
+     * tampoco puede sacar otro del mismo rubro ese año. Es deliberado —anular es
+     * una sanción— pero el mensaje tiene que decirlo, o el operador busca la
+     * forma de emitir uno nuevo y no la encuentra.
+     *
      * @throws SolicitudInvalidaException
      */
-    private function verificarCarnetAdmiteAdiciones(Carnet $carnet): void
+    private function verificarCarnetAdmiteTramites(Carnet $carnet): void
     {
-        // Anulado o vencido. Lo segundo casi no pasa dentro de la misma gestión
-        // —vence el 31 de diciembre—, pero un trámite cargado el 31 a las 23:50
-        // entraría en ese caso, y es correcto que no se le pueda agregar nada.
-        if (! $carnet->admiteAdiciones()) {
-            throw SolicitudInvalidaException::carnetNoAdmiteAdiciones($carnet->gestion);
+        if (! $carnet->admiteTramites()) {
+            throw SolicitudInvalidaException::carnetNoAdmiteTramites(
+                $carnet->rubro?->nombre ?? 'solicitado',
+                $carnet->gestion,
+                $carnet->estado,
+            );
         }
     }
 
     /**
+     * Un carnet no puede tener dos expedientes abiertos a la vez.
+     *
+     * El pescador pagaría dos veces por una sola autorización. Ya no hace falta
+     * filtrar por rubro dentro del carnet —todos los trámites de un carnet son
+     * del mismo rubro, por construcción— así que la comprobación se simplificó
+     * a «¿tiene algo abierto?».
+     *
+     * Esto NO está como índice en la base y es una decisión, no un olvido: un
+     * trámite RECHAZADO sí se puede volver a presentar con los papeles
+     * corregidos, y un carnet puede recibir varias actualizaciones a lo largo
+     * del año, así que la combinación se repite legítimamente. Expresarlo en SQL
+     * exigiría un índice parcial sobre los estados abiertos, y el mensaje que
+     * necesita ventanilla no lo puede dar la base de todos modos.
+     *
      * @throws SolicitudInvalidaException
      */
-    private function verificarRubroNoRepetido(Carnet $carnet, Rubro $rubro): void
+    private function verificarSinSolicitudEnCurso(Carnet $carnet): void
     {
-        $habilitacion = $carnet->habilitaciones()->where('rubro_id', $rubro->id)->first();
-
-        if ($habilitacion === null) {
-            return;
-        }
-
-        /*
-         * SUSPENDIDO NO ES LO MISMO QUE HABILITADO, aunque los dos bloqueen.
-         *
-         * Se distinguen porque al operador le llegan dos mensajes distintos, y
-         * uno de ellos le dice qué hacer. «Ya está habilitado» a quien ve el
-         * rubro cortado en pantalla es contradictorio y lo manda a buscar el
-         * problema donde no está.
-         *
-         * Lo que bloquea en los dos casos es lo mismo: la habilitación EXISTE, y
-         * volver a tramitarla sería cobrar dos veces por una sola.
-         */
-        if (! $habilitacion->estaHabilitado()) {
-            throw SolicitudInvalidaException::rubroSuspendido($rubro->nombre, $carnet->gestion);
-        }
-
-        throw SolicitudInvalidaException::rubroYaHabilitado($rubro->nombre, $carnet->gestion);
-    }
-
-    /**
-     * @throws SolicitudInvalidaException
-     */
-    private function verificarSinSolicitudEnCurso(Carnet $carnet, Rubro $rubro): void
-    {
-        /*
-         * Un mismo rubro no puede tener dos expedientes pendientes a la vez: el
-         * pescador pagaría dos veces por una sola habilitación.
-         *
-         * Esto NO está como índice en la base y es una decisión, no un olvido:
-         * un rubro RECHAZADO sí se puede volver a pedir con los papeles
-         * corregidos, así que la combinación (carnet, rubro) se repite
-         * legítimamente a lo largo del tiempo. Expresarlo en SQL exigiría un
-         * índice parcial sobre los estados abiertos, y el mensaje que necesita
-         * ventanilla no lo puede dar la base de todos modos.
-         */
-        $enCurso = $carnet->tramites()
-            ->where('rubro_id', $rubro->id)
-            // abiertos() y no pendientes(): un expediente que alguien tomó para
-            // revisar sigue en curso, y dejar presentar otro por el mismo rubro
-            // haría que el beneficiario pague dos veces por una sola
-            // habilitación.
-            ->abiertos()
-            ->exists();
+        // abiertos() y no pendientes(): un expediente que alguien tomó para
+        // revisar sigue en curso, y dejar presentar otro haría que el
+        // beneficiario pague dos veces por una sola autorización.
+        $enCurso = $carnet->tramites()->abiertos()->exists();
 
         if ($enCurso) {
-            throw SolicitudInvalidaException::solicitudEnCurso($rubro->nombre);
+            throw SolicitudInvalidaException::solicitudEnCurso(
+                $carnet->rubro?->nombre ?? 'solicitado',
+            );
         }
     }
 
@@ -1118,7 +1225,8 @@ class SolicitudCarnetService
      * peticiones simultáneas: entre el SELECT y el INSERT, otra conexión puede
      * haber escrito la misma fila. Quien garantiza de verdad es el índice de la
      * base; lo que llega de él es «duplicate key value violates unique
-     * constraint carnet_rubro_unico», que no le dice nada a nadie.
+     * constraint carnets_beneficiario_rubro_gestion_unique», que no le dice nada
+     * a nadie.
      *
      * El 23505 es el SQLSTATE estándar de «unique_violation» y lo usan tanto
      * PostgreSQL como SQLite vía PDO, así que la traducción funciona igual en
@@ -1137,17 +1245,32 @@ class SolicitudCarnetService
             return $e;
         }
 
-        if (str_contains($mensaje, 'carnet_rubro')) {
-            return SolicitudInvalidaException::rubroYaHabilitado(
-                $tramite?->rubro?->nombre ?? 'solicitado',
-                $tramite?->carnet?->gestion ?? (int) now()->format('Y'),
+        /*
+         * El índice de `carnets` se llama carnets_beneficiario_rubro_gestion_unique
+         * y es el único que puede saltar acá por una carrera entre dos
+         * ventanillas: las dos leyeron «no tiene carnet de este rubro» y las dos
+         * intentaron crearlo.
+         *
+         * El mensaje dice qué hacer —volver a intentar— porque el segundo
+         * intento SÍ va a funcionar: cuando entre, ya va a ver el carnet que
+         * creó el primero y va a registrar una actualización, que es lo que
+         * corresponde.
+         */
+        if (str_contains($mensaje, 'beneficiario_rubro_gestion')) {
+            return new SolicitudInvalidaException(
+                'El beneficiario ya tiene un carnet de este rubro en esta gestión. '.
+                'Vuelva a intentarlo: la solicitud se registrará como actualización.',
             );
         }
 
-        if (str_contains($mensaje, 'gestion')) {
+        // La firma de validación se comprueba antes de usarla —ver
+        // Carnet::nuevaFirma()— pero entre ese SELECT y el INSERT otra conexión
+        // pudo meter la misma. Es astronómicamente improbable y por eso el
+        // mensaje solo pide reintentar: no hay nada que el operador pueda
+        // corregir.
+        if (str_contains($mensaje, 'firma_validacion')) {
             return new SolicitudInvalidaException(
-                'El beneficiario ya tiene un carnet en esta gestión. Vuelva a intentarlo: '.
-                'la solicitud se registrará como adición de rubro.',
+                'No se pudo generar la firma del carnet. Vuelva a intentarlo.',
             );
         }
 

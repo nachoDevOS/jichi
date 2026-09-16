@@ -42,6 +42,40 @@ return new class extends Migration
             $table->decimal('costo', 10, 2)->default(0)
                 ->comment('Tarifa vigente en Bs. Se copia al tramite al registrarlo');
 
+            /*
+             * ¿ESTA ACTIVIDAD LLEVA CUPO EN KILOS?
+             *
+             * No todas. La pesca —«Pescador», «Faena»— se autoriza por volumen:
+             * tantos kilos por temporada, y ese número se contrasta contra las
+             * guías de transporte. La comercialización no: habilita a trasladar
+             * y vender, sin tope propio.
+             *
+             * ------------------------------------------------------------------
+             *  ES UNA COLUMNA Y NO UN `match` SOBRE EL NOMBRE
+             * ------------------------------------------------------------------
+             *
+             * La tentación es preguntar `$rubro->nombre === 'Pescador'`. No
+             * sirve, por dos motivos concretos:
+             *
+             *   - el catálogo lo edita la unidad desde el panel, y el mismo
+             *     rubro figura como «Pescador» o como «Faena» según quién lo
+             *     cargó. Un `match` por nombre deja de funcionar el día que
+             *     alguien corrige una tilde;
+             *   - los rubros se agregan por ordenanza. El que venga mañana
+             *     —«Acuicultor»— tendría que pasar por código para decir si
+             *     lleva cupo, cuando es un dato del catálogo.
+             *
+             * De qué depende: el formulario de trámite muestra u oculta el campo
+             * del cupo, la validación lo exige o lo prohíbe, y el plástico
+             * imprime el renglón CUPO o le da la tira entera al rubro.
+             *
+             * DEFAULT FALSE a propósito: un rubro nuevo no pide cupo hasta que
+             * alguien diga que sí. Al revés, el que se olvide de destildarlo
+             * obliga a ventanilla a inventar un número para poder guardar.
+             */
+            $table->boolean('requiere_capacidad')->default(false)
+                ->comment('Si la actividad se autoriza por volumen (kilos)');
+
             // 'activo' | 'inactivo'. Ver App\Enums\EstadoRubro.
             //
             // Se da de baja cambiando el estado y no borrando la fila: los

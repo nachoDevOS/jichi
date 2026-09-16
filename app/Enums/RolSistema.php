@@ -97,10 +97,12 @@ enum RolSistema: string
              */
             'tramites.aprobar',
             'tramites.rechazar',
-            // Suspender una habilitación y anular un carnet son medidas
-            // sancionatorias: el día que exista el rol de ventanilla, no las
-            // tendrá.
-            'habilitaciones.suspender',
+            // Suspender y anular un carnet son medidas sancionatorias: el día
+            // que exista el rol de ventanilla, no las tendrá.
+            //
+            // `carnets.suspender` reemplazó a `habilitaciones.suspender`: con un
+            // carnet por rubro, cortar una actividad es suspender su carnet.
+            'carnets.suspender',
             'carnets.anular',
             'reportes.exportar',
             'auditoria.ver',

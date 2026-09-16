@@ -26,6 +26,7 @@ export default function IndiceCarnets({
     filtros,
     estados,
     gestiones,
+    rubros,
     opcionesPorPagina,
 }: {
     carnets: Paginado<CarnetFila>;
@@ -33,10 +34,14 @@ export default function IndiceCarnets({
         buscar: string | null;
         estado: string | null;
         gestion: number | null;
+        /** Con un carnet por actividad, «mostrame los de Pescador» es corriente. */
+        rubro: number | null;
         por_pagina: number;
     };
     estados: OpcionEnum[];
     gestiones: number[];
+    /** Todos, incluso los dados de baja: sus carnets emitidos siguen existiendo. */
+    rubros: { id: number; nombre: string }[];
     opcionesPorPagina: number[];
 }) {
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
@@ -48,6 +53,7 @@ export default function IndiceCarnets({
                 buscar,
                 estado: filtros.estado,
                 gestion: filtros.gestion,
+                rubro: filtros.rubro,
                 por_pagina: filtros.por_pagina,
                 ...valores,
             },
@@ -56,7 +62,7 @@ export default function IndiceCarnets({
     }
 
     return (
-        <LayoutPanel titulo="Carnets" descripcion="Documentos emitidos, uno por persona y gestión.">
+        <LayoutPanel titulo="Carnets" descripcion="Documentos emitidos, uno por persona, rubro y gestión.">
             <Head title="Carnets" />
 
             <Card>
@@ -108,6 +114,27 @@ export default function IndiceCarnets({
                         ))}
                     </Select>
 
+                    {/*
+                        FILTRO POR ACTIVIDAD. Llegó con el modelo nuevo: antes un
+                        carnet tenía varios rubros y filtrar por uno devolvía
+                        documentos que además habilitaban otras tres cosas. Hoy el
+                        carnet ES la actividad, así que la lista filtrada responde
+                        exactamente «quiénes están habilitados para pescar».
+                    */}
+                    <Select
+                        className="sm:col-span-2"
+                        value={filtros.rubro ?? ''}
+                        onChange={(e) => filtrar({ rubro: e.target.value || null })}
+                        aria-label="Rubro"
+                    >
+                        <option value="">Todos los rubros</option>
+                        {rubros.map((r) => (
+                            <option key={r.id} value={r.id}>
+                                {r.nombre}
+                            </option>
+                        ))}
+                    </Select>
+
                     <form
                         className="relative sm:col-span-4"
                         onSubmit={(e) => {
@@ -141,7 +168,7 @@ export default function IndiceCarnets({
                                     <th className="px-5 py-3 font-medium">Titular</th>
                                     <th className="px-5 py-3 font-medium">Gestión</th>
                                     <th className="px-5 py-3 font-medium">Estado</th>
-                                    <th className="px-5 py-3 font-medium">Rubros</th>
+                                    <th className="px-5 py-3 font-medium">Rubro</th>
                                     <th className="px-5 py-3 font-medium">Vence</th>
                                 </tr>
                             </thead>
@@ -174,8 +201,20 @@ export default function IndiceCarnets({
                                                 {c.vigente ? 'Vigente' : c.estado_etiqueta}
                                             </Badge>
                                         </td>
-                                        <td className="px-5 py-3 tabular-nums text-muted-foreground">
-                                            {c.rubros_count}
+                                        {/*
+                                            LA ACTIVIDAD, no un contador de rubros.
+                                            Con un carnet por rubro, «cuántos rubros
+                                            tiene» siempre daría uno; lo que hace
+                                            falta saber es CUÁL, porque una misma
+                                            persona aparece varias veces en la lista.
+                                        */}
+                                        <td className="px-5 py-3">
+                                            <span className="font-medium">{c.rubro ?? '—'}</span>
+                                            {c.capacidad && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {c.capacidad}
+                                                </p>
+                                            )}
                                         </td>
                                         <td className="px-5 py-3 text-muted-foreground">
                                             {fecha(c.fecha_vencimiento)}

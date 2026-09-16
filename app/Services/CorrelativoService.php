@@ -37,13 +37,29 @@ class CorrelativoService
      * `siguiente()` devuelve el código completo —SERIE-2026-0001— que es lo que
      * quiere quien necesita un identificador legible y único por sí solo.
      *
-     * Los RECIBOS no: el talonario de papel trae el número pelado arriba a la
-     * derecha —0016— y el recibo digital tiene que decir lo mismo. Además lo
-     * guarda como entero para poder ordenarlo y sacar el último de la serie,
-     * cosa que con el código formateado no se puede.
+     * La otra la pedían los RECIBOS: el talonario de papel trae el número pelado
+     * arriba a la derecha —0016— y lo guardaban como entero para poder
+     * ordenarlo y sacar el último de la serie, cosa que con el código
+     * formateado no se puede.
      *
-     * La reserva —el bloqueo de la fila del contador— es la misma para los dos,
-     * y vive acá adentro una sola vez.
+     * ------------------------------------------------------------------------
+     *  HOY ESTE SERVICIO ESTÁ ESCRITO Y SIN USAR — otra vez
+     * ------------------------------------------------------------------------
+     *
+     * Ya le pasó una vez, cuando el carnet dejó de tener columna `codigo`.
+     * Volvió con los recibos, y se fue de nuevo al retirarse la tabla
+     * `recibos`: el comprobante se arma al vuelo y su número es el id del
+     * trámite. Ver App\Support\ReciboArmado::numeroImpreso().
+     *
+     * NO SE BORRA, y conviene saber por qué: un correlativo es justamente el
+     * dato que NO se puede derivar de otras tablas. El día que Contabilidad
+     * exija una serie sin huecos —hoy la del recibo los tiene, porque no todo
+     * trámite emite comprobante— la parte difícil ya está resuelta acá: la
+     * reserva con la fila del contador bloqueada, que es lo que impide que dos
+     * ventanillas saquen el mismo número.
+     *
+     * La reserva —ese bloqueo— es la misma para las dos formas, y vive acá
+     * adentro una sola vez.
      */
     public function siguienteNumero(string $serie, ?int $anio = null): int
     {

@@ -27,7 +27,7 @@ import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
  *  LOS RUBROS SOLO APARECEN SI EL CARNET ESTÁ VIGENTE
  * ----------------------------------------------------------------------------
  *
- * Un carnet vencido o anulado no habilita nada, así que listar sus rubros
+ * Un carnet vencido, suspendido o anulado no habilita nada, así que mostrar su actividad
  * —aunque fuera en gris— es pedirle al inspector que lea el sello y la lista al
  * mismo tiempo y saque la conclusión correcta. Con un carnet caído, la lista
  * directamente no está.
@@ -83,28 +83,36 @@ export function FichaCarnet({
                 <Renglon etiqueta="Vence" valor={fecha(carnet.fecha_vencimiento)} />
             </dl>
 
-            {carnet.vigente && (
+            {/*
+                LA ACTIVIDAD QUE EL CARNET AUTORIZA. Es UNA, no una lista: cada
+                carnet habilita un solo rubro, y quien tiene dos actividades
+                tiene dos carnets con dos QR distintos.
+
+                Solo se muestra con el carnet VIGENTE, y el servidor ya manda
+                `rubro` en null cuando no lo está. Es deliberado: enseñar la
+                actividad de un carnet vencido o suspendido —aunque fuera tachada—
+                arriesga que el inspector lea la línea y no la advertencia.
+            */}
+            {carnet.vigente && carnet.rubro && (
                 <div className="mt-6">
                     <p className="font-serif text-[11px] tracking-[0.14em] text-slate-500 uppercase">
-                        Actividades habilitadas
+                        Actividad habilitada
                     </p>
 
-                    {carnet.rubros.length === 0 ? (
-                        <p className="mt-2 font-serif text-[13px] text-slate-600 italic">
-                            El carnet es auténtico pero no tiene ninguna actividad habilitada.
+                    <p className="mt-2 flex items-center gap-2 font-serif text-[13px] text-slate-800">
+                        <BadgeCheck className="size-4 shrink-0 text-emerald-700" />
+                        {carnet.rubro}
+                    </p>
+
+                    {/*
+                        El cupo autorizado. Va debajo de la actividad y no en su
+                        misma línea porque es el dato que un control contrasta
+                        contra la guía de transporte: tiene que poder leerse solo.
+                    */}
+                    {carnet.capacidad && (
+                        <p className="mt-1.5 font-serif text-[13px] text-slate-600">
+                            Cupo autorizado: <strong>{carnet.capacidad}</strong>
                         </p>
-                    ) : (
-                        <ul className="mt-2 space-y-1.5">
-                            {carnet.rubros.map((rubro) => (
-                                <li
-                                    key={rubro}
-                                    className="flex items-center gap-2 font-serif text-[13px] text-slate-800"
-                                >
-                                    <BadgeCheck className="size-4 shrink-0 text-emerald-700" />
-                                    {rubro}
-                                </li>
-                            ))}
-                        </ul>
                     )}
                 </div>
             )}
@@ -137,6 +145,28 @@ function Sello({ carnet }: { carnet: CarnetPublico }) {
                 clase="border-rose-700/40 bg-rose-50 text-rose-800"
                 icono={<Ban className="size-7" />}
                 texto="Anulado"
+            />
+        );
+    }
+
+    /*
+     * SUSPENDIDO TIENE SELLO PROPIO, y no es un detalle estético.
+     *
+     * Sin este caso el sello caía en el genérico de abajo y un carnet suspendido
+     * se anunciaba como VENCIDO, mientras el texto de al lado explicaba una
+     * suspensión. El inspector leía dos cosas distintas en la misma pantalla, y
+     * se resuelven distinto: un vencimiento se arregla tramitando el carnet del
+     * año siguiente, una suspensión la levanta un supervisor.
+     *
+     * Va en rojo y no en ámbar porque, a diferencia del vencimiento, es una
+     * SANCIÓN vigente: el documento no caducó solo, alguien lo cortó.
+     */
+    if (carnet.estado === 'suspendido') {
+        return (
+            <Marco
+                clase="border-rose-700/40 bg-rose-50 text-rose-800"
+                icono={<Ban className="size-7" />}
+                texto="Suspendido"
             />
         );
     }

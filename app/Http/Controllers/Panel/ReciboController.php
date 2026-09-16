@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Panel;
 use App\Enums\ConceptoRecibo;
 use App\Enums\FormaPago;
 use App\Http\Controllers\Controller;
-use App\Models\Recibo;
 use App\Models\Tramite;
 use App\Services\ReciboTramiteService;
+use App\Support\ReciboArmado;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -69,23 +69,22 @@ class ReciboController extends Controller
     public function imprimir(Tramite $tramite): Response|RedirectResponse
     {
         /*
-         * Si el expediente ya pasó por revisión y todavía no tiene recibo, se
-         * emite acá mismo.
+         * El recibo se ARMA acá mismo, con los datos del expediente. No hay
+         * ninguna fila que leer: la tabla `recibos` se retiró. Ver
+         * App\Support\ReciboArmado.
          *
-         * Es el caso de los expedientes que cruzaron ese paso ANTES de que
-         * existiera este módulo: son reales, la plata se cobró y la gente espera
-         * su comprobante. Se fechan con su `fecha_revision` —el día en que se
-         * cobró de verdad— y no con la de hoy. Ver
-         * ReciboTramiteService::emitirAtrasado().
+         * La fecha impresa sale de `fecha_revision`, el día en que se cobró de
+         * verdad, y no de hoy: una reimpresión de un expediente de marzo sigue
+         * diciendo marzo.
          */
-        $recibo = $this->recibos->emitirAtrasado($tramite);
+        $recibo = $this->recibos->armar($tramite);
 
         if ($recibo === null) {
-            // Solo queda un caso: un expediente que nunca llegó a revisión. Ahí
-            // todavía no hay nada cobrado que respaldar.
+            // Un expediente que nunca llegó a revisión. Todavía no hay nada
+            // cobrado que respaldar.
             return back()->with(
                 'error',
-                'Este trámite todavía no tiene recibo: se emite al tomar el expediente para revisión.',
+                'Este trámite todavía no tiene recibo: corresponde al tomar el expediente para revisión.',
             );
         }
 
@@ -95,7 +94,7 @@ class ReciboController extends Controller
     /**
      * Arma el PDF y lo manda al navegador para imprimir.
      */
-    private function pdf(Recibo $recibo): Response
+    private function pdf(ReciboArmado $recibo): Response
     {
         $pdf = Pdf::loadView('documentos.recibo-oficial', [
             'recibo' => $recibo,
@@ -104,7 +103,7 @@ class ReciboController extends Controller
 
             // Los renglones del cuadro de importes y el total al pie.
             'renglones' => $this->renglones($recibo),
-            'total' => $this->importeFormateado((float) $recibo->monto),
+            'total' => $this->importeFormateado($recibo->monto),
 
             // Cuántos renglones en blanco agregar para que el cuadro conserve su
             // alto aunque haya un solo cobro. Ver RENGLONES_MINIMOS.
@@ -186,7 +185,7 @@ class ReciboController extends Controller
      *
      * @return array<int, array{descripcion: string, monto: string}>
      */
-    private function renglones(Recibo $recibo): array
+    private function renglones(ReciboArmado $recibo): array
     {
         return array_map(fn (array $linea): array => [
             'descripcion' => $linea['descripcion'],

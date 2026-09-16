@@ -59,6 +59,24 @@ export function CampoPagos({
         onCambiar(pagos.map((p, i) => (i === indice ? { ...p, [campo]: valor } : p)));
     }
 
+    /*
+     * EL NÚMERO DE TRANSACCIÓN SE LIMPIA AL TECLEAR, no al guardar.
+     *
+     * Los bancos numeran los depósitos con enteros, así que una letra o un
+     * espacio es un error de tipeo. Se descartan mientras escribe en vez de
+     * rebotarle el formulario al final: el operador está copiando de una boleta
+     * de papel y lo que necesita es que el campo no le acepte lo que no va.
+     *
+     * NO SE USA `type="number"`, y esa es la parte importante. Ese tipo acepta
+     * `e`, `+`, `-` y coma decimal —son números válidos para el navegador— y
+     * además le pone flechitas al campo, que en un dato que no es una cantidad
+     * no tienen ningún sentido. `inputMode="numeric"` abre el teclado numérico
+     * en el teléfono sin traer nada de eso.
+     */
+    function soloDigitos(valor: string): string {
+        return valor.replace(/\D/g, '');
+    }
+
     return (
         <div className="space-y-4">
             {pagos.length === 0 ? (
@@ -86,12 +104,15 @@ export function CampoPagos({
                                 error={errores[`pagos.${i}.nro_transaccion`]}
                                 // Es único en TODO el sistema: el mismo depósito
                                 // no puede pagar dos expedientes.
-                                ayuda="El que figura en la boleta del banco"
+                                ayuda="El que figura en la boleta del banco. Solo números."
                             >
                                 <Input
                                     id={`pago-${i}-nro`}
+                                    inputMode="numeric"
                                     value={pago.nro_transaccion}
-                                    onChange={(e) => actualizar(i, 'nro_transaccion', e.target.value)}
+                                    onChange={(e) =>
+                                        actualizar(i, 'nro_transaccion', soloDigitos(e.target.value))
+                                    }
                                 />
                             </Campo>
 

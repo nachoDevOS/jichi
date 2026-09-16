@@ -22,14 +22,15 @@ export default function VerBeneficiario({
     beneficiario,
     gestion,
     deuda,
-    carnetGestion,
+    carnetsGestion,
     carnets,
 }: {
     beneficiario: BeneficiarioFicha;
     gestion: number;
     deuda: number;
-    /** El carnet de la gestión en curso, o null si no tiene. */
-    carnetGestion: CarnetResumen | null;
+    /** Los carnets de la gestión en curso: uno por actividad. Vacío si no tiene. */
+    carnetsGestion: CarnetResumen[];
+    /** El historial completo, de todas las gestiones. */
     carnets: CarnetResumen[];
 }) {
     const { puede } = usePermisos();
@@ -119,7 +120,7 @@ export default function VerBeneficiario({
 
                 {/* ------------------------------------------------ Columna derecha */}
                 <div className="space-y-6 lg:col-span-2">
-                    <AvisoProximoTramite carnet={carnetGestion} gestion={gestion} />
+                    <AvisoProximoTramite carnets={carnetsGestion} gestion={gestion} />
 
                     {deuda > 0 && (
                         <Card className="border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
@@ -162,12 +163,19 @@ export default function VerBeneficiario({
                                                 Gestión {c.gestion} · vence {fecha(c.fecha_vencimiento)}
                                             </span>
 
-                                            <span className="ml-auto flex flex-wrap gap-1">
-                                                {(c.rubros ?? []).map((r) => (
-                                                    <Badge key={r} color="slate">
-                                                        {r}
-                                                    </Badge>
-                                                ))}
+                                            {/*
+                                                La actividad del carnet. Con un
+                                                carnet por rubro, sin esto las
+                                                filas de una misma gestión se ven
+                                                idénticas salvo por el número.
+                                            */}
+                                            <span className="ml-auto flex flex-wrap items-center gap-1">
+                                                <Badge color="slate">{c.rubro ?? '—'}</Badge>
+                                                {c.capacidad && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {c.capacidad}
+                                                    </span>
+                                                )}
                                             </span>
                                         </li>
                                     ))}
@@ -194,23 +202,35 @@ export default function VerBeneficiario({
  * EL CARTEL QUE RESUME LA REGLA A.
  *
  * Le dice al operador, antes de que empiece a cargar nada, si a esta persona le
- * corresponde una emisión inicial o una adición de rubro. No es la decisión
+ * corresponde una emisión inicial o una actualización. No es la decisión
  * final —esa la toma el servidor, con la fila bloqueada, al registrar— pero
  * evita la sorpresa de cargar un trámite pensando que es otra cosa.
  */
-function AvisoProximoTramite({ carnet, gestion }: { carnet: CarnetResumen | null; gestion: number }) {
-    if (carnet === null) {
+/**
+ * QUÉ ACTIVIDADES TIENE CUBIERTAS ESTA PERSONA ESTE AÑO.
+ *
+ * Antes este cartel anunciaba el tipo del próximo trámite —«será una adición de
+ * rubro»— y ya no puede: con un carnet por actividad, el tipo depende del RUBRO
+ * que se elija, no de la persona. La misma persona hace una emisión inicial si
+ * pide Comercializador y una actualización si pide Pescador.
+ *
+ * Así que ahora muestra el inventario, que es el dato del que sale la conclusión
+ * en el formulario de trámite. Ver `SituacionBeneficiarioCard`, que hace lo
+ * mismo del otro lado.
+ */
+function AvisoProximoTramite({ carnets, gestion }: { carnets: CarnetResumen[]; gestion: number }) {
+    if (carnets.length === 0) {
         return (
             <Card className="border-sky-300 bg-sky-50 dark:border-sky-500/40 dark:bg-sky-500/10">
                 <CardContent className="flex items-start gap-3 pt-5">
                     <BadgeCheck className="mt-0.5 size-5 shrink-0 text-sky-700 dark:text-sky-300" />
                     <div className="text-sm">
                         <p className="font-medium text-sky-900 dark:text-sky-200">
-                            Sin carnet de la gestión {gestion}
+                            Sin carnets de la gestión {gestion}
                         </p>
                         <p className="text-sky-800/80 dark:text-sky-200/80">
-                            El próximo trámite será una <strong>emisión inicial</strong>: se creará el
-                            carnet del año y se habilitará el rubro solicitado.
+                            Cualquier rubro que solicite será una <strong>emisión inicial</strong>:
+                            se creará el carnet de esa actividad.
                         </p>
                     </div>
                 </CardContent>
@@ -222,14 +242,28 @@ function AvisoProximoTramite({ carnet, gestion }: { carnet: CarnetResumen | null
         <Card className="border-violet-300 bg-violet-50 dark:border-violet-500/40 dark:bg-violet-500/10">
             <CardContent className="flex items-start gap-3 pt-5">
                 <BadgeCheck className="mt-0.5 size-5 shrink-0 text-violet-700 dark:text-violet-300" />
-                <div className="text-sm">
+                <div className="min-w-0 text-sm">
                     <p className="font-medium text-violet-900 dark:text-violet-200">
-                        Ya tiene carnet de la gestión {gestion}
+                        {carnets.length} carnet(s) en la gestión {gestion}
                     </p>
+
                     <p className="text-violet-800/80 dark:text-violet-200/80">
-                        El próximo trámite será una <strong>adición de rubro</strong> sobre ese mismo
-                        carnet. No se emite uno nuevo: la regla es un carnet por persona y gestión.
+                        Un carnet por actividad. Esas no se pueden volver a pedir este año;
+                        cualquier otro rubro emite un carnet nuevo.
                     </p>
+
+                    <ul className="mt-2 flex flex-wrap gap-1">
+                        {carnets.map((c) => (
+                            <li key={c.id}>
+                                <Badge color={c.estado_color}>
+                                    {c.rubro ?? '—'}
+                                    <span className="ml-1 opacity-70">
+                                        · {c.estado_etiqueta.toLowerCase()}
+                                    </span>
+                                </Badge>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </CardContent>
         </Card>

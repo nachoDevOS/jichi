@@ -14,7 +14,7 @@ Estado al **15 de septiembre de 2026**, después de agregar la impresión del ca
 | **Trámites** | Completo: solicitud → aprobación → impresión → entrega | `SolicitudCarnetService` |
 | **Pagos** | Completo: 1 a N depósitos por trámite | `PagoTramiteService` |
 | **Recibos** | Completo: el talonario del SEDAG en PDF | `ReciboTramiteService` |
-| **Carnets** | Completo: consulta, suspensión de rubro, anulación, **impresión del plástico** | `CarnetController`, `CarnetImpresionController` |
+| **Carnets** | Completo: consulta, suspensión, anulación, **impresión del plástico**. Uno por persona, rubro y gestión | `CarnetController`, `CarnetImpresionController` |
 | **Rubros** | Completo: catálogo con tarifa vigente | `RubroController` |
 | Verificación pública | Completo, con firma de validación | `VerificacionController` |
 
@@ -30,7 +30,7 @@ Aparece en gris en el menú. No existe ni la ruta ni el controlador.
 - Padrón de carnets vigentes de una gestión, para imprimir.
 - Trámites rechazados con su motivo: sirve para detectar qué requisito falla más
   seguido y corregir el instructivo de ventanilla.
-- Carnets con rubros suspendidos.
+- Carnets suspendidos, por actividad.
 
 **Por dónde empezar:** copiar el patrón de `BeneficiarioController::index()`
 —filtros + `Paginacion` + `through()`— y agregar una acción de exportación con
@@ -167,15 +167,16 @@ ejemplo— que hoy no pueden ocurrir. Se borró al dejar un solo rol. Cuando el
 módulo de Usuarios se construya, hay que volver a escribirlo como pruebas HTTP
 contra sus rutas.
 
-### 6. `DemoSeeder` no pasa por el servicio
+### 6. ~~`DemoSeeder` no pasa por el servicio~~ — RESUELTO
 
-Escribe los carnets, trámites y pagos a mano en vez de llamar a
-`SolicitudCarnetService`. El motivo está anotado en el archivo: el servicio exige
-`UploadedFile` de verdad, y sembrar 100 trámites por ahí dejaría ~300 archivos
-falsos en `storage/app/public` en cada `migrate:fresh`.
+Ya no escribe carnets, trámites ni pagos: siembra **solo el padrón** —treinta
+beneficiarios— y el circuito se carga desde la pantalla. El motivo por el que la
+copia era mala se confirmó en el cambio a «un carnet por rubro»: ese guion
+escrito a mano habría habido que reescribirlo entero, y ninguna prueba habría
+avisado si quedaba mal.
 
-**Consecuencia:** si una regla del servicio cambia, hay que tocar el seeder
-también. Está anotado, pero es una copia y las copias se quedan viejas.
+Lo que sí hace falta sembrado es el padrón: tipear treinta personas para probar
+el buscador o la paginación no prueba nada y cuesta una tarde.
 
 ### 7. No hay edición ni anulación de pagos
 
@@ -219,7 +220,9 @@ adivinando.
 
 ### 12. No hay libro de recibos
 
-La tabla `recibos` ya tiene el índice `['gestion', 'fecha_emision']` preparado
+**OJO: este pendiente cambió de forma.** La tabla `recibos` se retiró, así que
+ya no hay nada que listar directamente; un libro de recibos hoy se arma
+recorriendo los trámites con `fecha_revision`. El índice que estaba preparado
 para el listado, pero no existe la pantalla. Contabilidad lo va a pedir junto con
 Reportes: es el equivalente a revisar el talonario para cuadrar contra caja.
 
@@ -285,6 +288,24 @@ desplaza sola dentro de su tarjeta.
 No se notaba porque el tablero se prueba en el escritorio, donde sobra ancho.
 Los otros cinco listados se revisaron y **no** tienen el problema: son los únicos
 que no están dentro de una grilla. La trampa quedó anotada en CLAUDE.md.
+
+### 17. El cambio a «un carnet por rubro» dejó dos cosas por decidir
+
+El modelo nuevo funciona y está verificado, pero abrió dos preguntas que no
+corresponde resolver sin la unidad:
+
+**a) Un carnet ANULADO bloquea el rubro por el resto del año.** El índice único
+`(beneficiario, rubro, gestión)` no distingue estados, así que anular el carnet
+de Pescador de alguien le impide sacar otro de Pescador hasta enero. Antes
+pasaba lo mismo pero con TODO el carnet, así que no es una regresión — y es
+coherente con que anular sea una sanción. Pero si la unidad quiere permitir
+reemitir tras una anulación, hace falta decidir cómo: un índice parcial
+`WHERE estado != 'anulado'` lo permitiría, al precio de que dos carnets del mismo
+rubro convivan en la misma gestión.
+
+**b) El trámite de ACTUALIZACIÓN no tiene tarifa propia.** Copia
+`rubros.costo`, igual que una emisión inicial, así que corregir un cupo cuesta lo
+mismo que emitir el carnet. Puede ser lo querido o no; hoy nadie lo definió.
 
 ### 10. NO HAY PRUEBAS AUTOMÁTICAS — de nada
 

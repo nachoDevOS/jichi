@@ -43,7 +43,7 @@ use App\Models\Tramite;
  *     Otros
  *
  * Este sistema emite **carnets**, que en el mostrador se llaman «cédula de
- * pescador». Cobre lo que cobre —emisión inicial o adición de rubro, Pescador o
+ * pescador». Cobre lo que cobre —emisión inicial o actualización, Pescador o
  * Comercializador— lo que el pescador se lleva es su cédula, y esa es la
  * casilla que corresponde.
  *
@@ -86,7 +86,7 @@ enum ConceptoRecibo: string
      * ========================================================================
      *
      * **Cédulas**, siempre. Jichi emite carnets —la cédula de pescador— y eso es
-     * lo que se está cobrando, sea una emisión inicial o una adición de rubro,
+     * lo que se está cobrando, sea una emisión inicial o una actualización,
      * sea Pescador o Comercializador.
      *
      * ------------------------------------------------------------------------

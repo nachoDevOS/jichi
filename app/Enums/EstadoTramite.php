@@ -28,7 +28,7 @@ namespace App\Enums;
  *                rechaza. Es el único estado desde el que se puede aprobar.
  *
  *   APROBADO     Se validó todo. Acá —y solo acá— nace la fila en
- *                `carnet_rubro` y el beneficiario queda oficialmente
+ *                el carnet, y el beneficiario queda oficialmente
  *                habilitado.
  *
  *   RECHAZADO    Papeles ilegibles, pago que no corresponde, falta un
@@ -158,7 +158,7 @@ enum EstadoTramite: string
      * calle por un expediente que figura sin presentar.
      *
      * Aprobado y Rechazado son FINALES. Un trámite aprobado por error no se
-     * «des-aprueba»: ya se escribió la habilitación en `carnet_rubro` y
+     * «des-aprueba»: el cupo ya se consolidó en el carnet y
      * posiblemente se imprimió el carnet. Lo que corresponde es suspender el
      * rubro, que deja el rastro de por qué.
      *
@@ -254,7 +254,7 @@ enum EstadoTramite: string
      * detrás. Un expediente presentado que no corresponde se RECHAZA, que deja
      * el motivo escrito y le da al pescador una respuesta.
      *
-     * APROBADO tampoco: ya nació la fila en `carnet_rubro`, la persona quedó
+     * APROBADO tampoco: el carnet ya habilita, la persona quedó
      * habilitada y posiblemente se imprimió el plástico. Lo que corresponde ahí
      * es suspender el rubro o anular el carnet, que dejan el rastro de por qué.
      *

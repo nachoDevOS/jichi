@@ -41,7 +41,18 @@ export interface CarnetPublico {
      * autoriza a trabajar, y mostrarlo —aunque fuera en rojo— arriesga que el
      * inspector lea la fila y no el color.
      */
-    rubros: string[];
+    /**
+     * La actividad que el carnet autoriza. UNA, no una lista: el carnet es de un
+     * solo rubro.
+     *
+     * Viene en `null` cuando el carnet no está vigente —vencido, suspendido o
+     * anulado— y no es un olvido: mostrar la actividad, aunque fuera marcada en
+     * rojo, arriesga que el inspector lea la fila y no el color. Lo que no
+     * habilita, no aparece.
+     */
+    rubro: string | null;
+    /** El cupo autorizado: «600 KG». Null por lo mismo que `rubro`. */
+    capacidad: string | null;
 }
 
 /** Datos institucionales que se muestran en el encabezado y el pie. */

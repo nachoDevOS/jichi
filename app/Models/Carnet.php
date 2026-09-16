@@ -3,27 +3,36 @@
 namespace App\Models;
 
 use App\Enums\EstadoCarnet;
-use App\Enums\EstadoHabilitacion;
+use App\Enums\EstadoTramite;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
- * El documento anual. Uno por persona y por gestión — ver la migración
- * `carnets`, donde esa regla está escrita como índice único.
+ * El documento anual de UNA actividad. Uno por persona, rubro y gestión — ver
+ * la migración `carnets`, donde esa regla está escrita como índice único.
+ *
+ * Una persona que pesca y comercializa tiene DOS carnets en 2026, cada uno con
+ * su plástico, su firma y su cupo. El carnet ES la habilitación: no hay tabla
+ * intermedia, y por eso tampoco hay `habilitaciones()` — la que había se retiró
+ * junto con `carnet_rubro`.
+ *
+ * OJO CON `#[Fillable]`: lo que no esté en esta lista, `update()` lo descarta
+ * EN SILENCIO, sin lanzar ningún error. `rubro_id` y `capacidad_kg` están acá
+ * porque el servicio las escribe al emitir y al aprobar.
  */
 #[Fillable([
     'beneficiario_id',
+    'rubro_id',
     'firma_validacion',
     'gestion',
     'asociacion',
+    'capacidad_kg',
     'fecha_emision',
     'fecha_vencimiento',
     'estado',
@@ -49,6 +58,10 @@ class Carnet extends Model
         return [
             'estado' => EstadoCarnet::class,
             'gestion' => 'integer',
+            // decimal:2 y no float, por el mismo motivo que en `tramites`: el
+            // cupo se compara contra kilos declarados en guías de transporte, y
+            // en punto flotante 600.1 + 0.2 no da 600.3.
+            'capacidad_kg' => 'decimal:2',
             'fecha_emision' => 'date',
             'fecha_vencimiento' => 'date',
         ];
@@ -84,20 +97,16 @@ class Carnet extends Model
         return $this->hasMany(Tramite::class);
     }
 
-    public function habilitaciones(): HasMany
-    {
-        return $this->hasMany(CarnetRubro::class);
-    }
-
     /**
-     * Los rubros del carnet, con los datos de la habilitación en el pivote.
+     * LA ACTIVIDAD QUE HABILITA ESTE CARNET.
+     *
+     * Es un `belongsTo` y no la lista que había antes: el carnet tiene UN rubro,
+     * no varios. Donde el código viejo pedía `$carnet->rubros` o
+     * `$carnet->habilitaciones`, ahora pide `$carnet->rubro`.
      */
-    public function rubros(): BelongsToMany
+    public function rubro(): BelongsTo
     {
-        return $this->belongsToMany(Rubro::class, 'carnet_rubro')
-            ->using(CarnetRubro::class)
-            ->withPivot(['id', 'fecha_habilitacion', 'estado'])
-            ->withTimestamps();
+        return $this->belongsTo(Rubro::class);
     }
 
     // ------------------------------------------------------------------
@@ -105,30 +114,38 @@ class Carnet extends Model
     // ------------------------------------------------------------------
 
     /**
-     * ¿Vale hoy este carnet?
+     * ¿Vale hoy este carnet? ¿Autoriza a trabajar?
      *
      * SE MIRAN LAS DOS COSAS, Y NO ES REDUNDANTE:
      *
-     *   - el estado, porque un carnet ANULADO en marzo conserva la fecha de
+     *   - el estado, porque un carnet ANULADO o SUSPENDIDO conserva la fecha de
      *     vencimiento de diciembre y la fecha sola no lo delataría;
      *   - la fecha, porque el estado `vencido` lo escribe un comando programado
      *     que corre una vez al día, y entre corrida y corrida un carnet que
      *     venció ayer sigue diciendo «vigente».
      *
      * Cada una tapa el agujero de la otra. Ver App\Enums\EstadoCarnet.
+     *
+     * DESDE EL MODELO NUEVO, ESTO RESPONDE ADEMÁS «¿PUEDE EJERCER ESTE RUBRO?».
+     * Antes eran dos preguntas —el carnet valía, y aparte cada rubro estaba
+     * habilitado o suspendido—; hoy el carnet es el rubro y se responden juntas.
      */
     public function estaVigente(): bool
     {
-        return $this->estado === EstadoCarnet::Vigente
+        return $this->estado->habilita()
             && $this->fecha_vencimiento?->endOfDay()->isFuture();
     }
 
     /**
-     * ¿Se le puede sumar un rubro más?
+     * ¿Se le puede presentar un trámite de actualización?
+     *
+     * Reemplaza al viejo `admiteAdiciones()`: ya no se le suman rubros a un
+     * carnet —cada rubro es un carnet—, pero sí se le puede presentar un
+     * expediente para corregir el cupo o la asociación.
      */
-    public function admiteAdiciones(): bool
+    public function admiteTramites(): bool
     {
-        return $this->estado->admiteAdiciones() && $this->estaVigente();
+        return $this->estado->admiteTramites() && $this->estaVigente();
     }
 
     /**
@@ -138,20 +155,31 @@ class Carnet extends Model
      * misma razón que los `puede_*` del trámite: escrita otra vez en React, la
      * regla terminaría diciendo algo distinto que el controlador.
      *
-     * Dos condiciones, y cada una tapa un caso real de ventanilla:
+     * ------------------------------------------------------------------------
+     *  LA SEGUNDA CONDICIÓN CAMBIÓ DE FORMA, NO DE SENTIDO
+     * ------------------------------------------------------------------------
+     *
+     * Antes se exigía «al menos un rubro habilitado», porque el carnet nacía
+     * con el trámite PENDIENTE y la habilitación recién aparecía al aprobar:
+     * sin esa condición se imprimía una credencial que no autorizaba a nada.
+     *
+     * Hoy no hay habilitaciones que contar, pero el problema es el mismo: el
+     * carnet sigue naciendo con el trámite en PENDIENTE. Lo que se exige ahora
+     * es que ALGÚN trámite suyo esté aprobado — que es exactamente lo que antes
+     * significaba tener un rubro habilitado.
+     *
+     * Las otras dos condiciones no cambian:
      *
      *   - EL CARNET NO PUEDE ESTAR ANULADO. Anular es una sanción: volver a
      *     sacar el plástico dejaría en la calle un documento que el sistema ya
      *     desconoció, con su QR intacto.
-     *   - TIENE QUE TENER AL MENOS UN RUBRO HABILITADO. El carnet nace con el
-     *     trámite —en PENDIENTE ya existe la fila—, pero la habilitación recién
-     *     aparece al APROBAR. Imprimir antes entregaría una credencial que no
-     *     autoriza a nada y que todavía puede no estar pagada.
+     *   - VENCIDO SÍ SE IMPRIME. Es la reimpresión de un documento que existió:
+     *     el plástico dice su gestión y su fecha de vencimiento, y la
+     *     verificación pública ya avisa que caducó.
      *
-     * VENCIDO SÍ SE IMPRIME. Es la reimpresión de un documento que existió: el
-     * plástico dice su gestión y su fecha de vencimiento, y la verificación
-     * pública ya avisa que caducó. Negarla obligaría a explicar a mano por qué
-     * el sistema no puede mostrar lo que emitió el año pasado.
+     * SUSPENDIDO TAMBIÉN SE IMPRIME, por lo mismo: el documento existe y la
+     * verificación pública informa que está cortado. Negar la reimpresión no
+     * quitaría de circulación el plástico que la persona ya tiene.
      */
     public function puedeImprimirse(): bool
     {
@@ -159,43 +187,41 @@ class Carnet extends Model
             return false;
         }
 
-        // Si quien llamó ya trajo las habilitaciones con `with()`, se cuentan en
-        // memoria. `$this->habilitaciones()->exists()` consultaría IGUAL, con el
+        // Si quien llamó ya trajo los trámites con `with()`, se cuentan en
+        // memoria. `$this->tramites()->where(...)` consultaría IGUAL, con el
         // eager loading puesto y todo — es la trampa que ya costó 18 consultas
         // por tecleada en el autocompletado de beneficiarios.
-        if ($this->relationLoaded('habilitaciones')) {
-            return $this->habilitaciones->isNotEmpty();
+        if ($this->relationLoaded('tramites')) {
+            return $this->tramites->contains(
+                fn (Tramite $t): bool => $t->estado === EstadoTramite::Aprobado,
+            );
         }
 
-        return $this->habilitaciones()->exists();
+        return $this->tramites()->where('estado', EstadoTramite::Aprobado)->exists();
     }
 
     /**
-     * ¿Este rubro ya está habilitado en el carnet?
+     * El cupo tal como se escribe en el plástico: «600 KG».
      *
-     * Es la comprobación que impide cobrar dos veces la misma adición. La red
-     * de abajo es el índice único `carnet_rubro_unico`, que sí resiste dos
-     * peticiones simultáneas; esta sirve para poder dar un mensaje entendible
-     * en ventanilla antes de llegar a ese error.
+     * Devuelve null cuando no hay cupo cargado, para que la maqueta impresa
+     * pueda saltear el renglón entero en vez de dibujar «KG» sin número.
      *
-     * Cuenta también los rubros SUSPENDIDOS: la habilitación existe, lo que
-     * corresponde es levantar la suspensión, no volver a tramitarla.
+     * Se recorta la cola de decimales cuando son cero: la unidad trabaja en
+     * kilos enteros, y «600,00 KG» en una tarjeta CR80 gasta cuatro caracteres
+     * de un renglón que ya viene justo.
      */
-    public function tieneRubro(int $rubroId): bool
+    public function capacidadLegible(): ?string
     {
-        return $this->habilitaciones()->where('rubro_id', $rubroId)->exists();
-    }
+        if ($this->capacidad_kg === null) {
+            return null;
+        }
 
-    /**
-     * Los rubros que hoy autorizan a trabajar, sin los suspendidos.
-     *
-     * Es lo que se imprime en el reverso y lo que ve el inspector al escanear.
-     */
-    public function rubrosHabilitados(): Collection
-    {
-        return $this->rubros()
-            ->wherePivot('estado', EstadoHabilitacion::Habilitado->value)
-            ->get();
+        $kg = (float) $this->capacidad_kg;
+        $numero = fmod($kg, 1.0) === 0.0
+            ? number_format($kg, 0, ',', '.')
+            : number_format($kg, 2, ',', '.');
+
+        return "{$numero} KG";
     }
 
     // ------------------------------------------------------------------
@@ -399,7 +425,19 @@ class Carnet extends Model
     public function scopeVigentes(Builder $query): Builder
     {
         return $query
-            ->where('estado', EstadoCarnet::Vigente)
-            ->whereDate('fecha_vencimiento', '>=', now()->toDateString());
+            ->where($query->qualifyColumn('estado'), EstadoCarnet::Vigente)
+            ->whereDate($query->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString());
+    }
+
+    /**
+     * Los carnets de una actividad.
+     *
+     * qualifyColumn() porque los reportes cruzan `carnets` con `rubros` y con
+     * `tramites`, y las tres tienen columnas que se llaman igual. Ver la regla 9
+     * de CLAUDE.md.
+     */
+    public function scopeDeRubro(Builder $query, int $rubroId): Builder
+    {
+        return $query->where($query->qualifyColumn('rubro_id'), $rubroId);
     }
 }

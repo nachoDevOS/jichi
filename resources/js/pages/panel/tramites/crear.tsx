@@ -29,7 +29,7 @@ import type { FormularioSolicitud, RubroOpcion } from '@/types/tramites';
  *      tiene hoy?             se le habilita?   depósitos y el carnet
  *                                               que va a recibir
  *
- * No hay una pantalla de «emisión inicial» y otra de «adición de rubro». El
+ * No hay una pantalla de «emisión inicial» y otra de «actualización». El
  * operador carga siempre lo mismo y el sistema decide el tipo al guardar,
  * mirando si esa persona ya tiene carnet de la gestión en curso.
  *
@@ -131,6 +131,22 @@ export default function CrearTramite({
      * las aplica RegistrarSolicitudRequest en el servidor, y ninguna de las dos
      * reemplaza a la otra.
      */
+    /*
+     * CAMBIAR DE RUBRO LIMPIA EL CUPO, y no es cosmética.
+     *
+     * Si el operador teclea 600 para Pescador y después cambia a
+     * Comercializador —que no se autoriza por volumen— ese 600 quedaría en el
+     * formulario aunque el campo ya no se vea. Al guardar, la validación lo
+     * RECHAZA con `prohibited`, y el operador vería un error sobre un campo que
+     * no está en pantalla: imposible de corregir sin recargar.
+     *
+     * Se limpia siempre, no solo al pasar a un rubro sin cupo: un cupo pensado
+     * para una actividad no tiene por qué arrastrarse a otra.
+     */
+    function elegirRubro(id: string) {
+        form.setData((datos) => ({ ...datos, rubro_id: id, capacidad_kg: '' }));
+    }
+
     const puedeAvanzar = paso === 1 ? beneficiario !== null : form.data.rubro_id !== '';
 
     function enviar(e: FormEvent) {
@@ -159,7 +175,7 @@ export default function CrearTramite({
     return (
         <LayoutPanel
             titulo="Nueva solicitud"
-            descripcion={`Gestión ${gestion}. El sistema decide si corresponde emitir el carnet o sumar un rubro al que ya tiene.`}
+            descripcion={`Gestión ${gestion}. Un carnet por rubro: el sistema decide si corresponde emitirlo o actualizar el que ya tiene.`}
         >
             <Head title="Nueva solicitud" />
 
@@ -245,7 +261,7 @@ export default function CrearTramite({
                                         <Select
                                             id="rubro_id"
                                             value={form.data.rubro_id}
-                                            onChange={(e) => form.setData('rubro_id', e.target.value)}
+                                            onChange={(e) => elegirRubro(e.target.value)}
                                             aria-invalid={Boolean(form.errors.rubro_id)}
                                         >
                                             <option value="">Seleccione un rubro…</option>
@@ -371,43 +387,48 @@ export default function CrearTramite({
                                     </Campo>
 
                                     {/*
-                                        EL CUPO NO SE IMPRIME EN EL CARNET.
-                                        El carnet de papel lo traía —«600 KG» bajo
-                                        el domicilio— pero el nuevo no, a pedido de
-                                        la unidad. Se pide igual porque es con lo
-                                        que después se contrasta una guía de
-                                        transporte.
+                                        EL CUPO SOLO APARECE SI EL RUBRO LO LLEVA.
 
-                                        Por eso la ayuda lo dice explícito: sin esa
-                                        línea, quien carga el formulario espera
-                                        verlo aparecer en la vista previa de al
-                                        lado y va a creer que algo falla.
+                                        No todas las actividades se autorizan por
+                                        volumen: la pesca sí —tantos kilos, que
+                                        después se contrastan contra una guía de
+                                        transporte— y la comercialización no.
 
-                                        OBLIGATORIO: sin cupo, la habilitación no
-                                        dice cuánto autoriza y el control no tiene
-                                        contra qué comparar.
+                                        Quién lo decide es el CATÁLOGO
+                                        (`rubros.requiere_capacidad`), no una lista
+                                        de nombres escrita acá: el mismo rubro
+                                        figura como «Pescador» o como «Faena» según
+                                        quién lo cargó.
+
+                                        Esconder el campo es COMODIDAD, no regla: la
+                                        validación del servidor lo exige o lo
+                                        prohíbe según el mismo dato, porque el
+                                        `rubro_id` llega por el cuerpo de la
+                                        petición y cualquiera puede escribir otro.
                                     */}
-                                    <Campo
-                                        etiqueta="Capacidad autorizada (Kg)"
-                                        htmlFor="capacidad_kg"
-                                        obligatorio
-                                        error={form.errors.capacidad_kg}
-                                        ayuda="Uso interno: no se imprime en el carnet."
-                                    >
-                                        <Input
-                                            id="capacidad_kg"
-                                            type="number"
-                                            inputMode="decimal"
-                                            min="0"
-                                            step="0.01"
-                                            placeholder="600"
-                                            value={form.data.capacidad_kg}
-                                            onChange={(e) =>
-                                                form.setData('capacidad_kg', e.target.value)
-                                            }
-                                            aria-invalid={Boolean(form.errors.capacidad_kg)}
-                                        />
-                                    </Campo>
+                                    {rubroElegido?.requiere_capacidad && (
+                                        <Campo
+                                            etiqueta="Capacidad autorizada (Kg)"
+                                            htmlFor="capacidad_kg"
+                                            obligatorio
+                                            error={form.errors.capacidad_kg}
+                                            ayuda="Se imprime en el carnet, junto al rubro."
+                                        >
+                                            <Input
+                                                id="capacidad_kg"
+                                                type="number"
+                                                inputMode="decimal"
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="600"
+                                                value={form.data.capacidad_kg}
+                                                onChange={(e) =>
+                                                    form.setData('capacidad_kg', e.target.value)
+                                                }
+                                                aria-invalid={Boolean(form.errors.capacidad_kg)}
+                                            />
+                                        </Campo>
+                                    )}
 
                                     <Campo
                                         etiqueta="Observaciones"
@@ -456,6 +477,12 @@ export default function CrearTramite({
                                         situacion={beneficiario.situacion}
                                         beneficiario={beneficiario}
                                         asociacion={form.data.asociacion}
+                                        // El rubro y el cupo ahora SE IMPRIMEN, así
+                                        // que la maqueta los necesita para mostrar
+                                        // la tarjeta tal como va a salir.
+                                        rubro={rubroElegido?.nombre ?? null}
+                                        capacidadKg={form.data.capacidad_kg}
+                                        requiereCapacidad={rubroElegido?.requiere_capacidad ?? false}
                                     />
                                 </CardContent>
                             </Card>

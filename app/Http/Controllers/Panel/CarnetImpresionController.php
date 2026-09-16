@@ -52,16 +52,20 @@ use Illuminate\Http\Response;
  * ----------------------------------------------------------------------------
  *
  * Y es la decisión de fondo del módulo. El carnet es UNO por persona y por
- * gestión, y sobre él se van habilitando rubros: quien hoy es pescador puede
- * sumar comercializador en octubre con una adición, sin que el plástico cambie
- * —mismo registro, misma firma—. Impresos, la lista de rubros y el cupo
- * quedarían viejos el día de esa adición, y el documento diría MENOS de lo que
- * la persona está autorizada a hacer, que es peor que no decir nada.
+ * gestión Y POR RUBRO, y ese rubro no cambia nunca: es parte de la llave que
+ * identifica al documento. Por eso el rubro y el cupo SÍ van impresos, al revés
+ * de lo que decía este mismo comentario con el modelo anterior.
  *
- * A qué autoriza se consulta ESCANEANDO EL QR, que responde con los rubros
- * habilitados hoy y sin los suspendidos. El cupo se consulta en la ficha del
- * carnet, que es donde la unidad lo contrasta contra las guías — es lo que ya
- * decía la migración de `carnet_rubro`: «No se imprime».
+ * Con el carnet viejo —uno por persona, con los rubros colgados— una adición de
+ * octubre dejaba vieja cualquier lista impresa: el plástico diría MENOS de lo
+ * que la persona está autorizada a hacer, que es peor que no decir nada. Hoy no
+ * existe esa operación; sumar una actividad emite otro carnet, con su propio
+ * plástico.
+ *
+ * LO QUE SIGUE SIN IMPRIMIRSE es el estado. Un carnet se suspende o se anula
+ * DESPUÉS de impreso y el plástico no se entera, así que si vale HOY se consulta
+ * escaneando el QR. Es el mismo criterio de siempre —en un documento impreso va
+ * lo que no cambia— aplicado a lo que de verdad cambia.
  *
  * Por eso mismo puede ser GET, igual que el recibo.
  */
@@ -90,7 +94,10 @@ class CarnetImpresionController extends Controller
     {
         $carnet->load([
             'beneficiario',
-            'habilitaciones.rubro:id,nombre',
+            // requiere_capacidad NO es opcional en este select: de ella
+            // depende que el renglón CUPO salga o no. Sin la columna,
+            // requiereCapacidad() leería null y el cupo no se imprimiría nunca.
+            'rubro:id,nombre,requiere_capacidad',
         ]);
 
         /*
@@ -102,7 +109,7 @@ class CarnetImpresionController extends Controller
         if (! $carnet->puedeImprimirse()) {
             return back()->with('error', $carnet->estado === EstadoCarnet::Anulado
                 ? 'El carnet está anulado: no se puede imprimir.'
-                : 'El carnet todavía no tiene ningún rubro habilitado. La habilitación nace al aprobar el trámite.');
+                : 'El carnet todavía no tiene ningún trámite aprobado. La habilitación nace al aprobar.');
         }
 
         return $this->pdf($carnet);
@@ -279,6 +286,42 @@ class CarnetImpresionController extends Controller
     private const ANCHO_VALOR_ANGOSTO = 38.0;
 
     /**
+     * EL RENGLON PARTIDO EN TRES — REGISTRO + GESTION + CUPO.
+     *
+     * Los anchos UTILES de cada tira: el declarado en el Blade menos su relleno
+     * de 4 pt. En CSS el padding SUMA al width, y medir contra el declarado ya
+     * hizo que un rotulo se imprimiera encima de una tira.
+     *
+     * El reparto sale de lo que ocupa cada dato a 6,1 pt:
+     *
+     *     «000011»    6 car. x 0,539 x 6,1 = 19,7   cabe en 20
+     *     «2026»      4 car.               = 13,1   cabe en 15
+     *     «1.200 KG»  8 car.               = 26,3   cabe en 31,5
+     *
+     * Al cupo se le da la tira mas ancha a proposito: es el unico de los tres
+     * que puede crecer —un cupo de cinco digitos con separador de miles— y el
+     * unico sin rotulo que lo anuncie, asi que conviene que no se encoja.
+     */
+    private const ANCHO_TRIPLE_REGISTRO = 20.0;
+
+    private const ANCHO_TRIPLE_GESTION = 15.0;
+
+    private const ANCHO_TRIPLE_CUPO = 31.5;
+
+    /**
+     * Cuantos caracteres entran en el TITULO a cuerpo pleno.
+     *
+     * 230 pt utiles / 6,55 pt por caracter (0,605 em de la negrita a 9,5 pt mas
+     * 0,8 de interletrado) = 35. Se deja en 30 para no llegar al limite: el
+     * calculo es un promedio y un titulo de puras mayusculas anchas —«M», «W»—
+     * ocupa mas que el promedio.
+     *
+     * Pasado ese largo, titulo() devuelve la clase `largo` y la hoja de estilos
+     * baja cuerpo, interletrado y contorno JUNTOS. Ver `.titulo.largo`.
+     */
+    private const CARACTERES_TITULO = 30;
+
+    /**
      * EL ANCHO UTIL DE LA TIRA DE LA CEDULA, y su cuerpo, en puntos.
      *
      * 43,6 es lo declarado en el Blade, que ya viene de restarle el relleno
@@ -397,37 +440,51 @@ class CarnetImpresionController extends Controller
         $sinCargar = 'Sin cargar en la ficha';
         $anchoValor = self::ANCHO_VALOR;
 
-        return [
-            /*
-             * LA CEDULA PASA POR EL MISMO CALCULO QUE LOS RENGLONES.
-             *
-             * Vive en una tira angosta -la de la foto- y el numero cambia de
-             * largo segun la expedicion y el complemento, asi que una cedula
-             * larga tiene que achicarse igual que un nombre largo. Recortada
-             * seria peor que en cualquier otro campo: un numero de documento al
-             * que le falta el final no identifica a nadie.
-             */
-            'documento' => $this->texto(
-                ($documento = trim((string) $beneficiario?->documento_identidad)) !== ''
-                    ? 'C.I. '.$documento
-                    : null,
-                'C.I. —',
-                self::ANCHO_CEDULA,
-                self::CUERPO_CEDULA,
-            ),
+        /*
+         * ====================================================================
+         *  LOS SEIS RENGLONES DEL PLASTICO
+         * ====================================================================
+         *
+         * SIEMPRE SEIS, para cualquier actividad, y eso costo llegar a tenerlo.
+         * Los dos datos que ya no estan aca explican por que:
+         *
+         *   - EL RUBRO se fue al TITULO. Un renglon «RUBRO : Comercializador»
+         *     con el titulo diciendo «CEDULA DE COMERCIALIZADOR» imprimia dos
+         *     veces la misma palabra.
+         *   - EL CUPO se fue a la columna de la FOTO, debajo de la cedula, donde
+         *     habia 30 pt muertos. Como renglon obligaba a apretar el salto de
+         *     14 a 12 pt para que entraran siete.
+         *
+         * Sacando esos dos se libero el lugar que permitio darle a CIUDAD y a
+         * PROVINCIA una tira entera cada una —compartian una— sin pasar de seis.
+         *
+         * EL ORDEN es el de la cedula de papel: nombre, asociacion, domicilio y
+         * el numero de registro al final.
+         */
+        $campos = [
+            $this->campo('NOMBRE', $beneficiario?->nombreCompleto, 'Sin nombre en la ficha', $anchoValor),
+
+            $this->campo('ASOCIACIÓN', $carnet->asociacion, 'Sin asociación declarada', $anchoValor),
 
             /*
-             * LOS SEIS RENGLONES DEL PLASTICO, en el mismo orden que la cedula
-             * de papel: nombre, asociacion, domicilio y el numero de registro.
-             */
-            'campos' => [
-                $this->campo('NOMBRE', $beneficiario?->nombreCompleto, 'Sin nombre en la ficha', $anchoValor),
-                $this->campo('ASOCIACIÓN', $carnet->asociacion, 'Sin asociación declarada', $anchoValor),
-                $this->campo('CIUDAD', $beneficiario?->ciudad, $sinCargar, $anchoValor),
-                $this->campo('PROVINCIA', $beneficiario?->provincia, $sinCargar, $anchoValor),
-                $this->campo('DIRECCIÓN', $beneficiario?->direccion, $sinCargar, $anchoValor),
+                 * CIUDAD Y PROVINCIA VAN CADA UNA EN SU RENGLON, a pedido.
+                 *
+                 * Compartieron uno mientras el rubro ocupaba una tira: eran los
+                 * dos valores mas cortos y mas repetidos del padron, asi que se
+                 * los junto para no pasar de seis renglones. Al sacarse el
+                 * renglon del rubro se libero el lugar.
+                 *
+                 * Y con eso vuelve «PROVINCIA» entera: se abreviaba a «PROV.»
+                 * porque el rotulo del SEGUNDO par tiene una caja de 32 pt y a
+                 * 6,1 pt bold la palabra mide 33,2. El rotulo de un renglon
+                 * entero tiene 44 pt y entra sin problema.
+                 */
+            $this->campo('CIUDAD', $beneficiario?->ciudad, $sinCargar, $anchoValor),
+            $this->campo('PROVINCIA', $beneficiario?->provincia, $sinCargar, $anchoValor),
 
-                /*
+            $this->campo('DIRECCIÓN', $beneficiario?->direccion, $sinCargar, $anchoValor),
+
+            /*
                  * EL REGISTRO CIERRA LA LISTA, como en el plastico, Y LLEVA LA
                  * GESTION AL LADO: es el unico renglon con dos pares.
                  *
@@ -448,10 +505,211 @@ class CarnetImpresionController extends Controller
                  * impresa nunca fue la respuesta: un carnet puede estar anulado
                  * con su fecha intacta. Eso se consulta en el panel.
                  */
-                $this->campo('REGISTRO', $carnet->registro(), '000000', self::ANCHO_VALOR_ANGOSTO) + [
-                    'segundo' => $this->campo('GESTIÓN', (string) $carnet->gestion, '—', self::ANCHO_VALOR_ANGOSTO),
-                ],
-            ],
+            $this->renglonRegistro($carnet),
+        ];
+
+        return [
+            /*
+             * EL TITULO DE LA TARJETA, con el rubro adentro.
+             *
+             * ----------------------------------------------------------------
+             *  DECIA «CEDULA» A SECAS, Y EL MOTIVO SE DIO VUELTA
+             * ----------------------------------------------------------------
+             *
+             * Con el modelo viejo el carnet era UNO para todas las actividades
+             * de una persona, asi que nombrar una en el titulo habria dicho algo
+             * que el documento no era. Hoy el carnet es de UN rubro y ese rubro
+             * es parte de la llave que lo identifica: el titulo puede decirlo, y
+             * conviene que lo diga — es lo que se lee de lejos, antes que
+             * cualquier renglon.
+             *
+             * Sin rubro cargado se cae a «CEDULA» a secas, que es lo que decia
+             * antes: un titulo que termina en «DE» seria peor que uno corto.
+             */
+            'titulo' => $this->titulo($carnet),
+
+            /*
+             * LA CEDULA PASA POR EL MISMO CALCULO QUE LOS RENGLONES.
+             *
+             * Vive en una tira angosta -la de la foto- y el numero cambia de
+             * largo segun la expedicion y el complemento, asi que una cedula
+             * larga tiene que achicarse igual que un nombre largo. Recortada
+             * seria peor que en cualquier otro campo: un numero de documento al
+             * que le falta el final no identifica a nadie.
+             */
+            'documento' => $this->texto(
+                ($documento = trim((string) $beneficiario?->documento_identidad)) !== ''
+                    ? 'C.I. '.$documento
+                    : null,
+                'C.I. —',
+                self::ANCHO_CEDULA,
+                self::CUERPO_CEDULA,
+            ),
+
+            'campos' => $campos,
+        ];
+    }
+
+    /**
+     * ========================================================================
+     *  EL TITULO DE LA TARJETA Y EL CUERPO EN EL QUE ENTRA
+     * ========================================================================
+     *
+     * «CEDULA DE PESCADOR», «CEDULA DE COMERCIALIZADOR».
+     *
+     * ------------------------------------------------------------------------
+     *  POR QUE DEVUELVE TAMBIEN UNA CLASE DE TAMANO
+     * ------------------------------------------------------------------------
+     *
+     * Porque el titulo ya no es una palabra fija: su largo depende del catalogo,
+     * que edita la unidad. A 9,5 pt con 0,8 de interletrado cada caracter ocupa
+     * unos 6,55 pt, asi que en los 230 pt utiles de la tarjeta entran unos 35.
+     *
+     *     CEDULA DE PESCADOR          18 car.  ~118 pt   entra holgado
+     *     CEDULA DE COMERCIALIZADOR   25 car.  ~164 pt   entra
+     *     un rubro de 30+ caracteres            se pasa   -> clase `largo`
+     *
+     * NO SE RECORTA, se achica: es la misma regla que los renglones —ver
+     * texto()—. Un titulo cortado en «CEDULA DE COMERCIALIZA» no identifica
+     * nada y queda peor que uno chico.
+     *
+     * ------------------------------------------------------------------------
+     *  EL CONTORNO ESCALA CON EL CUERPO, Y POR ESO ES UNA CLASE Y NO UN width
+     * ------------------------------------------------------------------------
+     *
+     * El titulo va perfilado en dorado dibujandolo cinco veces, y el corrimiento
+     * de las cuatro copias tiene que bajar en la misma proporcion que la letra:
+     * medio punto sobre un cuerpo chico no perfila, engorda la letra hasta
+     * cerrarle los huecos. Por eso la variante vive en la hoja de estilos —donde
+     * el cuerpo, el interletrado y los cuatro corrimientos se mueven juntos— y
+     * acá solo se elige cual.
+     *
+     * @return array{texto: string, clase: string}
+     */
+    private function titulo(Carnet $carnet): array
+    {
+        $rubro = trim((string) $carnet->rubro?->nombre);
+
+        $texto = $rubro !== ''
+            ? mb_strtoupper("Cédula de {$rubro}")
+            : 'CÉDULA';
+
+        return [
+            'texto' => $texto,
+            'clase' => mb_strlen($texto) > self::CARACTERES_TITULO ? 'largo' : '',
+        ];
+    }
+
+    /**
+     * ========================================================================
+     *  EL CUPO, EN LA COLUMNA DE LA FOTO — o NADA, si la actividad no lleva
+     * ========================================================================
+     *
+     * ------------------------------------------------------------------------
+     *  POR QUE ABAJO DEL C.I. Y NO COMO UN RENGLON MAS
+     * ------------------------------------------------------------------------
+     *
+     * Porque ahi hay lugar y en la columna de datos no. La foto termina en 112 y
+     * la tira del C.I. en 122,5; de ahi al borde de la tarjeta quedan 30 pt
+     * muertos, que es justo donde entra una tira mas.
+     *
+     * Y GANA LA COLUMNA DE LA DERECHA: con el cupo como renglon, la tarjeta de
+     * un pescador llegaba a SIETE y habia que apretar el salto de 14 a 12 pt
+     * para que entraran. Sacandolo de ahi, las dos actividades vuelven a seis
+     * renglones y al salto de siempre.
+     *
+     * Ademas queda al lado de la foto y de la cedula, que son los otros dos
+     * datos que un control mira primero: quien es, y cuanto tiene autorizado.
+     *
+     * ------------------------------------------------------------------------
+     *  NO TODAS LAS ACTIVIDADES LLEVAN CUPO
+     * ------------------------------------------------------------------------
+     *
+     * La pesca se autoriza POR VOLUMEN —tantos kilos, contrastables contra una
+     * guia de transporte— y el plastico lo imprime. La comercializacion no:
+     * habilita a trasladar y vender, sin tope propio.
+     *
+     * Lo dice el catalogo (`rubros.requiere_capacidad`), no una lista de nombres
+     * escrita aca: el mismo rubro figura como «Pescador» o como «Faena» segun
+     * quien lo cargo, y los que vengan por ordenanza entran sin pasar por codigo.
+     *
+     * DEVUELVE NULL cuando no corresponde, y la plantilla no dibuja la tira. Un
+     * recuadro vacio se lee como un dato que falta, y en un documento de
+     * identidad un campo en blanco invita a completarlo a mano.
+     *
+     * VA SIN ROTULO, a pedido: «800 KG» se lee solo. La unidad de medida hace de
+     * etiqueta, que es lo que ya pasaba en la cedula de papel.
+     *
+     * PASA POR texto() como los demas valores: mide contra su tira y se achica
+     * si no entra, en vez de cortarse.
+     *
+     * @return array{valor: string, molde: string, cuerpo: float, lineas: int}|null
+     */
+    private function cupo(Carnet $carnet): ?array
+    {
+        if (! $carnet->rubro?->requiereCapacidad()) {
+            return null;
+        }
+
+        return $this->texto(
+            $carnet->capacidadLegible(),
+            '— KG',
+            self::ANCHO_TRIPLE_CUPO,
+            self::CUERPO_VALOR,
+        );
+    }
+
+    /**
+     * ========================================================================
+     *  EL ULTIMO RENGLON — REGISTRO, GESTION Y, SI CORRESPONDE, EL CUPO
+     * ========================================================================
+     *
+     * ------------------------------------------------------------------------
+     *  POR QUE LOS TRES JUNTOS
+     * ------------------------------------------------------------------------
+     *
+     * REGISTRO y GESTION van juntos desde siempre: el numero solo no alcanza
+     * porque se reinicia con cada gestion —es el id del carnet, y los carnets
+     * son por ano—, asi que el 000002 de 2026 y el de 2027 son dos credenciales
+     * distintas con el mismo numero impreso.
+     *
+     * EL CUPO SE SUMO A ESE RENGLON en vez de ocupar uno propio. Como renglon
+     * la tarjeta llegaba a SIETE y habia que apretar el salto de 14 a 12 pt;
+     * como tira suelta bajo la cedula quedaba lejos del resto de los datos. Acá
+     * vuelve a la columna de datos —donde lo traia la cedula de papel— sin
+     * costar una linea.
+     *
+     * ------------------------------------------------------------------------
+     *  EL CUPO NO LLEVA ROTULO
+     * ------------------------------------------------------------------------
+     *
+     * A pedido, y se sostiene: «800 KG» se lee solo, la unidad hace de etiqueta.
+     * Ademas en un renglon de tres no hay lugar para un tercer rotulo — los
+     * 176 pt de la tira ya estan repartidos entre REGISTRO, GESTION y los tres
+     * valores.
+     *
+     * CUANDO LA ACTIVIDAD NO LLEVA CUPO el renglon vuelve al reparto de dos,
+     * con las tiras anchas de siempre. No es un caso raro: la comercializacion
+     * no tiene tope propio.
+     *
+     * @return array<string, mixed>
+     */
+    private function renglonRegistro(Carnet $carnet): array
+    {
+        $cupo = $this->cupo($carnet);
+
+        if ($cupo === null) {
+            return $this->campo('REGISTRO', $carnet->registro(), '000000', self::ANCHO_VALOR_ANGOSTO) + [
+                'segundo' => $this->campo('GESTIÓN', (string) $carnet->gestion, '—', self::ANCHO_VALOR_ANGOSTO),
+            ];
+        }
+
+        // 'triple' es la variante de reparto: el Blade la convierte en una clase
+        // que angosta las dos primeras tiras y abre la tercera.
+        return $this->campo('REGISTRO', $carnet->registro(), '000000', self::ANCHO_TRIPLE_REGISTRO) + [
+            'reparto' => 'triple',
+            'segundo' => $this->campo('GESTIÓN', (string) $carnet->gestion, '—', self::ANCHO_TRIPLE_GESTION),
+            'tercero' => $cupo,
         ];
     }
 

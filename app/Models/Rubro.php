@@ -7,7 +7,6 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -18,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Auditable —hay que poder responder quién subió una tarifa y cuándo— pero no
  * SoftDeletes: un rubro no se borra nunca, se pasa a inactivo.
  */
-#[Fillable(['nombre', 'descripcion', 'costo', 'estado'])]
+#[Fillable(['nombre', 'descripcion', 'costo', 'requiere_capacidad', 'estado'])]
 class Rubro extends Model
 {
     use Auditable;
@@ -28,12 +27,8 @@ class Rubro extends Model
         return [
             'estado' => EstadoRubro::class,
             'costo' => 'decimal:2',
+            'requiere_capacidad' => 'boolean',
         ];
-    }
-
-    public function habilitaciones(): HasMany
-    {
-        return $this->hasMany(CarnetRubro::class);
     }
 
     public function tramites(): HasMany
@@ -42,19 +37,35 @@ class Rubro extends Model
     }
 
     /**
-     * Los carnets que tienen este rubro habilitado.
+     * Los carnets emitidos para esta actividad.
+     *
+     * Era un `belongsToMany` a través de `carnet_rubro`; desde que el carnet es
+     * de un solo rubro, la relación es directa y la tabla intermedia ya no
+     * existe. `$rubro->carnets` sigue devolviendo lo mismo que antes —los
+     * carnets de esta actividad— así que quien la usaba para contar no cambia.
      */
-    public function carnets(): BelongsToMany
+    public function carnets(): HasMany
     {
-        return $this->belongsToMany(Carnet::class, 'carnet_rubro')
-            ->using(CarnetRubro::class)
-            ->withPivot(['id', 'fecha_habilitacion', 'estado'])
-            ->withTimestamps();
+        return $this->hasMany(Carnet::class);
     }
 
     public function estaActivo(): bool
     {
         return $this->estado === EstadoRubro::Activo;
+    }
+
+    /**
+     * ¿Esta actividad se autoriza por volumen?
+     *
+     * De acá cuelgan cuatro cosas, y por eso conviene preguntarlo por este
+     * método y no leer la columna suelta: el formulario muestra u oculta el
+     * campo del cupo, la validación lo exige o lo prohíbe, la ficha del carnet
+     * lo muestra o no, y el plástico imprime el renglón CUPO o le da la tira
+     * entera al nombre del rubro.
+     */
+    public function requiereCapacidad(): bool
+    {
+        return (bool) $this->requiere_capacidad;
     }
 
     /**

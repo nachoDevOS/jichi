@@ -130,20 +130,14 @@ export default function VerTramite({
                         cuando la plata entró. El servidor ya resolvió si
                         corresponde: si `recibo` llegó, el botón va.
 
-                        `recibo.numero` en null significa «corresponde pero
-                        todavía no se emitió» —un expediente que cruzó revisión
-                        antes de que existiera este módulo—. Se emite al
-                        imprimirlo, y por eso el texto cambia: no se puede
-                        prometer un número que todavía no se asignó.
-
                         Va como <a> y no como router.visit(): abre el PDF en otra
                         pestaña, y una navegación de Inertia no sabe qué hacer con
                         un archivo.
 
-                        Reimprimir sale SIEMPRE con el mismo número —el papel ya
-                        se entregó—, así que el botón no se esconde después de la
-                        primera vez: perder el recibo es justamente el caso en el
-                        que hay que volver a sacarlo.
+                        Reimprimir sale SIEMPRE con el mismo número —es el id del
+                        expediente, que no cambia— así que el botón no se esconde
+                        después de la primera vez: perder el recibo es justamente
+                        el caso en el que hay que volver a sacarlo.
                     */}
                     {recibo && puede('recibos.imprimir') && (
                         <a
@@ -153,7 +147,7 @@ export default function VerTramite({
                             className={buttonVariants({ variant: 'outline' })}
                         >
                             <Receipt className="size-4" />
-                            {recibo.numero ? `Recibo N° ${recibo.numero}` : 'Imprimir recibo'}
+                            Recibo N° {recibo.numero}
                         </a>
                     )}
 
@@ -422,26 +416,26 @@ export default function VerTramite({
 
                         <Dato etiqueta="Vence" valor={fecha(carnet.fecha_vencimiento)} />
 
-                        <div>
-                            <p className="mb-2 text-muted-foreground">Rubros del carnet</p>
+        {/*
+                            LA ACTIVIDAD DEL CARNET, que es siempre la misma que la
+                            del trámite: el expediente cuelga del carnet de ese
+                            rubro. Se muestra igual porque el supervisor está
+                            firmando un documento concreto y tiene que ver cuál.
 
-                            {carnet.rubros.length === 0 ? (
-                                <p className="text-muted-foreground">
-                                    Ninguno todavía. La habilitación nace al aprobar este trámite.
-                                </p>
-                            ) : (
-                                <ul className="space-y-1">
-                                    {carnet.rubros.map((r) => (
-                                        <li key={r.nombre} className="flex items-center justify-between gap-2">
-                                            <span>{r.nombre}</span>
-                                            <Badge color={r.estado === 'habilitado' ? 'emerald' : 'rose'}>
-                                                {r.estado_etiqueta}
-                                            </Badge>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
+                            Antes acá iba la lista de rubros ya habilitados, para
+                            dar contexto —«en qué carnet entra el que estoy por
+                            aprobar»—. Esa pregunta desapareció con el pivote.
+                        */}
+                        <Dato etiqueta="Rubro" valor={carnet.rubro} />
+
+                        {/*
+                            EL CUPO DEL CARNET PUEDE DIFERIR DEL DEL TRÁMITE, y por
+                            eso se muestra el del carnet y no el del expediente: el
+                            trámite PROPONE un cupo y la aprobación lo CONSOLIDA.
+                            Mientras está pendiente, el carnet sigue mostrando el
+                            que tenía —o nada, si es una emisión inicial—.
+                        */}
+                        <Dato etiqueta="Cupo autorizado" valor={carnet.capacidad} />
 
                         <Link
                             href={route('carnets.show', carnet.id)}

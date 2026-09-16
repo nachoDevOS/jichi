@@ -182,12 +182,16 @@ class TramiteController extends Controller
             'rubros' => Rubro::query()
                 ->activos()
                 ->orderBy('nombre')
-                ->get(['id', 'nombre', 'descripcion', 'costo'])
+                ->get(['id', 'nombre', 'descripcion', 'costo', 'requiere_capacidad'])
                 ->map(fn (Rubro $r): array => [
                     'id' => $r->id,
                     'nombre' => $r->nombre,
                     'descripcion' => $r->descripcion,
                     'costo' => (float) $r->costo,
+                    // De esto depende que el formulario muestre el campo del
+                    // cupo. La validación lo vuelve a comprobar contra el
+                    // catálogo: esconder el campo es comodidad, no regla.
+                    'requiere_capacidad' => $r->requiereCapacidad(),
                 ])
                 ->all(),
         ]);
@@ -253,7 +257,7 @@ class TramiteController extends Controller
         $tramite->load([
             'rubro',
             'carnet.beneficiario',
-            'carnet.rubros',
+            'carnet.rubro',
             'pagos',
         ]);
 
@@ -325,14 +329,21 @@ class TramiteController extends Controller
                 // los `puede_*` del trámite: el carnet existe desde PENDIENTE,
                 // pero no habilita a nada hasta que se aprueba.
                 'puede_imprimirse' => $tramite->carnet->puedeImprimirse(),
-                // Los rubros que el carnet YA tiene, para que el supervisor vea
-                // en qué contexto entra el que está por aprobar.
-                'rubros' => $tramite->carnet->rubros->map(fn ($r): array => [
-                    'nombre' => $r->nombre,
-                    'estado' => $r->pivot->estado->value,
-                    'estado_etiqueta' => $r->pivot->estado->etiqueta(),
-                    'fecha_habilitacion' => $r->pivot->fecha_habilitacion?->toDateString(),
-                ])->all(),
+
+                /*
+                 * LA ACTIVIDAD DEL CARNET Y SU CUPO.
+                 *
+                 * Antes acá viajaba la lista de rubros del carnet, para que el
+                 * supervisor viera en qué contexto entraba el que estaba por
+                 * aprobar. Con un carnet por rubro esa lista no existe: el
+                 * contexto ES el carnet, y siempre coincide con el rubro del
+                 * trámite. Se manda igual porque la ficha lo muestra al lado del
+                 * registro, y porque el cupo del carnet puede diferir del que
+                 * trae el expediente —el trámite propone, la aprobación
+                 * consolida—.
+                 */
+                'rubro' => $tramite->carnet->rubro?->nombre,
+                'capacidad' => $tramite->carnet->capacidadLegible(),
             ],
 
             'pagos' => $tramite->pagos->map(fn ($p): array => [
@@ -360,38 +371,28 @@ class TramiteController extends Controller
     /**
      * El recibo del expediente, para la ficha.
      *
-     * ------------------------------------------------------------------------
-     *  DEVUELVE ALGO AUNQUE EL RECIBO TODAVÍA NO EXISTA
-     * ------------------------------------------------------------------------
+     * NULL cuando el expediente todavía no llegó a revisión: ahí no hay nada
+     * cobrado que respaldar y la pantalla no ofrece el botón.
      *
-     * Porque la pantalla tiene que ofrecer el botón desde que el expediente pasa
-     * por revisión, y no solo cuando la fila ya está escrita. Un trámite que
-     * cruzó ese paso antes de que existiera este módulo no tiene recibo todavía
-     * —pero le corresponde— y se emite al imprimirlo. Ver
-     * ReciboTramiteService::emitirAtrasado().
-     *
-     * Por eso `numero` puede venir en null: significa «se puede imprimir, y el
-     * número se asigna recién ahí». La pantalla cambia el texto del botón según
-     * eso, no la decisión de mostrarlo.
-     *
-     * NULL solo cuando el expediente ni siquiera llegó a revisión.
+     * En cualquier otro caso devuelve el recibo armado. Ya no existe el estado
+     * intermedio de «le corresponde pero la fila no está escrita»: no hay fila
+     * que escribir, el comprobante se reconstruye cada vez. Ver
+     * App\Support\ReciboArmado.
      *
      * @return array<string, mixed>|null
      */
     private function resumirRecibo(Tramite $tramite): ?array
     {
-        $recibo = $this->recibos->para($tramite);
+        $recibo = $this->recibos->armar($tramite);
 
         if ($recibo === null) {
-            return $this->recibos->corresponde($tramite)
-                ? ['numero' => null, 'fecha_emision' => null, 'monto' => null]
-                : null;
+            return null;
         }
 
         return [
             'numero' => $recibo->numeroImpreso(),
             'fecha_emision' => $recibo->fecha_emision?->toDateString(),
-            'monto' => (float) $recibo->monto,
+            'monto' => $recibo->monto,
         ];
     }
 
@@ -423,7 +424,7 @@ class TramiteController extends Controller
                 ->with('error', SolicitudInvalidaException::tramiteNoSePuedeEditar($tramite->estado)->getMessage());
         }
 
-        $tramite->load(['rubro:id,nombre', 'carnet:id,gestion,beneficiario_id', 'carnet.beneficiario', 'pagos']);
+        $tramite->load(['rubro:id,nombre,requiere_capacidad', 'carnet:id,gestion,beneficiario_id', 'carnet.beneficiario', 'pagos']);
 
         return Inertia::render('panel/tramites/editar', [
             'tramite' => [
@@ -434,6 +435,10 @@ class TramiteController extends Controller
                 'observaciones' => $tramite->observaciones,
                 'asociacion' => $tramite->asociacion,
                 'capacidad_kg' => $tramite->capacidad_kg !== null ? (float) $tramite->capacidad_kg : null,
+                // Si el rubro del expediente se autoriza por volumen. De esto
+                // depende que el campo del cupo se muestre; la validación lo
+                // vuelve a comprobar contra el catálogo.
+                'requiere_capacidad' => $tramite->rubro?->requiereCapacidad() ?? false,
                 'ci_file_url' => $tramite->ci_file_url,
                 'cert_asociacion_file_url' => $tramite->cert_asociacion_file_url,
 
@@ -477,16 +482,30 @@ class TramiteController extends Controller
         $extensiones = implode(',', config('jichi.archivos.extensiones'));
         $maxKb = config('jichi.archivos.max_kb');
 
+        // El rubro decide si el cupo se puede editar. loadMissing y no load:
+        // si el modelo ya vino con la relación, no se vuelve a consultar.
+        $tramite->loadMissing('rubro');
+
         $datos = $request->validate([
             'ciFile' => ['nullable', 'file', 'mimes:'.$extensiones, 'max:'.$maxKb],
             'certAsociacionFile' => ['nullable', 'file', 'mimes:'.$extensiones, 'max:'.$maxKb],
             'asociacion' => ['nullable', 'string', 'max:150'],
-            // Las mismas reglas que el alta: el cupo se contrasta después contra
-            // guías de transporte, así que un cero o un negativo no sirven.
-            'capacidad_kg' => ['nullable', 'numeric', 'min:0.01', 'max:99999999'],
+            /*
+             * Mismas reglas que el alta: el cupo se contrasta después contra
+             * guías de transporte, así que un cero o un negativo no sirven.
+             *
+             * Y solo se puede editar si el rubro del trámite lo lleva.
+             * Se mira el rubro del EXPEDIENTE y no el del formulario porque el
+             * rubro no se puede cambiar al editar —ver el docblock de
+             * SolicitudCarnetService::actualizar()—.
+             */
+            'capacidad_kg' => $tramite->rubro?->requiereCapacidad()
+                ? ['nullable', 'numeric', 'min:0.01', 'max:99999999']
+                : ['nullable', 'prohibited'],
             'observaciones' => ['nullable', 'string', 'max:1000'],
         ], [
             'capacidad_kg.min' => 'El cupo tiene que ser mayor que cero.',
+            'capacidad_kg.prohibited' => 'Este rubro no se autoriza por volumen: no lleva cupo en kilos.',
         ]);
 
         try {

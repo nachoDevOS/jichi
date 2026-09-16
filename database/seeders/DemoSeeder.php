@@ -17,16 +17,20 @@ use Illuminate\Database\Seeder;
  *  POR QUÉ SOLO PERSONAS
  * ----------------------------------------------------------------------------
  *
- * Este seeder llegó a fabricar también doce carnets con sus trámites, pagos y
- * habilitaciones, siguiendo un guion de casos. Se sacó todo eso y conviene
- * entender por qué, para no volver a agregarlo sin pensarlo:
+ * Este seeder llegó a fabricar también doce carnets con sus trámites y pagos,
+ * siguiendo un guion de casos. Se sacó todo eso y conviene entender por qué,
+ * para no volver a agregarlo sin pensarlo:
  *
  *   1. ESCRIBÍA EL RESULTADO DE LAS REGLAS A MANO. No pasaba por
  *      SolicitudCarnetService —que exige `UploadedFile` de verdad—, así que
  *      copiaba lo que el servicio hace: qué tipo de trámite corresponde, cuándo
- *      nace la fila en `carnet_rubro`, cómo se suman los pagos. Una copia de
- *      reglas de negocio en un archivo que nadie mira al cambiarlas, y las
- *      copias se quedan viejas.
+ *      el carnet pasa a habilitar, cómo se suman los pagos. Una copia de reglas
+ *      de negocio en un archivo que nadie mira al cambiarlas, y las copias se
+ *      quedan viejas.
+ *
+ *      Y se vio en este cambio: el paso de «un carnet por persona» a «un carnet
+ *      por rubro» habría obligado a reescribir ese guion entero, sin que
+ *      ninguna prueba avisara si quedaba mal.
  *
  *   2. FABRICABA DINERO Y DOCUMENTOS QUE NO EXISTEN. Los pagos venían con
  *      números de transacción inventados y rutas de boletas que no apuntan a

@@ -4,7 +4,7 @@ import { colorSerie, ESTILO_EJE, ESTILO_TOOLTIP } from '@/lib/graficos';
 import type { CarnetsPorRubro } from '@/types/dashboard';
 
 /**
- * Cuántos carnets de la gestión habilitan cada rubro.
+ * Cuántos carnets vigentes hay de cada actividad en la gestión.
  *
  * LAS BARRAS VAN HORIZONTALES (`layout="vertical"`) porque los nombres de rubro
  * son largos —«Comercializador»— y en barras verticales quedarían
@@ -20,7 +20,7 @@ export function GraficoCarnetsPorRubro({ datos, gestion }: { datos: CarnetsPorRu
             <CardHeader>
                 <CardTitle>Carnets por rubro</CardTitle>
                 <CardDescription>
-                    Gestión {gestion}, contando solo las habilitaciones activas.
+                    Gestión {gestion}, contando solo los carnets vigentes.
                 </CardDescription>
             </CardHeader>
 

@@ -72,14 +72,14 @@ Lo que está fijado de a pares:
 ```
 PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
    │                              │
-   │                              └── nace carnet_rubro ──▶ ACÁ se puede imprimir
+   │                              └── el carnet habilita ──▶ ACÁ se puede imprimir
    └── el carnet YA EXISTE, pero no autoriza a nada
 ```
 
 **El carnet existe desde PENDIENTE y no se puede imprimir hasta APROBADO.** La
 fila de `carnets` nace junto con el expediente —la crea
-`SolicitudCarnetService::registrar()` cuando la persona no tenía uno de esta
-gestión— pero la habilitación del rubro nace al aprobar. Entre uno y otro
+`SolicitudCarnetService::registrar()` cuando la persona no tenía uno de ese rubro
+en esta gestión— pero no habilita hasta que alguien firma. Entre uno y otro
 momento el plástico saldría con todos sus datos y sin autorizar nada, y encima
 puede no estar pagado todavía.
 
@@ -87,7 +87,7 @@ Lo dice `Carnet::puedeImprimirse()`, con dos condiciones:
 
 | Condición | Por qué |
 | --- | --- |
-| Al menos un rubro habilitado | Sin eso el carnet no autoriza a nada |
+| Al menos un trámite APROBADO | Sin eso el carnet no autoriza a nada. Antes se contaban las filas de `carnet_rubro`; al desaparecer el pivote, la pregunta equivalente es si algún expediente del carnet llegó a aprobarse |
 | El carnet no está anulado | Anular es una sanción: reimprimirlo devolvería a la calle un documento que el sistema ya desconoció |
 
 **Un carnet VENCIDO sí se imprime.** Es la reimpresión de un documento que
@@ -135,10 +135,67 @@ validez no son la misma atribución.
 | C.I. (debajo de la foto, en su propia tira) | `Beneficiario::documento_identidad` |
 | Foto | `beneficiarios.foto`, cuadrada, embebida en base64 |
 | NOMBRE | `Beneficiario::nombreCompleto` |
+| CUPO | `Carnet::capacidadLegible()`. **Tercer valor del último renglón, SIN rótulo**, y solo si la actividad lo lleva |
 | ASOCIACIÓN | `carnets.asociacion` — la copia que se congeló al emitir |
-| CIUDAD / PROVINCIA / DIRECCIÓN | La ficha del beneficiario |
+| CIUDAD | La ficha del beneficiario, en su propio renglón |
+| PROVINCIA | Ídem. Entera, ya no abreviada |
+| DIRECCIÓN | La ficha del beneficiario |
 | REGISTRO | `Carnet::registro()` — el id con ceros: `000013` |
 | GESTIÓN | `carnets.gestion` — comparte renglón con el registro |
+
+**Son SEIS renglones, siempre, para cualquier actividad.** Uno solo comparte un
+segundo par: `REGISTRO + GESTIÓN`, partido por la mitad —38 pt útiles cada uno—,
+que es lo que necesitan seis dígitos y un año. El salto entre renglones es fijo:
+14 pt desde los 66.
+
+> **LLEGAR A SEIS COSTÓ SACAR DOS DATOS DE LA COLUMNA.** Los dos estaban de más
+> ahí, y conviene saber adónde fueron:
+>
+> | Dato | Dónde está ahora | Por qué salió |
+> | --- | --- | --- |
+> | RUBRO | En el **título** | Con «CÉDULA DE COMERCIALIZADOR» arriba, el renglón imprimía dos veces la misma palabra |
+> | CUPO | En la **columna de la foto**, bajo el C.I. | Como renglón, un pescador llegaba a SIETE y había que apretar el salto de 14 a 12 pt |
+>
+> Sacarlos liberó el lugar que permitió darle a CIUDAD y a PROVINCIA una tira
+> entera cada una —compartían una— y, de paso, **«PROVINCIA» volvió entera**: se
+> abreviaba a «PROV.» porque el rótulo de un segundo par tiene una caja de 32 pt
+> y la palabra mide 33,2 a 6,1 pt bold. El rótulo de un renglón entero tiene 44.
+
+> **EL ÚLTIMO RENGLÓN LLEVA DOS O TRES DATOS.** `REGISTRO + GESTIÓN` siempre, y
+> el `CUPO` cuando la actividad se autoriza por volumen. Con cupo el renglón usa
+> el reparto `triple`:
+>
+> | | Rótulo | Valor |
+> | --- | --- | --- |
+> | REGISTRO | 0 → 44 | 47,5 → 75,5 |
+> | GESTIÓN | 78 → 108 | 111,5 → 134,5 |
+> | CUPO | *(sin rótulo)* | 137 → 176,5 |
+>
+> **El cupo va SIN rótulo**, a pedido: «800 KG» se lee solo, la unidad hace de
+> etiqueta. Y es lo único que cabe — los 176 pt ya están repartidos entre dos
+> rótulos y tres valores. Se queda con la tira más ancha porque es el único que
+> puede crecer, con un cupo de cinco dígitos y separador de miles.
+>
+> **SOLO SALE SI LA ACTIVIDAD LO LLEVA.** Sin cupo el renglón vuelve al reparto
+> de dos, con las tiras anchas de siempre. Lo decide `rubros.requiere_capacidad`,
+> no una lista de nombres. Ver `CarnetImpresionController::renglonRegistro()`.
+>
+> Antes probó dos lugares más: un renglón propio —que llevaba la tarjeta a siete
+> y obligaba a apretar el salto— y una tira suelta bajo la cédula, que lo dejaba
+> lejos del resto de los datos. Acá vuelve a la columna donde lo traía la cédula
+> de papel, sin costar una línea.
+
+> **OJO CON LOS RÓTULOS DE UN SEGUNDO PAR.** El cálculo de encogido de `texto()`
+> protege a los VALORES: si un nombre no entra, se achica. Los rótulos son
+> constantes y nadie los mide, así que uno largo se desborda en silencio sobre
+> lo que tenga al lado. Pasó con «PROVINCIA» cuando compartía renglón: a 6,1 pt
+> bold mide 33,2 en una caja de 32, y en el PDF salía «PROVINCIACercado» pegado.
+>
+> Volvió a pasar con «GESTIÓN» al partir el renglón en tres: con una caja de
+> 27 pt salía «GESTIÓN2026» pegado, y hubo que abrirla a 30.
+>
+> Antes de poner un rótulo en un renglón partido, medirlo:
+> **caracteres × 0,605 × cuerpo**, y dejarle un par de puntos de margen.
 
 ### El registro y la gestión comparten renglón
 
@@ -367,32 +424,64 @@ pesar más que el encabezado.
 > sobre una letra más chica la engorda, que es la trampa que ya había aparecido
 > con los rótulos.
 
-### El título dice «CÉDULA» a secas
+### El título dice «CÉDULA DE <RUBRO>»
 
-Y no «CÉDULA DE PESCADOR» como el plástico de papel. Es a pedido, y es coherente
-con el resto de la tarjeta: **el carnet es UNO para todos los rubros**, así que
-nombrar una actividad en el título diría algo que el documento no es.
+**Ya no.** Hoy dice «CÉDULA DE PESCADOR», con el rubro adentro, igual que el
+plástico de papel.
 
-### No van los rubros, ni el cupo en kilos, ni el vencimiento
+Decía «CÉDULA» a secas mientras el carnet era UNO para todas las actividades de
+una persona: nombrar una habría dicho algo que el documento no era. Con un carnet
+por rubro, el título es lo que se lee de lejos —antes que cualquier renglón— y
+puede decirlo.
 
-Y las tres ausencias salen de la misma regla:
+**El largo lo decide el catálogo**, así que el título se achica si no entra, igual
+que los renglones. A 9,5 pt con 0,8 de interletrado cada carácter ocupa ~6,55 pt
+y en los 230 pt útiles entran unos 35:
 
-> Una persona tiene **un** carnet por gestión, y sobre ese carnet se van
-> habilitando rubros.
+| Título | Caracteres | Ancho | Resultado |
+| --- | --- | --- | --- |
+| `CÉDULA DE PESCADOR` | 18 | ~118 pt | entra holgado |
+| `CÉDULA DE COMERCIALIZADOR` | 25 | ~164 pt | entra |
+| más de 30 | — | — | clase `.titulo.largo`: 7,6 pt |
 
-- **Sin la lista de rubros.** Quien hoy es pescador puede sumar comercializador
-  en octubre con una adición, y el plástico **no cambia**: mismo carnet, mismo
-  registro. Impresa, la lista quedaría vieja ese mismo día y el documento diría
-  MENOS de lo que la persona está autorizada a hacer — que es peor que no decir
-  nada. Y una suspensión hace lo inverso: dejaría impreso un rubro que ya no
-  vale.
-- **Sin el cupo en kilos.** El plástico de papel traía «600 KG» bajo el
-  domicilio. Es un tope POR ACTIVIDAD —con dos rubros habría dos cupos y un
-  único renglón donde ponerlos— y cambia con cada adición. Se sigue guardando en
-  el trámite y en la habilitación, pero es dato de control interno para cruzar
-  contra las guías de transporte. Es lo que ya decía la migración de
-  `carnet_rubro`: «No se imprime».
-- **Sin la fecha de vencimiento.** Todos los carnets de una gestión vencen el
+> **La variante baja las TRES medidas juntas** —cuerpo, interletrado y
+> corrimiento del contorno—. Achicar solo la letra dejaría un borde de 0,45 pt
+> sobre un cuerpo de 7,6: pasa de ser un 6% a un 9% y engorda la letra hasta
+> cerrarle los huecos, que es justo lo que el perfilado viene a evitar.
+
+Lo arma `CarnetImpresionController::titulo()`, y `vista-previa-carnet.tsx` repite
+el mismo umbral. Los dos tienen que moverse juntos.
+
+### El rubro y el cupo SÍ van; el vencimiento no
+
+Esta sección decía lo contrario, y vale la pena leer por qué cambió: **el motivo
+viejo era bueno, y lo que cambió no fue la opinión sino el sistema.**
+
+Con el modelo anterior —un carnet por persona, con los rubros colgados en
+`carnet_rubro`— el plástico no llevaba ni la lista de rubros ni el cupo:
+
+- quien era pescador podía sumar comercializador en octubre con una adición, y el
+  plástico **no cambiaba**: mismo carnet, mismo registro. Impresa, la lista
+  quedaba vieja ese mismo día y el documento pasaba a decir MENOS de lo que la
+  persona estaba autorizada a hacer — peor que no decir nada;
+- el cupo era un tope POR ACTIVIDAD, así que con dos rubros había dos cupos y un
+  único renglón donde ponerlos.
+
+Hoy el carnet es de **un** rubro, y ese rubro es parte de la llave que lo
+identifica: no cambia nunca. No queda nada que pueda dejar vieja la impresión, y
+el cupo es uno solo.
+
+**Y es más que una posibilidad: es necesario.** Dos carnets de la misma persona
+en la misma gestión son dos plásticos con el mismo nombre, la misma foto y el
+mismo domicilio. Sin el rubro impreso, nada los distingue a simple vista — y el
+número de registro no ayuda, porque nadie compara seis dígitos en un control.
+
+Lo que sigue sin imprimirse:
+
+- **El ESTADO.** Un carnet se suspende o se anula DESPUÉS de impreso y la tarjeta
+  no se entera. Es el mismo criterio de siempre —en un documento impreso va lo
+  que no cambia— aplicado a lo que de verdad cambia.
+- **La fecha de vencimiento.** Todos los carnets de una gestión vencen el
   mismo día —el 31 de diciembre, ver `Carnet::vencimientoDeGestion()`— así que
   **con la gestión impresa la fecha no agrega nada**: 2026 ya dice 31/12/2026.
   Y si la pregunta es si HOY vale, la fecha impresa nunca fue la respuesta: un
@@ -403,7 +492,7 @@ Y las tres ausencias salen de la misma regla:
   > `000013`, seis dígitos sin año. El dato faltaba de verdad, y el renglón
   > compartido es lo que lo tapó.
 
-Las tres cosas se consultan en la ficha del carnet, en el panel.
+El estado y la fecha se consultan en la ficha del carnet, en el panel.
 
 ### Las tiras van blancas y la letra negra fina, como una cédula de identidad
 
@@ -612,6 +701,20 @@ Unos **156 KB por carnet**. El fondo es casi todo: 99 KB del PNG.
 ---
 
 ## 7. La foto del titular
+
+> **ARRANCA EN 76 pt, NO EN 66.** Estaba a la misma altura que el renglón
+> NOMBRE, y la columna izquierda terminaba 23 pt antes que la derecha —foto y
+> cédula cerraban en 122,5 y el último renglón en 145,5—. Bajada 10 pt, las dos
+> columnas quedan parejas a la vista. La tira del C.I. la acompaña: 115 → 125.
+>
+> **EL RECUADRO ES CUADRADO Y TIENE QUE SEGUIRLO SIENDO:** 46 × 46 pt más 0,8 de
+> borde por lado. En DomPDF el borde SUMA al ancho declarado —igual que el
+> padding— así que ocupa 47,6 × 47,6: sigue cuadrado porque los dos lados crecen
+> igual. Tocar uno solo lo deforma.
+>
+> Y OJO: el ancho está atado a dos cosas más. La tira de la cédula mide 43,6
+> —los 47,6 del recuadro menos su relleno— y la columna de datos arranca en 60.
+> Cambiar el ancho de la foto obliga a mover las dos.
 
 **Es un cuadrado de 46 × 46 pt (16 mm)**, un retrato tipo carnet como el de la
 credencial de papel.

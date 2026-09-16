@@ -6,6 +6,19 @@ namespace App\Enums;
  * En qué situación está un carnet.
  *
  * ----------------------------------------------------------------------------
+ *  UN CARNET ES UNA ACTIVIDAD, ASÍ QUE SU ESTADO ES EL DE ESA ACTIVIDAD
+ * ----------------------------------------------------------------------------
+ *
+ * Antes existía un enum aparte, `EstadoHabilitacion`, para decir si un rubro
+ * estaba habilitado o suspendido DENTRO de un carnet que agrupaba varios. Ese
+ * enum ya no existe, y sus dos valores se resolvieron acá: con un carnet por
+ * rubro, suspender la actividad es suspender el carnet, y los demás carnets de
+ * la persona siguen intactos.
+ *
+ * A un pescador se le puede cortar el transporte de producto sin quitarle la
+ * pesca artesanal: son dos carnets distintos y se suspende uno.
+ *
+ * ----------------------------------------------------------------------------
  *  ESTA COLUMNA PUEDE MENTIR, Y ESTÁ BIEN QUE PUEDA
  * ----------------------------------------------------------------------------
  *
@@ -17,14 +30,26 @@ namespace App\Enums;
  * carnet vale hoy se mira `fecha_vencimiento`, que no puede quedar desfasada.
  * Ver Carnet::estaVigente().
  *
- * ¿Y entonces para qué está la columna? Para dos cosas que la fecha no puede
+ * ¿Y entonces para qué está la columna? Para tres cosas que la fecha no puede
  * dar: distinguir «venció» de «se anuló» —un carnet anulado en marzo tiene la
- * fecha de vencimiento de diciembre y la fecha no lo delata—, y para filtrar y
- * agrupar en los listados sin calcular una comparación de fechas por fila.
+ * fecha de vencimiento de diciembre y la fecha no lo delata—, marcar una
+ * suspensión, que no tiene ninguna fecha asociada, y filtrar y agrupar en los
+ * listados sin calcular una comparación por fila.
  */
 enum EstadoCarnet: string
 {
     case Vigente = 'vigente';
+
+    /**
+     * Cortado temporalmente. El documento sigue existiendo y su historial
+     * queda legible —un inspector necesita saber que estuvo autorizado hasta
+     * tal fecha—, pero hoy no habilita a trabajar.
+     *
+     * Se distingue de `Anulado` porque se puede volver atrás: lo levanta un
+     * supervisor. Anular es definitivo.
+     */
+    case Suspendido = 'suspendido';
+
     case Vencido = 'vencido';
     case Anulado = 'anulado';
 
@@ -32,29 +57,64 @@ enum EstadoCarnet: string
     {
         return match ($this) {
             self::Vigente => 'Vigente',
+            self::Suspendido => 'Suspendido',
             self::Vencido => 'Vencido',
             self::Anulado => 'Anulado',
         };
     }
 
+    /**
+     * Nombre del color del badge.
+     *
+     * Devuelve el NOMBRE y no las clases armadas con texto, porque Tailwind
+     * solo incluye en el CSS final las clases que puede leer literalmente en el
+     * código. Si se agrega un color acá hay que agregarlo también al mapa de
+     * `resources/js/components/ui/badge.tsx`, o el badge sale sin fondo y sin
+     * ningún error que lo explique.
+     */
     public function color(): string
     {
         return match ($this) {
             self::Vigente => 'emerald',
-            self::Vencido => 'amber',
+            self::Suspendido => 'amber',
+            self::Vencido => 'slate',
             self::Anulado => 'rose',
         };
     }
 
     /**
-     * ¿Se le pueden seguir agregando rubros?
+     * ¿Este carnet autoriza a trabajar HOY, según su estado?
      *
-     * Un carnet anulado no admite adiciones aunque la fecha no haya llegado: se
-     * anuló por algo. Un carnet vencido tampoco —lo que corresponde es emitir el
-     * de la gestión nueva—, pero esa comprobación se hace además contra la
-     * fecha, por lo dicho arriba sobre el desfase de esta columna.
+     * Solo mira el estado; la fecha la agrega `Carnet::estaVigente()`, por lo
+     * dicho arriba sobre el desfase de esta columna. Un carnet suspendido
+     * existe y es consultable, pero no habilita.
      */
-    public function admiteAdiciones(): bool
+    public function habilita(): bool
+    {
+        return $this === self::Vigente;
+    }
+
+    /**
+     * ¿Se puede volver a levantar?
+     *
+     * Solo una suspensión. Vencido se resuelve emitiendo el carnet de la
+     * gestión siguiente, y anulado es definitivo.
+     */
+    public function esReversible(): bool
+    {
+        return $this === self::Suspendido;
+    }
+
+    /**
+     * ¿Admite que se le presente un trámite de actualización?
+     *
+     * Un carnet anulado no, aunque la fecha no haya llegado: se anuló por algo.
+     * Uno vencido tampoco —lo que corresponde es emitir el de la gestión
+     * nueva—, pero esa comprobación se hace además contra la fecha. Uno
+     * suspendido tampoco: lo que corresponde es que un supervisor lo levante,
+     * no cobrar otro trámite por lo mismo.
+     */
+    public function admiteTramites(): bool
     {
         return $this === self::Vigente;
     }

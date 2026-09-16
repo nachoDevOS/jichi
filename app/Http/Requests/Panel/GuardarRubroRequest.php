@@ -51,6 +51,17 @@ class GuardarRubroRequest extends FormRequest
              */
             'costo' => ['required', 'numeric', 'min:0', 'max:999999.99'],
 
+            /*
+             * Si la actividad se autoriza por volumen. De esto depende que el
+             * formulario de trámite pida el cupo, que la validación lo exija y
+             * que el plástico imprima el renglón CUPO.
+             *
+             * `boolean` acepta true/false, 1/0 y "1"/"0": una casilla sin marcar
+             * no se manda en el formulario, así que se le da un valor por
+             * defecto en prepareForValidation().
+             */
+            'requiere_capacidad' => ['required', 'boolean'],
+
             'estado' => ['required', Rule::enum(EstadoRubro::class)],
         ];
     }
@@ -65,6 +76,7 @@ class GuardarRubroRequest extends FormRequest
             'nombre.unique' => 'Ya existe un rubro con ese nombre.',
             'costo.required' => 'Indique el costo del rubro. Escriba 0 si es gratuito.',
             'costo.min' => 'El costo no puede ser negativo.',
+            'requiere_capacidad.required' => 'Indique si la actividad lleva cupo en kilos.',
             'estado.required' => 'Indique si el rubro está activo.',
         ];
     }
@@ -73,6 +85,14 @@ class GuardarRubroRequest extends FormRequest
     {
         $this->merge([
             'nombre' => trim((string) $this->input('nombre')),
+
+            /*
+             * UNA CASILLA SIN MARCAR NO SE MANDA, y esa es la trampa: el
+             * navegador omite el campo entero en vez de enviar `false`. Sin este
+             * valor por defecto, `required` rebotaría el formulario con «indique
+             * si lleva cupo» justamente cuando el operador contestó que no.
+             */
+            'requiere_capacidad' => $this->boolean('requiere_capacidad'),
         ]);
     }
 }

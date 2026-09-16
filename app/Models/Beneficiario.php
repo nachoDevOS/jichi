@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -207,20 +208,37 @@ class Beneficiario extends Model
     // ------------------------------------------------------------------
 
     /**
-     * El carnet de la gestión indicada, o NULL si no tiene.
+     * ========================================================================
+     *  EL CARNET DE ESTA PERSONA PARA ESTE RUBRO Y ESTA GESTIÓN, O NULL
+     * ========================================================================
      *
      * ESTE MÉTODO ES LA REGLA A DEL MÓDULO. De lo que devuelva depende todo lo
      * demás: sin carnet el trámite es EMISIÓN INICIAL y hay que crear el
-     * documento; con carnet es ADICIÓN DE RUBRO y se reutiliza el que existe.
+     * documento; con carnet es ACTUALIZACIÓN y se reutiliza el que existe.
+     *
+     * ------------------------------------------------------------------------
+     *  RECIBE EL RUBRO, Y ESO ES LO QUE CAMBIÓ
+     * ------------------------------------------------------------------------
+     *
+     * Antes se llamaba `carnetDeGestion($gestion)` y respondía «el carnet de
+     * esta persona este año», porque había uno solo. Hoy una persona puede
+     * tener varios en la misma gestión —uno por actividad— así que la pregunta
+     * sin el rubro no tiene una única respuesta, y un método que devolviera
+     * «el primero» sería una fuente de errores silenciosos: el sistema
+     * reutilizaría el carnet de Pescador para un trámite de Comercializador.
+     *
+     * Por eso el rubro es OBLIGATORIO. Para la otra pregunta —«todos los que
+     * tiene este año»— está `carnetsDeGestion()`.
      *
      * Se busca por `gestion` y no por rango de fechas a propósito: un carnet
      * emitido el 2 de enero para cerrar la gestión anterior existe, y por fecha
      * de emisión caería en el año equivocado.
      *
-     * NO filtra por estado: devuelve también el anulado y el vencido. Quien
-     * decide qué hacer con eso es SolicitudCarnetService, porque la respuesta
-     * cambia según el caso —un carnet anulado no admite adiciones, pero tampoco
-     * permite emitir otro en la misma gestión: el índice único no lo dejaría—.
+     * NO filtra por estado: devuelve también el anulado, el suspendido y el
+     * vencido. Quien decide qué hacer con eso es SolicitudCarnetService, porque
+     * la respuesta cambia según el caso —un carnet anulado no admite trámites,
+     * pero tampoco permite emitir otro del mismo rubro en la misma gestión: el
+     * índice único no lo dejaría—.
      *
      * ------------------------------------------------------------------------
      *  SI LA RELACIÓN YA ESTÁ CARGADA, NO SE VUELVE A CONSULTAR
@@ -236,20 +254,47 @@ class Beneficiario extends Model
      * filtra en memoria, sobre las filas que ya están; sin ella se consulta como
      * siempre. Quien llama no tiene que saber cuál de los dos es.
      */
-    public function carnetDeGestion(?int $gestion = null): ?Carnet
+    public function carnetDeRubroEnGestion(int $rubroId, ?int $gestion = null): ?Carnet
     {
         $gestion ??= (int) now()->format('Y');
 
         if ($this->relationLoaded('carnets')) {
-            return $this->carnets->firstWhere('gestion', $gestion);
+            return $this->carnets
+                ->first(fn (Carnet $c): bool => $c->rubro_id === $rubroId && $c->gestion === $gestion);
         }
 
-        return $this->carnets()->where('gestion', $gestion)->first();
+        return $this->carnets()
+            ->where('rubro_id', $rubroId)
+            ->where('gestion', $gestion)
+            ->first();
     }
 
-    public function tieneCarnetEnGestion(?int $gestion = null): bool
+    /**
+     * TODOS los carnets de la persona en una gestión — uno por actividad.
+     *
+     * Es la vista que necesita la pantalla: el formulario de trámite muestra
+     * qué actividades ya tiene cubiertas este año, y la ficha del beneficiario
+     * las lista. Devuelve una colección, nunca null; vacía si no tiene ninguno.
+     *
+     * Mismo cuidado con `relationLoaded()` que arriba, y por el mismo motivo.
+     *
+     * @return Collection<int, Carnet>
+     */
+    public function carnetsDeGestion(?int $gestion = null): Collection
     {
-        return $this->carnetDeGestion($gestion) !== null;
+        $gestion ??= (int) now()->format('Y');
+
+        if ($this->relationLoaded('carnets')) {
+            return $this->carnets->where('gestion', $gestion)->values();
+        }
+
+        return $this->carnets()->where('gestion', $gestion)->get();
+    }
+
+    /** ¿Tiene carnet de esta actividad este año? */
+    public function tieneCarnetDeRubro(int $rubroId, ?int $gestion = null): bool
+    {
+        return $this->carnetDeRubroEnGestion($rubroId, $gestion) !== null;
     }
 
     /**

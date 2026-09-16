@@ -11,37 +11,57 @@ namespace App\Enums;
  *
  * El tipo sale de una sola pregunta, y la respuesta está en la base:
  *
- *     ¿la persona ya tiene carnet de la gestión en curso?
+ *     ¿la persona ya tiene carnet DE ESTE RUBRO en la gestión en curso?
  *         NO  ->  EmisionInicial   (hay que crear el carnet)
- *         SÍ  ->  AdicionRubro     (se reutiliza el que tiene)
+ *         SÍ  ->  Actualizacion    (se reutiliza el que tiene)
  *
  * Dejarlo como un selector del formulario sería pedirle a ventanilla que
  * adivine algo que el sistema ya sabe. Y equivocarse ahí no es un detalle: un
- * «emisión inicial» marcado de más intenta crear un segundo carnet para la
- * misma gestión, que el índice único rechaza y voltea el trámite entero.
+ * «emisión inicial» marcado de más intenta crear un segundo carnet del mismo
+ * rubro para la misma gestión, que el índice único rechaza y voltea el trámite
+ * entero.
  *
  * Quien decide es SolicitudCarnetService::registrar(). Este enum solo pone
  * nombre a las dos posibilidades y las etiquetas que se muestran en pantalla.
+ *
+ * ----------------------------------------------------------------------------
+ *  POR QUÉ YA NO EXISTE «ADICIÓN DE RUBRO»
+ * ----------------------------------------------------------------------------
+ *
+ * Porque dejó de describir nada. Con el modelo viejo el carnet era uno por
+ * persona y gestión, y pedir una actividad más lo hacía CRECER: eso era la
+ * adición. Hoy cada actividad es un carnet propio, así que pedir un rubro más
+ * no agranda nada — emite un documento nuevo, y eso ya tiene nombre: emisión
+ * inicial, la del carnet de ESE rubro.
+ *
+ * Lo que quedó sin nombre es el otro caso: presentar un trámite sobre un carnet
+ * que ya existe, para corregir el cupo o la asociación. Eso es la ACTUALIZACIÓN.
  */
 enum TipoTramite: string
 {
     case EmisionInicial = 'emision_inicial';
-    case AdicionRubro = 'adicion_rubro';
+    case Actualizacion = 'actualizacion';
 
     public function etiqueta(): string
     {
         return match ($this) {
             self::EmisionInicial => 'Emisión Inicial',
-            self::AdicionRubro => 'Adición de Rubro',
+            self::Actualizacion => 'Actualización',
         };
     }
 
     public function descripcion(): string
     {
         return match ($this) {
-            self::EmisionInicial => 'Primer carnet de la gestión: se emite el documento y se habilita el rubro solicitado.',
-            self::AdicionRubro => 'El beneficiario ya tiene carnet vigente en esta gestión: se le suma un rubro más.',
+            self::EmisionInicial => 'El beneficiario no tenía carnet de este rubro en la gestión: se emite el documento.',
+            self::Actualizacion => 'Ya tiene carnet vigente de este rubro: se actualizan los datos autorizados sobre el mismo documento.',
         };
+    }
+
+    /** ¿Este tipo hace nacer un carnet? */
+    public function emiteCarnet(): bool
+    {
+        return $this === self::EmisionInicial;
     }
 
     /**
@@ -56,7 +76,7 @@ enum TipoTramite: string
     {
         return match ($this) {
             self::EmisionInicial => 'sky',
-            self::AdicionRubro => 'violet',
+            self::Actualizacion => 'violet',
         };
     }
 

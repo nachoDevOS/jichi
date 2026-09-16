@@ -1,4 +1,4 @@
-import type { EstadoCarnet, EstadoHabilitacion } from '@/types';
+import type { EstadoCarnet } from '@/types';
 
 /**
  * Tipos del módulo Beneficiarios.
@@ -117,20 +117,20 @@ export interface CarnetResumen {
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
     tramites_count?: number;
-    rubros?: string[];
+    /** La actividad del carnet. Es lo que distingue dos filas del mismo año. */
+    rubro: string | null;
+    /** El cupo ya escrito como va impreso: «600 KG». */
+    capacidad: string | null;
 }
 
-/** Un rubro ya habilitado en un carnet, tal como lo ve el formulario. */
-export interface RubroDelCarnet {
-    id: number;
-    nombre: string | null;
-    estado: EstadoHabilitacion;
-    estado_etiqueta: string;
-    estado_color: string;
-    fecha_habilitacion: string | null;
-}
-
-/** El carnet de la gestión, con sus rubros. */
+/**
+ * Un carnet de la gestión en curso: UNA actividad.
+ *
+ * Reemplaza al par `CarnetDeLaGestion` + `RubroDelCarnet` del modelo anterior,
+ * donde el carnet era uno solo y traía adentro la lista de rubros habilitados.
+ * Hoy cada actividad es un carnet, así que lo que era una lista anidada pasó a
+ * ser una lista de estos.
+ */
 export interface CarnetDeLaGestion {
     id: number;
     /**
@@ -138,47 +138,63 @@ export interface CarnetDeLaGestion {
      * rellenado con ceros, así que es corto, se dicta de memoria y se compara
      * de un vistazo entre dos credenciales.
      *
-     * La firma NO viaja acá: no se imprime en ningún lado del carnet, va solo
-     * dentro del QR. Ver Carnet::registro().
+     * La firma NO viaja acá: es la llave de la verificación pública y no tiene
+     * nada que hacer en un autocompletado. Ver Carnet::registro().
      */
     registro: string;
+
+    /** La actividad que habilita. Es lo que distingue dos carnets del año. */
+    rubro_id: number;
+    rubro: string | null;
+
     gestion: number;
     /** La que certificó al beneficiario al emitir. Se imprime en la tarjeta. */
     asociacion: string | null;
+    /** El cupo ya escrito como va impreso: «600 KG». Null si no se cargó. */
+    capacidad: string | null;
     estado: EstadoCarnet;
     estado_etiqueta: string;
     estado_color: string;
     /** Calculado contra la fecha, no leído del estado. Ver Carnet::estaVigente(). */
     vigente: boolean;
-    admite_adiciones: boolean;
+    /** Si se le puede presentar un trámite de actualización. */
+    admite_tramites: boolean;
     fecha_vencimiento: string | null;
-    rubros: RubroDelCarnet[];
 }
 
 /**
  * Qué tiene esta persona en la gestión en curso.
  *
- * Lo arma App\Support\SituacionCarnet y responde las tres preguntas que el
+ * Lo arma App\Support\SituacionCarnet y responde las preguntas que el
  * formulario de trámite necesita antes de ofrecer nada:
  *
- *   - ¿tiene carnet de este año? → emisión inicial o adición de rubro
- *   - ¿qué rubros ya tiene?      → esos no se pueden volver a pedir
- *   - ¿el carnet sigue vigente?  → uno anulado o vencido no admite adiciones
+ *   - ¿qué actividades ya tiene cubiertas este año?
+ *   - ¿cuáles siguen vigentes y cuáles están cortadas?
+ *   - ¿qué rubros puede pedir sin chocar con nada?
+ *
+ * OJO CON LA PREGUNTA QUE YA NO SE PUEDE HACER: «¿es emisión inicial o
+ * actualización?» no tiene una respuesta para toda la persona, porque depende
+ * del RUBRO que se esté por pedir. Alguien con carnet de Pescador pide una
+ * emisión inicial si elige Comercializador, y una actualización si elige
+ * Pescador. La pantalla lo resuelve mirando `rubros_ocupados`.
  *
  * ES PARA LA PANTALLA, NO ES LA REGLA. El servidor vuelve a comprobar todo al
  * registrar: entre que el operador ve esto y aprieta guardar pueden pasar
- * minutos, y en el medio otra ventanilla pudo haber habilitado el mismo rubro.
+ * minutos, y en el medio otra ventanilla pudo haber emitido el mismo carnet.
  */
 export interface SituacionBeneficiario {
     gestion: number;
+    /** Si tiene AL MENOS UNO. Ya no significa «tiene EL carnet». */
     tiene_carnet: boolean;
-    carnet: CarnetDeLaGestion | null;
+    /** Uno por actividad. Vacío si no sacó ninguno este año. */
+    carnets: CarnetDeLaGestion[];
     /**
-     * Los ids que el selector de rubros tiene que dejar deshabilitados.
+     * Los ids de rubro que el selector tiene que dejar deshabilitados.
      *
-     * Incluye los SUSPENDIDOS: la habilitación existe igual, solo que cortada,
-     * y lo que corresponde es que un supervisor la levante —no cobrar otro
-     * trámite por lo mismo—.
+     * Incluye los SUSPENDIDOS —la autorización existe, solo que cortada, y lo
+     * que corresponde es que un supervisor la levante— y los ANULADOS, porque
+     * el carnet anulado sigue ocupando su lugar en el índice único y la base no
+     * dejaría emitir otro del mismo rubro ese año.
      */
     rubros_ocupados: number[];
 }

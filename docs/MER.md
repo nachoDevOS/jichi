@@ -7,7 +7,7 @@ Las 24 tablas de la base se dividen en tres grupos:
 
 | Grupo | Tablas | Qué son |
 | --- | --- | --- |
-| **Dominio** | `beneficiarios`, `rubros`, `carnets`, `carnet_rubro`, `tramites`, `pagos`, `recibos` | El negocio. Son las que se modelan acá |
+| **Dominio** | `beneficiarios`, `rubros`, `carnets`, `tramites`, `pagos` | El negocio. Son las que se modelan acá |
 | **Soporte** | `users`, `correlativos`, `configuraciones`, `auditorias`, `accesos` | Operación del sistema |
 | **Infraestructura** | `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `sessions`, `migrations` | Laravel y el paquete de permisos. No son del negocio |
 
@@ -18,8 +18,7 @@ Las 24 tablas de la base se dividen en tres grupos:
 ```mermaid
 erDiagram
     BENEFICIARIOS ||--o{ CARNETS : "obtiene"
-    CARNETS       ||--o{ CARNET_RUBRO : "habilita"
-    RUBROS        ||--o{ CARNET_RUBRO : "se habilita en"
+    RUBROS        ||--o{ CARNETS : "es la actividad de"
     CARNETS       ||--o{ TRAMITES : "recibe"
     RUBROS        ||--o{ TRAMITES : "se solicita en"
     TRAMITES      ||--o{ PAGOS : "se cubre con"
@@ -52,34 +51,28 @@ erDiagram
         varchar nombre UK
         text    descripcion
         numeric costo "tarifa vigente en Bs"
+        boolean requiere_capacidad "si se autoriza por volumen (kilos)"
         varchar estado "activo | inactivo"
     }
 
     CARNETS {
         bigint   id PK
-        bigint   beneficiario_id FK
+        bigint   beneficiario_id FK "UQ junto con rubro_id y gestion"
+        bigint   rubro_id FK "la actividad que habilita"
         varchar  firma_validacion UK "16 chars: identifica el carnet"
-        smallint gestion "UQ junto con beneficiario_id"
+        smallint gestion "UQ junto con beneficiario_id y rubro_id"
         varchar  asociacion "copia de tramites.asociacion"
+        numeric  capacidad_kg "cupo autorizado en kilos"
         date     fecha_emision
         date     fecha_vencimiento
-        varchar  estado "vigente | vencido | anulado"
-    }
-
-    CARNET_RUBRO {
-        bigint  id PK
-        bigint  carnet_id FK "UQ junto con rubro_id"
-        bigint  rubro_id FK
-        date    fecha_habilitacion
-        numeric capacidad_kg "cupo autorizado en kilos"
-        varchar estado "habilitado | suspendido"
+        varchar  estado "vigente | suspendido | vencido | anulado"
     }
 
     TRAMITES {
         bigint    id PK
         bigint    carnet_id FK
         bigint    rubro_id FK
-        varchar   tipo_tramite "emision_inicial | adicion_rubro"
+        varchar   tipo_tramite "emision_inicial | actualizacion"
         varchar   estado "pendiente | en_revision | aprobado | rechazado"
         varchar   ciFile "fotocopia de carnet de identidad"
         varchar   certAsociacionFile "certificado de la asociacion"
@@ -128,13 +121,15 @@ erDiagram
 | Relación | Cardinalidad | En palabras |
 | --- | --- | --- |
 | `beneficiarios` → `carnets` | 1 : 0..N | Una persona tiene un carnet **por gestión**. Varios años, varios carnets; el mismo año, uno solo |
-| `carnets` ↔ `rubros` | N : M vía `carnet_rubro` | Un carnet habilita varios rubros; un rubro está en muchos carnets |
+| `rubros` → `carnets` | 1 : N | Un carnet habilita UNA actividad; una actividad tiene muchos carnets emitidos |
 | `carnets` → `tramites` | 1 : 0..N | Cada rubro pedido es un trámite distinto colgado del mismo carnet |
 | `rubros` → `tramites` | 1 : 0..N | Un trámite pide exactamente un rubro |
 | `tramites` → `pagos` | 1 : 0..N | Un trámite se cubre con uno o varios depósitos |
-| `tramites` → `recibos` | 1 : 0..1 | Un solo recibo por trámite, y recién al enviarlo a revisión |
+| `tramites` → *recibo* | 1 : 0..1 | **Sin tabla.** El comprobante se arma al vuelo; existe desde que hay `fecha_revision` |
 
-`carnet_rubro` es la entidad asociativa que resuelve el N:M, pero **no es un pivote pelado**: tiene identidad propia (`id`), atributos propios (`fecha_habilitacion`, `capacidad_kg`, `estado`) y es la fila que *nace* cuando se aprueba un trámite. Es la habilitación misma.
+**Acá había un N:M y ya no lo hay.** `carnets` ↔ `rubros` se resolvía con una entidad asociativa, `carnet_rubro`, que tenía identidad y atributos propios (`fecha_habilitacion`, `capacidad_kg`, `estado`) y nacía al aprobar un trámite: era la habilitación misma.
+
+Al pasar a **un carnet por rubro**, esa entidad quedó sin razón de ser: sus atributos son los del carnet, y su clave `(carnet_id, rubro_id)` es redundante con la del carnet. Se eliminó, y con ella el enum `EstadoHabilitacion`, cuyos dos valores se absorbieron en `EstadoCarnet`. **El carnet ES la habilitación.**
 
 ---
 
@@ -144,11 +139,8 @@ Lo que hace interesante a este MER no son las claves foráneas sino las restricc
 
 | Restricción | Tabla | Regla que garantiza |
 | --- | --- | --- |
-| `carnets_beneficiario_gestion_unique (beneficiario_id, gestion)` | `carnets` | **Una persona, un carnet por año.** Es la regla que ordena todo el sistema |
+| `carnets_beneficiario_rubro_gestion_unique (beneficiario_id, rubro_id, gestion)` | `carnets` | **Una persona, un carnet por actividad y por año.** Es la regla que ordena todo el sistema |
 | `carnets_firma_validacion_unique` | `carnets` | El carnet **no tiene número**: se identifica por su firma de 16 caracteres, que además es la llave de la verificación pública |
-| `carnet_rubro_unico (carnet_id, rubro_id)` | `carnet_rubro` | No se habilita dos veces el mismo rubro en el mismo carnet |
-| `recibos_serie_unica (gestion, numero)` | `recibos` | Numeración del talonario sin saltos ni repetidos dentro del año |
-| `recibos_tramite_id_unique` | `recibos` | Un recibo por trámite. Una reimpresión sale con el **mismo** número |
 | `pagos_nro_transaccion_unique` | `pagos` | El mismo depósito no se carga dos veces |
 | `rubros_nombre_unique` | `rubros` | No hay dos rubros con el mismo nombre |
 | `correlativos_serie_anio_unique` | `correlativos` | Fuente del número de recibo: una fila por serie y año |
@@ -178,10 +170,8 @@ Las claves foráneas no son todas iguales, y ahí se lee el valor que el sistema
 | `carnets.beneficiario_id` → `beneficiarios` | `RESTRICT` | No se borra a alguien que tiene carnets emitidos |
 | `tramites.carnet_id` → `carnets` | `RESTRICT` | No se borra un carnet con expedientes |
 | `tramites.rubro_id` → `rubros` | `RESTRICT` | No se borra un rubro que alguien solicitó |
-| `carnet_rubro.rubro_id` → `rubros` | `RESTRICT` | Ni uno que está habilitado |
-| `carnet_rubro.carnet_id` → `carnets` | `CASCADE` | La habilitación no existe sin su carnet |
+| `carnets.rubro_id` → `rubros` | `RESTRICT` | Ni uno con carnets emitidos: el catálogo se inactiva, no se borra |
 | `pagos.tramite_id` → `tramites` | `CASCADE` | El pago no existe sin su trámite |
-| `recibos.tramite_id` → `tramites` | `SET NULL` | **El recibo sobrevive al trámite**: guarda su copia congelada de nombre, CI y monto |
 | `auditorias.user_id` → `users` | `SET NULL` | El registro histórico no se borra con el usuario |
 | `accesos.user_id` → `users` | `SET NULL` | Ídem |
 
@@ -197,8 +187,10 @@ Hay campos repetidos a propósito. No son un error de diseño: son copias congel
 | --- | --- | --- | --- |
 | `tramites.monto_requerido` | `rubros.costo` | Al registrar el trámite | Si mañana sube la tarifa, el trámite viejo sigue debiendo lo que decía cuando se presentó |
 | `carnets.asociacion` | `tramites.asociacion` | Al emitir el carnet | Queda impreso en el plástico |
-| `carnet_rubro.capacidad_kg` | `tramites.capacidad_kg` | Al aprobar | El cupo autorizado es el de esa aprobación, no el de la siguiente |
-| `recibos.beneficiario_nombre`, `beneficiario_ci`, `monto`, `detalle` | `beneficiarios` y `pagos` | Al emitir el recibo | El papel que se llevó el pescador dice eso, y tiene que poder reimprimirse idéntico años después |
+| `carnets.capacidad_kg` | `tramites.capacidad_kg` | **Solo al aprobar** | El cupo autorizado es el de esa aprobación. Lo que venga en blanco NO pisa lo que ya había |
+| `carnets.asociacion` | `tramites.asociacion` | **Solo al aprobar** | Igual que el cupo: el carnet nace en NULL y se llena con la primera firma |
+
+**Las dos columnas de `capacidad_kg` no son el mismo dato.** `tramites` guarda lo **pedido**; `carnets`, lo **autorizado**. Entre el registro y la aprobación valen cosas distintas: quien tiene 600 kg autorizados y pide 850 sigue rigiendo por 600 hasta que se cobre y se firme. Con una sola columna, el pedido pisaría al vigente antes de pagarse — y un rechazo posterior no tendría a dónde volver.
 
 La regla general: **un documento emitido guarda su propio texto**, no una referencia a algo que puede cambiar.
 
@@ -211,12 +203,9 @@ Todos van en columnas `varchar`, nunca en tipos `ENUM` nativos de PostgreSQL —
 | Tabla.columna | Valores | Enum |
 | --- | --- | --- |
 | `tramites.estado` | `pendiente`, `en_revision`, `aprobado`, `rechazado` | `EstadoTramite` |
-| `tramites.tipo_tramite` | `emision_inicial`, `adicion_rubro` | `TipoTramite` |
+| `tramites.tipo_tramite` | `emision_inicial`, `actualizacion` | `TipoTramite` |
 | `carnets.estado` | `vigente`, `vencido`, `anulado` | `EstadoCarnet` |
-| `carnet_rubro.estado` | `habilitado`, `suspendido` | `EstadoHabilitacion` |
 | `rubros.estado` | `activo`, `inactivo` | `EstadoRubro` |
-| `recibos.forma_pago` | `deposito`, `efectivo` | `FormaPago` |
-| `recibos.descripcion` | `permiso_faena`, `importe_alevines`, `aprovechamiento_pesquero`, `guia_transporte`, `cedulas`, `otros` | `ConceptoRecibo` |
 
 ### El ciclo de vida del trámite
 
@@ -225,7 +214,7 @@ stateDiagram-v2
     [*] --> pendiente : registrar
     pendiente --> en_revision : enviar — nace el RECIBO
     pendiente --> [*] : eliminar, con motivo
-    en_revision --> aprobado : aprobar — nace CARNET_RUBRO
+    en_revision --> aprobado : aprobar — el carnet queda habilitado
     en_revision --> rechazado : rechazar, con motivo
     aprobado --> [*]
     rechazado --> [*]
@@ -304,17 +293,23 @@ erDiagram
 
 `auditorias` usa una **relación polimórfica** (`auditable_type` + `auditable_id`): apunta a cualquier modelo del sistema sin necesidad de una clave foránea por tabla. Por eso no tiene flechas hacia el dominio en el diagrama — esa integridad la sostiene la aplicación, no el motor.
 
-`correlativos` y `configuraciones` son **tablas sueltas**, sin relaciones. La primera es el contador del talonario de recibos; la segunda, pares clave-valor con los parámetros del sistema.
+`correlativos` y `configuraciones` son **tablas sueltas**, sin relaciones. La segunda son pares clave-valor con los parámetros del sistema. La primera es un contador genérico que hoy **nadie usa**: alimentaba la serie del talonario de recibos y quedó libre al retirarse esa tabla. No se borró porque un correlativo es justamente el dato que no se puede derivar — ver `CorrelativoService`.
+
+> **NO HAY TABLA `recibos`.** El comprobante se ARMA al vuelo con los datos de
+> `beneficiarios`, `carnets`, `rubros`, `tramites` y `pagos` cada vez que
+> alguien lo imprime; su número es el id del trámite y su fecha es
+> `tramites.fecha_revision`. Ver `App\Support\ReciboArmado`, que explica qué se
+> gana y qué se pierde con eso.
 
 ---
 
 ## 7. El recorrido completo, un paso por línea
 
 1. Se registra un **beneficiario**, o se busca uno existente por CI.
-2. Se presenta un **trámite** pidiendo un **rubro**. El sistema decide solo si es `emision_inicial` —y crea el **carnet**— o `adicion_rubro` —y reutiliza el del año en curso—.
+2. Se presenta un **trámite** pidiendo un **rubro**. El sistema decide solo si es `emision_inicial` —y crea el **carnet de ese rubro**— o `actualizacion` —y reutiliza el que ya existe—.
 3. Se cargan uno o más **pagos** con su boleta escaneada, hasta cubrir `monto_requerido`.
 4. Se **envía a revisión**: en la misma transacción nace el **recibo** numerado, y el pescador se va con ese papel.
-5. Se **aprueba**: nace la fila en **carnet_rubro** y recién ahí la persona queda habilitada.
+5. Se **aprueba**: el cupo y la asociación se consolidan en el **carnet** y recién ahí la persona queda habilitada.
 6. Se **imprime** el carnet (`fecha_generacion`) y se **entrega** (`fecha_entrega`).
 
 ---

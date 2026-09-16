@@ -350,9 +350,14 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     // Suspender o rehabilitar un rubro suelto del carnet. La medida es por
     // actividad y no por documento: a un pescador se le puede cortar el
     // transporte sin quitarle la pesca.
-    Route::post('/habilitaciones/{habilitacion}/alternar', [CarnetController::class, 'alternarHabilitacion'])
-        ->middleware('permiso:habilitaciones.suspender')
-        ->name('habilitaciones.alternar');
+    /*
+     * Suspender o levantar un carnet. Reemplaza a la ruta
+     * `habilitaciones.alternar` del modelo anterior: con un carnet por rubro no
+     * hay habilitaciones que suspender, se suspende el carnet de esa actividad.
+     */
+    Route::post('/carnets/{carnet}/suspender', [CarnetController::class, 'suspender'])
+        ->middleware('permiso:carnets.suspender')
+        ->name('carnets.suspender');
 
     /*
     |--------------------------------------------------------------------------

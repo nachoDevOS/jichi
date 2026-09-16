@@ -39,7 +39,19 @@ class RegistrarPagoRequest extends FormRequest
              * petición puede meter la misma boleta. Ver
              * PagoTramiteService::registrar().
              */
-            'nro_transaccion' => ['required', 'string', 'max:50', 'unique:pagos,nro_transaccion'],
+            /*
+             * SOLO DÍGITOS, y sigue siendo `string` en la base.
+             *
+             * Los bancos numeran los depósitos con enteros, así que una letra o
+             * un guión acá es casi siempre un error de tipeo —y el número es lo
+             * único que permite cruzar el pago contra el extracto bancario—.
+             *
+             * PERO LA COLUMNA NO PASA A NUMÉRICA, y eso es deliberado: un número
+             * de transacción puede empezar con ceros, y guardado como entero los
+             * pierde —«00123» se convierte en «123»— y deja de coincidir con la
+             * boleta. Además puede exceder el rango de un entero.
+             */
+            'nro_transaccion' => ['required', 'string', 'regex:/^[0-9]+$/', 'max:50', 'unique:pagos,nro_transaccion'],
 
             // min:0.01 y no min:0 — un pago de cero no es un pago, es una fila
             // que ensucia el historial y hace creer que se cobró algo.
@@ -71,6 +83,7 @@ class RegistrarPagoRequest extends FormRequest
 
         return [
             'nro_transaccion.required' => 'Escriba el número de transacción del depósito.',
+            'nro_transaccion.regex' => 'El número de transacción son solo dígitos, sin letras, espacios ni guiones.',
             'nro_transaccion.unique' => 'Ese número de transacción ya fue registrado en otro pago.',
             'monto.required' => 'Indique el monto del depósito.',
             'monto.numeric' => 'El monto debe ser un número.',

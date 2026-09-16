@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Panel;
 
 use App\Enums\EstadoRubro;
+use App\Models\Rubro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
@@ -112,7 +113,29 @@ class RegistrarSolicitudRequest extends FormRequest
              * esta regla el número se guardaría truncado o reventaría en la base
              * con un error que el operador no puede entender.
              */
-            'capacidad_kg' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+            /*
+             * ------------------------------------------------------------------
+             *  OBLIGATORIO SOLO SI EL RUBRO SE AUTORIZA POR VOLUMEN
+             * ------------------------------------------------------------------
+             *
+             * No todas las actividades llevan cupo: la pesca se autoriza por
+             * kilos, la comercialización no. Lo dice el catálogo
+             * (`rubros.requiere_capacidad`), no una lista de nombres escrita acá
+             * — ver el comentario de esa columna sobre por qué.
+             *
+             * Y cuando el rubro NO lo lleva, el campo va PROHIBIDO, no
+             * simplemente ignorado. Aceptarlo y descartarlo en silencio dejaría
+             * que un cupo tecleado por error desapareciera sin aviso; peor, si
+             * un día alguien deja de descartarlo, el trámite guardaría un cupo
+             * para una actividad que no tiene tope y nadie lo notaría.
+             *
+             * `prohibited` deja pasar el campo vacío, que es lo que manda el
+             * formulario cuando el operador cambia de rubro: el error solo salta
+             * si llega un valor de verdad.
+             */
+            'capacidad_kg' => $this->rubroRequiereCapacidad()
+                ? ['required', 'numeric', 'min:0.01', 'max:999999.99']
+                : ['nullable', 'prohibited'],
 
             'observaciones' => ['nullable', 'string', 'max:1000'],
 
@@ -129,7 +152,12 @@ class RegistrarSolicitudRequest extends FormRequest
              * cobró algo.
              */
             'pagos' => ['nullable', 'array', 'max:10'],
-            'pagos.*.nro_transaccion' => ['required', 'string', 'max:50', 'distinct', 'unique:pagos,nro_transaccion'],
+            /*
+             * SOLO DÍGITOS. Ver el comentario de RegistrarPagoRequest: los
+             * bancos numeran con enteros, pero la columna sigue siendo texto
+             * porque un número que empieza con ceros los pierde como entero.
+             */
+            'pagos.*.nro_transaccion' => ['required', 'string', 'regex:/^[0-9]+$/', 'max:50', 'distinct', 'unique:pagos,nro_transaccion'],
             'pagos.*.monto' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'pagos.*.comprobante' => ['required', 'file', 'mimes:'.$extensiones, 'max:'.$maxKb],
             'pagos.*.fecha_pago' => ['nullable', 'date', 'before_or_equal:today'],
@@ -162,11 +190,13 @@ class RegistrarSolicitudRequest extends FormRequest
             'asociacion.min' => 'El nombre de la asociación es demasiado corto.',
 
             'capacidad_kg.required' => 'Indique la capacidad autorizada en kilos.',
+            'capacidad_kg.prohibited' => 'Este rubro no se autoriza por volumen: no lleva cupo en kilos.',
             'capacidad_kg.numeric' => 'La capacidad autorizada tiene que ser un número en kilos.',
             'capacidad_kg.min' => 'La capacidad autorizada debe ser mayor a cero.',
             'capacidad_kg.max' => 'La capacidad autorizada es demasiado alta. Revise el número.',
 
             'pagos.*.nro_transaccion.required' => 'Escriba el número de transacción del depósito.',
+            'pagos.*.nro_transaccion.regex' => 'El número de transacción son solo dígitos, sin letras, espacios ni guiones.',
             'pagos.*.nro_transaccion.unique' => 'Ese número de transacción ya fue registrado en otro pago.',
             'pagos.*.nro_transaccion.distinct' => 'Hay dos pagos con el mismo número de transacción.',
             'pagos.*.monto.required' => 'Indique el monto del depósito.',
@@ -220,5 +250,24 @@ class RegistrarSolicitudRequest extends FormRequest
         }
 
         return $pagos;
+    }
+
+    /**
+     * ¿El rubro elegido lleva cupo en kilos?
+     *
+     * Se resuelve contra el catálogo y no contra una lista de nombres: el mismo
+     * rubro figura como «Pescador» o como «Faena» según quién lo cargó, y los
+     * rubros nuevos entran por ordenanza sin pasar por código.
+     *
+     * Devuelve false si el rubro no existe o no se mandó. No es un agujero: la
+     * regla `exists` de `rubro_id` ya va a rebotar el formulario por su cuenta,
+     * y mientras tanto conviene no exigir un cupo para un rubro que no se pudo
+     * leer —el operador vería dos errores y solo uno sería el suyo—.
+     */
+    private function rubroRequiereCapacidad(): bool
+    {
+        $rubro = Rubro::find($this->input('rubro_id'));
+
+        return $rubro?->requiereCapacidad() ?? false;
     }
 }

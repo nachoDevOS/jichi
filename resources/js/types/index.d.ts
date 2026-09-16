@@ -150,15 +150,17 @@ export type EstadoTramite = 'pendiente' | 'en_revision' | 'aprobado' | 'rechazad
  * Espejo de App\Enums\TipoTramite.
  *
  * No lo elige el operador: lo decide el sistema según la persona ya tenga o no
- * carnet de la gestión en curso.
+ * carnet DE ESE RUBRO en la gestión en curso.
  */
-export type TipoTramite = 'emision_inicial' | 'adicion_rubro';
+export type TipoTramite = 'emision_inicial' | 'actualizacion';
 
-/** Espejo de App\Enums\EstadoCarnet. */
-export type EstadoCarnet = 'vigente' | 'vencido' | 'anulado';
-
-/** Espejo de App\Enums\EstadoHabilitacion — el estado de un rubro EN un carnet. */
-export type EstadoHabilitacion = 'habilitado' | 'suspendido';
+/**
+ * Espejo de App\Enums\EstadoCarnet.
+ *
+ * `suspendido` llegó al absorber el enum EstadoHabilitacion, que ya no existe:
+ * con un carnet por rubro, cortar una actividad es suspender su carnet.
+ */
+export type EstadoCarnet = 'vigente' | 'suspendido' | 'vencido' | 'anulado';
 
 /** Espejo de App\Enums\EstadoRubro. */
 export type EstadoRubro = 'activo' | 'inactivo';

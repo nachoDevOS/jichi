@@ -1,4 +1,4 @@
-import type { EstadoCarnet, EstadoHabilitacion, EstadoTramite } from '@/types';
+import type { EstadoCarnet, EstadoTramite } from '@/types';
 
 /**
  * Tipos del módulo Carnets.
@@ -20,7 +20,10 @@ export interface CarnetFila {
     estado_color: string;
     /** Calculado contra la fecha, no leído del estado. */
     vigente: boolean;
-    rubros_count: number;
+    /** La actividad del carnet. Es lo que distingue dos filas del mismo titular. */
+    rubro: string | null;
+    /** El cupo ya escrito como va impreso: «600 KG». Null si no se cargó. */
+    capacidad: string | null;
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
 }
@@ -46,7 +49,36 @@ export interface CarnetFicha {
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
-    admite_adiciones: boolean;
+    /** Si se le puede presentar un trámite de actualización. */
+    admite_tramites: boolean;
+
+    /**
+     * LA ACTIVIDAD DEL CARNET Y SU CUPO.
+     *
+     * Ocupan el lugar que tenía la lista `habilitaciones`: con un carnet por
+     * rubro no hay lista que mostrar, hay UN rubro y UN cupo, y los dos van
+     * impresos en el plástico.
+     */
+    rubro: string | null;
+    rubro_descripcion: string | null;
+    /** En kilos, para mostrar o comparar. `null` es «sin definir», no cero. */
+    capacidad_kg: number | null;
+    /** El mismo dato ya escrito como va impreso: «600 KG». */
+    capacidad: string | null;
+    /**
+     * Si esta actividad se autoriza por volumen.
+     *
+     * La ficha esconde el bloque del cupo cuando es `false`: mostrar «Cupo
+     * autorizado: sin definir» en un carnet de Comercializador no informa nada
+     * y sugiere que falta cargar un dato que no existe.
+     */
+    requiere_capacidad: boolean;
+
+    /** Si el botón de suspender corresponde: solo desde vigente. */
+    puede_suspenderse: boolean;
+    /** Si corresponde el de levantar la suspensión: solo desde suspendido. */
+    puede_rehabilitarse: boolean;
+
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
     /** El número impreso en el carnet: 000013. */
@@ -58,7 +90,8 @@ export interface CarnetFicha {
     /**
      * Si el plástico se puede sacar. Lo decide Carnet::puedeImprimirse() y no
      * esta pantalla: hace falta que el carnet no esté anulado y que tenga al
-     * menos un rubro habilitado, que es algo que nace recién al APROBAR.
+     * menos un trámite APROBADO — el carnet nace con el trámite pendiente, y
+     * hasta que alguien lo firme no autoriza a nada.
      */
     puede_imprimirse: boolean;
 }
@@ -70,31 +103,6 @@ export interface TitularCarnet {
     documento_identidad: string | null;
     foto_url: string | null;
     fechaNacimiento: string | null;
-}
-
-/**
- * Un rubro habilitado en el carnet: la fila de `carnet_rubro`.
- *
- * La fila NO se borra al suspender. Así se conserva el dato de que la actividad
- * estuvo autorizada hasta tal fecha, que es lo que un inspector necesita saber
- * al revisar una infracción del mes pasado.
- */
-export interface Habilitacion {
-    id: number;
-    rubro: string | null;
-    descripcion: string | null;
-    estado: EstadoHabilitacion;
-    estado_etiqueta: string;
-    estado_color: string;
-    fecha_habilitacion: string | null;
-
-    /**
-     * Cupo autorizado para ESTE rubro, en kilos. Copia de la del trámite que lo
-     * habilitó. No sale impreso en el plástico; se consulta desde el panel.
-     *
-     * `null` es «sin definir», distinto de cero.
-     */
-    capacidad_kg: number | null;
 }
 
 /** Un expediente del carnet, en la pestaña de historial. */

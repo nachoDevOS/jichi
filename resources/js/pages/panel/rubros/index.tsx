@@ -80,7 +80,7 @@ export default function IndiceRubros({ rubros }: { rubros: RubroFila[] }) {
                                             <Badge color={r.estado_color}>{r.estado_etiqueta}</Badge>
                                         </td>
                                         <td className="px-5 py-3 text-right tabular-nums text-muted-foreground">
-                                            {r.habilitaciones_count}
+                                            {r.carnets_count}
                                         </td>
                                         <td className="px-5 py-3 text-right tabular-nums text-muted-foreground">
                                             {r.tramites_count}

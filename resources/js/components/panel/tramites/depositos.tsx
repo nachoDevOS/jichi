@@ -244,12 +244,22 @@ export function FormularioDeposito({
                     htmlFor="nro_transaccion"
                     obligatorio
                     error={form.errors.nro_transaccion}
-                    ayuda="El del comprobante del banco"
+                    ayuda="El del comprobante del banco. Solo números."
                 >
+                    {/*
+                        Solo dígitos, y se limpian AL TECLEAR en vez de rebotar
+                        el formulario: el operador está copiando de una boleta de
+                        papel. No es `type="number"` a propósito — ese tipo acepta
+                        `e`, `+`, `-` y coma decimal, y le pone flechitas a un
+                        campo que no es una cantidad. Ver campo-pagos.tsx.
+                    */}
                     <Input
                         id="nro_transaccion"
+                        inputMode="numeric"
                         value={form.data.nro_transaccion}
-                        onChange={(e) => form.setData('nro_transaccion', e.target.value)}
+                        onChange={(e) =>
+                            form.setData('nro_transaccion', e.target.value.replace(/\D/g, ''))
+                        }
                     />
                 </Campo>
 

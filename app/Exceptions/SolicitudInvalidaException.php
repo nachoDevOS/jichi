@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Enums\EstadoCarnet;
 use App\Enums\EstadoTramite;
 use RuntimeException;
 
@@ -27,7 +28,7 @@ use RuntimeException;
  * Los mensajes de esta clase salen tal cual en el toast rojo de la pantalla, así
  * que se escriben en castellano de mostrador y no de programador: «Este rubro ya
  * está habilitado en el carnet de 2026», no «duplicate key value violates unique
- * constraint carnet_rubro_unico».
+ * constraint carnets_beneficiario_rubro_gestion_unique».
  *
  * Los constructores estáticos de abajo existen para eso: que el texto que ve el
  * ciudadano esté escrito en un solo lugar y no repartido por los controladores.
@@ -39,45 +40,57 @@ class SolicitudInvalidaException extends RuntimeException
         return new self("El rubro «{$rubro}» está dado de baja y no se puede solicitar.");
     }
 
-    public static function rubroYaHabilitado(string $rubro, int $gestion): self
-    {
-        return new self("El rubro «{$rubro}» ya está habilitado en el carnet de la gestión {$gestion}.");
-    }
-
-    /**
-     * El rubro está en el carnet, pero SUSPENDIDO.
-     *
-     * Tiene mensaje propio y no reusa el de arriba porque decirle «ya está
-     * habilitado» a quien ve el rubro cortado en pantalla es contradictorio, y
-     * lo manda a buscar el problema donde no está. Lo que corresponde es
-     * levantar la suspensión —una decisión de un supervisor— y no cobrar otro
-     * trámite por una habilitación que ya se pagó.
-     */
-    public static function rubroSuspendido(string $rubro, int $gestion): self
-    {
-        return new self(
-            "El rubro «{$rubro}» está SUSPENDIDO en el carnet de la gestión {$gestion}, no ausente. ".
-            'No se tramita de nuevo: un supervisor tiene que levantar la suspensión desde la ficha del carnet.',
-        );
-    }
-
     public static function solicitudEnCurso(string $rubro): self
     {
         return new self("Ya hay una solicitud pendiente para el rubro «{$rubro}». Resuelva esa antes de presentar otra.");
     }
 
     /*
-     * Los mensajes nombran el carnet por su GESTIÓN y no por su firma.
+     * Los mensajes nombran el carnet por su RUBRO y su GESTIÓN, no por su firma.
      *
      * Desde que se retiró la columna `codigo`, lo único que identifica un carnet
      * es una firma de dieciséis caracteres. Meterla en un mensaje de ventanilla
      * —«el carnet 4K7RJ2MXP9TQ3WHB no está vigente»— no ayuda a nadie: el
      * operador está mirando a una persona concreta, y lo que necesita saber es
-     * de qué AÑO es el carnet que no le sirve.
+     * de qué ACTIVIDAD y de qué AÑO es el carnet que no le sirve. Con un carnet
+     * por rubro, la gestión sola dejó de alcanzar: una persona puede tener tres
+     * carnets de 2026 y solo uno suspendido.
      */
-    public static function carnetNoAdmiteAdiciones(int $gestion): self
+
+    /**
+     * El carnet existe pero no admite que se le presente un trámite.
+     *
+     * ------------------------------------------------------------------------
+     *  EL MENSAJE CAMBIA SEGÚN EL ESTADO, Y NO ES ADORNO
+     * ------------------------------------------------------------------------
+     *
+     * Las tres situaciones se resuelven de forma distinta y el operador tiene
+     * que saber cuál le tocó:
+     *
+     *   - SUSPENDIDO: un supervisor tiene que levantarlo. No se tramita de nuevo,
+     *     porque la autorización ya se pagó. Decirle «no está vigente» a secas lo
+     *     manda a cargar un trámite que va a volver a rebotar.
+     *   - ANULADO: no hay vuelta atrás, y además el carnet SIGUE OCUPANDO su
+     *     lugar en el índice único, así que tampoco se puede emitir otro del
+     *     mismo rubro ese año. Si el mensaje no lo dice, el operador busca la
+     *     forma de emitir uno nuevo y no la encuentra.
+     *   - VENCIDO: lo que corresponde es el carnet de la gestión siguiente.
+     */
+    public static function carnetNoAdmiteTramites(string $rubro, int $gestion, EstadoCarnet $estado): self
     {
-        return new self("El carnet de la gestión {$gestion} no está vigente: no se le pueden agregar rubros.");
+        $detalle = match ($estado) {
+            EstadoCarnet::Suspendido => 'Está SUSPENDIDO: un supervisor tiene que levantar la suspensión '.
+                'desde la ficha del carnet. No corresponde tramitarlo de nuevo.',
+
+            EstadoCarnet::Anulado => 'Está ANULADO, y eso no se revierte. Tampoco se puede emitir otro carnet '.
+                'del mismo rubro para esta gestión: el anulado conserva su lugar.',
+
+            EstadoCarnet::Vencido => 'Está VENCIDO. Lo que corresponde es emitir el carnet de la gestión siguiente.',
+
+            EstadoCarnet::Vigente => 'No está vigente.',
+        };
+
+        return new self("El carnet de «{$rubro}» de la gestión {$gestion} no admite trámites. {$detalle}");
     }
 
     public static function beneficiarioDadoDeBaja(): self

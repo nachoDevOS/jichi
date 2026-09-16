@@ -23,11 +23,10 @@ mitad es lo que estás escribiendo, ya sabés dónde ponerlo.
 ```
 app/
 ├── Enums/                  Los valores fijos del negocio
-│   ├── TipoTramite.php          emision_inicial | adicion_rubro
+│   ├── TipoTramite.php          emision_inicial | actualizacion
 │   ├── EstadoTramite.php        pendiente → en_revision → aprobado | rechazado
 │   │                            (y las transiciones que valen desde cada uno)
 │   ├── EstadoCarnet.php         vigente | vencido | anulado
-│   ├── EstadoHabilitacion.php   habilitado | suspendido  (un rubro EN un carnet)
 │   ├── EstadoRubro.php          activo | inactivo
 │   ├── FormaPago.php            deposito | efectivo  (casillas del recibo)
 │   ├── ConceptoRecibo.php       las 6 casillas de DESCRIPCIÓN del recibo

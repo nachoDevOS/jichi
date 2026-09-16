@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
 | Un trámite es «esta persona pide que se le habilite este rubro». Nace
 | PENDIENTE con los papeles adjuntos y termina APROBADO o RECHAZADO.
 |
-|     PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO   (nace la fila en carnet_rubro)
+|     PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO   (el carnet queda habilitado)
 |         │              │
 |         └──────────────┴────────▶ RECHAZADO  (con motivo escrito, obligatorio)
 |
@@ -37,18 +37,34 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('carnet_id')->constrained('carnets')->restrictOnDelete();
+
+            /*
+             * EL RUBRO DEL EXPEDIENTE — el mismo que el del carnet, a propósito.
+             *
+             * Desde que el carnet es de un solo rubro, este dato se podría
+             * deducir con un salto (`$tramite->carnet->rubro_id`). Se conserva
+             * por dos motivos: los listados y los reportes filtran y agrupan
+             * trámites por rubro sin necesitar el join, y el expediente queda
+             * legible por sí solo — que es la misma razón por la que copia el
+             * costo y la asociación.
+             *
+             * LA CONTRAPARTIDA: son dos columnas que tienen que decir lo mismo,
+             * y la base no lo impide. Quien las mantiene de acuerdo es
+             * SolicitudCarnetService, que es el único que escribe las dos.
+             */
             $table->foreignId('rubro_id')->constrained('rubros')->restrictOnDelete();
 
             /*
-             * 'emision_inicial' | 'adicion_rubro'. Ver App\Enums\TipoTramite.
+             * 'emision_inicial' | 'actualizacion'. Ver App\Enums\TipoTramite.
              *
              * NO LO ELIGE EL OPERADOR. Lo decide el sistema mirando si la
-             * persona ya tenía carnet de la gestión en curso. Dejarlo a elección
-             * de ventanilla sería pedirle al operador que adivine algo que la
-             * base de datos ya sabe, y equivocarse ahí significa cobrar de menos
-             * o emitir un carnet duplicado. Ver SolicitudCarnetService::registrar().
+             * persona ya tenía carnet DE ESE RUBRO en la gestión en curso.
+             * Dejarlo a elección de ventanilla sería pedirle al operador que
+             * adivine algo que la base de datos ya sabe, y equivocarse ahí
+             * significa cobrar de menos o intentar emitir un carnet duplicado.
+             * Ver SolicitudCarnetService::registrar().
              */
-            $table->string('tipo_tramite', 50)->comment('emision_inicial | adicion_rubro');
+            $table->string('tipo_tramite', 50)->comment('emision_inicial | actualizacion');
 
             // Ver App\Enums\EstadoTramite.
             $table->string('estado', 30)->default('pendiente')
@@ -94,19 +110,18 @@ return new class extends Migration
              * CUPO AUTORIZADO EN KILOS — declarado en ESTE trámite.
              *
              * Es cuánto puede capturar o trasladar la persona en la actividad
-             * que está pidiendo. El carnet de papel lo traía impreso —«600 KG»
-             * bajo el domicilio—; el nuevo NO lo imprime, a pedido de la
-             * unidad. Se guarda igual porque es dato de control: sin él no se
-             * puede contrastar una guía de transporte contra lo autorizado, ni
-             * sacar el cupo total comprometido en una gestión.
+             * que está pidiendo. Se copia a `carnets.capacidad_kg` al aprobar,
+             * y desde ahí SÍ se imprime en el plástico: con un carnet por rubro
+             * hay un único cupo por documento y no cambia, así que la tarjeta lo
+             * puede mostrar sin quedar vieja.
              *
              * Va acá y no en `rubros` porque no es una propiedad de la
              * actividad sino de la autorización concreta: dos pescadores del
              * mismo rubro pueden tener cupos distintos según lo que resuelva la
-             * unidad. Y va en el TRÁMITE —no directo en la habilitación— por el
-             * mismo motivo que `asociacion`: es lo que se declaró el día que se
-             * presentó el papel, y tiene que quedar en el expediente aunque la
-             * habilitación se suspenda o el cupo se corrija después.
+             * unidad. Y va en el TRÁMITE además de en el carnet por el mismo
+             * motivo que `asociacion`: es lo que se declaró el día que se
+             * presentó el papel, y tiene que quedar en el expediente aunque el
+             * carnet se suspenda o el cupo se corrija después.
              *
              * EL FORMULARIO LO EXIGE, PERO LA COLUMNA ES NULLABLE. No es una
              * contradicción: es la misma decisión que con `asociacion` y los
@@ -120,7 +135,7 @@ return new class extends Migration
              * migrar la columna el día que aparezca el primero.
              */
             $table->decimal('capacidad_kg', 10, 2)->nullable()
-                ->comment('Cupo autorizado en kilos. No se imprime en el carnet');
+                ->comment('Cupo SOLICITADO en kilos. Pasa a carnets.capacidad_kg al aprobar');
 
             /*
              * CUÁNTO HAY QUE PAGAR — copia congelada de `rubros.costo`.
@@ -170,16 +185,18 @@ return new class extends Migration
             /*
              * NO HAY UNIQUE (carnet_id, rubro_id) ACÁ, y no es un olvido.
              *
-             * Un rubro rechazado se puede volver a pedir con los papeles
-             * corregidos, así que la misma combinación aparece más de una vez a
-             * lo largo del tiempo. Lo que no puede repetirse es el rubro ya
-             * APROBADO, y eso lo impide el unique de `carnet_rubro`.
+             * Un trámite rechazado se puede volver a presentar con los papeles
+             * corregidos, y un carnet puede recibir varias actualizaciones a lo
+             * largo del año, así que la misma combinación aparece más de una vez
+             * a lo largo del tiempo. Lo que no puede repetirse es el CARNET, y
+             * eso lo impide el unique (beneficiario, rubro, gestión) de
+             * `carnets`.
              *
-             * Lo que sí se impide —un segundo trámite PENDIENTE para el mismo
-             * rubro— se comprueba en el servicio: expresarlo como índice exigiría
-             * uno parcial sobre estado = 'pendiente', y el mensaje de error que
-             * necesita ventanilla («ya hay una solicitud en curso para este
-             * rubro») no lo puede dar la base.
+             * Lo que sí se impide —un segundo trámite ABIERTO sobre el mismo
+             * carnet— se comprueba en el servicio: expresarlo como índice
+             * exigiría uno parcial sobre los estados abiertos, y el mensaje de
+             * error que necesita ventanilla («ya hay una solicitud en curso para
+             * este rubro») no lo puede dar la base.
              */
         });
     }

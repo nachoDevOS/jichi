@@ -62,6 +62,8 @@ export default function EditarTramite({
         observaciones: string | null;
         asociacion: string | null;
         capacidad_kg: number | null;
+        /** Si la actividad de este expediente se autoriza por volumen. */
+        requiere_capacidad: boolean;
         ci_file_url: string | null;
         cert_asociacion_file_url: string | null;
         monto_requerido: number;
@@ -167,21 +169,29 @@ export default function EditarTramite({
                                 />
                             </Campo>
 
-                            <Campo
-                                etiqueta="Capacidad autorizada (Kg)"
-                                htmlFor="capacidad_kg"
-                                error={form.errors.capacidad_kg}
-                                ayuda="Uso interno: no se imprime en el carnet."
-                            >
-                                <Input
-                                    id="capacidad_kg"
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    value={form.data.capacidad_kg}
-                                    onChange={(e) => form.setData('capacidad_kg', e.target.value)}
-                                />
-                            </Campo>
+                            {/*
+                                Solo si la actividad se autoriza por volumen. El
+                                rubro NO se puede cambiar al editar, así que acá
+                                alcanza con mirar el del expediente. Ver
+                                CarnetImpresionController::renglonRubro().
+                            */}
+                            {tramite.requiere_capacidad && (
+                                <Campo
+                                    etiqueta="Capacidad autorizada (Kg)"
+                                    htmlFor="capacidad_kg"
+                                    error={form.errors.capacidad_kg}
+                                    ayuda="Se imprime en el carnet, junto al rubro."
+                                >
+                                    <Input
+                                        id="capacidad_kg"
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        value={form.data.capacidad_kg}
+                                        onChange={(e) => form.setData('capacidad_kg', e.target.value)}
+                                    />
+                                </Campo>
+                            )}
                         </CardContent>
                     </Card>
 

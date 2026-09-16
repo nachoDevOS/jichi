@@ -22,44 +22,71 @@ PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
 
 ## 1. El dominio en una página
 
-Una persona —el **beneficiario**— saca un **carnet**, que es anual. Sobre ese
-carnet se habilitan **rubros** (las actividades que puede hacer). Para habilitar
-un rubro hay que presentar un **trámite**, que se cubre con uno o varios
-**pagos**. Cuando el trámite se aprueba nace la fila en `carnet_rubro`, y recién
-ahí la persona queda habilitada.
+Una persona —el **beneficiario**— saca un **carnet** por cada **rubro** (cada
+actividad que ejerce), y cada carnet es anual. Para obtenerlo presenta un
+**trámite**, que se cubre con uno o varios **pagos**. Cuando el trámite se
+aprueba, el carnet queda habilitado y recién ahí la persona puede trabajar en esa
+actividad.
+
+Quien pesca y además comercializa tiene **dos carnets** en la misma gestión, con
+dos plásticos, dos firmas de validación y dos cupos autorizados.
 
 ```
 beneficiario ──< carnet ──< tramite ──< pago
                    │           │
-                   │           └── rubro
+                   │           └── rubro   (el mismo del carnet)
                    │           └── recibo  (1 a 1)
-                   └──< carnet_rubro >── rubro
+                   └── rubro               (la actividad que habilita)
 ```
 
 ### La regla que ordena todo
 
-> **Una persona tiene como máximo UN carnet por gestión.**
+> **Una persona tiene como máximo UN carnet por RUBRO y por gestión.**
 
-Está escrita como índice único en la base —`carnets_beneficiario_gestion_unique`—
-y de ella salen los dos únicos tipos de trámite:
+Está escrita como índice único en la base
+—`carnets_beneficiario_rubro_gestion_unique`— y de ella salen los dos únicos
+tipos de trámite:
 
 | Situación | Tipo | Qué hace |
 | --- | --- | --- |
-| No tiene carnet de este año | `emision_inicial` | Crea el carnet y le cuelga el trámite |
-| Ya tiene carnet de este año | `adicion_rubro` | Reutiliza el carnet que existe |
+| No tiene carnet **de ese rubro** este año | `emision_inicial` | Crea el carnet y le cuelga el trámite |
+| Ya lo tiene | `actualizacion` | Reutiliza ese carnet; al aprobar consolida cupo y asociación |
 
 **El tipo lo decide el sistema, no el operador.** Hay un solo formulario de alta;
-`SolicitudCarnetService::registrar()` mira si la persona ya tiene carnet y
-resuelve. Dejarlo a elección de ventanilla sería pedirle al operador que adivine
-algo que la base ya sabe, y equivocarse ahí significa cobrar de menos o emitir un
-carnet duplicado.
+`SolicitudCarnetService::registrar()` mira si la persona ya tiene carnet de ese
+rubro y resuelve. Dejarlo a elección de ventanilla sería pedirle al operador que
+adivine algo que la base ya sabe, y equivocarse ahí significa cobrar de menos o
+intentar emitir un carnet duplicado.
+
+#### Lo que este modelo reemplazó
+
+Antes el carnet era **uno por persona y gestión**, y los rubros se le colgaban en
+una tabla intermedia `carnet_rubro`: sumar una actividad hacía crecer ese carnet
+y se llamaba «adición de rubro».
+
+Esa tabla y el enum `EstadoHabilitacion` **ya no existen**. El carnet ES la
+habilitación: la fila del pivote decía «este carnet habilita esta actividad,
+desde esta fecha, con este cupo, en este estado», y hoy eso es exactamente lo que
+dice la fila del carnet. Mantener las dos era guardar el mismo dato dos veces con
+la posibilidad de que discreparan.
+
+Consecuencias que conviene tener presentes:
+
+- **«Adición de rubro» ya no describe nada.** Pedir una actividad más no agranda
+  ningún carnet: emite otro, y eso es una emisión inicial.
+- **Suspender es por carnet.** `EstadoCarnet` absorbió `suspendido`. A un
+  pescador se le puede cortar el transporte sin quitarle la pesca porque son dos
+  carnets distintos.
+- **El plástico ahora imprime el rubro y el cupo.** Antes no podía —una adición
+  dejaba vieja la lista— y ahora hace falta: sin el rubro, dos carnets de la
+  misma persona son tarjetas idénticas.
 
 ### El circuito del expediente
 
 ```
 PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
 (borrador)                   │                         │
-                             │                         └── nace carnet_rubro  ← la habilitación
+                             │                         └── el carnet queda habilitado
                              ├── nace el RECIBO OFICIAL            ← el papel del pescador
                              └──[rechazar]──▶ RECHAZADO (con motivo escrito, obligatorio)
 ```
@@ -148,7 +175,7 @@ real. El sistema lo cubre tres veces:
 | --- | --- | --- |
 | 1. Bloqueo | `lockForUpdate()` sobre la fila | `SolicitudCarnetService::bloquear()` |
 | 2. Recomprobación | La guarda de transición corre **otra vez** ya dentro de la transacción | `verificarTransicion()` |
-| 3. Índice único | La base rechaza el duplicado pase lo que pase | `carnet_rubro_unico`, `pagos.nro_transaccion` |
+| 3. Índice único | La base rechaza el duplicado pase lo que pase | `carnets_beneficiario_rubro_gestion_unique`, `pagos.nro_transaccion` |
 
 La capa 3 es la única que garantiza de verdad; las capas 1 y 2 existen para que
 el operador vea un mensaje entendible en vez de «duplicate key value violates
@@ -209,8 +236,28 @@ motivo: **algo ya salió del mostrador y no puede cambiar retroactivamente.**
 | Dónde | Qué congela | Si no lo hiciera |
 | --- | --- | --- |
 | `tramites.monto_requerido` | La tarifa del rubro al presentar | Subir la tarifa en marzo dejaría impagos de golpe los expedientes de febrero |
-| `carnet_rubro.capacidad_kg` | El cupo autorizado | Habría que remontar cuál trámite habilitó el rubro |
-| `recibos.*` | El documento **entero** | Corregir un apellido cambiaría un papel que ya está en el bolsillo de alguien |
+| `carnets.capacidad_kg` y `carnets.asociacion` | El cupo y la asociación **autorizados** | Habría que remontar cuál trámite los autorizó — que puede no ser el último, si hubo correcciones |
+
+> **`tramites.capacidad_kg` NO es una copia redundante de `carnets.capacidad_kg`.**
+> Es la pregunta que más vuelve al mirar el esquema, porque las dos columnas se
+> llaman igual y guardan kilos:
+>
+> | Columna | Qué guarda | Quién la escribe |
+> | --- | --- | --- |
+> | `tramites.capacidad_kg` | Lo **pedido** en ese expediente | El formulario, al registrar |
+> | `carnets.capacidad_kg` | Lo **autorizado**, lo que rige HOY | `consolidarCarnet()`, solo al aprobar |
+>
+> Entre el registro y la aprobación valen cosas distintas, y ahí está el motivo.
+> Alguien con 600 kg autorizados presenta un trámite para subir a 850: hasta que
+> se cobre y se firme sigue rigiendo 600. Con una sola columna ese 850 pisaría al
+> 600 —autorizando más kilos sin haber pagado— y si el trámite después se
+> rechaza, el 600 ya no existiría en ningún lado para volver atrás.
+>
+> **El carnet nace con las dos columnas en NULL.** Es la misma línea que traza
+> `Carnet::puedeImprimirse()`: el carnet existe desde PENDIENTE, pero no
+> habilita, no autoriza un cupo y no se imprime hasta que hay un trámite
+> aprobado. Lo mismo vale para `asociacion`.
+
 
 ### 2.7 Panel y público no se mezclan
 
@@ -238,12 +285,12 @@ aunque fuera en rojo, arriesga que el inspector lea la fila y no el color—.
 | Tabla | Qué guarda | Particularidades |
 | --- | --- | --- |
 | `beneficiarios` | La persona | Borrado lógico. Columnas en **camelCase** desde `primerNombre`. Índice único **parcial** |
-| `carnets` | El documento anual | Sin columna `codigo`. Se identifica por `firma_validacion` |
-| `rubros` | Catálogo de actividades | No se borra nunca, se pasa a `inactivo` |
-| `carnet_rubro` | La habilitación | Pivote **con modelo propio** (`CarnetRubro`) |
+| `carnets` | El documento anual **de una actividad** | Sin columna `codigo`. Se identifica por `firma_validacion`. Único por `(beneficiario, rubro, gestion)` |
+| `rubros` | Catálogo de actividades | No se borra nunca, se pasa a `inactivo`. `requiere_capacidad` dice si la actividad se autoriza por volumen |
+| ~~`carnet_rubro`~~ | — | **Eliminada.** El carnet ES la habilitación |
 | `tramites` | El expediente | Cuelga del **carnet**, no del beneficiario |
 | `pagos` | Cada depósito | `nro_transaccion` único **global** |
-| `recibos` | El comprobante entregado | Copia congelada. Sobrevive al borrado del trámite |
+| ~~`recibos`~~ | — | **Eliminada.** El comprobante se arma al vuelo desde las otras tablas |
 
 ### Tablas de infraestructura
 
@@ -287,7 +334,9 @@ viaja **únicamente dentro del QR**. Ese reparto es lo que hace que las dos cosa
 funcionen. La contrapartida: si el QR queda ilegible no hay forma de verificar
 desde la calle, hay que pasar por la oficina.
 
-**Una firma por carnet, no por rubro.** Una adición no la cambia, o el QR ya
+**Una firma por carnet, o sea una por rubro.** Con el modelo viejo había que
+aclarar que una adición no la cambiaba; hoy cada rubro es un carnet distinto y
+cada uno nace con la suya. Lo que no cambia nunca es la firma DE UN carnet, o el QR ya
 impreso dejaría de funcionar.
 
 ### Índices únicos y el borrado lógico
@@ -302,8 +351,9 @@ CREATE UNIQUE INDEX beneficiarios_ci_unico
     WHERE deleted_at IS NULL
 ```
 
-> En `recibos.tramite_id` ocurre lo **inverso**: ahí el `NULL != NULL` es
-> justamente lo que se quiere. Muchos recibos pueden quedar huérfanos; lo que no
+> Esto valía también para `recibos.tramite_id`, cuando esa tabla existía: ahí el
+> `NULL != NULL` era justamente lo que se quería. Muchos recibos podían quedar
+> huérfanos; lo que no
 > puede es que dos apunten al mismo trámite.
 
 ---
@@ -388,7 +438,8 @@ que correr igual en los dos.
 - **SQL específico de motor** va en `app/Support/Sql.php` (`like()` resuelve
   `ILIKE` vs `LIKE`, `periodoMes()` resuelve el truncado de fecha).
 - **Scopes con `qualifyColumn()`**, siempre: `tramites`, `carnets`, `rubros` y
-  `carnet_rubro` tienen **todas** una columna `estado`, y los reportes las cruzan
+  tienen **todas** una columna `estado` —y `carnets` y `tramites` comparten
+  además `rubro_id`—, y los reportes las cruzan
   con `join`. Sin calificar, PostgreSQL responde `column reference "estado" is
   ambiguous` y la consulta ni corre.
 - **camelCase obliga a entrecomillar** en SQL escrito a mano:
@@ -487,7 +538,8 @@ Las que ya costaron un error real. La lista completa con más contexto está en
   snake_case, no lo encuentra, cae al accesor viejo y revienta. Acceder directo
   (`$beneficiario->nombreCompleto`) sí funciona.
 - **`attach()` no dispara eventos de Eloquent**, así que `Auditable` no registra
-  nada. Por eso las habilitaciones se crean con `CarnetRubro::create()`.
+  nada. Ya no aplica a las habilitaciones —el pivote se eliminó— pero sigue
+  valiendo para cualquier relación muchos-a-muchos que se agregue.
 - **Un DELETE en cascada tampoco dispara eventos.** Por eso los pagos se borran
   uno por uno con Eloquent: son dinero declarado y no pueden desaparecer sin
   rastro.

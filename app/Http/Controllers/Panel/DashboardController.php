@@ -175,21 +175,30 @@ class DashboardController extends Controller
     }
 
     /**
-     * Cuántos carnets de la gestión habilitan cada rubro.
+     * Cuántos carnets vigentes hay de cada actividad en la gestión.
      *
      * @return array<int, array<string, mixed>>
      */
     private function carnetsPorRubro(int $gestion): array
     {
-        $conteo = DB::table('carnet_rubro')
-            ->join('carnets', 'carnets.id', '=', 'carnet_rubro.carnet_id')
-            ->where('carnets.gestion', $gestion)
-            // La columna se califica con el nombre de la tabla porque `carnets`
-            // y `carnet_rubro` tienen las dos una columna `estado`: sin eso,
-            // PostgreSQL responde «column reference "estado" is ambiguous».
-            ->where('carnet_rubro.estado', 'habilitado')
-            ->groupBy('carnet_rubro.rubro_id')
-            ->select('carnet_rubro.rubro_id', DB::raw('COUNT(*) as cantidad'))
+        /*
+         * LA CONSULTA SE SIMPLIFICÓ AL DESAPARECER EL PIVOTE.
+         *
+         * Antes había que cruzar `carnet_rubro` con `carnets` para saber a qué
+         * gestión pertenecía cada habilitación. Hoy el rubro está en la propia
+         * fila del carnet, así que es un group by sobre una sola tabla.
+         *
+         * Se cuentan solo los VIGENTES —y no todos los emitidos— porque la
+         * pregunta del tablero es «cuánta gente está habilitada hoy en cada
+         * actividad», y un carnet suspendido o anulado no habilita a nadie. Es
+         * lo mismo que hacía el filtro `estado = habilitado` de la versión
+         * anterior, expresado sobre el estado del carnet.
+         */
+        $conteo = Carnet::query()
+            ->deGestion($gestion)
+            ->vigentes()
+            ->groupBy('rubro_id')
+            ->select('rubro_id', DB::raw('COUNT(*) as cantidad'))
             ->pluck('cantidad', 'rubro_id');
 
         // Se recorre el catálogo entero y no solo lo que devolvió la consulta:

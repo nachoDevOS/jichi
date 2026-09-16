@@ -3,109 +3,105 @@
 namespace App\Services;
 
 use App\Enums\ConceptoRecibo;
+use App\Enums\EstadoTramite;
 use App\Enums\FormaPago;
 use App\Models\Configuracion;
-use App\Models\Recibo;
 use App\Models\Tramite;
-use Illuminate\Support\Facades\DB;
+use App\Support\ReciboArmado;
 
 /**
  * ============================================================================
- *  EL RECIBO OFICIAL DEL SEDAG
+ *  ARMA EL RECIBO OFICIAL — el talonario verde del SEDAG
  * ============================================================================
  *
- * Reemplaza al talonario verde de tres copias —Original: Cliente, Copia
- * Amarilla: Contabilidad, Copia Verde: Archivo—.
- *
  * ----------------------------------------------------------------------------
- *  CUÁNDO NACE
+ *  ESTE SERVICIO YA NO GUARDA NADA
  * ----------------------------------------------------------------------------
  *
- * Al pasar el expediente a EN REVISIÓN, y no antes ni después. Ese es el
- * momento en que, en el mostrador, el pescador ya entregó los papeles y la
- * plata: se va con su recibo en la mano mientras la unidad revisa.
+ * Antes emitía: escribía una fila en `recibos` con una copia congelada del
+ * comprobante y un número correlativo propio. Esa tabla se retiró a pedido del
+ * responsable —toda su información ya vive en `beneficiarios`, `carnets`,
+ * `rubros`, `tramites` y `pagos`— así que hoy este servicio RECONSTRUYE el
+ * recibo cada vez que alguien lo pide.
  *
- * Lo dispara SolicitudCarnetService::enviarARevision(), dentro de su misma
- * transacción. Si la toma para revisión se deshace, el recibo tampoco queda — y
- * el número vuelve al contador, porque CorrelativoService participa de esa
- * transacción.
- *
- * ----------------------------------------------------------------------------
- *  SE EMITE UNA SOLA VEZ
- * ----------------------------------------------------------------------------
- *
- * `emitir()` es idempotente: si el trámite ya tiene recibo, devuelve el que
- * tiene y no consume otro número. Hace falta porque el papel ya se entregó —una
- * reimpresión tiene que salir con el MISMO 0016, o el pescador tendría dos
- * recibos distintos por el mismo pago y Contabilidad no podría cuadrarlos—.
+ * Lo que eso cambia, en una línea: el recibo dejó de ser un documento guardado
+ * y pasó a ser una VISTA de los datos actuales. Las consecuencias están
+ * anotadas en App\Support\ReciboArmado, y conviene leerlas antes de tocar acá.
  *
  * ----------------------------------------------------------------------------
- *  EL PDF NO SE GUARDA EN DISCO
+ *  CUÁNDO EXISTE UN RECIBO
  * ----------------------------------------------------------------------------
  *
- * Se arma al vuelo cada vez que alguien lo imprime, a partir de esta tabla. Un
- * archivo guardado no agregaría nada —los datos ya están congelados en la fila,
- * ver la migración— y sí traería el problema de siempre: un adjunto más que
- * limpiar cuando el expediente se borra, y que en s3 no se puede borrar.
+ * Cuando el expediente pasó por EN REVISIÓN, y no antes. Ese es el momento en
+ * que el pescador entregó los papeles y la plata y se fue con su comprobante.
+ * Lo marca `tramites.fecha_revision`, que es además la fecha que va impresa:
+ * el dato ya estaba guardado, así que no se perdió nada al sacar la tabla.
+ *
+ * Un expediente PENDIENTE no tiene recibo porque todavía no se presentó nada.
  */
 class ReciboTramiteService
 {
-    /**
-     * La serie del contador. Los recibos llevan la suya, aparte de cualquier
-     * otra numeración del sistema, porque es un talonario propio.
-     */
-    public const SERIE = 'RECIBO';
-
-    public function __construct(private readonly CorrelativoService $correlativos) {}
-
-    /**
-     * Emite el recibo del trámite, o devuelve el que ya tenía.
+    /*
+     * NO HAY CorrelativoService ACÁ, Y ANTES SÍ.
      *
-     * Se llama desde dentro de la transacción de enviarARevision(). No abre
-     * una propia a propósito: si abriera la suya, el recibo sobreviviría a un
-     * rollback de la operación que lo originó y quedaría un número entregado
-     * por un trámite que nunca pasó a revisión.
+     * Le pedía el número de la serie 'RECIBO' por gestión. Un correlativo es
+     * justamente lo que NO se puede derivar —hay que guardarlo en algún lado—
+     * así que al sacar la tabla se fue con ella: hoy el número impreso es el id
+     * del trámite. Ver ReciboArmado::numeroImpreso(), que explica qué se pierde.
+     *
+     * CorrelativoService queda escrito y sin usar, como ya le pasó una vez.
      */
-    public function emitir(Tramite $tramite, ?string $fechaEmision = null): Recibo
-    {
-        $existente = Recibo::query()->where('tramite_id', $tramite->getKey())->first();
 
-        if ($existente !== null) {
-            return $existente;
+    /**
+     * ¿A este expediente le corresponde un recibo?
+     *
+     * Se mira `fecha_revision` y no el estado, porque el estado sigue avanzando
+     * —aprobado, rechazado— y el recibo ya se entregó igual. Un trámite
+     * rechazado conserva su comprobante: la plata entró.
+     */
+    public function corresponde(Tramite $tramite): bool
+    {
+        return $tramite->fecha_revision !== null
+            || $tramite->estado !== EstadoTramite::Pendiente;
+    }
+
+    /**
+     * ========================================================================
+     *  ARMA EL RECIBO DE ESTE EXPEDIENTE, O NULL SI NO LE TOCA
+     * ========================================================================
+     *
+     * Devuelve null cuando el trámite todavía está PENDIENTE: no hay papel que
+     * imprimir porque nadie presentó nada. Quien llama decide qué hacer con eso
+     * —el controlador devuelve un aviso, la ficha muestra «todavía no»—.
+     *
+     * Carga las relaciones que necesita con `loadMissing`: si quien llamó ya las
+     * trajo con `with()`, no se vuelve a consultar.
+     */
+    public function armar(Tramite $tramite): ?ReciboArmado
+    {
+        if (! $this->corresponde($tramite)) {
+            return null;
         }
 
-        $gestion = $tramite->carnet?->gestion ?? (int) now()->format('Y');
+        $tramite->loadMissing(['carnet.beneficiario', 'rubro', 'pagos']);
+
         $beneficiario = $tramite->carnet?->beneficiario;
         [$formaPago, $nroDeposito] = $this->resolverPago($tramite);
 
-        return Recibo::create([
-            'tramite_id' => $tramite->getKey(),
+        return new ReciboArmado(
+            // El id del expediente hace de número. Ver numeroImpreso().
+            numero: (int) $tramite->getKey(),
+            gestion: $tramite->carnet?->gestion ?? (int) now()->format('Y'),
 
-            // El contador bloquea su fila hasta que la transacción de afuera
-            // haga commit, así dos ventanillas no pueden sacar el mismo número.
-            'numero' => $this->correlativos->siguienteNumero(self::SERIE, $gestion),
-            'gestion' => $gestion,
+            beneficiario_nombre: (string) $beneficiario?->nombreCompleto,
+            beneficiario_ci: $beneficiario?->documento_identidad,
 
-            /*
-             * DESDE ACÁ, TODO ES COPIA CONGELADA.
-             *
-             * Se escribe lo que el papel va a decir HOY. Corregir después el
-             * apellido del beneficiario o la tarifa del rubro no reescribe este
-             * recibo: el original ya está en manos de alguien. Ver la migración.
-             */
-            'beneficiario_nombre' => (string) $beneficiario?->nombreCompleto,
-            'beneficiario_ci' => $beneficiario?->documento_identidad,
-
-            'concepto' => $this->concepto($tramite),
-
-            // Los renglones del cuadro «IMPORTE A PAGAR Bs.»: uno por depósito.
-            // Ver detalle() y la migración que agregó la columna.
-            'detalle' => $this->detalle($tramite),
+            concepto: $this->concepto($tramite),
 
             // La casilla dice QUÉ SE COBRÓ: siempre «Cédulas», porque lo que
             // este sistema emite es el carnet. El rubro habilitado se lee en el
             // renglón «Concepto». Ver App\Enums\ConceptoRecibo.
-            'descripcion' => ConceptoRecibo::desdeTramite($tramite),
+            descripcion: ConceptoRecibo::desdeTramite($tramite),
 
             /*
              * EL MONTO ES LO COBRADO, NO LO QUE COSTABA.
@@ -118,121 +114,31 @@ class ReciboTramiteService
              * el caso de la plata puesta en el mostrador, que llega a revisión
              * sin boleta y que este mismo recibo respalda.
              */
-            'monto' => $tramite->montoPagado() > 0
+            monto: $tramite->montoPagado() > 0
                 ? $tramite->montoPagado()
                 : (float) $tramite->monto_requerido,
 
-            'forma_pago' => $formaPago,
-            'nro_deposito' => $nroDeposito,
+            forma_pago: $formaPago,
+            nro_deposito: $nroDeposito,
 
-            'lugar' => $this->lugar(),
+            lugar: $this->lugar(),
 
             /*
-             * LA FECHA DEL RECIBO ES LA DEL DÍA QUE SE COBRÓ, NO LA DE HOY.
+             * LA FECHA DEL PAPEL ES LA DE REVISIÓN, no la de hoy.
              *
-             * En el camino normal son la misma cosa: el recibo nace en el
-             * momento en que el expediente pasa a revisión.
+             * Es el dato que salvó la eliminación de la tabla: `fecha_revision`
+             * ya guardaba el momento exacto en que se entregó el comprobante, así
+             * que una reimpresión de marzo sigue diciendo marzo.
              *
-             * Se distinguen al emitir uno atrasado —un trámite que ya estaba en
-             * revisión desde antes de que este módulo existiera—. Ahí se pasa su
-             * `fecha_revision`, que es cuando el pescador entregó la plata de
-             * verdad. Ponerle la fecha de hoy haría que el papel declarara un
-             * cobro que no ocurrió ese día, y Contabilidad lo cuadraría contra
-             * el mes equivocado.
+             * Se cae a `fecha_solicitud` para los expedientes que cruzaron ese
+             * paso antes de que existiera la columna.
              */
-            'fecha_emision' => $fechaEmision ?? now()->toDateString(),
-        ]);
+            fecha_emision: $tramite->fecha_revision ?? $tramite->fecha_solicitud,
+
+            detalle: $this->detalle($tramite),
+        );
     }
 
-    /**
-     * ========================================================================
-     *  EMITE EL RECIBO DE UN EXPEDIENTE QUE YA ESTABA EN REVISIÓN
-     * ========================================================================
-     *
-     * Devuelve el recibo del trámite, y si todavía no tiene uno pero YA LE
-     * CORRESPONDE, lo emite en el momento.
-     *
-     * ------------------------------------------------------------------------
-     *  PARA QUÉ HACE FALTA
-     * ------------------------------------------------------------------------
-     *
-     * El recibo nace solo al pasar a EN REVISIÓN, pero los expedientes que
-     * cruzaron ese paso ANTES de que existiera este módulo se quedaron sin
-     * ninguno. Son expedientes reales, con su plata cobrada y su gente
-     * esperando el comprobante: no pueden quedar sin poder imprimirlo.
-     *
-     * Lo mismo vale para cualquier trámite que haya llegado a revisión por un
-     * camino que no pase por `enviarARevision()` —una migración del padrón en
-     * papel, por ejemplo—.
-     *
-     * ------------------------------------------------------------------------
-     *  SE FECHA CUANDO SE COBRÓ, NO CUANDO SE IMPRIME
-     * ------------------------------------------------------------------------
-     *
-     * Con `fecha_revision`, que es el día en que el pescador entregó los papeles
-     * y la plata. Ver el comentario de `emitir()`.
-     *
-     * El número, en cambio, es el que toque HOY en la serie: los correlativos se
-     * entregan en orden de emisión y no se pueden intercalar hacia atrás sin
-     * pisar uno ya entregado.
-     */
-    public function emitirAtrasado(Tramite $tramite): ?Recibo
-    {
-        $existente = $this->para($tramite);
-
-        if ($existente !== null) {
-            return $existente;
-        }
-
-        if (! $this->corresponde($tramite)) {
-            return null;
-        }
-
-        return DB::transaction(function () use ($tramite): Recibo {
-            $tramite->loadMissing(['carnet.beneficiario', 'rubro']);
-
-            return $this->emitir($tramite, $tramite->fecha_revision?->toDateString());
-        });
-    }
-
-    /**
-     * ¿A este expediente le corresponde un recibo?
-     *
-     * Sí desde que ventanilla lo ENVIÓ a revisión: ese es el momento en que la
-     * plata entró y el pescador se va del mostrador. Antes no —un expediente
-     * PENDIENTE todavía se está armando y no hay nada que respaldar—.
-     *
-     * Se mira `fecha_revision` y no el estado, a propósito: un trámite ya
-     * APROBADO o RECHAZADO pasó por revisión en su momento y su recibo sigue
-     * correspondiendo. El estado de hoy no borra que se cobró.
-     */
-    public function corresponde(Tramite $tramite): bool
-    {
-        return $tramite->fecha_revision !== null;
-    }
-
-    /**
-     * El recibo de un trámite, si lo tiene.
-     *
-     * Lo usa la ficha para decidir si dibuja el botón de imprimir, y el
-     * controlador antes de armar el PDF.
-     */
-    public function para(Tramite $tramite): ?Recibo
-    {
-        return Recibo::query()->where('tramite_id', $tramite->getKey())->first();
-    }
-
-    // ------------------------------------------------------------------
-    //  Auxiliares
-    // ------------------------------------------------------------------
-
-    /**
-     * Qué se está cobrando, en el renglón «Concepto:».
-     *
-     * Se arma con el rubro y la gestión porque son las dos cosas que el
-     * pescador necesita poder leer del papel cuando vuelve a preguntar: qué
-     * actividad pagó y de qué año.
-     */
     private function concepto(Tramite $tramite): string
     {
         $rubro = $tramite->rubro?->nombre ?? 'Trámite de carnet';

@@ -1,4 +1,4 @@
-import type { EstadoCarnet, EstadoHabilitacion, EstadoTramite, TipoTramite } from '@/types';
+import type { EstadoCarnet, EstadoTramite, TipoTramite } from '@/types';
 
 /**
  * Tipos del módulo Trámites.
@@ -141,18 +141,14 @@ export interface CarnetDelTramite {
     fecha_vencimiento: string | null;
     /**
      * Si el plástico se puede sacar ya. Lo decide Carnet::puedeImprimirse():
-     * el carnet no tiene que estar anulado y tiene que tener al menos un rubro
-     * habilitado, cosa que nace al APROBAR el expediente. Por eso el botón de
-     * imprimir no aparece antes, aunque el carnet exista desde PENDIENTE.
+     * el carnet no tiene que estar anulado y tiene que tener al menos un trámite
+     * APROBADO. Por eso el botón de imprimir no aparece antes, aunque el carnet
+     * exista desde PENDIENTE.
      */
     puede_imprimirse: boolean;
-    /** Los rubros que el carnet YA tiene, para dar contexto al supervisor. */
-    rubros: {
-        nombre: string;
-        estado: EstadoHabilitacion;
-        estado_etiqueta: string;
-        fecha_habilitacion: string | null;
-    }[];
+    /** La actividad que habilita este carnet, y su cupo autorizado. */
+    rubro: string | null;
+    capacidad: string | null;
 }
 
 /**
@@ -166,13 +162,17 @@ export interface ReciboDelTramite {
     /**
      * El número impreso en el talonario, con sus ceros: «0016».
      *
-     * `null` significa «todavía no se emitió, pero YA CORRESPONDE»: es el caso
-     * de un expediente que pasó a revisión antes de que existiera este módulo.
-     * El recibo se emite al imprimirlo y ahí toma su número.
+     * Es el id del EXPEDIENTE, no una serie propia: la tabla `recibos` se
+     * retiró y el comprobante se arma al vuelo, así que no hay dónde guardar un
+     * correlativo. Ver App\Support\ReciboArmado::numeroImpreso().
+     *
+     * Consecuencia a tener presente: la serie tiene huecos, porque no todo
+     * trámite emite recibo.
      */
-    numero: string | null;
+    numero: string;
+    /** El día en que se entregó: `tramites.fecha_revision`. */
     fecha_emision: string | null;
-    monto: number | null;
+    monto: number;
 }
 
 /** Un depósito aplicado al trámite. */
@@ -191,6 +191,19 @@ export interface RubroOpcion {
     nombre: string;
     descripcion: string | null;
     costo: number;
+    /**
+     * ¿Esta actividad se autoriza por volumen (kilos)?
+     *
+     * La pesca sí —el carnet lleva el cupo impreso y se contrasta contra las
+     * guías de transporte—; la comercialización no. Sale del catálogo y no de
+     * una lista de nombres en React: el mismo rubro figura como «Pescador» o
+     * como «Faena» según quién lo cargó.
+     *
+     * De esto depende que el formulario pida el cupo y que la ficha y el
+     * plástico lo muestren. El servidor lo vuelve a comprobar al guardar:
+     * esconder un campo es comodidad, no regla.
+     */
+    requiere_capacidad: boolean;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { UserRound } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { SituacionBeneficiario } from '@/types/beneficiarios';
 
 /**
@@ -34,30 +35,34 @@ import type { SituacionBeneficiario } from '@/types/beneficiarios';
  * deformar en la impresora—.
  *
  * ----------------------------------------------------------------------------
- *  LO QUE LA TARJETA NO DICE, Y ES A PROPÓSITO
+ *  EL RUBRO Y EL CUPO AHORA SÍ VAN IMPRESOS
  * ----------------------------------------------------------------------------
  *
- * NO LLEVA LOS RUBROS, NI EL CUPO EN KILOS, NI LA FECHA DE VENCIMIENTO.
+ * Este comentario decía lo contrario hasta el cambio de modelo, y el motivo
+ * viejo era bueno: el carnet era UNO por persona y gestión, con los rubros
+ * colgados aparte, así que una adición de octubre dejaba vieja la lista impresa
+ * y la tarjeta pasaba a decir MENOS de lo que la persona podía hacer. Con el
+ * cupo pasaba algo parecido: era un tope POR ACTIVIDAD, y con dos rubros había
+ * dos cupos y un solo renglón donde ponerlos.
  *
- * El carnet es UNO por persona y por gestión, y los rubros se le van sumando:
- * una adición los agrega, una suspensión los corta, y un plástico no se
- * reimprime cada vez. Impresos quedarían viejos, y la tarjeta diría MENOS de lo
- * que la persona está autorizada a hacer.
+ * Hoy el carnet es de UN rubro, y ese rubro es parte de la llave que lo
+ * identifica: no cambia nunca. No queda nada que pueda dejar vieja la
+ * impresión, y el cupo es uno solo.
  *
- * El cupo es un tope POR ACTIVIDAD —con dos rubros habría dos cupos y un único
- * renglón donde ponerlos—; se guarda igual, pero es dato de control interno para
- * cruzar contra las guías de transporte. Y el vencimiento no hace falta: todos
- * los carnets de una gestión vencen el mismo día, así que el año ya lo dice; si
- * la pregunta es si HOY vale, la fecha impresa nunca fue la respuesta, porque un
- * carnet puede estar anulado con su fecha intacta.
+ * Y es más que una posibilidad, es necesario: dos carnets de la misma persona
+ * en la misma gestión son dos plásticos con el mismo nombre, la misma foto y el
+ * mismo domicilio. Sin el rubro impreso nada los distingue a simple vista.
  *
- * Todo eso se consulta en la ficha del carnet, en el panel.
+ * LO QUE SIGUE SIN IR es la FECHA DE VENCIMIENTO: todos los carnets de una
+ * gestión vencen el mismo día, así que el año ya lo dice; y si la pregunta es
+ * si HOY vale, la fecha impresa nunca fue la respuesta, porque un carnet puede
+ * estar anulado o suspendido con su fecha intacta. Eso se consulta en el panel.
  *
- * EL TÍTULO DICE «CÉDULA» A SECAS, y no «CÉDULA DE PESCADOR» como el plástico
- * de papel. Es a pedido, y es coherente con el resto de la tarjeta: el carnet es
- * UNO para todos los rubros, así que nombrar una actividad en el título diría
- * algo que el documento no es — el mismo motivo por el que no se imprimen los
- * rubros.
+ * EL TÍTULO LLEVA EL RUBRO ADENTRO: «CÉDULA DE PESCADOR», como el plástico de
+ * papel. Decía «CÉDULA» a secas mientras el carnet era uno para todas las
+ * actividades de una persona —nombrar una habría dicho algo que el documento no
+ * era—; hoy es de un solo rubro que no cambia nunca, y el título es lo que se
+ * lee de lejos, antes que cualquier renglón.
  *
  * ----------------------------------------------------------------------------
  *  LA TARJETA NO LLEVA QR, Y ESO TIENE UN COSTO
@@ -66,7 +71,7 @@ import type { SituacionBeneficiario } from '@/types/beneficiarios';
  * Lo tuvo y se sacó a pedido. La verificación pública sigue existiendo —la
  * pantalla, la firma de validación, todo— pero DESDE EL PLÁSTICO YA NO HAY FORMA
  * DE LLEGAR A ELLA: quien tenga el carnet en la mano no puede comprobar si es
- * real ni ver qué rubros habilita. Eso ahora solo se consulta desde el panel.
+ * real ni ver si sigue vigente. Eso ahora solo se consulta desde el panel.
  *
  * Es la misma limitación que tenía la credencial de papel, que era su problema
  * central: quien la miraba tenía que creerle.
@@ -97,6 +102,9 @@ export function VistaPreviaCarnet({
     situacion,
     beneficiario,
     asociacion,
+    rubro,
+    capacidadKg,
+    requiereCapacidad = false,
 }: {
     situacion: SituacionBeneficiario;
     beneficiario: {
@@ -112,8 +120,36 @@ export function VistaPreviaCarnet({
      * se teclea. Si viene vacía se cae a la que ya tiene el carnet emitido.
      */
     asociacion?: string;
+    /**
+     * EL RUBRO ELEGIDO EN EL PASO ANTERIOR, y con él se decide todo lo demás.
+     *
+     * Es el dato que convirtió a esta vista previa en algo distinto: con un
+     * carnet por actividad, la tarjeta que se va a imprimir depende del rubro,
+     * no solo de la persona. Sin rubro elegido todavía —paso 1 del formulario—
+     * llega en null y el renglón muestra su molde.
+     */
+    rubro?: string | null;
+    /** El cupo que se está tecleando, en kilos. Se formatea acá. */
+    capacidadKg?: string;
+    /**
+     * Si la actividad elegida se autoriza por volumen.
+     *
+     * Cuando es `false` el renglón del rubro NO lleva el par del cupo y se queda
+     * con la tira entera — igual que el PDF. Un renglón partido con la mitad
+     * derecha vacía se lee como un dato que falta, cuando en realidad esa
+     * actividad no tiene cupo que declarar.
+     */
+    requiereCapacidad?: boolean;
 }) {
-    const carnet = situacion.carnet;
+    /*
+     * EL CARNET QUE SE ESTÁ POR TOCAR ES EL DE ESTE RUBRO, no «el de la
+     * gestión»: la persona puede tener varios y solo uno corresponde.
+     *
+     * Si lo encuentra, el trámite es una ACTUALIZACIÓN y la tarjeta ya existe
+     * —se muestra su número y sus datos—. Si no, es una emisión inicial y todo
+     * va con su molde.
+     */
+    const carnet = situacion.carnets.find((c) => c.rubro === rubro) ?? null;
 
     /*
      * EL NÚMERO DE REGISTRO ES LO QUE SE IMPRIME.
@@ -123,8 +159,8 @@ export function VistaPreviaCarnet({
      * va a tener; un renglón vacío se leería como que el carnet va a salir sin
      * número.
      *
-     * Si la persona YA tiene carnet de la gestión se muestra el suyo de verdad:
-     * este trámite es una adición y no va a emitir otro, así que el número
+     * Si la persona YA tiene carnet DE ESTE RUBRO se muestra el suyo de verdad:
+     * el trámite es una actualización y no va a emitir otro, así que el número
      * impreso no cambia.
      */
     const registro = carnet?.registro ?? '';
@@ -139,6 +175,24 @@ export function VistaPreviaCarnet({
      */
     const asociacionImpresa = asociacion?.trim() || carnet?.asociacion || '';
     const sinCargar = 'Sin cargar en la ficha';
+
+    /*
+     * EL CUPO SE ESCRIBE COMO VA IMPRESO: «600 KG».
+     *
+     * Lo que llega es lo tecleado en el formulario —texto suelto— y lo que el
+     * carnet ya tiene viene del servidor ya formateado (Carnet::capacidadLegible).
+     * Se unifican acá para que la maqueta muestre siempre la misma forma que el
+     * PDF, que es la única razón de ser de esta vista previa.
+     *
+     * Los decimales en cero se recortan: la unidad trabaja en kilos enteros y
+     * «600,00 KG» gasta cuatro caracteres de un renglón que ya viene justo.
+     */
+    const cupoTecleado = capacidadKg?.trim() ?? '';
+    const cupoNumero = Number(cupoTecleado.replace(',', '.'));
+    const cupoImpreso =
+        cupoTecleado !== '' && Number.isFinite(cupoNumero) && cupoNumero > 0
+            ? `${cupoNumero.toLocaleString('es-BO', { maximumFractionDigits: 2 })} KG`
+            : (carnet?.capacidad ?? '');
 
     return (
         <div className="space-y-2">
@@ -161,7 +215,7 @@ export function VistaPreviaCarnet({
                 <div className="relative flex h-full flex-col p-[3.5%] text-[#14350f]">
                     <Encabezado />
 
-                    <Titulo />
+                    <Titulo rubro={rubro} />
 
                     <div className="mt-[1%] flex min-h-0 flex-1 gap-[2.3%]">
                         <Retrato
@@ -171,6 +225,19 @@ export function VistaPreviaCarnet({
 
                         <dl className="flex min-w-0 flex-1 flex-col justify-start gap-[2%]">
                             <Renglon etiqueta="Nombre" valor={beneficiario.nombreCompleto} molde="Sin nombre en la ficha" />
+
+                            {/*
+                                NI EL RUBRO NI EL CUPO TIENEN RENGLÓN ACÁ, y los
+                                dos se fueron por el mismo motivo: en una CR80
+                                entran seis, y gastarlos en datos que caben en
+                                otro lado es lo más caro que puede hacerse.
+
+                                El RUBRO lo dice el TÍTULO, arriba. El CUPO va en
+                                la columna de la foto, debajo de la cédula, donde
+                                había espacio muerto. Ver
+                                CarnetImpresionController::cupo().
+                            */}
+
                             <Renglon etiqueta="Asociación" valor={asociacionImpresa} molde="Cargue la asociación" />
 
                             {/*
@@ -179,13 +246,27 @@ export function VistaPreviaCarnet({
                                 vacíos hay que ir a editar al beneficiario, y por
                                 eso el molde lo dice en vez de dejar el renglón en
                                 blanco —que se leería como un error del sistema—.
+
                             */}
-                            <Renglon etiqueta="Ciudad" valor={beneficiario.ciudad ?? ''} molde={sinCargar} />
-                            <Renglon etiqueta="Provincia" valor={beneficiario.provincia ?? ''} molde={sinCargar} />
+                            {/* Cada una en su renglón. Compartían uno mientras
+                                el rubro ocupaba una tira; al pasar el rubro al
+                                título se liberó el lugar. Y con eso «Provincia»
+                                vuelve entera: se abreviaba porque el rótulo del
+                                segundo par tiene una caja más chica. */}
+                            <Renglon
+                                etiqueta="Ciudad"
+                                valor={beneficiario.ciudad ?? ''}
+                                molde={sinCargar}
+                            />
+                            <Renglon
+                                etiqueta="Provincia"
+                                valor={beneficiario.provincia ?? ''}
+                                molde={sinCargar}
+                            />
                             <Renglon etiqueta="Dirección" valor={beneficiario.direccion ?? ''} molde={sinCargar} />
                             {/*
                                 El registro y la gestión van en el MISMO
-                                renglón, y es el único con dos pares. El número
+                                renglón. El número
                                 se reinicia con cada gestión —es el id del
                                 carnet, y los carnets son por año—, así que el
                                 000002 de 2026 y el de 2027 son dos credenciales
@@ -197,6 +278,12 @@ export function VistaPreviaCarnet({
                                 valor={registro}
                                 molde={moldeRegistro}
                                 segundo={{ etiqueta: 'Gestión', valor: String(situacion.gestion) }}
+                                // El cupo va como TERCER valor, sin rótulo:
+                                // «800 KG» se lee solo, y en un renglón de tres
+                                // no hay lugar para otra etiqueta. Solo si la
+                                // actividad se autoriza por volumen. Ver
+                                // CarnetImpresionController::renglonRegistro().
+                                tercero={requiereCapacidad ? cupoImpreso || '— KG' : undefined}
                             />
                         </dl>
                     </div>
@@ -328,16 +415,37 @@ function Encabezado() {
  * letras a este cuerpo. En el PDF el mismo efecto se consigue dibujando el texto
  * cinco veces, porque DomPDF no tiene ninguna de las dos propiedades.
  */
-function Titulo() {
+function Titulo({ rubro }: { rubro?: string | null }) {
+    const texto = rubro?.trim() ? `Cédula de ${rubro.trim()}`.toUpperCase() : 'CÉDULA';
+
+    /*
+     * EL TÍTULO SE ACHICA CUANDO NO ENTRA, igual que en el PDF.
+     *
+     * Su largo lo decide el catálogo: «CÉDULA DE COMERCIALIZADOR» entra holgado,
+     * pero un rubro de más de treinta caracteres se pasaría del ancho de la
+     * tarjeta. El umbral es el mismo que usa
+     * `CarnetImpresionController::CARACTERES_TITULO`, y los dos tienen que
+     * moverse juntos o la maqueta deja de prometer lo que el PDF cumple.
+     *
+     * BAJAN LAS TRES MEDIDAS A LA VEZ —cuerpo, interletrado y contorno—. Un
+     * borde de 0,45 px sobre una letra más chica pasa de ser un 6% a un 9% del
+     * cuerpo y la engorda hasta cerrarle los huecos, que es justo lo que el
+     * perfilado viene a evitar.
+     */
+    const largo = texto.length > 30;
+    const borde = largo ? 0.36 : 0.45;
+
     return (
         <p
-            className="mt-[1%] shrink-0 text-center text-[0.82rem] leading-tight font-bold tracking-[0.07em] text-[#a01717]"
+            className={cn(
+                'mt-[1%] shrink-0 text-center leading-tight font-bold text-[#a01717]',
+                largo ? 'text-[0.66rem] tracking-[0.04em]' : 'text-[0.82rem] tracking-[0.07em]',
+            )}
             style={{
-                textShadow:
-                    '0.45px 0.45px 0 #e8b21c, -0.45px 0.45px 0 #e8b21c, 0.45px -0.45px 0 #e8b21c, -0.45px -0.45px 0 #e8b21c',
+                textShadow: `${borde}px ${borde}px 0 #e8b21c, -${borde}px ${borde}px 0 #e8b21c, ${borde}px -${borde}px 0 #e8b21c, -${borde}px -${borde}px 0 #e8b21c`,
             }}
         >
-            CÉDULA
+            {texto}
         </p>
     );
 }
@@ -355,7 +463,10 @@ function Titulo() {
  */
 function Retrato({ documento, foto }: { documento: string; foto: string | null }) {
     return (
-        <div className="flex w-[21%] shrink-0 flex-col gap-[4%]">
+        // mt-[7%] baja la columna respecto de los renglones de al lado, igual
+        // que el `top: 76pt` del PDF: apoyada arriba, la izquierda terminaba
+        // mucho antes que la derecha.
+        <div className="mt-[7%] flex w-[21%] shrink-0 flex-col gap-[4%]">
             <div className="flex aspect-square items-center justify-center overflow-hidden border border-[#2f6b1f] bg-white">
                 {foto ? (
                     <img src={foto} alt="" aria-hidden className="size-full object-cover" />
@@ -376,6 +487,15 @@ function Retrato({ documento, foto }: { documento: string; foto: string | null }
                 C.I. {documento || '—'}
             </p>
 
+            {/* EL CUPO, DEBAJO DE LA CÉDULA — misma tira, en negrita.
+
+                Va acá y no como un renglón más porque en la columna de datos no
+                entraba: con el cupo como renglón, la tarjeta de un pescador
+                llegaba a SIETE y había que apretar el salto. Acá aprovecha el
+                espacio que quedaba muerto bajo la cédula.
+
+                Solo sale si la actividad se autoriza por volumen. Un recuadro
+                vacío se leería como un dato que falta. */}
         </div>
     );
 }
@@ -432,16 +552,24 @@ const PERFIL_ROTULO =
  * francamente blanca en vez de blanca-con-suciedad. Menos capas y mejor
  * resultado.
  *
- * Un renglón puede llevar un SEGUNDO PAR a la derecha —hoy solo el de Registro,
- * con la Gestión al lado—. Cuando lo lleva, las dos tiras se reparten el ancho:
- * `flex-1` sobre ambas, que es el equivalente en pantalla del corte a la mitad
- * que hace el Blade con coordenadas fijas.
+ * Un renglón puede llevar un SEGUNDO PAR a la derecha. Hoy lo llevan tres:
+ * Rubro + Cupo, Ciudad + Provincia y Registro + Gestión.
+ *
+ * Cuando lo lleva, las dos tiras se reparten el ancho por igual —`flex-1` sobre
+ * ambas, el equivalente en pantalla del corte a la mitad que hace el Blade con
+ * coordenadas fijas—. Alcanza para los cuatro valores que hoy comparten renglón:
+ * Ciudad + Provincia y Registro + Gestión, todos cortos.
+ *
+ * Hubo un reparto DESPAREJO, para el renglón «Rubro + Cupo»: «Comercializador»
+ * contra «600 KG» no es un corte a la mitad. Se fue con ese renglón, que se sacó
+ * al pasar el rubro al título.
  */
 function Renglon({
     etiqueta,
     valor,
     molde,
     segundo,
+    tercero,
 }: {
     etiqueta: string;
     valor: string;
@@ -449,10 +577,16 @@ function Renglon({
     molde: string;
     /** El par de la derecha, para los renglones compartidos. */
     segundo?: { etiqueta: string; valor: string };
+    /**
+     * Un TERCER valor, sin rótulo. Hoy solo el cupo: «800 KG» se lee solo y en
+     * un renglón de tres no entra otra etiqueta.
+     */
+    tercero?: string;
 }) {
     return (
         <div className="flex items-center gap-[2%]">
             <dt className="w-[25%] shrink-0 text-[0.56rem] font-bold text-white uppercase">{etiqueta}</dt>
+
             <Tira valor={valor} molde={molde} />
 
             {segundo && (
@@ -463,6 +597,8 @@ function Renglon({
                     <Tira valor={segundo.valor} molde="—" />
                 </>
             )}
+
+            {tercero !== undefined && <Tira valor={tercero} molde="— KG" />}
         </div>
     );
 }
@@ -485,11 +621,10 @@ function Tira({ valor, molde }: { valor: string; molde: string }) {
 
     return (
         <dd
-            className={
-                vacio
-                    ? 'min-w-0 flex-1 truncate bg-white px-1 py-[1%] text-[0.55rem] leading-tight text-black/35'
-                    : 'min-w-0 flex-1 truncate bg-white px-1 py-[1%] text-[0.55rem] leading-tight text-black'
-            }
+            className={cn(
+                'min-w-0 flex-1 truncate bg-white px-1 py-[1%] text-[0.55rem] leading-tight',
+                vacio ? 'text-black/35' : 'text-black',
+            )}
         >
             {valor || molde}
         </dd>
