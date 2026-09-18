@@ -191,6 +191,7 @@ export default function VerBeneficiario({
                 titulo="¿Dar de baja al beneficiario?"
                 descripcion="Dejará de aparecer en el padrón y no podrá iniciar trámites nuevos. Sus carnets y pagos históricos se conservan."
                 textoConfirmar="Dar de baja"
+                confirmacion="Entiendo que la persona deja el padrón y no va a poder iniciar trámites nuevos."
                 onCancelar={() => setConfirmarBaja(false)}
                 onConfirmar={() => router.delete(route('beneficiarios.destroy', beneficiario.id))}
             />

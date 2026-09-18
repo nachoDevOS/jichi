@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -32,6 +32,7 @@ export function ConfirmarAccion({
     titulo,
     descripcion,
     textoConfirmar = 'Confirmar',
+    confirmacion,
     procesando = false,
     onConfirmar,
     onCancelar,
@@ -40,11 +41,24 @@ export function ConfirmarAccion({
     titulo: string;
     descripcion?: ReactNode;
     textoConfirmar?: string;
+    /**
+     * Frase que hay que MARCAR antes de poder confirmar. Ver la nota de abajo.
+     * Sin esta prop no aparece ninguna casilla y la ventana se comporta como
+     * siempre.
+     */
+    confirmacion?: string;
     /** Deshabilita los botones mientras la petición está en curso. */
     procesando?: boolean;
     onConfirmar: () => void;
     onCancelar: () => void;
 }) {
+    const [aceptado, setAceptado] = useState(false);
+
+    // Se limpia al cerrar: la segunda vez aparecería ya marcada y no serviría
+    // para nada.
+    useEffect(() => {
+        if (!abierto) setAceptado(false);
+    }, [abierto]);
     /*
      * useEffect ejecuta código "por fuera" del pintado: acá, escuchar la tecla
      * Escape mientras la ventana está abierta.
@@ -90,11 +104,28 @@ export function ConfirmarAccion({
                     </div>
                 </div>
 
+                {confirmacion && (
+                    <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-md border border-border bg-secondary/40 p-3 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={aceptado}
+                            onChange={(e) => setAceptado(e.target.checked)}
+                            className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
+                        />
+                        <span>{confirmacion}</span>
+                    </label>
+                )}
+
                 <div className="mt-6 flex justify-end gap-2">
                     <Button variant="outline" onClick={onCancelar} disabled={procesando}>
                         Cancelar
                     </Button>
-                    <Button variant="destructive" onClick={onConfirmar} disabled={procesando}>
+                    <Button
+                        variant="destructive"
+                        onClick={onConfirmar}
+                        // Con casilla, el botón espera a que esté marcada.
+                        disabled={procesando || (Boolean(confirmacion) && !aceptado)}
+                    >
                         {textoConfirmar}
                     </Button>
                 </div>
@@ -102,3 +133,30 @@ export function ConfirmarAccion({
         </div>
     );
 }
+
+/**
+ * ============================================================================
+ *  LA CASILLA DE CONSENTIMIENTO
+ * ============================================================================
+ *
+ * Una frase que hay que MARCAR antes de poder confirmar. El botón queda apagado
+ * hasta entonces.
+ *
+ * ----------------------------------------------------------------------------
+ *  PARA QUÉ SIRVE SI YA HAY QUE APRETAR «CONFIRMAR»
+ * ----------------------------------------------------------------------------
+ *
+ * Porque un botón se aprieta de memoria. Después de la décima vez, «¿está
+ * seguro?» ya no se lee: la mano va sola al mismo lugar de la pantalla. La
+ * casilla rompe eso porque está en OTRO lado y exige un acto distinto.
+ *
+ * Y sobre todo, DICE QUÉ SE ESTÁ AFIRMANDO. En validar un depósito no es una
+ * traba: es la declaración misma —«comparé la boleta con el extracto»— y esa
+ * frase es lo que después respalda la firma de quien revisó.
+ *
+ * Se usa solo donde hace falta: lo irreversible y lo que es una declaración. En
+ * todo lo demás estorba, y una casilla que se marca sin leer no protege nada.
+ *
+ * Se limpia al cerrar la ventana, o la segunda vez aparecería ya marcada y no
+ * serviría para nada.
+ */

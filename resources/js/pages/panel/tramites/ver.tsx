@@ -1,11 +1,28 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Check, FileText, IdCard, Pencil, Printer, Receipt, Send, TriangleAlert, Truck, X } from 'lucide-react';
+import {
+    Check,
+    FileText,
+    IdCard,
+    Pencil,
+    Printer,
+    Receipt,
+    RotateCcw,
+    Send,
+    TriangleAlert,
+    Truck,
+    X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { DialogoImprimirCarnet } from '@/components/panel/carnets/dialogo-imprimir-carnet';
-import { ListaDepositos, ResumenDepositos } from '@/components/panel/tramites/depositos';
+import {
+    FormularioDeposito,
+    ListaDepositos,
+    ResumenDepositos,
+} from '@/components/panel/tramites/depositos';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
@@ -54,6 +71,7 @@ export default function VerTramite({
     const { institucion } = usePage<PageProps>().props;
 
     const [rechazando, setRechazando] = useState(false);
+    const [reabriendo, setReabriendo] = useState(false);
     const [imprimiendo, setImprimiendo] = useState(false);
     const rechazo = useForm({ motivo_rechazo: '' });
 
@@ -67,6 +85,30 @@ export default function VerTramite({
                         <Button variant="outline" onClick={() => router.visit(route('tramites.edit', tramite.id))}>
                             <Pencil className="size-4" />
                             Editar trámite
+                        </Button>
+                    )}
+
+                    {/*
+                        REABRIR — el camino de vuelta de un rechazo.
+
+                        El pescador volvió al mostrador con lo que le faltaba. El
+                        expediente vuelve a ser BORRADOR, con sus depósitos y su
+                        historial, en vez de obligar a presentar uno nuevo: el
+                        nuevo nacería con cero cobrado mientras el dinero se
+                        queda colgado del rechazado.
+
+                        Va en `default` porque en un expediente rechazado es LA
+                        acción que corresponde — no hay ninguna otra.
+
+                        Pide confirmación pero NO motivo, al revés que rechazar:
+                        esto no decide nada, devuelve los papeles a la mesa de
+                        quien los arma, y el porqué ya está escrito en el rechazo
+                        que se está atendiendo.
+                    */}
+                    {tramite.puede_reabrir && puede('tramites.editar') && (
+                        <Button onClick={() => setReabriendo(true)}>
+                            <RotateCcw className="size-4" />
+                            Reabrir para corregir
                         </Button>
                     )}
 
@@ -215,6 +257,59 @@ export default function VerTramite({
                 la pantalla la recalculara por su cuenta, algún día diría una cosa
                 distinta de la que aplica el servidor.
             */}
+            {/*
+                POR QUÉ NO SE PUEDE APROBAR TODAVÍA.
+
+                Que el botón «Aprobar» desaparezca no alcanza: el supervisor tiene
+                que poder saber el motivo sin apretar nada. Esto aparece solo
+                cuando el dinero YA está cubierto —si falta plata, ese es el
+                problema real y ese aviso lo da el bloque de depósitos— y todavía
+                queda alguna boleta sin controlar.
+
+                Los pendientes y los observados se cuentan por separado porque las
+                dos salidas son distintas: uno se valida, el otro hay que
+                corregirlo antes.
+            */}
+            {tramite.estado === 'en_revision' &&
+                tramite.pagado &&
+                tramite.pagos_por_controlar.pendientes + tramite.pagos_por_controlar.observados >
+                    0 && (
+                    <Card className="mb-6 border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20">
+                        <CardContent className="flex gap-3 p-4 text-sm">
+                            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+
+                            <div className="space-y-1">
+                                <p className="font-medium">
+                                    Falta controlar los depósitos: no se puede aprobar.
+                                </p>
+
+                                <ul className="list-inside list-disc text-muted-foreground">
+                                    {tramite.pagos_por_controlar.pendientes > 0 && (
+                                        <li>
+                                            {tramite.pagos_por_controlar.pendientes === 1
+                                                ? 'Hay 1 depósito sin validar'
+                                                : `Hay ${tramite.pagos_por_controlar.pendientes} depósitos sin validar`}
+                                        </li>
+                                    )}
+
+                                    {tramite.pagos_por_controlar.observados > 0 && (
+                                        <li>
+                                            {tramite.pagos_por_controlar.observados === 1
+                                                ? '1 quedó observado y hay que corregirlo'
+                                                : `${tramite.pagos_por_controlar.observados} quedaron observados y hay que corregirlos`}
+                                        </li>
+                                    )}
+                                </ul>
+
+                                <p className="text-muted-foreground">
+                                    Se controlan boleta por boleta en el bloque de depósitos, más
+                                    abajo.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
             {tramite.faltantes.length > 0 && (
                 <Card className="mb-6 border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20">
                     <CardContent className="flex gap-3 p-4 text-sm">
@@ -231,8 +326,12 @@ export default function VerTramite({
                                 ))}
                             </ul>
 
+                            {/* Los papeles se reemplazan en «Editar trámite»;
+                                los depósitos se cargan acá abajo, en la tarjeta
+                                de esta misma pantalla. */}
                             <p className="text-muted-foreground">
-                                Se cargan con «Editar trámite».
+                                Los papeles se cargan con «Editar trámite»; los depósitos, más
+                                abajo.
                             </p>
                         </div>
                     </CardContent>
@@ -253,7 +352,11 @@ export default function VerTramite({
             <ConfirmarConMotivo
                 abierto={rechazando}
                 titulo={`Rechazar el trámite #${tramite.id}`}
-                descripcion="El expediente se cierra y no se puede volver atrás. El beneficiario puede presentar de nuevo con los papeles corregidos."
+                // Ya no dice «no se puede volver atrás», porque ahora sí se
+                // puede: el expediente se REABRE cuando el beneficiario trae lo
+                // corregido, y vuelve con sus depósitos. Lo que no se deshace es
+                // el rechazo en sí, que queda registrado.
+                descripcion="Se le devuelven los papeles al beneficiario con el motivo escrito. Cuando vuelva con lo corregido, el expediente se puede reabrir y seguir trabajándolo."
                 etiquetaMotivo="Motivo del rechazo"
                 ayuda="Lo lee el beneficiario cuando vuelve a preguntar. Sea concreto: qué papel faltó o qué estaba mal."
                 placeholder="Ej.: la fotocopia del carnet está ilegible, no se lee el número."
@@ -268,6 +371,40 @@ export default function VerTramite({
                     })
                 }
                 onCancelar={() => setRechazando(false)}
+            />
+
+            {/*
+                LA VENTANA DE REABRIR.
+
+                Sin motivo —ver el comentario del botón— pero CON confirmación,
+                porque el expediente cambia de manos: deja de estar cerrado y
+                vuelve a la mesa de ventanilla, donde se puede editar y donde el
+                dinero se puede mover otra vez.
+
+                La descripción dice lo que el operador necesita saber y no
+                adivina: que los depósitos siguen ahí —que es justamente por lo
+                que esto existe— y que el recibo ya entregado no cambia.
+            */}
+            <ConfirmarAccion
+                abierto={reabriendo}
+                titulo={`Reabrir el trámite #${tramite.id}`}
+                descripcion={
+                    <>
+                        Vuelve a quedar <strong>pendiente</strong>, con sus depósitos y sus
+                        papeles, para corregirlo y volver a enviarlo a revisión. El rechazo y
+                        su motivo quedan registrados, y el recibo oficial conserva su número y
+                        su fecha.
+                    </>
+                }
+                textoConfirmar="Reabrir expediente"
+                onConfirmar={() =>
+                    router.patch(
+                        route('tramites.reabrir', tramite.id),
+                        {},
+                        { onSuccess: () => setReabriendo(false) },
+                    )
+                }
+                onCancelar={() => setReabriendo(false)}
             />
 
             <div className="grid gap-6 lg:grid-cols-3">
@@ -371,19 +508,50 @@ export default function VerTramite({
 
                         {/*
                             ========================================================
-                             ACÁ LOS DEPÓSITOS SOLO SE MIRAN. NO HAY CÓMO CARGARLOS.
+                             ACÁ LOS DEPÓSITOS TAMBIÉN SE TRABAJAN — Y ANTES NO
                             ========================================================
 
-                            Ni formulario ni botón que lleve a uno. Se cargan
-                            desde «Editar trámite», que es el botón de la barra
-                            de arriba — el mismo con el que se reemplazan los
-                            adjuntos.
+                            Esta tarjeta era de solo lectura: los depósitos se
+                            cargaban y se corregían únicamente desde «Editar
+                            trámite», para que quedara claro cuál era «el lugar».
 
-                            Llegó a haber un enlace acá que decía «Registrar un
-                            depósito» y se sacó: aunque solo navegaba a la otra
-                            pantalla, en el medio de esta tarjeta se leía como si
-                            desde la ficha se pudiera cargar. Esta pantalla es de
-                            consulta; la de corrección es la que escribe.
+                            Eso dejaba un expediente sin salida, y apareció en
+                            ventanilla: OBSERVAR una boleta solo se puede EN
+                            REVISIÓN —el control es parte de la revisión— pero
+                            «Editar trámite» no abre fuera de PENDIENTE. El
+                            revisor marcaba «la boleta dice otra cosa» y del otro
+                            lado no había dónde corregirla; el único botón que
+                            quedaba era «Validar», que es justamente el que no
+                            corresponde.
+
+                            La regla de fondo no cambió, se precisó: al ENVIAR se
+                            congelan los PAPELES del expediente —eso es lo que
+                            quien aprueba firma— pero NO el dinero. El servidor
+                            ya lo decía (`permitePagos()` y `admiteCorreccion()`
+                            aceptan en revisión); lo que faltaba era la pantalla.
+
+                            QUITAR también vive acá, y estuvo prohibido un rato
+                            con este argumento: el recibo ya salió, hacer
+                            desaparecer un depósito lo dejaría cobrando más de lo
+                            que el expediente muestra. Se cae solo, porque
+                            CORREGIR ya hace eso mismo —el recibo se arma al
+                            vuelo, así que bajar un monto de 110 a 30 cambia el
+                            papel entregado igual que borrar la fila—. Y dejaba
+                            sin salida el caso que apareció en ventanilla: una
+                            boleta cargada DOS VECES sobre un expediente ya
+                            presentado, que no se puede corregir —no hay dato
+                            correcto que poner— y quedaba sumando para siempre.
+
+                            Lo que separa a las dos no es el momento sino el
+                            PERMISO: quitar pide `pagos.eliminar`, que es de
+                            administración, y el motivo por escrito.
+
+                            DONDE SÍ SE CIERRA TODO ES AL APROBAR. Ahí el
+                            formulario desaparece y los botones también: un
+                            expediente aprobado está pagado por definición —no se
+                            aprueba sin cubrir el monto— así que un depósito más
+                            no pertenece a este trámite, y tocarlo cambiaría el
+                            recibo de un carnet ya emitido.
                         */}
                         <CardContent className="space-y-4">
                             <ResumenDepositos
@@ -391,13 +559,35 @@ export default function VerTramite({
                                 montoPagado={tramite.monto_pagado}
                                 saldoPendiente={tramite.saldo_pendiente}
                                 moneda={institucion.moneda}
+                                porControlar={tramite.pagos_por_controlar}
                             />
 
+                            {/*
+                                LOS DOS JUNTOS, y no se contradice con «quien
+                                carga no valida».
+
+                                Esa separación la hacen los PERMISOS —
+                                `pagos.registrar` contra `pagos.validar`— y
+                                `Pago::puedeValidarlo()`, que compara contra
+                                quién cargó la boleta. La pantalla no es el
+                                control: repartir los botones en dos pantallas
+                                no impedía nada, porque con un solo rol la misma
+                                persona abría las dos.
+                            */}
                             <ListaDepositos
                                 pagos={pagos}
                                 moneda={institucion.moneda}
-                                vacio="Se cargan desde «Editar trámite»."
+                                vacio="Cargue las boletas acá abajo."
+                                conControl
+                                conCorreccion={puede('pagos.registrar')}
                             />
+
+                            {tramite.admite_pagos && puede('pagos.registrar') && (
+                                <FormularioDeposito
+                                    tramiteId={tramite.id}
+                                    moneda={institucion.moneda}
+                                />
+                            )}
                         </CardContent>
                     </Card>
                 </div>

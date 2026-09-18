@@ -8,7 +8,8 @@ namespace App\Enums;
  * ============================================================================
  *
  *     PENDIENTE ──[enviar]──▶ EN REVISIÓN ──┬──▶ APROBADO
- *     (borrador)                              └──▶ RECHAZADO
+ *     (borrador)  ▲                          └──▶ RECHAZADO
+ *                 └───────────[reabrir]───────────┘
  *
  * PENDIENTE es un BORRADOR. Se arma, se corrige y se borra si sobra; no se
  * rechaza, porque todavía nadie lo presentó. EN REVISIÓN ya está presentado: no
@@ -32,7 +33,10 @@ namespace App\Enums;
  *                habilitado.
  *
  *   RECHAZADO    Papeles ilegibles, pago que no corresponde, falta un
- *                requisito. Lleva SIEMPRE un motivo escrito.
+ *                requisito. Lleva SIEMPRE un motivo escrito. Los papeles
+ *                volvieron al pescador, y cuando trae lo corregido el
+ *                expediente se REABRE: vuelve a ser borrador, con sus depósitos
+ *                y su historial. No se presenta uno nuevo.
  *
  * ----------------------------------------------------------------------------
  *  POR QUÉ SON CUATRO Y NO SEIS
@@ -87,7 +91,9 @@ enum EstadoTramite: string
             self::Pendiente => 'El expediente se está armando. Cuando los papeles estén completos, envíelo a revisión.',
             self::EnRevision => 'Verifique los adjuntos y los pagos, y después apruebe o rechace.',
             self::Aprobado => 'El rubro quedó habilitado en el carnet. Falta imprimirlo y entregarlo.',
-            self::Rechazado => 'El expediente se cerró. El beneficiario puede volver a presentar con los papeles corregidos.',
+            // Reabrir y NO «presentar de nuevo»: un expediente nuevo dejaría
+            // los depósitos ya cargados colgados de este. Ver siguientes().
+            self::Rechazado => 'Se le devolvieron los papeles al beneficiario. Cuando vuelva con lo corregido, reabra el expediente para seguir trabajándolo.',
         };
     }
 
@@ -157,10 +163,32 @@ enum EstadoTramite: string
      * se le entrega al pescador. Volver atrás dejaría un papel numerado en la
      * calle por un expediente que figura sin presentar.
      *
-     * Aprobado y Rechazado son FINALES. Un trámite aprobado por error no se
-     * «des-aprueba»: el cupo ya se consolidó en el carnet y
-     * posiblemente se imprimió el carnet. Lo que corresponde es suspender el
-     * rubro, que deja el rastro de por qué.
+     * ------------------------------------------------------------------------
+     *  RECHAZADO VUELVE AL BORRADOR — Y ANTES ERA UN CALLEJÓN SIN SALIDA
+     * ------------------------------------------------------------------------
+     *
+     *     RECHAZADO ──[reabrir]──▶ PENDIENTE ──[enviar]──▶ EN REVISIÓN
+     *
+     * Rechazar es devolverle los papeles al pescador con el motivo escrito, y lo
+     * que sigue es que vuelva con lo corregido. Eso antes obligaba a presentar
+     * un expediente NUEVO, y ahí estaba el problema: **los depósitos ya
+     * cargados se quedaban colgados del trámite muerto**. La plata no se
+     * traslada sola, así que el beneficiario aparecía debiendo todo de nuevo
+     * sobre un expediente que sí tenía el dinero cobrado.
+     *
+     * Vuelve a PENDIENTE y no directo a EN REVISIÓN a propósito: PENDIENTE es
+     * el borrador, y ahí ya valen TODAS las reglas de armar un expediente
+     * —editar los papeles, agregar, corregir y quitar depósitos, y volver a
+     * enviar—. La alternativa era declarar editable también a RECHAZADO, y eso
+     * deja dos estados de escritura que hay que mantener en pie a la vez.
+     *
+     * NO es «des-rechazar»: el rechazo queda en `auditorias` con su motivo y su
+     * fecha. Lo que se reabre es el trabajo, no la decisión.
+     *
+     * Aprobado SÍ es final. Un trámite aprobado por error no se «des-aprueba»:
+     * el cupo ya se consolidó en el carnet y posiblemente se imprimió el
+     * plástico. Lo que corresponde es suspender el carnet, que deja el rastro de
+     * por qué.
      *
      * @return array<int, self>
      */
@@ -169,7 +197,8 @@ enum EstadoTramite: string
         return match ($this) {
             self::Pendiente => [self::EnRevision],
             self::EnRevision => [self::Aprobado, self::Rechazado],
-            self::Aprobado, self::Rechazado => [],
+            self::Rechazado => [self::Pendiente],
+            self::Aprobado => [],
         };
     }
 
@@ -272,17 +301,65 @@ enum EstadoTramite: string
     }
 
     /**
-     * ¿Se le pueden seguir cargando pagos?
+     * ========================================================================
+     *  ¿SE LE PUEDEN SEGUIR CARGANDO PAGOS?
+     * ========================================================================
      *
-     * Sí mientras esté abierto —el beneficiario está juntando el monto— y
-     * también una vez aprobado, porque un trámite puede aprobarse y terminarse
-     * de cobrar después. Rechazado no: ese expediente ya no cobra nada.
+     * Solo mientras el expediente esté ABIERTO: en PENDIENTE el beneficiario
+     * está juntando el monto, y en EN REVISIÓN puede aparecer una boleta que
+     * faltaba o corregirse una observada. Es dinero de un trámite que todavía
+     * no se resolvió.
+     *
+     * ------------------------------------------------------------------------
+     *  APROBADO YA NO, Y ANTES SÍ
+     * ------------------------------------------------------------------------
+     *
+     * El motivo escrito era «un trámite puede aprobarse y terminarse de cobrar
+     * después». Eso dejó de poder pasar: `Tramite::puedeAprobarse()` exige el
+     * monto CUBIERTO y todas las boletas validadas, así que un expediente
+     * aprobado está pagado por definición. La regla quedó permitiendo algo que
+     * ya no puede ocurrir, y lo único que habilitaba era cargar plata de más
+     * sobre un carnet ya emitido.
+     *
+     * Y hace daño concreto: el RECIBO OFICIAL se arma al vuelo con los
+     * depósitos que hay —ver ReciboTramiteService::detalle()—, así que un
+     * depósito agregado después de aprobar cambia un comprobante ya entregado
+     * por plata que no respalda nada de este trámite.
+     *
+     * Si entró dinero de más, eso no es un depósito de este expediente: es un
+     * asunto de mostrador.
+     *
+     * ------------------------------------------------------------------------
+     *  RECHAZADO TAMPOCO
+     * ------------------------------------------------------------------------
+     *
+     * Y sigue siendo así aunque ahora se pueda reabrir: mientras está rechazado
+     * el expediente está en el mostrador del pescador, no en la mesa de nadie.
+     * Para cargarle plata hay que REABRIRLO primero —el acto de decir «esto se
+     * retoma» va antes de cobrar—.
+     *
+     * OJO: esto COINCIDE hoy con `estaAbierto()` y no se escribe delegando en
+     * él a propósito. Son dos preguntas distintas que dan el mismo conjunto:
+     * una cuenta trabajo sin terminar, esta es un permiso de escritura. Usar
+     * `estaAbierto()` como permiso fue el error que ya se corrigió una vez.
      */
     public function permitePagos(): bool
     {
-        return $this !== self::Rechazado;
+        return $this === self::Pendiente || $this === self::EnRevision;
     }
 
+    /**
+     * ¿De acá ya no se sale?
+     *
+     * Solo APROBADO. Rechazado dejó de serlo cuando se agregó la reapertura:
+     * ver siguientes(). Se calcula desde ahí y no con un `match` propio,
+     * justamente para que no puedan decir cosas distintas.
+     *
+     * OJO CON LO QUE DEPENDE DE ESTO: `verificarTransicion()` lo usa solo para
+     * elegir el mensaje de error —«ya está resuelto» contra «ese salto no
+     * vale»—. Un rechazado al que se intente aprobar de una ahora recibe el
+     * segundo, que es el correcto: el camino existe, pero pasa por reabrir.
+     */
     public function esFinal(): bool
     {
         return $this->siguientes() === [];

@@ -371,7 +371,21 @@ class SolicitudCarnetService
 
             $bloqueado->update([
                 'estado' => EstadoTramite::EnRevision,
-                'fecha_revision' => now(),
+                /*
+                 * LA FECHA DE REVISIÓN SE ESCRIBE UNA SOLA VEZ.
+                 *
+                 * Es la fecha del RECIBO OFICIAL —el comprobante se arma al
+                 * vuelo y la toma de acá, ver App\Support\ReciboArmado— y ese
+                 * papel ya está en manos del pescador desde el primer envío.
+                 *
+                 * Importa desde que un expediente rechazado se puede REABRIR y
+                 * volver a enviar: pisarla dejaría el recibo diciendo una fecha
+                 * distinta de la impresa, con el mismo número, y Contabilidad
+                 * con dos versiones del mismo comprobante. El segundo envío no
+                 * emite un recibo nuevo porque no hay una segunda cobranza: es
+                 * el mismo dinero del mismo trámite.
+                 */
+                'fecha_revision' => $bloqueado->fecha_revision ?? now(),
             ]);
 
             // Se refresca el modelo que trajo QUIEN LLAMÓ, no el bloqueado. Ver
@@ -438,6 +452,25 @@ class SolicitudCarnetService
             throw SolicitudInvalidaException::tramiteImpago(
                 $saldo,
                 (string) Configuracion::obtener('general.simbolo_moneda', 'Bs'),
+            );
+        }
+
+        /*
+         * QUE ESTÉ PAGADO NO ALCANZA: TIENE QUE ESTAR CONTROLADO.
+         *
+         * La suma de arriba sale de filas que tipeó una persona en ventanilla.
+         * Hasta que alguien MÁS abra la boleta escaneada y la compare contra el
+         * extracto del banco, lo que hay es una declaración, no un cobro.
+         *
+         * Va DESPUÉS del saldo a propósito: si falta plata, ese es el problema
+         * real y el mensaje «valide los depósitos» solo confundiría.
+         */
+        if (! $tramite->pagosValidados()) {
+            $porControlar = $tramite->pagosPorControlar();
+
+            throw SolicitudInvalidaException::pagosSinValidar(
+                $porControlar['pendientes'],
+                $porControlar['observados'],
             );
         }
 
@@ -515,11 +548,77 @@ class SolicitudCarnetService
              *
              * Queda vigente y sin rubros, que es exactamente lo que es: un
              * documento emitido que todavía no autoriza ninguna actividad. Si el
-             * pescador vuelve con los papeles corregidos, su nueva solicitud se
-             * registra como ADICIÓN sobre este mismo carnet —Regla A— y no se
-             * gasta otro registro.
+             * pescador vuelve con los papeles corregidos, se REABRE este mismo
+             * expediente —ver reabrir()— y el carnet sigue siendo el suyo.
              */
 
+            return $tramite->refresh();
+        });
+    }
+
+    /**
+     * ========================================================================
+     *  REABRE UN EXPEDIENTE RECHAZADO PARA SEGUIR TRABAJÁNDOLO
+     * ========================================================================
+     *
+     *     RECHAZADO ──[reabrir]──▶ PENDIENTE ──[enviar]──▶ EN REVISIÓN
+     *
+     * El pescador volvió al mostrador con lo que le faltaba. Esto devuelve el
+     * expediente al BORRADOR, y desde ahí valen todas las reglas de armarlo:
+     * se cambian los papeles, se agregan, corrigen y quitan depósitos, y se
+     * vuelve a enviar.
+     *
+     * ------------------------------------------------------------------------
+     *  POR QUÉ NO ALCANZABA CON PRESENTAR UN EXPEDIENTE NUEVO
+     * ------------------------------------------------------------------------
+     *
+     * Era la salida anterior, y el problema es la PLATA: los depósitos cuelgan
+     * del trámite (`pagable_id`) y no se trasladan solos. Un expediente nuevo
+     * nacía con cero cobrado mientras el rechazado se quedaba con el dinero
+     * cargado, así que el beneficiario figuraba debiendo todo de nuevo. Además
+     * gastaba un número de trámite por cada vuelta.
+     *
+     * NO ES «DES-RECHAZAR». El rechazo ya ocurrió y queda en `auditorias` con su
+     * motivo, su autor y su fecha. Lo que se reabre es el trabajo, no la
+     * decisión — por eso `motivo_rechazo` se limpia de la fila: describe un
+     * estado en el que el expediente ya no está, y dejarlo mostraría «Rechazado:
+     * X» sobre algo que volvió a estar abierto.
+     *
+     * NO SE TOCA `fecha_revision`, y eso es lo que protege el recibo ya
+     * entregado: ver el comentario de enviarARevision().
+     *
+     * @throws SolicitudInvalidaException
+     */
+    public function reabrir(Tramite $tramite): Tramite
+    {
+        $this->verificarTransicion($tramite, EstadoTramite::Pendiente);
+
+        return DB::transaction(function () use ($tramite): Tramite {
+            $bloqueado = $this->bloquear($tramite);
+
+            $this->verificarTransicion($bloqueado, EstadoTramite::Pendiente);
+
+            /*
+             * QUE NO HAYA OTRO EXPEDIENTE ABIERTO PARA ESTE CARNET.
+             *
+             * Mientras estaba rechazado, este carnet quedó libre para recibir
+             * otra solicitud —un rechazado no cuenta como «en curso»— así que
+             * bien puede haberse presentado una. Reabrir sin mirar dejaría DOS
+             * expedientes abiertos por la misma habilitación, y el beneficiario
+             * pagando dos veces por ella.
+             *
+             * Es la misma comprobación que hace el alta, con el mismo mensaje:
+             * la pregunta es idéntica y la respuesta también.
+             */
+            $this->verificarSinSolicitudEnCurso($bloqueado->carnet);
+
+            $bloqueado->update([
+                'estado' => EstadoTramite::Pendiente,
+                'motivo_rechazo' => null,
+            ]);
+
+            // Se refresca el modelo de quien llamó, no el bloqueado. Ver
+            // bloquear() sobre por qué esa distinción importa.
             return $tramite->refresh();
         });
     }
@@ -672,7 +771,17 @@ class SolicitudCarnetService
         return [
             $tramite->ciFile,
             $tramite->certAsociacionFile,
-            ...$tramite->pagos->pluck('comprobante')->all(),
+            /*
+             * `urlFile` Y NO `comprobante`: esa columna no existe.
+             *
+             * `pluck()` sobre un nombre equivocado NO FALLA —devuelve una lista
+             * de nulls— así que esto se veía correcto y no borraba una sola
+             * boleta: cada expediente eliminado dejaba todas sus boletas
+             * tiradas en el disco, para siempre y sin ningún error. Lo que
+             * confunde es que el modelo SÍ tiene `comprobante_url`, que es el
+             * accesor con la dirección completa, no la columna.
+             */
+            ...$tramite->pagos->pluck('urlFile')->all(),
         ];
     }
 

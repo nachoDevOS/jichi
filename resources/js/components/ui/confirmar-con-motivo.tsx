@@ -1,5 +1,5 @@
 import { TriangleAlert } from 'lucide-react';
-import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,6 +41,7 @@ export function ConfirmarConMotivo({
     ayuda,
     placeholder,
     textoConfirmar = 'Confirmar',
+    confirmacion,
     minimo = 10,
     valor,
     onCambiar,
@@ -56,6 +57,11 @@ export function ConfirmarConMotivo({
     ayuda?: string;
     placeholder?: string;
     textoConfirmar?: string;
+    /**
+     * Frase que hay que MARCAR antes de poder confirmar. Ver la nota de abajo.
+     * Sin esta prop no aparece ninguna casilla.
+     */
+    confirmacion?: string;
     /** Cuántos caracteres exige el servidor. El botón espera a llegar. */
     minimo?: number;
     valor: string;
@@ -67,6 +73,12 @@ export function ConfirmarConMotivo({
     onCancelar: () => void;
 }) {
     const campo = useRef<HTMLTextAreaElement>(null);
+    const [aceptado, setAceptado] = useState(false);
+
+    // Se limpia al cerrar, por lo mismo que en ConfirmarAccion.
+    useEffect(() => {
+        if (!abierto) setAceptado(false);
+    }, [abierto]);
 
     /*
      * Escape cierra, y el foco arranca en el textarea.
@@ -91,7 +103,8 @@ export function ConfirmarConMotivo({
     if (!abierto) return null;
 
     const escrito = valor.trim().length;
-    const suficiente = escrito >= minimo;
+    // Dos condiciones cuando hay casilla: el texto y la marca.
+    const suficiente = escrito >= minimo && (!confirmacion || aceptado);
 
     function enviar(e: FormEvent) {
         e.preventDefault();
@@ -142,11 +155,27 @@ export function ConfirmarConMotivo({
                         </Campo>
 
                         {/* Cuánto falta para poder confirmar. Sin esto, el botón
-                            apagado no dice por qué lo está. */}
-                        {!suficiente && (
+                            apagado no dice por qué lo está.
+
+                            Solo habla del TEXTO: si lo que falta es marcar la
+                            casilla, ya lo dice la casilla misma, que está a la
+                            vista. Decir las dos cosas a la vez confunde. */}
+                        {escrito < minimo && (
                             <p className="mt-1 text-xs text-muted-foreground">
                                 Faltan {minimo - escrito} caracteres para poder continuar.
                             </p>
+                        )}
+
+                        {confirmacion && (
+                            <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-md border border-border bg-secondary/40 p-3 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={aceptado}
+                                    onChange={(e) => setAceptado(e.target.checked)}
+                                    className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
+                                />
+                                <span>{confirmacion}</span>
+                            </label>
                         )}
                     </div>
 
@@ -172,3 +201,30 @@ export function ConfirmarConMotivo({
         </div>
     );
 }
+
+/**
+ * ============================================================================
+ *  LA CASILLA DE CONSENTIMIENTO
+ * ============================================================================
+ *
+ * Una frase que hay que MARCAR antes de poder confirmar. El botón queda apagado
+ * hasta entonces.
+ *
+ * ----------------------------------------------------------------------------
+ *  PARA QUÉ SIRVE SI YA HAY QUE APRETAR «CONFIRMAR»
+ * ----------------------------------------------------------------------------
+ *
+ * Porque un botón se aprieta de memoria. Después de la décima vez, «¿está
+ * seguro?» ya no se lee: la mano va sola al mismo lugar de la pantalla. La
+ * casilla rompe eso porque está en OTRO lado y exige un acto distinto.
+ *
+ * Y sobre todo, DICE QUÉ SE ESTÁ AFIRMANDO. En validar un depósito no es una
+ * traba: es la declaración misma —«comparé la boleta con el extracto»— y esa
+ * frase es lo que después respalda la firma de quien revisó.
+ *
+ * Se usa solo donde hace falta: lo irreversible y lo que es una declaración. En
+ * todo lo demás estorba, y una casilla que se marca sin leer no protege nada.
+ *
+ * Se limpia al cerrar la ventana, o la segunda vez aparecería ya marcada y no
+ * serviría para nada.
+ */

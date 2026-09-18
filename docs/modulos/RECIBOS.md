@@ -346,18 +346,36 @@ monto de verdad se rompía.
 > una y sin ambigüedad.** Ningún test puede verificar eso — hay que renderizar y
 > mirar.
 
-### Los renglones también quedan congelados
+### Los renglones NO quedan congelados — y es la parte que más hay que tener presente
 
-Van en `recibos.detalle` (JSON) y **no se leen de `pagos` al imprimir**. Acá el
-motivo es concreto, no teórico: un trámite **sigue aceptando depósitos después
-de pasar a revisión** —`EstadoTramite::permitePagos()` lo permite hasta que se
-rechaza—. Leyéndolos al imprimir, una boleta cargada la semana siguiente
-aparecería en la reimpresión de un recibo entregado antes de que ese depósito
-existiera: el papel del pescador y el del sistema dirían cosas distintas.
+> Este apartado decía lo contrario, porque se escribió cuando existía la tabla
+> `recibos` y los renglones se copiaban a una columna `detalle` (JSON). Esa
+> tabla se retiró —ver el aviso del principio— y con ella la copia.
 
-Las filas anteriores a esa columna tienen `detalle` en NULL y `Recibo::lineas()`
-arma un renglón único con el total — que es exactamente lo que esos recibos
-decían impresos.
+Hoy `ReciboTramiteService::detalle()` **lee `pagos` en el momento de imprimir**,
+así que el detalle del comprobante refleja los depósitos que hay HOY, no los que
+había cuando el pescador se llevó el papel. Lo que se conserva es el **número**
+—el id del trámite— y la **fecha** —`tramites.fecha_revision`, que se escribe una
+sola vez y no se pisa ni al reenviar un expediente reabierto—.
+
+En la práctica, el detalle cambia cuando:
+
+- se **corrige** el monto de un depósito (110,00 → 30,00);
+- se **quita** un depósito del expediente;
+- se **agrega** uno mientras el trámite sigue en revisión.
+
+Las tres se pueden hacer desde la ficha, y las tres son necesarias: son la única
+forma de arreglar una boleta mal cargada. Ver
+[PAGOS.md](PAGOS.md#5-bis-corregir-un-depósito).
+
+Lo que ya NO puede pasar es que el detalle se mueva después de aprobar: desde
+que `EstadoTramite::permitePagos()` deja de aceptar depósitos en APROBADO, el
+expediente queda quieto cuando se firma. Antes se podían cargar depósitos sobre
+un trámite aprobado, y eso cambiaba el recibo de un carnet ya impreso.
+
+**Es el costo conocido de no tener tabla `recibos`.** Si algún día molesta, la
+solución no es volver a la tabla entera: alcanza con congelar el detalle en una
+columna del trámite al momento de enviar a revisión.
 
 El monto va alineado a la **derecha** contra la línea de los centavos, que es
 como se lee una cifra de dinero: centrado, el ojo no encuentra dónde termina. El

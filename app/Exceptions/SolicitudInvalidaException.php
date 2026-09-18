@@ -114,10 +114,16 @@ class SolicitudInvalidaException extends RuntimeException
      * dónde salir, y la salida cambia según dónde esté parado el expediente.
      *
      *   EN REVISIÓN  todavía se puede hacer algo: rechazarlo devuelve los
-     *                papeles con el motivo escrito, y se presenta de nuevo
-     *                corregido. Eso es lo que hay que decirle.
+     *                papeles con el motivo escrito, y se reabre corregido. Eso
+     *                es lo que hay que decirle.
      *
-     *   RESUELTO     ya no hay vuelta: alguien firmó. El mensaje solo confirma
+     *   RECHAZADO    tampoco es el final: el expediente se REABRE y vuelve al
+     *                borrador con todo lo que tenía. Antes este caso caía en el
+     *                mensaje de «ya no admite más cambios», que hoy sería
+     *                mentira y dejaría al operador buscando una salida que
+     *                tiene delante.
+     *
+     *   APROBADO     ya no hay vuelta: alguien firmó. El mensaje solo confirma
      *                que la decisión está tomada.
      *
      * Ver EstadoTramite::permiteEdicion().
@@ -128,7 +134,14 @@ class SolicitudInvalidaException extends RuntimeException
             return new self(
                 'El trámite ya fue enviado a revisión y no se puede editar: el recibo oficial '.
                 'ya está en manos del beneficiario. Si los papeles no sirven, rechácelo indicando '.
-                'el motivo y preséntelo de nuevo.',
+                'el motivo; después se reabre y se corrige.',
+            );
+        }
+
+        if ($estado === EstadoTramite::Rechazado) {
+            return new self(
+                'El trámite está rechazado. Para corregirlo hay que reabrirlo primero: '.
+                'vuelve a quedar pendiente, con sus depósitos y sus papeles.',
             );
         }
 
@@ -150,6 +163,17 @@ class SolicitudInvalidaException extends RuntimeException
                 'Un trámite enviado a revisión no se puede eliminar: ya se emitió su recibo '.
                 'oficial y el beneficiario se llevó ese papel. Si el expediente no corresponde, '.
                 'recházelo indicando el motivo.',
+            );
+        }
+
+        // Rechazado tiene salida propia desde que existe la reapertura, y es
+        // otra que la del aprobado: el expediente vuelve al borrador y desde ahí
+        // sí se puede borrar. Mandarlo a «suspenda el carnet» sería mandarlo a
+        // un lugar donde no hay nada que suspender: un rechazo no habilitó nada.
+        if ($estado === EstadoTramite::Rechazado) {
+            return new self(
+                'Un trámite rechazado no se puede eliminar directamente. Si el expediente no '.
+                'debería existir, reábralo —vuelve a quedar pendiente— y elimínelo desde ahí.',
             );
         }
 
@@ -183,14 +207,156 @@ class SolicitudInvalidaException extends RuntimeException
         ));
     }
 
-    public static function pagoNoAdmitido(): self
+    /**
+     * Se quiso cargar un depósito sobre un expediente que ya no cobra.
+     *
+     * Son dos casos y el mensaje los separa, porque la salida es distinta: un
+     * rechazado se REABRE y sigue cobrando; uno aprobado ya está pagado por
+     * definición —no se aprueba sin cubrir el monto— así que un depósito más no
+     * pertenece a este trámite.
+     */
+    public static function pagoNoAdmitido(EstadoTramite $estado = EstadoTramite::Rechazado): self
     {
-        return new self('El trámite está rechazado: no admite registrar pagos.');
+        if ($estado === EstadoTramite::Aprobado) {
+            return new self(
+                'El trámite ya está aprobado y su costo estaba cubierto: no admite más depósitos. '.
+                'Si entró dinero de más, no corresponde a este expediente.',
+            );
+        }
+
+        return new self(
+            'El trámite está rechazado: no admite registrar pagos. '.
+            'Reábralo si el beneficiario volvió con lo corregido.',
+        );
     }
 
     public static function transaccionRepetida(string $nro): self
     {
         return new self("El número de transacción «{$nro}» ya fue registrado en otro pago.");
+    }
+
+    /**
+     * Se quiso corregir un depósito que ya no admite correcciones.
+     *
+     * El detalle lo arma `Pago::motivoSinCorreccion()`, que es el mismo texto
+     * que la pantalla muestra en lugar del botón. Escrito dos veces, alcanzaría
+     * con tocar uno para que la pantalla ofrezca lo que el servicio rechaza.
+     */
+    public static function pagoNoSePuedeCorregir(string $detalle): self
+    {
+        return new self("No se puede corregir este depósito: {$detalle}");
+    }
+
+    /**
+     * Se quiso quitar un depósito que ya no se puede quitar.
+     *
+     * El detalle lo arma `Pago::motivoSinEliminacion()`, que es el mismo texto
+     * que la pantalla muestra en lugar del botón.
+     */
+    public static function pagoNoSePuedeEliminar(string $detalle): self
+    {
+        return new self("No se puede quitar este depósito: {$detalle}");
+    }
+
+    /**
+     * Se quiso quitar un depósito sin decir por qué.
+     *
+     * Mismo motivo que al eliminar un expediente: la fila no queda. Con ella se
+     * va el número de transacción, el monto y el vínculo con la boleta, así que
+     * si el porqué no está en `auditorias` no queda nada que explique por qué
+     * el expediente hoy tiene cobrado menos que ayer.
+     */
+    public static function motivoEliminacionPagoObligatorio(): self
+    {
+        return new self('Para quitar un depósito hay que escribir por qué: es lo único que va a quedar de él.');
+    }
+
+    /**
+     * Se intentó aprobar con depósitos que nadie controló.
+     *
+     * El mensaje DICE CUÁNTOS y en qué estado, porque las dos salidas son
+     * distintas: los pendientes se validan, los observados hay que corregirlos
+     * primero. «Faltan validar pagos» a secas manda a abrir la ficha a ver cuál.
+     */
+    public static function pagosSinValidar(int $pendientes, int $observados): self
+    {
+        $partes = [];
+
+        if ($pendientes > 0) {
+            $partes[] = $pendientes === 1
+                ? 'hay 1 depósito sin validar'
+                : "hay {$pendientes} depósitos sin validar";
+        }
+
+        if ($observados > 0) {
+            $partes[] = $observados === 1
+                ? '1 quedó observado'
+                : "{$observados} quedaron observados";
+        }
+
+        return new self(
+            'No se puede aprobar: '.implode(' y ', $partes).
+            '. Los depósitos se controlan uno por uno desde la ficha del trámite.',
+        );
+    }
+
+    /**
+     * Se quiso validar un depósito cargado por uno mismo.
+     *
+     * Separación de funciones: quien dice «entraron 150 Bs» no puede además
+     * declarar que lo comprobó, porque entonces no lo comprobó nadie.
+     */
+    public static function noValidaSuPropioPago(): self
+    {
+        return new self(
+            'No puede validar un depósito que cargó usted mismo. Tiene que revisarlo otra persona.',
+        );
+    }
+
+    /**
+     * Se quiso controlar un depósito fuera del momento en que corresponde.
+     *
+     * El detalle lo arma el modelo —`Pago::motivoSinControl()`— porque cambia
+     * según el estado de lo que se paga, y repetirlo acá sería mantener dos
+     * versiones del mismo texto.
+     */
+    public static function fueraDeMomentoParaControlar(string $detalle): self
+    {
+        return new self(trim('No se puede controlar este depósito ahora. '.$detalle));
+    }
+
+    /**
+     * ========================================================================
+     *  SE QUISO VALIDAR UN DEPÓSITO QUE ESTÁ OBSERVADO
+     * ========================================================================
+     *
+     * Observar es haber encontrado un problema: «la boleta dice 120 y está
+     * cargado 150». Validarlo en el estado siguiente, sin que nadie haya tocado
+     * el dato, sería dar por bueno exactamente lo que se marcó como malo — y el
+     * problema señalado se perdería sin dejar rastro de si se arregló.
+     *
+     * LA SALIDA ES CORREGIRLO. Al corregir un depósito observado vuelve a quedar
+     * SIN CONTROLAR —el dato es nuevo y nadie lo miró todavía— y desde ahí sí se
+     * valida. Ver PagoTramiteService::corregir().
+     *
+     * Si la observación estaba equivocada, abrir «Corregir» y guardar sin
+     * cambiar nada alcanza: lo devuelve a sin controlar y queda en `auditorias`
+     * quién lo hizo.
+     */
+    public static function pagoObservadoSeCorrigePrimero(): self
+    {
+        return new self(
+            'Este depósito está observado: primero hay que corregirlo. '.
+            'Al corregirlo vuelve a quedar sin controlar y ahí se puede validar.',
+        );
+    }
+
+    /** Se quiso observar un depósito sin decir qué está mal. */
+    public static function motivoObservacionObligatorio(): self
+    {
+        return new self(
+            'Escriba qué no cuadra en la boleta: es lo único que le dice a ventanilla qué corregir.',
+        );
     }
 
     public static function motivoRechazoObligatorio(): self
@@ -226,9 +392,12 @@ class SolicitudInvalidaException extends RuntimeException
             ? $faltantes[0]
             : implode(', ', array_slice($faltantes, 0, -1)).' y '.end($faltantes);
 
+        // «Complételo» y no «Cárguelo»: desde que la lista incluye el dinero,
+        // lo que falta puede ser un depósito y no un papel. Las dos cosas se
+        // resuelven en la misma pantalla.
         return new self(
             "No se puede tomar para revisión: falta {$lista}. ".
-            'Cárguelo con «Editar trámite» y vuelva a intentarlo.',
+            'Complételo desde «Editar trámite» y vuelva a intentarlo.',
         );
     }
 }

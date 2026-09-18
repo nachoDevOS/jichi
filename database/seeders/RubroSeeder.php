@@ -17,10 +17,24 @@ use Illuminate\Database\Seeder;
  *   COMERCIALIZADOR  habilita a trasladar y vender el producto. Es la guía
  *                    única de transporte.
  *
- * Una misma persona puede tener los dos en el mismo carnet: pesca y además
- * lleva su producto al mercado. Por eso son rubros del carnet y no dos
- * documentos distintos —que es como se manejaba en papel, con el problema de
- * que el pescador tenía que cargar dos talonarios—.
+ * Una misma persona puede ejercer los dos, y entonces tiene DOS CARNETS en la
+ * misma gestión: uno por actividad, cada uno con su plástico y su firma. Por
+ * eso el rubro es parte de la llave del carnet y no una lista colgada de él.
+ *
+ * ----------------------------------------------------------------------------
+ *  QUÉ PERMISO OPERATIVO EMITE CADA UNO
+ * ----------------------------------------------------------------------------
+ *
+ * El carnet es la llave anual; con él solo no se sale a trabajar. De cada uno
+ * cuelga el permiso con el que se trabaja de verdad:
+ *
+ *     Pescador        ──▶ FAENAS   (una por salida de pesca)
+ *     Comercializador ──▶ GUÍAS    (una por carga trasladada)
+ *
+ * Lo dicen estas dos banderas y NUNCA un `match` sobre el nombre del rubro: el
+ * catálogo lo edita la unidad desde el panel, el mismo rubro figura como
+ * «Pescador» o como «Faena» según quién lo cargó, y los que vengan por
+ * ordenanza entran sin pasar por código.
  *
  * ----------------------------------------------------------------------------
  *  LOS MONTOS SON REFERENCIALES
@@ -66,6 +80,8 @@ class RubroSeeder extends Seeder
                 // La pesca se autoriza POR VOLUMEN: el carnet lleva el cupo en
                 // kilos impreso y se contrasta contra las guías de transporte.
                 'requiere_capacidad' => true,
+                'emite_faenas' => true,
+                'emite_guias' => false,
                 'estado' => EstadoRubro::Activo,
             ],
             [
@@ -76,6 +92,8 @@ class RubroSeeder extends Seeder
                 // La comercialización habilita a trasladar y vender, sin tope
                 // propio: el carnet de este rubro NO lleva renglón de cupo.
                 'requiere_capacidad' => false,
+                'emite_faenas' => false,
+                'emite_guias' => true,
                 'estado' => EstadoRubro::Activo,
             ],
         ];

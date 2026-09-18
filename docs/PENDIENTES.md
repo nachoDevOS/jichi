@@ -1,5 +1,201 @@
 # Qué falta y qué sigue abierto
 
+---
+
+## El circuito del depósito observado quedó cerrado — y un rechazo ya no es el final
+
+El **17/09/2026**, más tarde, apareció en ventanilla un expediente TRABADO: en
+revisión, con un depósito validado y otro observado. No se podía aprobar —faltaba
+controlar el observado—, no se podía corregir —el botón vivía en «Editar
+trámite», que no abre fuera de PENDIENTE— y no se podía agregar otro depósito por
+lo mismo. La única salida que ofrecía la pantalla era «Validar» sobre el
+observado, que es justo la que no corresponde.
+
+El agujero de fondo: **observar solo pasa EN REVISIÓN y corregir solo se podía en
+PENDIENTE**, así que el circuito observar → corregir → validar no se podía
+completar en ninguna pantalla.
+
+Tres cosas cambiaron:
+
+- **Un depósito OBSERVADO ya no ofrece «Validar».** La salida es corregirlo, y al
+  corregirlo vuelve solo a «sin controlar». La regla está en
+  `ValidacionPagoService::validar()`, no solo en la pantalla.
+- **Los depósitos se cargan, se corrigen y se quitan desde la FICHA**, no solo
+  desde «Editar trámite». Al enviar se congelan los PAPELES del expediente, no el
+  dinero.
+- **Al APROBAR se cierra el dinero.** Un trámite aprobado ya no admite depósitos
+  nuevos ni cambios en los que tiene. `permitePagos()` aceptaba aprobado con el
+  motivo «puede terminarse de cobrar después», y eso dejó de poder pasar cuando
+  aprobar pasó a exigir el monto cubierto. Lo único que habilitaba era cargar
+  plata de más sobre un carnet ya emitido y cambiar el detalle de un recibo ya
+  entregado.
+- **Quitar se habilita exactamente cuando corregir.** Estuvo restringido al
+  borrador por un argumento que no se sostiene —«el recibo ya salió»—, y corregir
+  ya cambia el recibo igual: se arma al vuelo, así que bajar un monto de 110 a 30
+  mueve el papel entregado tanto como borrar la fila. Lo que separa a las dos es
+  el PERMISO (`pagos.eliminar`, de administración) y el motivo por escrito. La
+  regla vieja además dejaba sin salida una boleta cargada DOS VECES sobre un
+  expediente ya presentado: corregirla no sirve y quitarla estaba prohibido.
+- **Un trámite RECHAZADO se puede REABRIR** y vuelve a PENDIENTE con sus
+  depósitos y su historial. Antes había que presentar uno nuevo, y eso dejaba la
+  plata colgada del trámite muerto: los pagos cuelgan del trámite por
+  `pagable_id` y no se trasladan solos.
+
+**Lo que hay que tener presente en el uso diario:**
+
+- **Al reenviar un expediente reabierto, el recibo NO cambia de número ni de
+  fecha.** `fecha_revision` se escribe solo si está en NULL. Lo que sí cambia es
+  su DETALLE, porque el comprobante se arma al vuelo con los depósitos que hay
+  —ver `ReciboTramiteService::detalle()`—: si se corrigió un monto o se sumó una
+  boleta, una reimpresión no dice lo mismo que el papel entregado. Es el costo
+  conocido de no tener tabla `recibos`, y ahora se paga más seguido.
+- **Reabrir se niega si el carnet ya tiene otro expediente abierto.** Mientras
+  estaba rechazado se pudo haber presentado uno nuevo; dos abiertos harían que el
+  beneficiario pague dos veces por una habilitación.
+
+---
+
+## Corregir y quitar depósitos: hecho, y con eso cerró el circuito de la observación
+
+Desde el **17/09/2026** una boleta cargada mal se corrige desde «Editar
+trámite», con el botón «Corregir» de cada depósito. Era lo único que faltaba
+para que «observar» sirviera de algo: quien revisa marcaba que el monto no
+cuadraba y del otro lado no había dónde arreglarlo. Ver
+[modulos/PAGOS.md](modulos/PAGOS.md).
+
+**Lo que cambia en el uso diario, y hay que saberlo:**
+
+- Un depósito **ya validado no se puede corregir**. Para cambiarlo, quien revisa
+  tiene que observarlo primero. Es deliberado: validar es una firma con nombre y
+  hora, y no puede quedar puesta sobre un número que cambió después.
+- **Un trámite ya no se envía a revisión sin el costo cubierto.** Antes se podía,
+  y el RECIBO OFICIAL salía igual — un comprobante por dinero que no había
+  entrado. El aviso de la ficha dice cuánto falta.
+
+El mismo día se agregó **quitar un depósito**, para el caso en que corregir no
+alcanza: la misma boleta cargada dos veces, o la de otra persona pegada en el
+expediente equivocado.
+
+- Permiso propio, **`pagos.eliminar`**, del grupo de administración. Hubo que
+  correr `php artisan db:seed --class=RolPermisoSeeder`.
+- **Solo mientras el expediente sea un BORRADOR.** Una vez enviado ya salió el
+  recibo oficial: ahí se puede corregir, pero no quitar. La pantalla lo dice.
+- Motivo obligatorio y casilla de confirmación, como al eliminar un expediente.
+  La boleta se borra del disco con la fila.
+
+**Esto NO es la «anulación de pagos» que el sistema no tiene**, y la diferencia
+importa: anular dejaría la fila a la vista con un estado, invitando a sumarla por
+error. Acá la fila se va y queda la línea de `auditorias`.
+
+- [ ] **Falta corregir y quitar depósitos de FAENAS y GUÍAS.** Las reglas del
+      modelo ya valen para los tres —`admiteCorreccion()` y
+      `admiteEliminacion()` contemplan el permiso anulado— pero los botones solo
+      están en «Editar trámite». Las fichas de faena y guía todavía no muestran
+      ninguno — va junto con el alta de pagos de esos dos, que sigue pendiente
+      más abajo.
+
+### Resuelto de paso: el alta de depósito no pedía la fecha
+
+El formulario «Registrar un depósito» de «Editar trámite» tenía tres campos y
+ninguno era la fecha, así que **todo depósito cargado ahí quedaba con la fecha de
+hoy**. Una boleta del viernes registrada el lunes quedaba fechada el lunes, y esa
+fecha es justo por donde se cruza el pago contra el extracto del banco. El
+formulario del alta del trámite sí la pedía desde el principio, así que el mismo
+dato se cargaba de dos maneras según por dónde entrara.
+
+### Resuelto de paso: al eliminar un expediente, sus boletas quedaban en el disco
+
+`SolicitudCarnetService::rutasDeAdjuntos()` juntaba las boletas con
+`pluck('comprobante')`, y esa columna **no existe** —es `urlFile`; `comprobante_url`
+es el accesor con la dirección completa—. `pluck()` sobre un nombre equivocado no
+falla: devuelve una lista de nulls. Así que cada expediente eliminado dejaba
+todas sus boletas tiradas en el disco, para siempre y sin ningún error.
+
+### Resuelto de paso: la fecha del depósito se mostraba un día antes
+
+`fecha_pago` viajaba como INSTANTE (`2026-09-17T00:00:00+00:00`) y el navegador
+la pasaba a horario local: en Bolivia —UTC-4— eso es el 16 a las 20:00, así que
+**un depósito del 17 se veía como 16/09**, en la ficha y en el libro de caja. El
+operador tipeaba una fecha y la pantalla le contestaba otra. Ahora viaja como
+fecha suelta (`toDateString()`), que es lo que realmente es.
+
+---
+
+## Control de depósitos: hecho, con una consecuencia que hay que saber
+
+Desde el **16/09/2026** cada depósito se valida u observa, y queda escrito quién
+y cuándo. Ver [modulos/PAGOS.md](modulos/PAGOS.md).
+
+**LO QUE CAMBIA EN EL USO DIARIO:** un trámite ya no se puede aprobar hasta que
+alguien haya controlado TODAS sus boletas.
+
+La separación de funciones —que quien carga no valide— empezó siendo una regla
+fija y se convirtió en **configuración** el mismo día: encendida, con un solo
+usuario dejaba el circuito trabado. Hoy arranca APAGADA.
+
+- [ ] **Encender `pagos.revisor_distinto`** el día que haya un segundo usuario.
+      Es el control que corresponde cuando hay dos personas.
+- [ ] Para eso hace falta crear ese usuario, y **no hay pantalla de usuarios
+      todavía**: se crea por consola (`php artisan tinker`).
+- [ ] Tampoco hay pantalla de Configuración, así que el interruptor se cambia
+      por consola: `App\Models\Configuracion::guardar('pagos.revisor_distinto', '1')`.
+
+
+
+---
+
+## Faenas y guías: la base está, las pantallas no
+
+El **16/09/2026** se crearon las tablas, los enums y los modelos de los permisos
+operativos, y `pagos` pasó a ser polimórfica. Lo que quedó escrito y probado:
+
+| Capa | Estado |
+| --- | --- |
+| Migraciones `faenas`, `guias`, `guia_detalles`, `pagos` polimórfica | Escritas y probadas desde cero. **Consolidadas**: no hay migraciones `add_*`, las tablas nacen con su forma final |
+| Enums `EstadoPermiso`, `TipoTransporte`, `CondicionProducto` | Hechos |
+| Modelos `Faena`, `Guia`, `GuiaDetalle` + relaciones | Hechos y probados a mano |
+| `Carnet::faenas()` / `guias()` / `puedeEmitirFaenas()` / `puedeEmitirGuias()` | Hechos |
+| `rubros.emite_faenas` / `emite_guias` + `RubroSeeder` | Sembrados |
+| Libro de caja mostrando los tres conceptos | Hecho |
+
+El **16/09/2026**, más tarde, se agregó la interfaz completa: servicios,
+controladores, rutas, permisos, formularios y fichas. **El módulo se puede usar
+en ventanilla.**
+
+| Capa | Estado |
+| --- | --- |
+| `FaenaService` / `GuiaService` — las reglas de emisión y anulación | Hechos |
+| `PermisoOperativoException` — los mensajes de mostrador | Hecha |
+| Controladores, rutas y permisos (`faenas.*`, `guias.*`) | Hechos |
+| `GuardarFaenaRequest` / `GuardarGuiaRequest` | Hechos |
+| Listado, formulario y ficha de cada uno + ítem en el menú | Hechos |
+| Buscador de carnets filtrado por permiso | Hecho |
+| Las faenas y guías en la ficha del carnet, con su botón de alta | Hecho |
+
+**Lo que sigue faltando:**
+
+- [ ] **El ALTA DE PAGOS de faenas y guías.** `PagoTramiteService` solo sabe de
+      trámites, y su nombre lo dice. Las fichas muestran «Sin depósitos
+      registrados» y no ofrecen ningún botón. **Es lo más urgente**: hoy los dos
+      permisos se emiten pero no se puede registrar contra ellos el depósito, así
+      que el saldo de una faena queda siempre en deuda.
+- [ ] **Los PDF** de la faena y de la guía, calcando los formularios de papel.
+      Mientras tanto se siguen llenando a mano y el sistema solo los registra.
+- [ ] Un reporte por especie y por período, que es para lo que `guia_detalles`
+      es una tabla aparte.
+- [ ] `php artisan db:seed --class=RolPermisoSeeder` hay que correrlo para que
+      los seis permisos nuevos existan en la base — o hacer `migrate:fresh --seed`.
+
+### Un detalle que va a doler si no se resuelve antes de cargar mucho
+
+`guia_detalles.especie` es **texto libre**. Es la decisión correcta hoy —no
+existe un padrón escrito de las especies del Beni, y una lista cerrada
+incompleta impediría emitir la guía— pero significa que «Surubí», «surubi» y
+«SURUBI» van a convivir en la columna por la que después se filtra. El scope
+`deEspecie()` compara con `ILIKE` para tapar lo peor. Cuando la unidad tenga la
+lista oficial, esto pasa a `especie_id` con una migración que mapee lo cargado,
+y cuantas menos filas haya ese día, mejor.
+
 Estado al **15 de septiembre de 2026**, después de agregar la impresión del carnet.
 
 ---

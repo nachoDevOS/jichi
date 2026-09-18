@@ -10,29 +10,12 @@ use Illuminate\Support\Facades\Schema;
 | Beneficiarios — la persona que saca el carnet
 |--------------------------------------------------------------------------
 |
-| EL NOMBRE VA PARTIDO EN CINCO COLUMNAS, NO EN UNA
+| El nombre va PARTIDO EN CINCO COLUMNAS porque así llega: la cédula boliviana
+| lo trae separado. Partirlo después con código no se puede acertar siempre.
 |
-| La cédula boliviana trae el nombre separado y los formularios en papel lo
-| piden separado. Guardarlo en un solo campo obligaría a partirlo después con
-| código, y ahí no hay forma de acertar siempre: «Rosa Elena Antezana Áñez»
-| puede ser dos nombres y dos apellidos, o un nombre y tres apellidos, y la
-| computadora no puede saberlo. Se pide separado porque separado es como llega.
-|
-| El apellido de casada se guarda SIN el «de». En la base va «Justiniano»; el
-| «de Justiniano» lo arma el sistema al imprimir. Si el «de» estuviera dentro
-| de la columna, buscar «Justiniano» no encontraría a esa persona.
-|
-| NOTA SOBRE LOS NOMBRES DE COLUMNA
-|
-| De `primerNombre` en adelante las columnas van en camelCase, por pedido
-| expreso. En PostgreSQL eso obliga a entrecomillarlas en toda consulta escrita
-| a mano:
-|
-|     SELECT primerNombre FROM beneficiarios;     -- ERROR
-|     SELECT "primerNombre" FROM beneficiarios;   -- así sí
-|
-| Laravel y Eloquent no se ven afectados porque siempre entrecomillan solos.
-| El problema aparece al usar whereRaw / orderByRaw (ver Beneficiario::SQL_NOMBRE).
+| De `primerNombre` en adelante van en camelCase. En PostgreSQL eso obliga a
+| entrecomillar en SQL escrito a mano: SELECT "primerNombre", nunca sin comillas.
+| Eloquent entrecomilla solo; el problema aparece con whereRaw / orderByRaw.
 |
 */
 return new class extends Migration
@@ -45,9 +28,6 @@ return new class extends Migration
             // --- Documento de identidad
             $table->string('ci_nit', 30);
             $table->string('complemento', 5)->nullable()->comment('Complemento de CI boliviano');
-
-            // El departamento donde se expidió la cédula. Se imprime al lado
-            // del número en el carnet: «C.I. 7656924 BN».
             $table->string('expedido', 5)->nullable()->comment('BN, LP, SC, CB...');
 
             // --- Nombre, tal como figura en la cédula
@@ -55,12 +35,12 @@ return new class extends Migration
             $table->string('segundoNombre', 60)->nullable()->comment('Mucha gente no tiene');
             $table->string('apellidoPaterno', 60);
             $table->string('apellidoMaterno', 60)->nullable();
+            // Sin el «de»: en la base va «Justiniano». Con el «de» adentro,
+            // buscar «Justiniano» no encontraría a esa persona.
             $table->string('apellidoCasado', 60)->nullable()->comment('Sin el "de": se agrega al imprimir');
 
-            // NO hay columna `nombreCompleto`. El nombre armado no se guarda:
-            // se concatena cuando hace falta, en el modelo. Así no puede quedar
-            // desfasado de sus partes —corregir un apellido cambia el nombre
-            // impreso en el acto—. Ver Beneficiario::nombreCompleto().
+            // NO hay columna `nombreCompleto`: se arma en el modelo, así no
+            // puede quedar desfasado de sus partes.
 
             // --- Datos personales
             $table->date('fechaNacimiento');
@@ -73,48 +53,25 @@ return new class extends Migration
             $table->string('provincia')->nullable();
             $table->string('telefono', 30)->nullable();
             $table->string('email')->nullable();
-
-            // Ruta dentro de storage/app/public. Se imprime en el carnet.
             $table->string('foto')->nullable();
 
-            // No hay `created_by` ni `updated_by`. Quién cargó y quién modificó
-            // cada ficha queda registrado igual, en la tabla `auditorias`: el
-            // trait Auditable escribe una fila por cada alta, edición y baja,
-            // con el usuario y el detalle de lo que cambió. Dos columnas acá
-            // solo repetirían —y peor— lo que esa tabla ya guarda completo.
+            // Sin `created_by` / `updated_by`: quién cargó y quién modificó ya
+            // lo guarda `auditorias`, con el detalle de lo que cambió.
             $table->timestamps();
             $table->softDeletes();
 
-            // Índice sobre las partes del nombre, en el orden en que se ordena
-            // el padrón. No sirve para la BÚSQUEDA —que compara contra el
-            // nombre concatenado y por eso recorre la tabla entera—, pero sí
-            // para el orden alfabético de cada página del listado.
+            // Para el orden alfabético del listado, no para la búsqueda.
             $table->index(['apellidoPaterno', 'apellidoMaterno', 'primerNombre'], 'beneficiarios_nombre_index');
         });
 
         /*
-         * UNA PERSONA, UNA FICHA — y por qué el índice es PARCIAL.
+         * UNA PERSONA, UNA FICHA. Sin esto, la misma persona cargada dos veces
+         * sacaría dos carnets del mismo rubro en la misma gestión.
          *
-         * El script SQL de referencia no traía esta restricción, pero sin ella
-         * nada impide cargar dos veces al mismo pescador, y entonces
-         * `carnets_beneficiario_gestion_unique` deja de servir: la misma
-         * persona sacaría dos carnets en la misma gestión, uno por cada ficha
-         * duplicada. La regla de negocio «un carnet por persona por año» se
-         * apoya sobre esta.
-         *
-         * OJO CON EL BORRADO LÓGICO: la tentación es escribir
-         * unique(['ci_nit','complemento','deleted_at']) para que una ficha dada
-         * de baja no bloquee el alta de una nueva. NO FUNCIONA: en SQL
-         * `NULL != NULL`, así que dos filas vivas —las dos con deleted_at en
-         * NULL— se consideran distintas y el índice no bloquea nada. La forma
-         * correcta es un índice PARCIAL, que solo indexa las filas vivas.
-         *
-         * El COALESCE sobre `complemento` es por lo mismo: el complemento es
-         * opcional, y sin él dos fichas con la misma cédula y sin complemento
-         * pasarían el índice sin chistar.
-         *
-         * SQLite entiende esta misma sintaxis, así que la sentencia sirve en
-         * los dos motores y las pruebas en memoria la ejecutan igual.
+         * El índice es PARCIAL a propósito: meter `deleted_at` dentro del unique
+         * no sirve, porque en SQL NULL != NULL y todas las filas vivas se
+         * considerarían distintas. El COALESCE es por lo mismo, para el
+         * complemento opcional. SQLite entiende esta misma sintaxis.
          */
         DB::statement(<<<'SQL'
             CREATE UNIQUE INDEX beneficiarios_ci_unico

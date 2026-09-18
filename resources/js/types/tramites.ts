@@ -1,3 +1,4 @@
+import type { ControlDePago } from '@/types/pagos';
 import type { EstadoCarnet, EstadoTramite, TipoTramite } from '@/types';
 
 /**
@@ -45,6 +46,14 @@ export interface TramiteFila {
     monto_requerido: number;
     monto_pagado: number;
     saldo_pendiente: number;
+    /**
+     * Cuántos depósitos siguen frenando la aprobación, por estado.
+     *
+     * Separados porque las dos salidas son distintas: un pendiente se valida, un
+     * observado hay que corregirlo antes. Lo calcula
+     * `Tramite::pagosPorControlar()`.
+     */
+    pagos_por_controlar: { pendientes: number; observados: number };
     pagado: boolean;
 
     fecha_solicitud: string | null;
@@ -122,6 +131,16 @@ export interface TramiteFicha extends TramiteFila {
      */
     puede_rechazar: boolean;
 
+    /**
+     * ¿Se puede REABRIR? Solo desde RECHAZADO.
+     *
+     * Es el camino de vuelta: el expediente regresa al borrador con sus
+     * depósitos y sus papeles, en vez de obligar a presentar uno nuevo —que
+     * nacería con cero cobrado mientras el dinero se queda colgado del
+     * rechazado—. Ver `SolicitudCarnetService::reabrir()`.
+     */
+    puede_reabrir: boolean;
+
     /** ¿Se puede editar? Solo en PENDIENTE. Ver EstadoTramite::permiteEdicion(). */
     puede_editar: boolean;
     puede_generar: boolean;
@@ -176,13 +195,63 @@ export interface ReciboDelTramite {
 }
 
 /** Un depósito aplicado al trámite. */
-export interface PagoDelTramite {
+export interface PagoDelTramite extends ControlDePago {
     id: number;
     nro_transaccion: string;
     monto: number;
     comprobante_url: string | null;
     fecha_pago: string | null;
     observaciones: string | null;
+
+    /**
+     * Si este depósito todavía se puede CORREGIR.
+     *
+     * Opcional porque solo lo manda «Editar trámite», que es la pantalla donde
+     * se corrige: la ficha los muestra para controlarlos, no para tocarlos.
+     *
+     * Lo decide el servidor —`Pago::admiteCorreccion()`— y dice que no cuando
+     * el depósito ya fue validado: alguien firmó con su nombre que cuadraba
+     * contra el extracto, y cambiarle el monto después dejaría esa firma puesta
+     * sobre otro número.
+     */
+    puede_corregirse?: boolean;
+
+    /** Por qué no se puede corregir, ya escrito para mostrar. */
+    motivo_sin_correccion?: string | null;
+
+    /**
+     * Si este depósito se puede QUITAR del expediente. Es OTRA pregunta que
+     * `puede_corregirse`, y más estricta.
+     *
+     * Corregir deja la fila y su historial; quitar la hace desaparecer, y con
+     * ella el número de transacción y su boleta. Por eso solo se puede mientras
+     * el expediente sea un BORRADOR: una vez enviado salió el recibo oficial, y
+     * hacer desaparecer un depósito dejaría ese papel cobrando más de lo que el
+     * expediente puede mostrar. Ver `Pago::admiteEliminacion()`.
+     *
+     * Es solo la mitad: la otra es el permiso `pagos.eliminar`, que se consulta
+     * con usePermisos().
+     */
+    puede_eliminarse?: boolean;
+
+    /** Por qué no se puede quitar, ya escrito para mostrar. */
+    motivo_sin_eliminacion?: string | null;
+}
+
+/**
+ * Lo que manda el formulario de CORRECCIÓN de un depósito.
+ *
+ * Es el de alta con dos diferencias: la boleta es opcional —se conserva la que
+ * está si no se elige otra— y `_method`, que convierte el POST en un PUT del
+ * lado de Laravel. Hace falta porque el formulario lleva archivos, y
+ * router.put() no los manda.
+ */
+export interface FormularioCorreccionPago {
+    nro_transaccion: string;
+    monto: string;
+    comprobante: File | null;
+    fecha_pago: string;
+    _method: 'put';
 }
 
 /** Un rubro disponible en el formulario de solicitud. */

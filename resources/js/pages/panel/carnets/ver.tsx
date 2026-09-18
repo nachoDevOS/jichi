@@ -1,5 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Ban, IdCard, ShieldOff, ShieldCheck, User } from 'lucide-react';
+import { Ban, IdCard, Plus, ShieldOff, ShieldCheck, Ship, Truck, User } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { CodigoQr } from '@/components/comunes/codigo-qr';
 import { DialogoImprimirCarnet } from '@/components/panel/carnets/dialogo-imprimir-carnet';
@@ -11,7 +11,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fecha } from '@/lib/utils';
-import type { CarnetFicha, TitularCarnet, TramiteDelCarnet } from '@/types/carnets';
+import type {
+    CarnetFicha,
+    FaenaDelCarnet,
+    GuiaDelCarnet,
+    TitularCarnet,
+    TramiteDelCarnet,
+} from '@/types/carnets';
 
 /**
  * La ficha del carnet: lo que se imprime y lo que se sanciona.
@@ -27,10 +33,15 @@ export default function VerCarnet({
     carnet,
     beneficiario,
     tramites,
+    faenas,
+    guias,
 }: {
     carnet: CarnetFicha;
     beneficiario: TitularCarnet;
     tramites: TramiteDelCarnet[];
+    /** Las últimas 10. El total está en `carnet.total_faenas`. */
+    faenas: FaenaDelCarnet[];
+    guias: GuiaDelCarnet[];
 }) {
     const { puede } = usePermisos();
     const [anulando, setAnulando] = useState(false);
@@ -290,6 +301,161 @@ export default function VerCarnet({
                             )}
                         </CardContent>
                     </Card>
+
+                    {/*
+                        LOS PERMISOS OPERATIVOS QUE CUELGAN DEL CARNET.
+
+                        La sección se muestra según lo que el RUBRO emita
+                        —`emite_faenas`— y no según si hoy se puede emitir: un
+                        carnet vencido ya no emite, pero sigue teniendo que
+                        mostrar lo que emitió en su momento.
+
+                        El BOTÓN, en cambio, mira `puede_emitir_*`, que incluye
+                        la vigencia.
+                    */}
+                    {carnet.emite_faenas && (
+                        <Card>
+                            <CardHeader className="flex-row items-center justify-between gap-3">
+                                <CardTitle>
+                                    Faenas
+                                    {carnet.total_faenas > 0 && (
+                                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                            {carnet.total_faenas}
+                                        </span>
+                                    )}
+                                </CardTitle>
+
+                                {carnet.puede_emitir_faenas && puede('faenas.crear') && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            router.visit(route('faenas.create', { carnet: carnet.id }))
+                                        }
+                                    >
+                                        <Plus className="size-4" />
+                                        Nueva faena
+                                    </Button>
+                                )}
+                            </CardHeader>
+
+                            <CardContent>
+                                {faenas.length === 0 ? (
+                                    <p className="py-4 text-sm text-muted-foreground">
+                                        Sin faenas emitidas.
+                                    </p>
+                                ) : (
+                                    <ul className="divide-y divide-border text-sm">
+                                        {faenas.map((f) => (
+                                            <li
+                                                key={f.id}
+                                                className="flex flex-wrap items-center gap-3 py-2"
+                                            >
+                                                <Link
+                                                    href={route('faenas.show', f.id)}
+                                                    className="font-mono text-xs text-primary hover:underline"
+                                                >
+                                                    {f.nro_permiso}
+                                                </Link>
+
+                                                <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
+
+                                                <span className="text-muted-foreground">
+                                                    {f.embarcacion ?? '—'}
+                                                </span>
+
+                                                <span className="ml-auto tabular-nums text-muted-foreground">
+                                                    {f.cantidad ?? '—'} · {fecha(f.fecha_salida)}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+
+                                {/* El listado completo, cuando hay más de las
+                                    diez que trae la ficha. */}
+                                {carnet.total_faenas > faenas.length && (
+                                    <Link
+                                        href={route('faenas.index', { buscar: carnet.registro })}
+                                        className="mt-3 inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                                    >
+                                        <Ship className="size-4" />
+                                        Ver las {carnet.total_faenas}
+                                    </Link>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {carnet.emite_guias && (
+                        <Card>
+                            <CardHeader className="flex-row items-center justify-between gap-3">
+                                <CardTitle>
+                                    Guías de transporte
+                                    {carnet.total_guias > 0 && (
+                                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                            {carnet.total_guias}
+                                        </span>
+                                    )}
+                                </CardTitle>
+
+                                {carnet.puede_emitir_guias && puede('guias.crear') && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            router.visit(route('guias.create', { carnet: carnet.id }))
+                                        }
+                                    >
+                                        <Plus className="size-4" />
+                                        Nueva guía
+                                    </Button>
+                                )}
+                            </CardHeader>
+
+                            <CardContent>
+                                {guias.length === 0 ? (
+                                    <p className="py-4 text-sm text-muted-foreground">
+                                        Sin guías emitidas.
+                                    </p>
+                                ) : (
+                                    <ul className="divide-y divide-border text-sm">
+                                        {guias.map((g) => (
+                                            <li
+                                                key={g.id}
+                                                className="flex flex-wrap items-center gap-3 py-2"
+                                            >
+                                                <Link
+                                                    href={route('guias.show', g.id)}
+                                                    className="font-mono text-xs text-primary hover:underline"
+                                                >
+                                                    {g.nro_guia}
+                                                </Link>
+
+                                                <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
+
+                                                <span className="text-muted-foreground">
+                                                    {g.transporte_etiqueta} · {g.destino_lugar ?? '—'}
+                                                </span>
+
+                                                <span className="ml-auto tabular-nums text-muted-foreground">
+                                                    {g.total_kg.toFixed(2)} kg · {fecha(g.fecha)}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+
+                                {carnet.total_guias > guias.length && (
+                                    <Link
+                                        href={route('guias.index', { buscar: carnet.registro })}
+                                        className="mt-3 inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                                    >
+                                        <Truck className="size-4" />
+                                        Ver las {carnet.total_guias}
+                                    </Link>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </div>
         </LayoutPanel>

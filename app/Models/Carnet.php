@@ -109,6 +109,38 @@ class Carnet extends Model
         return $this->belongsTo(Rubro::class);
     }
 
+    /*
+     * ------------------------------------------------------------------
+     *  LOS PERMISOS OPERATIVOS QUE CUELGAN DEL CARNET
+     * ------------------------------------------------------------------
+     *
+     * El carnet es la LLAVE ANUAL; con él solo no se sale a trabajar. Lo que
+     * autoriza el trabajo de cada día son estos dos, y se emiten muchos por
+     * gestión:
+     *
+     *     carnet de Pescador        ──< faenas  (una por salida)
+     *     carnet de Comercializador ──< guías   (una por carga trasladada)
+     *
+     * LAS DOS RELACIONES EXISTEN EN TODO CARNET, aunque un carnet dado solo use
+     * una. Limitarlas por rubro desde el modelo obligaría a preguntar antes de
+     * poder consultar, y devolver una colección vacía dice exactamente lo
+     * mismo. Qué puede emitir cada actividad lo dicen `Rubro::emiteFaenas()` y
+     * `Rubro::emiteGuias()`, y lo hace cumplir el servicio al crear.
+     *
+     * Ordenadas de la más nueva a la más vieja porque la ficha muestra primero
+     * lo último emitido, que es lo que se consulta.
+     */
+
+    public function faenas(): HasMany
+    {
+        return $this->hasMany(Faena::class)->latest('fecha_salida');
+    }
+
+    public function guias(): HasMany
+    {
+        return $this->hasMany(Guia::class)->latest('id');
+    }
+
     // ------------------------------------------------------------------
     //  Reglas de negocio
     // ------------------------------------------------------------------
@@ -146,6 +178,35 @@ class Carnet extends Model
     public function admiteTramites(): bool
     {
         return $this->estado->admiteTramites() && $this->estaVigente();
+    }
+
+    /**
+     * ========================================================================
+     *  ¿SE LE PUEDE EMITIR UNA FAENA / UNA GUÍA A ESTE CARNET?
+     * ========================================================================
+     *
+     * SON DOS CONDICIONES Y LAS DOS HACEN FALTA:
+     *
+     *   - QUE LA ACTIVIDAD LO EMITA. Un carnet de Comercializador no da faenas
+     *     por más vigente que esté: son permisos de pesca. Lo dice el catálogo
+     *     —`rubros.emite_faenas`— y no un `match` sobre el nombre del rubro, por
+     *     lo mismo que `requiereCapacidad()`: el nombre lo edita la unidad desde
+     *     el panel y cambia.
+     *   - QUE EL CARNET VALGA HOY. Un carnet vencido o suspendido no habilita a
+     *     salir, así que tampoco puede autorizar una salida nueva.
+     *
+     * Devuelve un booleano y no lanza nada: es la pregunta que hace la pantalla
+     * para mostrar u ocultar el botón. Quien IMPIDE la emisión es el servicio,
+     * que además tiene que explicar en castellano cuál de las dos falló.
+     */
+    public function puedeEmitirFaenas(): bool
+    {
+        return $this->estaVigente() && (bool) $this->rubro?->emiteFaenas();
+    }
+
+    public function puedeEmitirGuias(): bool
+    {
+        return $this->estaVigente() && (bool) $this->rubro?->emiteGuias();
     }
 
     /**

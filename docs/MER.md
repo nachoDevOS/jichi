@@ -3,11 +3,11 @@
 Sistema de carnets de pesca del Gobierno Autónomo Departamental del Beni.
 PostgreSQL 18. Generado desde el esquema real (`storage/app/jichi-esquema.sql`).
 
-Las 24 tablas de la base se dividen en tres grupos:
+Las 27 tablas de la base se dividen en tres grupos:
 
 | Grupo | Tablas | Qué son |
 | --- | --- | --- |
-| **Dominio** | `beneficiarios`, `rubros`, `carnets`, `tramites`, `pagos` | El negocio. Son las que se modelan acá |
+| **Dominio** | `beneficiarios`, `rubros`, `carnets`, `tramites`, `pagos`, `faenas`, `guias`, `guia_detalles` | El negocio. Son las que se modelan acá |
 | **Soporte** | `users`, `correlativos`, `configuraciones`, `auditorias`, `accesos` | Operación del sistema |
 | **Infraestructura** | `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `sessions`, `migrations` | Laravel y el paquete de permisos. No son del negocio |
 
@@ -21,8 +21,12 @@ erDiagram
     RUBROS        ||--o{ CARNETS : "es la actividad de"
     CARNETS       ||--o{ TRAMITES : "recibe"
     RUBROS        ||--o{ TRAMITES : "se solicita en"
-    TRAMITES      ||--o{ PAGOS : "se cubre con"
-    TRAMITES      ||--o| RECIBOS : "genera"
+    CARNETS       ||--o{ FAENAS : "autoriza salidas de"
+    CARNETS       ||--o{ GUIAS : "autoriza traslados de"
+    GUIAS         ||--o{ GUIA_DETALLES : "traslada"
+    TRAMITES      ||--o{ PAGOS : "se cubre con (pagable)"
+    FAENAS        ||--o{ PAGOS : "se cubre con (pagable)"
+    GUIAS         ||--o{ PAGOS : "se cubre con (pagable)"
 
     BENEFICIARIOS {
         bigint    id PK
@@ -52,6 +56,8 @@ erDiagram
         text    descripcion
         numeric costo "tarifa vigente en Bs"
         boolean requiere_capacidad "si se autoriza por volumen (kilos)"
+        boolean emite_faenas "si de sus carnets cuelgan faenas"
+        boolean emite_guias "si de sus carnets cuelgan guias"
         varchar estado "activo | inactivo"
     }
 
@@ -90,30 +96,70 @@ erDiagram
 
     PAGOS {
         bigint    id PK
-        bigint    tramite_id FK
+        varchar   pagable_type "Tramite | Faena | Guia — SIN clave foranea"
+        bigint    pagable_id "id dentro de esa tabla"
         varchar   nro_transaccion UK
         numeric   monto
         varchar   urlFile "comprobante escaneado del deposito"
         timestamp fecha_pago
         text      observaciones
+        bigint    registrado_por FK "SET NULL. Quien lo cargo"
+        varchar   estado_validacion "pendiente | validado | observado"
+        bigint    validado_por FK "SET NULL. NO puede ser el mismo"
+        timestamp validado_at
+        text      motivo_observacion "obligatorio al observar"
     }
 
-    RECIBOS {
-        bigint   id PK
-        bigint   tramite_id FK "UQ, nullable"
-        integer  numero "UQ junto con gestion"
-        smallint gestion
-        varchar  beneficiario_nombre "copia congelada"
-        varchar  beneficiario_ci "copia congelada"
-        varchar  concepto
-        varchar  descripcion "permiso_faena | guia_transporte | otros..."
-        numeric  monto
-        varchar  forma_pago "deposito | efectivo"
-        varchar  nro_deposito
-        varchar  lugar
-        date     fecha_emision
-        json     detalle "renglones del cuadro de importes"
+    FAENAS {
+        bigint  id PK
+        bigint  carnet_id FK "carnet de un rubro con emite_faenas"
+        varchar nro_permiso UK "numero del talonario de papel"
+        varchar nro_recibo
+        numeric monto "tarifa por salida, copia congelada"
+        varchar embarcacion
+        varchar propietario
+        varchar comandante_barco
+        varchar matricula_naval
+        varchar nro_kardex
+        varchar region_desde
+        varchar region_hasta
+        date    fecha_salida "obligatoria: abre la ventana"
+        date    fecha_desembarque "obligatoria: la cierra"
+        numeric cantidad_autorizada_kg "tope de ESTA salida"
+        varchar estado "emitido | anulado"
     }
+
+    GUIAS {
+        bigint  id PK
+        bigint  carnet_id FK "carnet de un rubro con emite_guias"
+        varchar nro_guia UK "numero del talonario de papel"
+        varchar nro_recibo
+        varchar origen_lugar
+        varchar origen_depto
+        varchar origen_provincia
+        varchar origen_distrito
+        varchar destino_lugar
+        varchar destino_depto
+        varchar destino_provincia
+        varchar destino_distrito
+        varchar tipo_transporte "fluvial | aerea | terrestre"
+        varchar transporte_nombre
+        varchar transporte_placa
+        numeric capacidad_maxima "del vehiculo, no del permiso"
+        text    observaciones
+        varchar estado "emitido | anulado"
+    }
+
+    GUIA_DETALLES {
+        bigint  id PK
+        bigint  guia_id FK "CASCADE"
+        varchar especie "texto libre: no hay padron"
+        varchar condicion "fresco | congelado | seco | salado"
+        numeric cantidad_kg
+        numeric precio_unitario
+        numeric imponible "lo que dice el papel. NO se recalcula"
+    }
+
 ```
 
 ### Cómo se lee
@@ -125,11 +171,18 @@ erDiagram
 | `carnets` → `tramites` | 1 : 0..N | Cada rubro pedido es un trámite distinto colgado del mismo carnet |
 | `rubros` → `tramites` | 1 : 0..N | Un trámite pide exactamente un rubro |
 | `tramites` → `pagos` | 1 : 0..N | Un trámite se cubre con uno o varios depósitos |
+| `carnets` → `faenas` | 1 : 0..N | Un carnet de Pescador autoriza muchas salidas al año, una por faena |
+| `carnets` → `guias` | 1 : 0..N | Un carnet de Comercializador ampara muchos traslados al año |
+| `guias` → `guia_detalles` | 1 : N | Una guía traslada varias especies, cada una con su condición y sus kilos |
+| `faenas` → `pagos` | 1 : 0..N | Se cobran como el trámite: uno o varios depósitos |
+| `guias` → `pagos` | 1 : 0..N | Ídem |
 | `tramites` → *recibo* | 1 : 0..1 | **Sin tabla.** El comprobante se arma al vuelo; existe desde que hay `fecha_revision` |
 
-**Acá había un N:M y ya no lo hay.** `carnets` ↔ `rubros` se resolvía con una entidad asociativa, `carnet_rubro`, que tenía identidad y atributos propios (`fecha_habilitacion`, `capacidad_kg`, `estado`) y nacía al aprobar un trámite: era la habilitación misma.
+**`pagos` ES POLIMÓRFICA, Y ESO SIGNIFICA QUE PERDIÓ SU CLAVE FORÁNEA.** Las tres cosas que se cobran —el trámite, la faena y la guía— se pagan igual: uno o varios depósitos, cada uno con su boleta y su número de transacción. Modelarlas con tres tablas obligaría a triplicar el índice único de `nro_transaccion`, y entonces DEJARÍA de ser único: la misma boleta podría pagar un trámite y una faena, que es justo el fraude que ese índice viene a frenar.
 
-Al pasar a **un carnet por rubro**, esa entidad quedó sin razón de ser: sus atributos son los del carnet, y su clave `(carnet_id, rubro_id)` es redundante con la del carnet. Se eliminó, y con ella el enum `EstadoHabilitacion`, cuyos dos valores se absorbieron en `EstadoCarnet`. **El carnet ES la habilitación.**
+El costo es real y hay que tenerlo presente: **el motor ya no puede garantizar que `pagable_id` apunte a algo que existe**, ni impedir que se borre lo pagado. Por eso las tres tablas de destino van con `RESTRICT` hacia arriba y ninguna se borra en el uso normal. Esa integridad la sostiene la aplicación, igual que en `auditorias`.
+
+**Acá había un N:M y ya no lo hay** (esto es aparte, y es historia). `carnets` ↔ `rubros` se resolvía con una entidad asociativa, `carnet_rubro`. Al pasar a **un carnet por rubro**, esa entidad quedó sin razón de ser: sus atributos son los del carnet, y su clave `(carnet_id, rubro_id)` es redundante con la del carnet. Se eliminó, y con ella el enum `EstadoHabilitacion`, cuyos dos valores se absorbieron en `EstadoCarnet`. **El carnet ES la habilitación.**
 
 ---
 
@@ -142,6 +195,8 @@ Lo que hace interesante a este MER no son las claves foráneas sino las restricc
 | `carnets_beneficiario_rubro_gestion_unique (beneficiario_id, rubro_id, gestion)` | `carnets` | **Una persona, un carnet por actividad y por año.** Es la regla que ordena todo el sistema |
 | `carnets_firma_validacion_unique` | `carnets` | El carnet **no tiene número**: se identifica por su firma de 16 caracteres, que además es la llave de la verificación pública |
 | `pagos_nro_transaccion_unique` | `pagos` | El mismo depósito no se carga dos veces |
+| `faenas_nro_permiso_unique` | `faenas` | Dos faenas con el mismo número serían dos papeles que dicen ser el mismo, y en un control nadie sabría cuál vale |
+| `guias_nro_guia_unique` | `guias` | Ídem para la guía de transporte |
 | `rubros_nombre_unique` | `rubros` | No hay dos rubros con el mismo nombre |
 | `correlativos_serie_anio_unique` | `correlativos` | Fuente del número de recibo: una fila por serie y año |
 | `beneficiarios_ci_unico` | `beneficiarios` | Un CI + complemento por persona — tiene truco, ver abajo |
@@ -171,7 +226,12 @@ Las claves foráneas no son todas iguales, y ahí se lee el valor que el sistema
 | `tramites.carnet_id` → `carnets` | `RESTRICT` | No se borra un carnet con expedientes |
 | `tramites.rubro_id` → `rubros` | `RESTRICT` | No se borra un rubro que alguien solicitó |
 | `carnets.rubro_id` → `rubros` | `RESTRICT` | Ni uno con carnets emitidos: el catálogo se inactiva, no se borra |
-| `pagos.tramite_id` → `tramites` | `CASCADE` | El pago no existe sin su trámite |
+| `faenas.carnet_id` → `carnets` | `RESTRICT` | Una faena circuló por el río: no se borra con el carnet |
+| `guias.carnet_id` → `carnets` | `RESTRICT` | Ídem: la guía acompañó carga real |
+| `guia_detalles.guia_id` → `guias` | `CASCADE` | La única cascada del módulo: el detalle no vale sin su guía, y el formulario reescribe la grilla entera |
+| `pagos.pagable_id` → *(nada)* | **sin clave foránea** | Es polimórfica. Lo cubren los `RESTRICT` de arriba, no el motor |
+| `pagos.registrado_por` → `users` | `SET NULL` | El usuario se da de baja y el depósito tiene que seguir siendo legible |
+| `pagos.validado_por` → `users` | `SET NULL` | Ídem. **No puede ser el mismo que `registrado_por`**, y eso lo impide el servicio, no la base |
 | `auditorias.user_id` → `users` | `SET NULL` | El registro histórico no se borra con el usuario |
 | `accesos.user_id` → `users` | `SET NULL` | Ídem |
 
@@ -206,6 +266,14 @@ Todos van en columnas `varchar`, nunca en tipos `ENUM` nativos de PostgreSQL —
 | `tramites.tipo_tramite` | `emision_inicial`, `actualizacion` | `TipoTramite` |
 | `carnets.estado` | `vigente`, `vencido`, `anulado` | `EstadoCarnet` |
 | `rubros.estado` | `activo`, `inactivo` | `EstadoRubro` |
+| `faenas.estado` | `emitido`, `anulado` | `EstadoPermiso` |
+| `guias.estado` | `emitido`, `anulado` | `EstadoPermiso` (el mismo) |
+| `guias.tipo_transporte` | `fluvial`, `aerea`, `terrestre` | `TipoTransporte` |
+| `guia_detalles.condicion` | `fresco`, `congelado`, `seco`, `salado` | `CondicionProducto` |
+| `pagos.estado_validacion` | `pendiente`, `validado`, `observado` | `EstadoValidacionPago` |
+| `pagos.pagable_type` | `App\Models\Tramite`, `App\Models\Faena`, `App\Models\Guia` | *(sin enum: lo escribe Eloquent)* |
+
+**`EstadoPermiso` tiene DOS valores y esa pobreza es deliberada.** Un trámite recorre un circuito porque es un expediente; una faena y una guía se llenan en el mostrador, se cobran y se entregan en el acto — nacen valiendo. Y se ANULAN en vez de borrarse: el número salió de un talonario de papel, ya se gastó, y un hueco en la serie no se puede explicar después.
 
 ### El ciclo de vida del trámite
 
@@ -311,6 +379,15 @@ erDiagram
 4. Se **envía a revisión**: en la misma transacción nace el **recibo** numerado, y el pescador se va con ese papel.
 5. Se **aprueba**: el cupo y la asociación se consolidan en el **carnet** y recién ahí la persona queda habilitada.
 6. Se **imprime** el carnet (`fecha_generacion`) y se **entrega** (`fecha_entrega`).
+
+Y ahí **recién empieza el trabajo de todos los días**, que es lo que el carnet habilita:
+
+7. Con un carnet de **Pescador** vigente se emite una **faena** por cada salida: embarcación, comandante, de tal día a tal día, con tanto autorizado en kilos.
+8. Con un carnet de **Comercializador** vigente se emite una **guía** por cada carga trasladada, con su **detalle** especie por especie.
+9. Las dos se cobran con **pagos**, la misma tabla que cubre el trámite.
+10. **Cada depósito se controla**: alguien abre la boleta, la compara contra el extracto del banco y la VALIDA u OBSERVA. Un trámite con alguna boleta sin controlar no se puede aprobar.
+
+Qué puede emitir cada carnet lo dicen `rubros.emite_faenas` y `rubros.emite_guias`, **nunca el nombre del rubro**: el catálogo lo edita la unidad desde el panel y el mismo rubro figura como «Pescador» o como «Faena» según quién lo cargó.
 
 ---
 

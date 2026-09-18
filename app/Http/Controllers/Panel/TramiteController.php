@@ -13,6 +13,7 @@ use App\Models\Rubro;
 use App\Models\Tramite;
 use App\Services\ReciboTramiteService;
 use App\Services\SolicitudCarnetService;
+use App\Support\ControlDePago;
 use App\Support\Paginacion;
 use App\Support\SituacionCarnet;
 use Illuminate\Http\RedirectResponse;
@@ -252,14 +253,22 @@ class TramiteController extends Controller
     /**
      * FICHA — GET /panel/tramites/{tramite}
      */
-    public function show(Tramite $tramite): Response
+    public function show(Request $request, Tramite $tramite): Response
     {
         $tramite->load([
             'rubro',
             'carnet.beneficiario',
             'carnet.rubro',
-            'pagos',
+            // Con `validadoPor` y `registradoPor`: la ficha muestra quién cargó
+            // y quién controló cada boleta, y sin esto son dos consultas por
+            // depósito.
+            'pagos.registradoPor:id,name',
+            'pagos.validadoPor:id,name',
         ]);
+
+        // Quién está mirando, para saber si puede validar cada depósito: quien
+        // cargó la boleta no puede darla por buena.
+        $usuario = $request->user();
 
         return Inertia::render('panel/tramites/ver', [
             'tramite' => [
@@ -310,6 +319,9 @@ class TramiteController extends Controller
                     : [],
                 'puede_aprobar' => $tramite->puedeAprobarse(),
                 'puede_rechazar' => $tramite->puedeRechazarse(),
+                // El camino de vuelta de un rechazo. Ver
+                // SolicitudCarnetService::reabrir().
+                'puede_reabrir' => $tramite->puedeReabrirse(),
                 'puede_editar' => $tramite->estado->permiteEdicion(),
                 'puede_generar' => $tramite->puedeGenerarse(),
                 'puede_entregar' => $tramite->puedeEntregarse(),
@@ -346,13 +358,48 @@ class TramiteController extends Controller
                 'capacidad' => $tramite->carnet->capacidadLegible(),
             ],
 
+            /*
+             * EL `pagable` SE LE PONE A MANO A CADA DEPÓSITO.
+             *
+             * `admiteCorreccion()` y `admiteEliminacion()` preguntan por el
+             * estado de lo que se paga, y `pagable` es polimórfica: sin esto,
+             * cada pago vuelve a consultar el MISMO trámite que ya está en
+             * memoria. Acá se sabe de qué es cada uno: son todos de este
+             * expediente.
+             */
             'pagos' => $tramite->pagos->map(fn ($p): array => [
                 'id' => $p->id,
                 'nro_transaccion' => $p->nro_transaccion,
                 'monto' => (float) $p->monto,
                 'comprobante_url' => $p->comprobante_url,
-                'fecha_pago' => $p->fecha_pago?->toIso8601String(),
+                // Fecha SUELTA y no instante: lo que guarda la columna es el día
+                // que dice la boleta, y mandado como instante el navegador lo
+                // corría un día hacia atrás en Bolivia. El porqué largo está en
+                // PagoController::index().
+                'fecha_pago' => $p->fecha_pago?->toDateString(),
                 'observaciones' => $p->observaciones,
+                // El control de cada boleta. Es ACÁ donde quien revisa trabaja:
+                // abre el expediente, mira las boletas una por una y recién
+                // entonces aprueba.
+                ...ControlDePago::resumen($p, $usuario),
+
+                /*
+                 * Y QUÉ SE PUEDE HACER CON LA FILA, que en esta pantalla hace
+                 * falta desde que un depósito OBSERVADO ya no se puede validar.
+                 *
+                 * La salida de un observado es corregirlo, y observar solo pasa
+                 * EN REVISIÓN —el control es parte de la revisión—, así que si
+                 * el botón de corregir viviera solo en «Editar trámite» el
+                 * circuito no se podría cerrar en ninguna pantalla: ahí está el
+                 * expediente que quedó trabado.
+                 *
+                 * `puede_eliminarse` llega en false mientras el expediente no
+                 * sea un borrador, así que el botón de quitar se esconde solo.
+                 */
+                'puede_corregirse' => $p->setRelation('pagable', $tramite)->admiteCorreccion(),
+                'motivo_sin_correccion' => $p->motivoSinCorreccion(),
+                'puede_eliminarse' => $p->admiteEliminacion(),
+                'motivo_sin_eliminacion' => $p->motivoSinEliminacion(),
             ])->all(),
 
             /*
@@ -403,7 +450,7 @@ class TramiteController extends Controller
      * las observaciones. Ni el rubro ni el beneficiario se pueden cambiar: eso
      * sería otro trámite, no una corrección de este.
      */
-    public function edit(Tramite $tramite): Response|RedirectResponse
+    public function edit(Request $request, Tramite $tramite): Response|RedirectResponse
     {
         /*
          * SE VUELVE A LA FICHA, NO SE ABORTA CON UN 403.
@@ -424,7 +471,17 @@ class TramiteController extends Controller
                 ->with('error', SolicitudInvalidaException::tramiteNoSePuedeEditar($tramite->estado)->getMessage());
         }
 
-        $tramite->load(['rubro:id,nombre,requiere_capacidad', 'carnet:id,gestion,beneficiario_id', 'carnet.beneficiario', 'pagos']);
+        // Los dos usuarios de cada pago van en el load: `ControlDePago::resumen()`
+        // muestra los NOMBRES de quien cargó y quien controló, y sin esto son
+        // dos consultas por depósito.
+        $tramite->load([
+            'rubro:id,nombre,requiere_capacidad',
+            'carnet:id,gestion,beneficiario_id',
+            'carnet.beneficiario',
+            'pagos',
+            'pagos.registradoPor:id,name',
+            'pagos.validadoPor:id,name',
+        ]);
 
         return Inertia::render('panel/tramites/editar', [
             'tramite' => [
@@ -456,13 +513,63 @@ class TramiteController extends Controller
                 'admite_pagos' => $tramite->estado->permitePagos(),
             ],
 
+            /*
+             * EL `pagable` SE LE PONE A MANO A CADA DEPÓSITO.
+             *
+             * `admiteCorreccion()` pregunta por el estado de lo que se paga, y
+             * `pagable` es polimórfica: sin esto, cada pago vuelve a consultar
+             * el MISMO trámite que ya está en memoria —un N+1 silencioso, que
+             * es la forma en que este problema aparece siempre—. Acá se sabe
+             * de qué es cada uno: son todos de este expediente.
+             */
             'pagos' => $tramite->pagos->map(fn ($p): array => [
                 'id' => $p->id,
                 'nro_transaccion' => $p->nro_transaccion,
                 'monto' => (float) $p->monto,
                 'comprobante_url' => $p->comprobante_url,
-                'fecha_pago' => $p->fecha_pago?->toIso8601String(),
+                // Fecha SUELTA y no instante: lo que guarda la columna es el día
+                // que dice la boleta, y mandado como instante el navegador lo
+                // corría un día hacia atrás en Bolivia. El porqué largo está en
+                // PagoController::index().
+                'fecha_pago' => $p->fecha_pago?->toDateString(),
                 'observaciones' => $p->observaciones,
+
+                /*
+                 * EL CONTROL VIAJA TAMBIÉN ACÁ, aunque esta pantalla no
+                 * controla nada.
+                 *
+                 * No es para dibujar los botones de validar —esos son de la
+                 * ficha, porque quien carga la boleta no puede darla por
+                 * buena—: es porque el estado del control CONDICIONA la
+                 * corrección. Un depósito validado no se toca, y uno observado
+                 * vuelve a quedar sin controlar al corregirlo; las dos cosas
+                 * las dice la pantalla antes de que el operador escriba.
+                 */
+                ...ControlDePago::resumen($p, $request->user()),
+
+                /*
+                 * SI ESTE DEPÓSITO TODAVÍA SE PUEDE CORREGIR.
+                 *
+                 * Lo decide el servidor —`Pago::admiteCorreccion()`— y no React,
+                 * por lo mismo que los `puede_*` del circuito: la regla es una
+                 * sola y vive en el modelo. Un depósito ya validado no se toca,
+                 * porque alguien firmó con su nombre que cuadraba contra el
+                 * extracto del banco.
+                 *
+                 * Esconder el botón es comodidad; quien impide de verdad es
+                 * PagoTramiteService::corregir().
+                 */
+                'puede_corregirse' => $p->setRelation('pagable', $tramite)->admiteCorreccion(),
+                'motivo_sin_correccion' => $p->motivoSinCorreccion(),
+
+                /*
+                 * Y SI SE PUEDE QUITAR, que es OTRA pregunta.
+                 *
+                 * Quitar es más estricto que corregir: solo mientras el
+                 * expediente sea un borrador. Ver `Pago::admiteEliminacion()`.
+                 */
+                'puede_eliminarse' => $p->admiteEliminacion(),
+                'motivo_sin_eliminacion' => $p->motivoSinEliminacion(),
             ])->all(),
         ]);
     }
@@ -564,6 +671,30 @@ class TramiteController extends Controller
      * que el rubro no esté ya habilitado— lo hace el servicio dentro de una
      * transacción y con la fila bloqueada.
      */
+    /**
+     * REABRIR — PATCH /panel/tramites/{tramite}/reabrir
+     *
+     * El pescador volvió al mostrador con lo que le faltaba. El expediente
+     * rechazado vuelve a ser BORRADOR, con sus depósitos y su historial, en vez
+     * de obligar a presentar uno nuevo — que nacería con cero cobrado mientras
+     * el dinero se queda colgado del rechazado.
+     *
+     * NO PIDE MOTIVO, al revés que rechazar y eliminar. Esos dos cierran algo y
+     * el motivo es lo único que queda para explicarlo; esto no decide nada:
+     * devuelve el expediente a la mesa de quien lo arma, y el porqué ya está
+     * escrito en el rechazo que se está atendiendo.
+     */
+    public function reabrir(Tramite $tramite): RedirectResponse
+    {
+        try {
+            $this->solicitudes->reabrir($tramite);
+        } catch (SolicitudInvalidaException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('exito', 'Expediente reabierto. Ya se puede corregir y volver a enviar a revisión.');
+    }
+
     public function aprobar(Tramite $tramite): RedirectResponse
     {
         try {
@@ -729,6 +860,16 @@ class TramiteController extends Controller
             'monto_pagado' => $tramite->montoPagado(),
             'saldo_pendiente' => $tramite->saldoPendiente(),
             'pagado' => $tramite->estaPagado(),
+
+            /*
+             * CUÁNTOS DEPÓSITOS SIGUEN FRENANDO LA APROBACIÓN.
+             *
+             * Que el botón «Aprobar» desaparezca no alcanza: el supervisor tiene
+             * que poder saber POR QUÉ sin apretar nada. Van separados pendientes
+             * de observados porque las dos salidas son distintas —uno se valida,
+             * el otro hay que corregirlo primero—.
+             */
+            'pagos_por_controlar' => $tramite->pagosPorControlar(),
 
             'fecha_solicitud' => $tramite->fecha_solicitud?->toIso8601String(),
 

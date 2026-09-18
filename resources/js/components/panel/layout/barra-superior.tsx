@@ -3,7 +3,7 @@ import { ChevronRight, LogOut, Menu, PanelLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { LogoJichi } from '@/components/comunes/logo-jichi';
 import { ToggleApariencia } from '@/components/comunes/toggle-apariencia';
-import { moduloActual } from '@/components/panel/layout/navegacion';
+import { moduloActual, nombreDe } from '@/components/panel/layout/navegacion';
 import { iniciales } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
@@ -153,8 +153,12 @@ export function BarraSuperior({
  *
  * El último tramo es el `titulo` que ya recibe el layout, así que tampoco hay
  * un dato nuevo que mantener. Cuando el título ES el del módulo —el listado de
- * trámites se llama «Trámites»— el tramo del medio se saltea, o la miga diría
- * «Inicio / Trámites / Trámites».
+ * trámites de carnet se llama «Trámites de carnet»— el tramo del medio se
+ * saltea, o la miga diría «Inicio / Trámites de carnet / Trámites de carnet».
+ *
+ * SE USA `tituloCompleto` Y NO `titulo`: en la barra lateral los ítems de un
+ * grupo van con el nombre corto —«De faena», porque el grupo ya dice
+ * «Trámites»— y acá esa palabra suelta no se entiende.
  */
 function Migas({ titulo }: { titulo: string }) {
     const { ziggy } = usePage<PageProps>().props;
@@ -173,16 +177,16 @@ function Migas({ titulo }: { titulo: string }) {
                 Inicio
             </Link>
 
-            {modulo && !enElTablero && modulo.titulo !== titulo && (
+            {modulo && !enElTablero && nombreDe(modulo) !== titulo && (
                 <>
                     <ChevronRight aria-hidden className="size-3" />
 
                     {enlazable ? (
                         <Link href={route(modulo.ruta)} className="hover:text-foreground hover:underline">
-                            {modulo.titulo}
+                            {nombreDe(modulo)}
                         </Link>
                     ) : (
-                        <span>{modulo.titulo}</span>
+                        <span>{nombreDe(modulo)}</span>
                     )}
                 </>
             )}

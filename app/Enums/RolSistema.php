@@ -39,7 +39,7 @@ enum RolSistema: string
     public function descripcion(): string
     {
         return match ($this) {
-            self::Administrador => 'Control total del sistema: beneficiarios, carnets, rubros, trámites, pagos y configuración.',
+            self::Administrador => 'Control total del sistema: beneficiarios, carnets, rubros, trámites, faenas, guías, pagos y configuración.',
         };
     }
 
@@ -61,6 +61,8 @@ enum RolSistema: string
             'carnets.ver',
             'rubros.ver',
             'tramites.ver',
+            'faenas.ver',
+            'guias.ver',
             'pagos.ver',
             'reportes.ver',
         ];
@@ -70,6 +72,18 @@ enum RolSistema: string
             'beneficiarios.editar',
             'tramites.crear',
             'tramites.editar',
+            /*
+             * EMITIR FAENAS Y GUÍAS ES DE VENTANILLA, no de supervisión.
+             *
+             * Son papeles del talonario que se llenan en el mostrador y se
+             * entregan en el acto: no hay nada que firmar después. Pedir un
+             * permiso de supervisión los frenaría todos los días por algo que
+             * ya está autorizado —el carnet vigente es la autorización—.
+             *
+             * ANULARLOS sí es de supervisión: ver el bloque de abajo.
+             */
+            'faenas.crear',
+            'guias.crear',
             'pagos.registrar',
             // Imprimir el carnet y entregarlo en mano son dos hechos distintos y
             // quedan registrados con su propia fecha, por eso son dos permisos.
@@ -102,8 +116,23 @@ enum RolSistema: string
             //
             // `carnets.suspender` reemplazó a `habilitaciones.suspender`: con un
             // carnet por rubro, cortar una actividad es suspender su carnet.
+            /*
+             * CONTROLAR LOS DEPÓSITOS es de supervisión, no de ventanilla.
+             *
+             * Quien carga la boleta no puede darla por buena —eso lo impide
+             * además `Pago::puedeValidarlo()`— así que el permiso tiene que
+             * estar en otras manos, o el control no existe.
+             */
+            'pagos.validar',
             'carnets.suspender',
             'carnets.anular',
+            /*
+             * Anular una faena o una guía quema un número del talonario para
+             * siempre —no se desanula— y deja un hueco que hay que poder
+             * explicar. Por eso no lo tiene quien emite.
+             */
+            'faenas.anular',
+            'guias.anular',
             'reportes.exportar',
             'auditoria.ver',
         ];
@@ -111,6 +140,18 @@ enum RolSistema: string
         $administracion = [
             'beneficiarios.eliminar',
             'tramites.eliminar',
+            /*
+             * QUITAR UN DEPÓSITO NO ES CORREGIRLO, y por eso no va con
+             * `pagos.registrar`.
+             *
+             * Corregir deja la fila y su historial: se ve qué decía antes y
+             * quién lo cambió. Quitar la hace desaparecer —del expediente y de
+             * la suma cobrada— y lo único que queda es la línea de
+             * `auditorias`. Es el mismo criterio que separa `tramites.editar`
+             * de `tramites.eliminar`: quien atiende el mostrador corrige lo que
+             * tipeó; hacer desaparecer dinero declarado es otra cosa.
+             */
+            'pagos.eliminar',
             'usuarios.gestionar',
             'roles.gestionar',
             // El catálogo de rubros y sus tarifas cambia por ordenanza.

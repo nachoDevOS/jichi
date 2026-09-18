@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Receipt, Search } from 'lucide-react';
 import { useState } from 'react';
+import { AccionesControl, EstadoControl } from '@/components/panel/pagos/control-deposito';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
@@ -9,7 +10,7 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fecha } from '@/lib/utils';
-import type { Paginado, PageProps } from '@/types';
+import type { OpcionEnum, Paginado, PageProps } from '@/types';
 import type { PagoFila } from '@/types/pagos';
 
 /**
@@ -18,7 +19,11 @@ import type { PagoFila } from '@/types/pagos';
  *
  * Es la única pantalla de pagos que no cuelga de un trámite, porque justamente
  * lo que se quiere acá es mirarlos todos juntos. El alta de un depósito sí
- * cuelga del expediente: un pago sin trámite no significa nada.
+ * cuelga de lo que se está cobrando: un pago sin origen no significa nada.
+ *
+ * LISTA LAS TRES COSAS QUE SE COBRAN: trámites, faenas y guías. Tiene que ser
+ * así, porque lo que se cuadra contra el extracto del banco es todo lo que
+ * entró, no una parte. La columna «Concepto» dice de cuál viene cada fila.
  *
  * NO HAY BOTÓN DE ANULAR. Una boleta cargada mal se corrige, y la tabla
  * `auditorias` deja registrado el valor anterior, quién lo cambió y cuándo. Un
@@ -27,6 +32,7 @@ import type { PagoFila } from '@/types/pagos';
 export default function IndicePagos({
     pagos,
     filtros,
+    validaciones,
     total,
     opcionesPorPagina,
 }: {
@@ -35,8 +41,10 @@ export default function IndicePagos({
         buscar: string | null;
         desde: string | null;
         hasta: string | null;
+        validacion: string | null;
         por_pagina: number;
     };
+    validaciones: OpcionEnum[];
     /** Suma de TODO lo filtrado, no solo de la página visible. */
     total: number;
     opcionesPorPagina: number[];
@@ -51,6 +59,7 @@ export default function IndicePagos({
                 buscar,
                 desde: filtros.desde,
                 hasta: filtros.hasta,
+                validacion: filtros.validacion,
                 por_pagina: filtros.por_pagina,
                 ...valores,
             },
@@ -61,7 +70,7 @@ export default function IndicePagos({
     return (
         <LayoutPanel
             titulo="Pagos"
-            descripcion="Libro de caja: depósitos registrados contra los trámites."
+            descripcion="Libro de caja: depósitos registrados por trámites, faenas y guías."
         >
             <Head title="Pagos" />
 
@@ -86,9 +95,26 @@ export default function IndicePagos({
                         registros
                     </label>
 
+                    {/* «Mostrame lo que falta controlar» es la primera
+                        pregunta de quien revisa, así que el estado del control
+                        es un filtro y no solo una columna. */}
+                    <Select
+                        className="sm:col-span-2 sm:col-start-4"
+                        value={filtros.validacion ?? ''}
+                        onChange={(e) => filtrar({ validacion: e.target.value || null })}
+                        aria-label="Estado del control"
+                    >
+                        <option value="">Todo el control</option>
+                        {validaciones.map((v) => (
+                            <option key={v.value} value={v.value}>
+                                {v.label}
+                            </option>
+                        ))}
+                    </Select>
+
                     <Input
                         type="date"
-                        className="sm:col-span-2 sm:col-start-5"
+                        className="sm:col-span-2"
                         value={filtros.desde ?? ''}
                         onChange={(e) => filtrar({ desde: e.target.value || null })}
                         aria-label="Desde"
@@ -103,7 +129,7 @@ export default function IndicePagos({
                     />
 
                     <form
-                        className="relative sm:col-span-4"
+                        className="relative sm:col-span-3"
                         onSubmit={(e) => {
                             e.preventDefault();
                             filtrar({});
@@ -145,9 +171,15 @@ export default function IndicePagos({
                                 <tr>
                                     <th className="px-5 py-3 font-medium">Nº transacción</th>
                                     <th className="px-5 py-3 font-medium">Beneficiario</th>
+                                    <th className="px-5 py-3 font-medium">Concepto</th>
                                     <th className="px-5 py-3 font-medium">Rubro</th>
                                     <th className="px-5 py-3 text-right font-medium">Monto</th>
                                     <th className="px-5 py-3 font-medium">Fecha</th>
+                                    {/* El CONTROL de la boleta, que es otra cosa
+                                        que el pago: el dinero entró o no entró, y
+                                        esto dice si alguien lo comprobó contra el
+                                        extracto del banco. */}
+                                    <th className="px-5 py-3 font-medium">Control</th>
                                     <th className="px-5 py-3" />
                                 </tr>
                             </thead>
@@ -157,16 +189,29 @@ export default function IndicePagos({
                                     <tr key={p.id} className="hover:bg-secondary/50">
                                         <td className="px-5 py-3 font-mono text-xs">{p.nro_transaccion}</td>
                                         <td className="px-5 py-3">
-                                            <Link
-                                                href={route('tramites.show', p.tramite_id)}
-                                                className="text-primary hover:underline"
-                                            >
-                                                {p.beneficiario ?? '—'}
-                                            </Link>
+                                            {/*
+                                                El enlace solo cuando el pago es
+                                                de un trámite. Faenas y guías no
+                                                tienen pantalla propia todavía,
+                                                y un <Link> a una ruta que no
+                                                existe revienta al construir la
+                                                URL, no al hacer clic.
+                                            */}
+                                            {p.tramite_id !== null ? (
+                                                <Link
+                                                    href={route('tramites.show', p.tramite_id)}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {p.beneficiario ?? '—'}
+                                                </Link>
+                                            ) : (
+                                                <span>{p.beneficiario ?? '—'}</span>
+                                            )}
                                             <p className="font-mono text-xs text-muted-foreground">
                                                 {p.carnet_registro ?? '—'}
                                             </p>
                                         </td>
+                                        <td className="px-5 py-3">{p.concepto}</td>
                                         <td className="px-5 py-3">{p.rubro ?? '—'}</td>
                                         <td className="px-5 py-3 text-right font-medium tabular-nums">
                                             {bs(p.monto, institucion.moneda)}
@@ -174,7 +219,13 @@ export default function IndicePagos({
                                         <td className="px-5 py-3 text-muted-foreground">
                                             {fecha(p.fecha_pago)}
                                         </td>
+                                        <td className="px-5 py-3">
+                                            <EstadoControl pago={p} />
+                                        </td>
                                         <td className="px-5 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <AccionesControl pago={p} compacto />
+                                            </div>
                                             {p.comprobante_url && (
                                                 <a
                                                     href={p.comprobante_url}

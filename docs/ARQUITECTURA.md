@@ -35,9 +35,31 @@ dos plásticos, dos firmas de validación y dos cupos autorizados.
 beneficiario ──< carnet ──< tramite ──< pago
                    │           │
                    │           └── rubro   (el mismo del carnet)
-                   │           └── recibo  (1 a 1)
-                   └── rubro               (la actividad que habilita)
+                   │           └── recibo  (armado al vuelo, sin tabla)
+                   │
+                   ├── rubro               (la actividad que habilita)
+                   │
+                   ├──< faena ──< pago     (carnet de Pescador)
+                   └──< guia  ──< pago     (carnet de Comercializador)
+                           └──< guia_detalle   (especie, condición, kilos)
 ```
+
+**EL CARNET ES LA LLAVE ANUAL; CON ÉL SOLO NO SE SALE A TRABAJAR.** Lo que
+autoriza el trabajo de cada día son los **permisos operativos** que cuelgan de
+él, y se emiten muchos por gestión:
+
+| Carnet de… | Emite | Qué autoriza |
+| --- | --- | --- |
+| **Pescador** | **faenas** | UNA salida: esta embarcación, este comandante, de tal día a tal día, con tanto en kilos |
+| **Comercializador** | **guías** | UN traslado: de dónde a dónde, en qué vehículo, con qué carga |
+
+Cuál emite cada actividad lo dicen `rubros.emite_faenas` y `rubros.emite_guias`,
+**nunca un `match` sobre el nombre del rubro** — el catálogo lo edita la unidad
+desde el panel y el mismo rubro figura como «Pescador» o como «Faena» según
+quién lo cargó. Es el mismo criterio de `requiere_capacidad`.
+
+**Las tres cosas se cobran con la MISMA tabla `pagos`**, que por eso es
+polimórfica. Ver §3.
 
 ### La regla que ordena todo
 
@@ -85,21 +107,44 @@ Consecuencias que conviene tener presentes:
 
 ```
 PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
-(borrador)                   │                         │
-                             │                         └── el carnet queda habilitado
-                             ├── nace el RECIBO OFICIAL            ← el papel del pescador
-                             └──[rechazar]──▶ RECHAZADO (con motivo escrito, obligatorio)
+(borrador)  ▲                │                         │
+            │                │                         └── el carnet queda habilitado
+            │                ├── nace el RECIBO OFICIAL    ← el papel del pescador
+            │                └──[rechazar]──▶ RECHAZADO (con motivo escrito, obligatorio)
+            └────────────────────[reabrir]───────┘
 ```
 
 **PENDIENTE es un BORRADOR.** Ventanilla lo arma, lo corrige y lo borra si sobra;
 nadie lo vio todavía. **EN REVISIÓN ya está presentado**: no se edita ni se
-elimina, solo se resuelve.
+elimina, solo se resuelve. **RECHAZADO está en el mostrador del pescador**: se
+REABRE cuando vuelve con lo corregido, y ahí es borrador otra vez.
 
-| Estado | Editar | Eliminar | Enviar | Aprobar | Rechazar |
-| --- | :-: | :-: | :-: | :-: | :-: |
-| **Pendiente** | ✔ | ✔ | ✔ | ✘ | ✘ |
-| **En revisión** | ✘ | ✘ | ✘ | ✔ | ✔ |
-| Aprobado / Rechazado | ✘ | ✘ | ✘ | ✘ | ✘ |
+| Estado | Editar | Eliminar | Enviar | Aprobar | Rechazar | Reabrir |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| **Pendiente** | ✔ | ✔ | ✔ | ✘ | ✘ | ✘ |
+| **En revisión** | ✘ | ✘ | ✘ | ✔ | ✔ | ✘ |
+| **Rechazado** | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
+| Aprobado | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
+
+**Por qué se reabre en vez de presentar un expediente nuevo:** los depósitos
+cuelgan del trámite (`pagable_id`) y no se trasladan solos. Un expediente nuevo
+nacía con cero cobrado mientras el rechazado se quedaba con el dinero cargado,
+así que el beneficiario figuraba debiendo todo de nuevo — y cada vuelta gastaba
+un número de trámite. Reabrir lo devuelve a PENDIENTE con su plata y su
+historial. El rechazo no se borra: queda en `auditorias` con su motivo. Solo
+APROBADO es final. Ver `SolicitudCarnetService::reabrir()`.
+
+**Al reenviar, `fecha_revision` no se pisa** —se escribe solo si está en NULL—
+porque es la fecha del recibo que el pescador ya tiene en la mano. Si se
+reescribiera, el mismo número saldría con dos fechas distintas.
+
+**El DINERO se mueve mientras el expediente esté abierto, y se cierra al
+aprobar.** En PENDIENTE y EN REVISIÓN se cargan, corrigen y quitan depósitos
+—los papeles sí quedan congelados al enviar, el dinero no—; en APROBADO no.
+`permitePagos()` aceptaba también aprobado, con el motivo «puede terminarse de
+cobrar después», y eso dejó de poder pasar cuando aprobar pasó a exigir el monto
+cubierto: un expediente aprobado está pagado por definición. Ver
+[modulos/PAGOS.md](modulos/PAGOS.md).
 
 Los dos huecos que sorprenden tienen el mismo motivo de fondo —*quién vio qué*—:
 
@@ -112,6 +157,20 @@ Los dos huecos que sorprenden tienen el mismo motivo de fondo —*quién vio qu�
   dejaría el recibo en la calle sin nada detrás. Y quien aprueba firma sobre los
   papeles que vio: si se pueden cambiar mientras tanto, la firma deja de decir
   sobre qué se firmó. Un escaneo ilegible se RECHAZA y se presenta de nuevo.
+
+**PARA ENVIAR NO ALCANZA CON LOS PAPELES: EL COSTO TIENE QUE ESTAR CUBIERTO.**
+La suma de los depósitos tiene que llegar al costo del rubro, o el expediente no
+pasa a revisión y el aviso dice cuánto falta. Antes esto se comprobaba recién al
+APROBAR, y eso dejaba pasar lo que no se puede deshacer: al enviar queda
+habilitado el RECIBO OFICIAL, con su monto y su fecha, y el pescador se va del
+mostrador con ese papel. Emitirlo por un expediente a medio pagar es entregar un
+comprobante por dinero que no entró.
+
+Encaja con lo que significa cada estado: PENDIENTE es donde la persona está
+juntando la plata —ahí se cargan las boletas de a una— y ENVIAR es declarar que
+el expediente está completo. Lo cobrado es parte de estar completo. El rubro
+exento por ordenanza —costo cero— pasa sin depósitos. Ver
+`Tramite::faltantesParaRevision()`.
 
 Todo eso lo dictan `EstadoTramite::siguientes()`, `permiteEdicion()` y
 `permiteEliminacion()`. **`estaAbierto()` NO es permiso de escritura**: agrupa
@@ -286,10 +345,13 @@ aunque fuera en rojo, arriesga que el inspector lea la fila y no el color—.
 | --- | --- | --- |
 | `beneficiarios` | La persona | Borrado lógico. Columnas en **camelCase** desde `primerNombre`. Índice único **parcial** |
 | `carnets` | El documento anual **de una actividad** | Sin columna `codigo`. Se identifica por `firma_validacion`. Único por `(beneficiario, rubro, gestion)` |
-| `rubros` | Catálogo de actividades | No se borra nunca, se pasa a `inactivo`. `requiere_capacidad` dice si la actividad se autoriza por volumen |
+| `rubros` | Catálogo de actividades | No se borra nunca, se pasa a `inactivo`. Tres banderas mandan comportamiento: `requiere_capacidad` (¿se autoriza por volumen?), `emite_faenas` y `emite_guias` (¿qué permiso operativo cuelga de sus carnets?) |
 | ~~`carnet_rubro`~~ | — | **Eliminada.** El carnet ES la habilitación |
 | `tramites` | El expediente | Cuelga del **carnet**, no del beneficiario |
-| `pagos` | Cada depósito | `nro_transaccion` único **global** |
+| `pagos` | Cada depósito **y su control** | `registrado_por` ≠ `validado_por`: quien carga no valida. **POLIMÓRFICA**: `pagable_type` + `pagable_id` apuntan a un trámite, una faena o una guía. `nro_transaccion` único **global** — y eso es justamente lo que obliga a que sea una sola tabla |
+| `faenas` | El permiso de UNA salida de pesca | Cuelga del carnet. `nro_permiso` es el número del **talonario de papel**, lo tipea el operador. No se borra: se anula |
+| `guias` | La guía única de transporte | Cuelga del carnet. Cabecera nomás: quién, desde dónde, hasta dónde y en qué |
+| `guia_detalles` | La carga, especie por especie | La **única cascada** del dominio. `imponible` es lo que dice el papel y **no se recalcula** |
 | ~~`recibos`~~ | — | **Eliminada.** El comprobante se arma al vuelo desde las otras tablas |
 
 ### Tablas de infraestructura
@@ -450,6 +512,32 @@ que correr igual en los dos.
 ---
 
 ## 7. Módulos
+
+### Pagos — el control de cada depósito
+
+Cada boleta se VALIDA u OBSERVA, y queda escrito quién y cuándo. Quien la cargó
+no puede darla por buena, y un trámite con alguna boleta sin controlar **no se
+puede aprobar**.
+
+El detalle está en [modulos/PAGOS.md](modulos/PAGOS.md).
+
+### Faenas y guías — los permisos operativos
+
+Cuelgan de un carnet vigente y se emiten muchos por gestión: la **faena**
+autoriza una salida de pesca; la **guía** ampara un traslado de carga, con su
+detalle especie por especie.
+
+**Ninguno se edita ni se borra.** El número sale de un talonario de papel que la
+persona se lleva en el momento: editarlo dejaría al sistema contradiciendo al
+documento, y borrarlo dejaría un hueco en la serie además de liberar un número
+que el índice único volvería a aceptar. Se **anulan**, con motivo obligatorio.
+
+La única corrección posible es el DETALLE de la guía, porque el peso real se
+conoce en la balanza.
+
+El detalle completo está en
+[modulos/PERMISOS-OPERATIVOS.md](modulos/PERMISOS-OPERATIVOS.md).
+
 
 | Módulo | Estado | Entrada principal |
 | --- | --- | --- |

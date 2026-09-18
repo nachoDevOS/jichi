@@ -229,6 +229,24 @@ paga es quien abra pgAdmin.
 
 ## Base de datos (`database/`)
 
+> **Una tabla nueva del dominio toca SIETE lugares.** Se ve con el módulo de
+> faenas y guías, que se agregó entero el 16/09/2026:
+>
+> | Dónde | Qué |
+> | --- | --- |
+> | `database/migrations/` | La tabla, **muy** comentada: es el mejor lugar para explicar el esquema |
+> | `app/Enums/` | Sus estados y dominios cerrados, en columnas `string` |
+> | `app/Models/` | El modelo, sus relaciones y las preguntas que sabe contestar |
+> | `app/Services/` | Las reglas de negocio — **nunca en el controlador** |
+> | `app/Http/Controllers/Panel/` + `Requests/` | La pantalla y su validación |
+> | `resources/js/pages/panel/` + `types/` | El frontend |
+> | `docs/MER.md` + `docs/ARQUITECTURA.md` + esta guía | La documentación |
+>
+> Y si la tabla cambia una existente —como `pagos` al volverse polimórfica—,
+> hay que barrer lo que la usaba: relaciones, eager loading, tipos de
+> TypeScript y componentes.
+
+
 ```
 database/
 ├── migrations/     La estructura de las tablas, en orden cronológico

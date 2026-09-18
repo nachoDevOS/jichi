@@ -177,14 +177,18 @@ function ItemMenu({
     // Angosta la barra el texto desaparece, así que el nombre pasa al globito
     // del navegador. Sin esto quedan ocho iconos sin ninguna forma de saber
     // cuál es cuál.
-    const rotulo = angosto ? item.titulo : undefined;
+    //
+    // Va el nombre ENTERO y no el del renglón: angosta tampoco se ve el rótulo
+    // del grupo, así que un globito que dijera «De faena» dejaría al operador
+    // igual de perdido.
+    const rotulo = angosto ? (item.tituloCompleto ?? item.titulo) : undefined;
 
     const base = 'flex items-center gap-3 border-l-[3px] px-4 py-2.5 text-sm font-medium';
 
     if (!habilitado) {
         return (
             <span
-                title={rotulo ? `${item.titulo} — aún no habilitado` : 'Módulo aún no habilitado'}
+                title={rotulo ? `${rotulo} — aún no habilitado` : 'Módulo aún no habilitado'}
                 className={cn(base, 'cursor-not-allowed border-transparent opacity-40')}
             >
                 <Icono className="size-4 shrink-0" />

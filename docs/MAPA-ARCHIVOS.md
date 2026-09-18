@@ -20,6 +20,10 @@ decisiones que acá solo se nombran.
 | `EstadoRubro.php` | 48 | `activo \| inactivo` | Un rubro nunca se borra |
 | `TipoTramite.php` | 92 | `emision_inicial \| actualizacion` | **Lo decide el sistema, no el operador**. «Adición de rubro» ya no existe: pedir otro rubro emite otro carnet |
 | `RolSistema.php` | 124 | Roles y **todos** sus permisos | Un solo rol hoy (`administrador`). Los permisos ya están en cuatro bloques para poder agregar el segundo en una línea |
+| `EstadoValidacionPago.php` | 113 | `pendiente \| validado \| observado` | NO es el estado del pago sino el de su CONTROL. Nace PENDIENTE: si arrancara validado, todo estaría aprobado por omisión. Tres estados y no dos — «sin mirar» y «no cuadra» son cosas distintas |
+| `EstadoPermiso.php` | 106 | `emitido \| anulado` | **Lo comparten faenas y guías**, porque su ciclo de vida es idéntico. Solo dos valores: no hay circuito — el permiso se llena, se cobra y se entrega en el acto. Se **anula**, nunca se borra: el número ya se gastó del talonario |
+| `TipoTransporte.php` | 79 | `fluvial \| aerea \| terrestre` | Dice **quién controla y dónde**: la naval en el río, un retén en la carretera. Por eso la columna es obligatoria mientras el resto del transporte es opcional. `rotuloIdentificacion()` cambia «Placa» por «Matrícula» |
+| `CondicionProducto.php` | 70 | `fresco \| congelado \| seco \| salado` | Lista **cerrada**, al revés de la especie vecina: son cuatro, las usa el formulario de papel y no aparecen nuevas |
 | `FormaPago.php` | 52 | `deposito \| efectivo` | Son las dos casillas del recibo de papel |
 | `ConceptoRecibo.php` | 110 | Las seis casillas de DESCRIPCIÓN del recibo | Puente rubro→casilla **por nombre**, con caída a `Otros`: el catálogo y el talonario evolucionan por separado |
 
@@ -29,6 +33,9 @@ decisiones que acá solo se nombran.
 | --- | --- | --- | --- |
 | `SolicitudCarnetService.php` | 1053 | **El caso de uso central.** Reglas A, B y C + todo el circuito | El archivo más importante del sistema. Ver el desglose abajo |
 | `PagoTramiteService.php` | 223 | Pagos parciales, 1 a N | Los métodos vienen **de a pares**: uno recibe `UploadedFile`, el otro `...ConRuta`. No es duplicación — ver §2.4 de ARQUITECTURA |
+| `ValidacionPagoService.php` | 127 | Validar u observar un depósito | Aparte de `PagoTramiteService` porque son actos de PERSONAS distintas: uno es de ventanilla, este de supervisión. Y vale para los tres, porque `pagos` es polimórfica |
+| `FaenaService.php` | 155 | Emitir y anular faenas | Tres comprobaciones y el ORDEN importa: el rubro primero, porque elegir el carnet equivocado es el error más probable. El número se comprueba ANTES del INSERT, porque en PostgreSQL un INSERT fallido aborta la transacción |
+| `GuiaService.php` | 244 | Emitir y anular guías, y reemplazar su carga | Cabecera y detalle se escriben en la MISMA transacción. `reemplazarDetalle()` borra todo y reinserta a propósito: la grilla manda la lista completa, no un diff |
 | `ArchivoTramiteService.php` | 107 | Subir/descartar adjuntos alrededor de una transacción | `descartar()` **no propaga errores**: se llama desde un `catch` y taparía la excepción original |
 | `ReciboTramiteService.php` | 200 | **Arma** el RECIBO OFICIAL, no lo guarda | `armar()` lo reconstruye desde el trámite. No hay tabla `recibos` |
 | `CorrelativoService.php` | 120 | Números correlativos por serie y año | `SELECT ... FOR UPDATE`. **Sin usar otra vez**: llegó con los recibos y quedó libre al retirarse esa tabla |
@@ -52,11 +59,16 @@ decisiones que acá solo se nombran.
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
+| `FaenaController.php` | 295 | Listado, alta, ficha y anulación. **Sin editar ni borrar**: el papel ya está en manos de la persona. `create()` acepta `?carnet=` para llegar desde la ficha del carnet |
+| `GuiaController.php` | 358 | Ídem, más `actualizarDetalle()` — la única corrección que el módulo permite. `resumir()` usa el `withSum` del listado para no calcular los kilos por fila |
 | `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario |
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
 | `Tramite.php` | 310 | Cuelga del **carnet**. `montoPagado()` reusa `pagos_sum_monto` si el listado hizo `withSum`. Las 5 fechas van en `#[Fillable]` aunque ningún formulario las mande — `update()` las descartaría |
 | `CarnetRubro.php` | 71 | Pivote **con modelo propio**, porque `attach()` no dispara eventos y `Auditable` no registraría nada |
-| `Pago.php` | 68 | La columna es **`urlFile`**, el accesor es `comprobante_url`. No se anulan ni se borran |
+| `Pago.php` | 243 | **`pagable()` es un `morphTo`**: el depósito cubre un trámite, una faena o una guía. Sin morphMap — en la columna va el nombre completo de la clase. La columna del archivo es **`urlFile`**, el accesor es `comprobante_url`. No se anulan ni se borran |
+| `Faena.php` | 288 | Cuelga del **carnet**, no del beneficiario. `$attributes` declara `estado` por defecto **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `diasAutorizados()` suma uno — salir y desembarcar el mismo día es un día, no cero. `estaVigente()` mira TRES cosas, y la que se olvida es el carnet |
+| `Guia.php` | 279 | Cabecera; la carga está en `GuiaDetalle`. **`montoRequerido()` no es una columna**: sale de sumar el detalle, porque la guía se cobra sobre lo que traslada y no por tarifa fija. `excedeCapacidad()` devuelve `null` cuando no se sabe la capacidad |
+| `GuiaDetalle.php` | 133 | `$table` declarado a mano. **`importe()` prefiere `imponible` sobre cantidad × precio**, y el orden no es intercambiable: `imponible` es lo que dice el papel firmado |
 | `Rubro.php` | 70 | `Auditable` pero **sin** `SoftDeletes`: no se borra, se inactiva |
 | `Configuracion.php` | 63 | Cache `rememberForever`, invalidada en `saved`/`deleted` |
 | `Correlativo.php` | 18 | Solo la tabla del contador |
@@ -85,6 +97,7 @@ decisiones que acá solo se nombran.
 | `GuardarBeneficiarioRequest.php` | 186 | Índice único parcial ⇒ la regla `unique` ignora los dados de baja |
 | `GuardarUsuarioRequest.php` | 319 | **Escrito y comentado, pero sin ruta ni controlador** |
 | `RegistrarPagoRequest.php` | 103 | |
+| `CorregirPagoRequest.php` | 118 | Corregir una boleta ya cargada. La boleta es OPCIONAL y el `unique` del número **ignora la propia fila**, o guardar sin tocar el número se acusaría a sí mismo |
 | `GuardarRubroRequest.php` | 78 | |
 
 ## `app/Support/` y `app/Traits/`
@@ -126,12 +139,14 @@ decisiones que acá solo se nombran.
 | `pages/publico/` | `verificar.tsx` | |
 | `components/ui/` | Genéricas | **Única excepción a «todo en español»** |
 | `components/panel/` | Por módulo | `crear.tsx` de trámites: cuidado con los `key` de los botones. `tramites/vista-previa-carnet.tsx` es **el molde del carnet impreso**: si se toca, se toca también el Blade |
+| `components/panel/tramites/depositos.tsx` | Resumen, lista y los dos formularios | Un solo archivo para las DOS pantallas, que son dos MOMENTOS y no dos lugares para lo mismo: «Editar trámite» es el borrador y la FICHA es el expediente presentado —lo único que cambia es que ahí se CONTROLA—. `conCorreccion` va en las dos y enciende corregir Y quitar: un depósito observado tiene que poder arreglarse en la ficha, porque observar solo pasa en revisión. `FilaDeposito` es componente propio y no un `<li>` dentro del `map` porque tiene estado, y un hook no va en un `map`. «Quitar» pide además el permiso `pagos.eliminar`, que es de administración |
 | `components/panel/carnets/` | `dialogo-imprimir-carnet.tsx` | La vista previa antes de imprimir. Muestra el PDF DE VERDAD en un `iframe`, no una maqueta |
 | `components/panel/layout/` | Barra lateral, encabezado, menú | El ancho de la barra está escrito **dos veces** —`w-16`/`w-64` en la barra y `lg:pl-16`/`lg:pl-64` en el layout— y los dos se mueven juntos. `moduloActual()` de `navegacion.ts` es lo ÚNICO que decide qué módulo está abierto: lo usan el menú y las migas |
 | `components/panel/dashboard/` | Los bloques del tablero | `widget-estadistica.tsx` pinta de color entero: las clases van **escritas enteras**, como en `badge.tsx`. `mini-grafico.tsx` NO usa recharts a propósito |
 | `components/publico/` | Hoja oficial, ficha, buscador | |
 | `hooks/use-permisos.ts` | `puede('x.y')` | **Comodidad, no seguridad** |
-| `lib/utils.ts` | `bs()`, `fecha()`, `fechaHora()`, `cn()` | `aFechaLocal()` resuelve el bug de UTC-4. **Sin pruebas** |
+| `ui/confirmar-accion.tsx` · `ui/confirmar-con-motivo.tsx` | Las ventanas de confirmación | La prop `confirmacion` agrega una CASILLA que hay que marcar, y apaga el botón hasta entonces. Se usa solo en lo irreversible y en lo que es una declaración: marcada sin leer no protege nada. Se limpia al cerrar |
+| `lib/utils.ts` | `bs()`, `fecha()`, `fechaInput()`, `hora()`, `fechaHora()`, `hace()`, `cn()` | `aFechaLocal()` resuelve el bug de UTC-4. `fechaInput()` es su inversa —AAAA-MM-DD para un `<input type="date">`— y **no es `slice(0,10)`**: cortar un instante UTC da el día siguiente en Bolivia. `hace()` usa DOS `RelativeTimeFormat`: `auto` hasta días —para que salga «ayer»— y `always` de meses para arriba, o 40 días dirían «el mes pasado». **Sin pruebas** |
 | `types/` | La forma de lo que manda Laravel | Hay que actualizarlos al cambiar un controlador |
 
 ## `tests/` — VACÍO
@@ -166,8 +181,8 @@ archivo. Ver el punto 10 de [PENDIENTES.md](PENDIENTES.md).
 
 | Carpeta | Qué hay | No obvio |
 | --- | --- | --- |
-| `migrations/` | 16 archivos, en orden cronológico | Las del dominio (`2026_09_10_*`) están **muy** comentadas: son el mejor lugar para entender el esquema |
-| `seeders/RubroSeeder` | Pescador (80 Bs), Comercializador (120 Bs) | Los dos rubros **son** dos casillas del recibo de papel |
+| `migrations/` | 17 archivos, en orden cronológico | Las del dominio (`2026_09_10_*`) están **muy** comentadas: son el mejor lugar para entender el esquema |
+| `seeders/RubroSeeder` | Pescador (80 Bs), Comercializador (120 Bs) | Los dos rubros **son** dos casillas del recibo de papel. Siembra además `emite_faenas` / `emite_guias` |
 | `seeders/ConfiguracionSeeder` | Datos de la institución | |
 | `seeders/RolPermisoSeeder` | Lee los permisos de `RolSistema` | |
 | `seeders/DemoSeeder` | Datos de prueba | **No pasa por el servicio** — es una copia que puede quedar vieja |

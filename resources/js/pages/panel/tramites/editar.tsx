@@ -270,10 +270,25 @@ export default function EditarTramite({
                             moneda={institucion.moneda}
                         />
 
+                        {/*
+                            ACÁ SÍ SE CORRIGEN, y en la ficha no.
+
+                            Es el mismo reparto que el control, mirado desde el
+                            otro lado: esta pantalla es de VENTANILLA —carga las
+                            boletas y arregla lo que tipeó mal— y la ficha es de
+                            quien REVISA —las mira y las da por buenas—. Quien
+                            corrige no valida.
+
+                            Qué depósito se puede tocar lo decide el servidor,
+                            depósito por depósito: uno ya validado no se corrige
+                            sin que antes lo observen. Ver
+                            `Pago::admiteCorreccion()`.
+                        */}
                         <ListaDepositos
                             pagos={pagos}
                             moneda={institucion.moneda}
                             vacio="Cargue las boletas acá abajo."
+                            conCorreccion={puede('pagos.registrar')}
                         />
 
                         {tramite.admite_pagos && puede('pagos.registrar') && (

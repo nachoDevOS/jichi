@@ -74,6 +74,28 @@ export interface CarnetFicha {
      */
     requiere_capacidad: boolean;
 
+    /**
+     * QUÉ PERMISO OPERATIVO PUEDE EMITIR ESTE CARNET.
+     *
+     * Lo decide el servidor —Carnet::puedeEmitirFaenas()— e incluye la vigencia,
+     * así que un carnet suspendido devuelve `false` y el botón no aparece.
+     */
+    puede_emitir_faenas: boolean;
+    puede_emitir_guias: boolean;
+
+    /**
+     * Si el RUBRO emite ese papel, sin mirar la vigencia.
+     *
+     * Es lo que decide si la sección se muestra: un carnet vencido ya no puede
+     * emitir, pero sigue teniendo que mostrar lo que emitió en su momento.
+     */
+    emite_faenas: boolean;
+    emite_guias: boolean;
+
+    /** El total, que puede ser mayor que las 10 filas que trae la ficha. */
+    total_faenas: number;
+    total_guias: number;
+
     /** Si el botón de suspender corresponde: solo desde vigente. */
     puede_suspenderse: boolean;
     /** Si corresponde el de levantar la suspensión: solo desde suspendido. */
@@ -115,4 +137,29 @@ export interface TramiteDelCarnet {
     estado_color: string;
     monto_requerido: number;
     fecha_solicitud: string | null;
+}
+
+/** Una faena del carnet, en la ficha. Las últimas 10. */
+export interface FaenaDelCarnet {
+    id: number;
+    nro_permiso: string;
+    estado_etiqueta: string;
+    estado_color: string;
+    embarcacion: string | null;
+    fecha_salida: string | null;
+    fecha_desembarque: string | null;
+    /** Ya escrito como va en el papel: «450 KG». */
+    cantidad: string | null;
+}
+
+/** Una guía del carnet, en la ficha. Las últimas 10. */
+export interface GuiaDelCarnet {
+    id: number;
+    nro_guia: string;
+    estado_etiqueta: string;
+    estado_color: string;
+    transporte_etiqueta: string;
+    destino_lugar: string | null;
+    total_kg: number;
+    fecha: string | null;
 }

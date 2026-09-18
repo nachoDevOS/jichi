@@ -35,14 +35,48 @@ recién ahí la persona puede trabajar en esa actividad.
 Quien pesca y además comercializa tiene **dos carnets** en la misma gestión, con
 dos plásticos, dos firmas de validación y dos cupos autorizados.
 
+> **EL CARNET ES LA LLAVE ANUAL; CON ÉL SOLO NO SE SALE A TRABAJAR.** De cada
+> carnet cuelgan los **permisos operativos**, que son muchos por gestión y son
+> los que autorizan el trabajo de cada día:
+>
+> ```
+> beneficiario ──< carnet (Pescador, 2026)        ──< faena  (una por salida)
+>              ──< carnet (Comercializador, 2026) ──< guia   (una por traslado)
+>                                                        └──< guia_detalle
+> ```
+>
+> Una **faena** autoriza UNA salida: esta embarcación, este comandante, de tal
+> día a tal día, con tanto en kilos. Una **guía** ampara UN traslado: de dónde a
+> dónde, en qué vehículo, con qué carga — y su detalle lista la carga especie
+> por especie, con su condición y sus kilos.
+>
+> **Qué emite cada carnet lo dicen `rubros.emite_faenas` y `rubros.emite_guias`,
+> NUNCA el nombre del rubro** — mismo criterio que `requiere_capacidad`, y por
+> el mismo motivo: el catálogo lo edita la unidad desde el panel.
+>
+> Las dos tienen su módulo en el panel —listado, formulario y ficha— y sus
+> reglas en `FaenaService` / `GuiaService`. **No se editan ni se borran**: el
+> número sale de un talonario de papel que la persona se llevó, así que se
+> ANULAN con motivo. La única corrección es el detalle de la guía, porque el
+> peso real se conoce en la balanza. Ver
+> [docs/modulos/PERMISOS-OPERATIVOS.md](docs/modulos/PERMISOS-OPERATIVOS.md).
+>
+> **Los tres se cobran con la MISMA tabla `pagos`, que es polimórfica**
+> (`pagable_type` + `pagable_id`). Una sola tabla y no tres porque
+> `nro_transaccion` es único GLOBAL: partido en tres dejaría de serlo, y la
+> misma boleta podría pagar un trámite y una faena. El costo es que **se perdió
+> la clave foránea** — la integridad la sostienen los `RESTRICT` de arriba y la
+> aplicación, no el motor.
+
 El expediente recorre este circuito:
 
 ```
 PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
-(borrador)                   │                         │
-                             │                         └── el carnet queda habilitado
-                             ├── queda habilitado el RECIBO OFICIAL
-                             └──[rechazar]──▶ RECHAZADO
+(borrador)  ▲                │                         │
+            │                │                         └── el carnet queda habilitado
+            │                ├── queda habilitado el RECIBO OFICIAL
+            │                └──[rechazar]──▶ RECHAZADO
+            └────────────────────[reabrir]───────┘
 ```
 
 **Enviar a revisión es OBLIGATORIO: no se aprueba desde PENDIENTE.** Mientras
@@ -51,13 +85,23 @@ enviarlo, ventanilla declara que está completo y pasa a quien lo firma. El
 atajo `PENDIENTE ──▶ APROBADO` existió y se sacó: con él, quien cargaba la
 solicitud podía aprobarla sin que nadie más la tocara.
 
+**RECHAZADO NO ES EL FINAL: SE REABRE.** Rechazar es devolverle los papeles al
+pescador con el motivo escrito, y lo que sigue es que vuelva con lo corregido.
+Eso antes obligaba a presentar un expediente NUEVO, y ahí estaba el problema:
+**los depósitos ya cargados se quedaban colgados del trámite muerto** —cuelgan
+de él por `pagable_id` y no se trasladan solos—, así que la persona figuraba
+debiendo todo de nuevo. Reabrir lo devuelve a PENDIENTE con su dinero y su
+historial. No es «des-rechazar»: el rechazo queda en `auditorias` con su motivo.
+Solo APROBADO es final.
+
 **PENDIENTE es un BORRADOR, y eso define qué se puede hacer en cada estado:**
 
-| Estado | Editar | Eliminar | Enviar | Aprobar | Rechazar |
-| --- | :-: | :-: | :-: | :-: | :-: |
-| **Pendiente** | ✔ | ✔ | ✔ | ✘ | ✘ |
-| **En revisión** | ✘ | ✘ | ✘ | ✔ | ✔ |
-| Aprobado / Rechazado | ✘ | ✘ | ✘ | ✘ | ✘ |
+| Estado | Editar | Eliminar | Enviar | Aprobar | Rechazar | Reabrir |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| **Pendiente** | ✔ | ✔ | ✔ | ✘ | ✘ | ✘ |
+| **En revisión** | ✘ | ✘ | ✘ | ✔ | ✔ | ✘ |
+| **Rechazado** | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
+| Aprobado | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
 
 Las dos mitades de esa tabla salen de la misma idea:
 
@@ -68,14 +112,84 @@ Las dos mitades de esa tabla salen de la misma idea:
   numerado y el pescador se fue con ese papel; además, quien aprueba firma sobre
   los papeles que vio. Un expediente presentado que no sirve se RECHAZA, con su
   motivo escrito.
+- **En rechazado no se hace nada hasta reabrirlo.** La fila entera es ✘ menos
+  esa columna a propósito: editar, borrar o cobrar sobre un expediente que está
+  en el mostrador del pescador sería trabajar sobre algo que no está en la mesa
+  de nadie. Reabrir es el acto de decir «esto se retoma», y va antes que todo lo
+  demás.
 
 La tabla la dicta `EstadoTramite::permiteEdicion()`, `permiteEliminacion()` y
 `siguientes()`. **Ojo con `estaAbierto()`**: agrupa pendiente + en revisión y
 sirve para contar trabajo sin terminar, pero NO es permiso de escritura.
 
+> **AL REENVIAR, `fecha_revision` NO SE PISA.** Es la fecha del recibo oficial,
+> y ese papel ya está en manos del pescador desde el primer envío. Se escribe
+> solo si está en NULL; si no, el mismo número saldría con dos fechas distintas.
+
+**Lo que se congela al enviar son los PAPELES, no el dinero.** Un expediente en
+revisión sigue aceptando depósitos, correcciones y bajas de depósitos —eso pasa
+en la FICHA, no en «Editar trámite»—, porque el control de las boletas es parte
+de la revisión y un depósito observado tiene que poder arreglarse ahí mismo.
+
+> **QUITAR SE HABILITA EXACTAMENTE CUANDO CORREGIR**, y estuvo restringido al
+> borrador por un argumento que no se sostiene: «el recibo ya salió». Corregir ya
+> cambia el recibo igual —se arma al vuelo con los depósitos que hay, así que
+> bajar un monto de 110 a 30 mueve el papel entregado tanto como borrar la fila—.
+> Lo que separa a las dos no es el momento sino el PERMISO: quitar pide
+> `pagos.eliminar`, que es de administración, y el motivo por escrito. Ver
+> `Pago::admiteEliminacion()`, que delega en `admiteCorreccion()`.
+
+> **AL APROBAR SE CIERRA EL DINERO.** `permitePagos()` vale solo en PENDIENTE y
+> EN REVISIÓN. Decía además APROBADO, con el motivo «un trámite puede aprobarse
+> y terminarse de cobrar después» — y eso dejó de poder pasar cuando
+> `puedeAprobarse()` pasó a exigir el monto CUBIERTO: un expediente aprobado
+> está pagado por definición. La regla quedó permitiendo algo imposible, y lo
+> único que habilitaba era cargar plata de más sobre un carnet ya emitido y
+> cambiar el detalle de un recibo ya entregado. Si entró dinero de más, no es un
+> depósito de este expediente.
+
 Impreso y entregado no son estados sino fechas: `fecha_generacion` y
 `fecha_entrega`. Un estado obliga a sincronizar dos cosas que pueden discrepar;
 una fecha en NULL dice «todavía no pasó» sin posibilidad de contradicción.
+
+> **CADA DEPÓSITO SE CONTROLA, Y ESO FRENA LA APROBACIÓN.**
+>
+> ```
+> PENDIENTE ──▶ VALIDADO    la boleta cuadra con el extracto del banco
+>     ▲     └─▶ OBSERVADO   no cuadra, con el motivo escrito
+>     └──[corregir]──┘
+> ```
+>
+> `pagos.estado_validacion` NO es el estado del pago —el dinero entró o no
+> entró— sino el de su CONTROL. Un depósito observado **sigue sumando** en
+> `montoPagado()`: existe y está cargado; lo que está en duda es si respalda lo
+> que dice.
+>
+> **UN OBSERVADO NO SE VALIDA: PRIMERO SE CORRIGE.** Es la única salida y el
+> botón «Validar» no aparece sobre él. Validarlo sin que nadie haya tocado el
+> dato es dar por bueno justo lo que se marcó como malo, y el problema señalado
+> se pierde sin que quede si se arregló. Al CORREGIRLO vuelve solo a PENDIENTE
+> —el dato es nuevo y nadie lo miró— y desde ahí se valida. Si la observación
+> estaba equivocada, se abre «Corregir» y se guarda sin cambiar nada: queda en
+> `auditorias` quién lo hizo.
+>
+> **Y por eso corregir un depósito vive en la FICHA además de en «Editar
+> trámite»**: observar solo pasa EN REVISIÓN, y esa pantalla no abre ahí. Con el
+> botón en un solo lado el circuito no se podía cerrar y el expediente quedaba
+> trabado — pasó de verdad.
+>
+> **QUIÉN CARGÓ Y QUIÉN VALIDÓ SE GUARDAN SIEMPRE**, en dos columnas distintas.
+> Que el sistema EXIJA que sean personas distintas es configurable
+> —`pagos.revisor_distinto`, apagado por defecto—: encendido con un solo usuario
+> deja el circuito trabado, porque la misma cuenta carga y no puede validar.
+>
+> **El control es parte de la REVISIÓN**: solo se valida con el trámite EN
+> REVISIÓN. Pendiente es un borrador y aprobado ya no admite reparos. Ver
+> `Pago::admiteControl()`.
+>
+> `Tramite::puedeAprobarse()` exige las tres cosas: el estado, el monto cubierto
+> y **todos los depósitos validados**. Sin la tercera, la validación sería
+> decorativa.
 
 Al pasar a EN REVISIÓN queda habilitado el **RECIBO OFICIAL** —el talonario
 verde del SEDAG—: es el momento en que el pescador entregó los papeles y la
@@ -323,6 +437,28 @@ Los cuatro tienen que pasar.
   mientras el clic se está procesando y el formulario se envía solo. En el
   formulario de trámite eso registraba la solicitud al pasar del paso 2 al 3, con
   los adjuntos vacíos. Ver la barra de navegación de `pages/panel/tramites/crear.tsx`.
+- **Pedir columnas sueltas en un `with()` rompe los métodos del modelo, y no
+  avisa.** `with('rubro:id,nombre')` deja `emite_faenas` sin cargar, así que
+  `Carnet::puedeEmitirFaenas()` lee null, devuelve false, y el formulario de
+  faenas abre vacío descartando en silencio un carnet perfectamente válido.
+  Es la misma trampa que ya estaba anotada para las cinco columnas del nombre
+  del beneficiario, pero vale para CUALQUIER columna que un método lea: si el
+  modelo la consulta, va en el select. Ver `FaenaController::create()`.
+- **Un `default` de la base NO llega al objeto que devuelve `create()`.** El
+  INSERT lo aplica el motor, y el modelo en memoria se queda con la columna en
+  `null` hasta que alguien haga `refresh()`. Eso rompe lo obvio: emitir una
+  faena y preguntarle `estaEmitida()` en la línea siguiente contestaba que no,
+  con la fila ya escrita y correcta en la base. Si una columna tiene valor por
+  defecto y el código lo lee, va **también** en `protected $attributes` del
+  modelo. Pasó TRES veces en un día —`faenas.estado`, `faenas.monto`,
+  `pagos.estado_validacion`— y las tres se descubrieron igual: una prueba que
+  preguntaba por el estado justo después de `create()` — con el `->value` del enum, porque `$attributes` se llena antes de que
+  corran los casts. Ver `Faena` y `Guia`.
+- **Una relación polimórfica NO se puede precargar con `with('pagable.carnet')`.**
+  Eloquent no sabe qué es `pagable` hasta que lee la fila, así que no puede
+  resolver lo que cuelga de él: lo que se escribe así se ignora y el N+1 sigue
+  ahí, sin ningún error. Va con `morphWith`, declarando qué traer para cada
+  tipo. Ver `PagoController::index()`.
 - **Clases de Tailwind armadas juntando textos no funcionan.** Tailwind solo
   incluye en el CSS final las que puede leer literalmente en el código. Si se
   agrega un color a un enum de PHP, hay que agregarlo también al mapa de
@@ -345,6 +481,26 @@ Los cuatro tienen que pasar.
   de todos los carnets y a las fechas de nacimiento. Toda fecha se muestra con
   `fecha()` de `lib/utils.ts`, que distingue una fecha suelta de un instante; ver
   `aFechaLocal()`. Nunca `new Date(cadena)` directo en un componente.
+
+  **Y `fecha()` no alcanza si el SERVIDOR manda la forma equivocada.** Es la
+  otra mitad de la misma trampa y mordió con `pagos.fecha_pago`: la columna es un
+  timestamp, pero lo que guarda es el DÍA que dice la boleta. Mandada con
+  `toIso8601String()` llegaba como `2026-09-17T00:00:00+00:00` —un instante— y
+  `fecha()` hacía lo correcto con él: pasarlo a horario local, que en UTC-4 es el
+  16 a las 20:00. **Un depósito del 17 se mostraba como 16/09**, y nadie lo notó
+  hasta que un formulario tuvo que leer esa fecha de vuelta. La regla: si la
+  columna guarda un DÍA, va con `toDateString()`; si guarda un MOMENTO —cuándo se
+  validó, cuándo se cargó— va con `toIso8601String()`. Y para rellenar un
+  `<input type="date">` va `fechaInput()`, nunca `slice(0, 10)`.
+- **`pluck()` sobre una columna que no existe NO FALLA: devuelve nulls.** Es el
+  mismo silencio de `update()` con algo fuera de `#[Fillable]`, y acá costó
+  archivos: `rutasDeAdjuntos()` juntaba las boletas de los pagos con
+  `pluck('comprobante')` —la columna es `urlFile`; `comprobante_url` es el
+  accesor con la dirección completa— así que **cada expediente eliminado dejaba
+  todas sus boletas tiradas en el disco**, para siempre y sin ningún error. Al
+  escribir un `pluck()`, un `where()` o un `select()` a mano contra un nombre de
+  columna, confirmarlo en el `#[Fillable]` del modelo o en la migración: los
+  accesores `#[Appends]` se parecen a columnas y no lo son.
 - **`beneficiarios` usa camelCase de `primerNombre` en adelante.** En PostgreSQL
   eso obliga a entrecomillar: `SELECT "primerNombre" ...`. Sin comillas el motor
   pasa el nombre a minúscula y responde `column "primernombre" does not exist`.
@@ -547,6 +703,8 @@ sistema entero para entenderlo. Eso solo se sostiene si se mantienen:
 | Una regla de negocio, el esquema, un flujo | `docs/ARQUITECTURA.md` |
 | Agregaste o cambiaste un archivo a fondo | `docs/MAPA-ARCHIVOS.md` |
 | Un módulo entero | `docs/modulos/<MODULO>.md` |
+| Faenas o guías | `docs/modulos/PERMISOS-OPERATIVOS.md` |
+| Pagos o su control | `docs/modulos/PAGOS.md` |
 | Resolviste o encontraste un problema | `docs/PENDIENTES.md` |
 | Cualquier cosa | `docs/sesiones/MM-AAAA/AAAA-MM-DD.md` |
 

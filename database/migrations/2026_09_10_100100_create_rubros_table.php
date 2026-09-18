@@ -6,15 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 |--------------------------------------------------------------------------
-| Rubros — el catálogo de actividades que habilita un carnet
+| Rubros — el catálogo de actividades
 |--------------------------------------------------------------------------
 |
-| Un rubro es una actividad autorizada: pesca artesanal, transporte de
-| producto, venta en mercado. El carnet es uno solo por persona y gestión, y
-| sobre él se van habilitando rubros (ver `carnet_rubro`).
+| Pescador, Comercializador. Cada actividad emite su propio carnet anual.
 |
-| Es una tabla chica y de lectura constante: la carga el seeder y la
-| administra un usuario con permiso `rubros.gestionar`.
+| LAS TRES BANDERAS DE ABAJO MANDAN COMPORTAMIENTO, Y SE PREGUNTAN POR COLUMNA
+| Y NUNCA POR EL NOMBRE DEL RUBRO: el catálogo lo edita la unidad desde el
+| panel —el mismo rubro figura como «Pescador» o como «Faena» según quién lo
+| cargó— y los rubros nuevos entran por ordenanza, sin pasar por código.
+|
+| Tabla chica, de lectura constante y escritura rarísima.
 |
 */
 return new class extends Migration
@@ -26,68 +28,48 @@ return new class extends Migration
             $table->string('nombre', 50);
             $table->text('descripcion')->nullable();
 
-            /*
-             * EL COSTO NO ESTABA EN EL SCRIPT SQL Y HACE FALTA.
-             *
-             * La Regla C pide validar «si la sumatoria de los pagos cubre el
-             * costo total requerido» del trámite. Ese costo tiene que salir de
-             * algún lado, y el lugar natural es el rubro: cada actividad tiene
-             * su tarifa según ordenanza.
-             *
-             * El trámite NO lee esta columna al momento de aprobar: se la copia
-             * a `tramites.monto_requerido` cuando se registra la solicitud.
-             * Así, si mañana sube la tarifa, los expedientes ya abiertos siguen
-             * debiendo lo que decía el papel el día que se presentaron.
-             */
+            // Se COPIA a `tramites.monto_requerido` al registrar la solicitud.
+            // Así, subir la tarifa no deja impagos los expedientes ya abiertos.
             $table->decimal('costo', 10, 2)->default(0)
                 ->comment('Tarifa vigente en Bs. Se copia al tramite al registrarlo');
 
             /*
-             * ¿ESTA ACTIVIDAD LLEVA CUPO EN KILOS?
+             * ¿SE AUTORIZA POR VOLUMEN? La pesca sí —tantos kilos, contrastables
+             * contra las guías—; la comercialización no.
              *
-             * No todas. La pesca —«Pescador», «Faena»— se autoriza por volumen:
-             * tantos kilos por temporada, y ese número se contrasta contra las
-             * guías de transporte. La comercialización no: habilita a trasladar
-             * y vender, sin tope propio.
-             *
-             * ------------------------------------------------------------------
-             *  ES UNA COLUMNA Y NO UN `match` SOBRE EL NOMBRE
-             * ------------------------------------------------------------------
-             *
-             * La tentación es preguntar `$rubro->nombre === 'Pescador'`. No
-             * sirve, por dos motivos concretos:
-             *
-             *   - el catálogo lo edita la unidad desde el panel, y el mismo
-             *     rubro figura como «Pescador» o como «Faena» según quién lo
-             *     cargó. Un `match` por nombre deja de funcionar el día que
-             *     alguien corrige una tilde;
-             *   - los rubros se agregan por ordenanza. El que venga mañana
-             *     —«Acuicultor»— tendría que pasar por código para decir si
-             *     lleva cupo, cuando es un dato del catálogo.
-             *
-             * De qué depende: el formulario de trámite muestra u oculta el campo
-             * del cupo, la validación lo exige o lo prohíbe, y el plástico
-             * imprime el renglón CUPO o le da la tira entera al rubro.
-             *
-             * DEFAULT FALSE a propósito: un rubro nuevo no pide cupo hasta que
-             * alguien diga que sí. Al revés, el que se olvide de destildarlo
-             * obliga a ventanilla a inventar un número para poder guardar.
+             * De acá cuelgan cuatro cosas: el formulario muestra u oculta el
+             * campo del cupo, la validación lo exige o lo PROHÍBE, la ficha lo
+             * muestra o no, y el plástico imprime el renglón CUPO.
              */
             $table->boolean('requiere_capacidad')->default(false)
                 ->comment('Si la actividad se autoriza por volumen (kilos)');
 
-            // 'activo' | 'inactivo'. Ver App\Enums\EstadoRubro.
-            //
-            // Se da de baja cambiando el estado y no borrando la fila: los
-            // carnets y trámites históricos apuntan acá y no pueden quedar
-            // huérfanos. Un rubro inactivo no aparece en el formulario de
-            // solicitud, pero los carnets que ya lo tienen lo siguen mostrando.
+            /*
+             * QUÉ PERMISO OPERATIVO CUELGA DE SUS CARNETS.
+             *
+             *     Pescador        ──▶ FAENAS   (una por salida)
+             *     Comercializador ──▶ GUÍAS    (una por traslado)
+             *
+             * Son DOS banderas y no un solo `tipo_permiso` porque no son
+             * excluyentes: una actividad piscícola necesitaría faena para la
+             * cosecha y guía para trasladarla.
+             *
+             * DEFAULT FALSE en las tres: un rubro nuevo no habilita nada hasta
+             * que alguien lo tilde.
+             */
+            $table->boolean('emite_faenas')->default(false)
+                ->comment('Si de sus carnets cuelgan permisos por faena de pesca');
+            $table->boolean('emite_guias')->default(false)
+                ->comment('Si de sus carnets cuelgan guias unicas de transporte');
+
+            // 'activo' | 'inactivo'. Ver App\Enums\EstadoRubro. No se borra
+            // nunca: los carnets y trámites históricos apuntan acá.
             $table->string('estado', 30)->default('activo')->comment('activo | inactivo');
 
             $table->timestamps();
 
             // Dos rubros con el mismo nombre serían indistinguibles en el
-            // formulario de solicitud, y el operador elegiría a ciegas.
+            // formulario y el operador elegiría a ciegas.
             $table->unique('nombre');
         });
     }

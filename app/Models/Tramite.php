@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoTramite;
+use App\Enums\EstadoValidacionPago;
 use App\Enums\TipoTramite;
 use App\Support\Archivos;
 use App\Traits\Auditable;
@@ -12,8 +13,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * El expediente de una solicitud: «esta persona pide este rubro».
@@ -103,9 +104,17 @@ class Tramite extends Model
         )->withTrashed();
     }
 
-    public function pagos(): HasMany
+    /**
+     * Los depósitos con que se cubre el costo del trámite.
+     *
+     * morphMany y no hasMany, porque `pagos` también cobra faenas y guías. Para
+     * quien consume la relación no cambia nada —`$tramite->pagos` sigue
+     * devolviendo lo mismo— pero NO hay columna `tramite_id`: lo que consulte
+     * `pagos` va por `pagable_type` + `pagable_id`. Ver `create_pagos_table`.
+     */
+    public function pagos(): MorphMany
     {
-        return $this->hasMany(Pago::class)->orderBy('fecha_pago');
+        return $this->morphMany(Pago::class, 'pagable')->orderBy('fecha_pago');
     }
 
     // ------------------------------------------------------------------
@@ -199,7 +208,29 @@ class Tramite extends Model
      * Devuelve la lista de lo que falta, en castellano de ventanilla y ya listo
      * para mostrar. Vacío significa que está completo.
      *
-     * Son los DOS ADJUNTOS DEL EXPEDIENTE, y nada más.
+     * Son los DOS ADJUNTOS DEL EXPEDIENTE y EL DINERO.
+     *
+     * ------------------------------------------------------------------------
+     *  EL MONTO TIENE QUE ESTAR CUBIERTO ANTES DE ENVIAR, NO RECIÉN AL APROBAR
+     * ------------------------------------------------------------------------
+     *
+     * La suma de los depósitos tiene que llegar al costo del rubro. Antes esto
+     * se comprobaba solo al APROBAR, y eso dejaba pasar lo que no se puede
+     * deshacer: al enviar a revisión queda habilitado el RECIBO OFICIAL, con el
+     * monto y la fecha congelados, y el pescador se va del mostrador con ese
+     * papel. Emitirlo por un expediente a medio pagar es entregar un
+     * comprobante por dinero que no entró.
+     *
+     * Y encaja con lo que significa cada estado: PENDIENTE es el borrador donde
+     * la persona está juntando la plata —ahí se cargan las boletas de a una—;
+     * ENVIAR es declarar que el expediente está completo. Un expediente
+     * completo incluye lo cobrado.
+     *
+     * Se compara con `>=` y no con `==`, igual que en `estaPagado()`: un
+     * depósito puede venir por unos centavos de más y eso no debe trabar nada.
+     *
+     * El rubro EXENTO por ordenanza —costo cero— pasa sin depósitos, porque la
+     * suma de nada ya cubre un costo de cero.
      *
      * ------------------------------------------------------------------------
      *  POR QUÉ SE COMPRUEBA ACÁ SI EL FORMULARIO YA LOS EXIGE
@@ -239,6 +270,18 @@ class Tramite extends Model
             $faltan[] = 'el certificado de la asociación';
         }
 
+        // El texto DICE CUÁNTO FALTA, no «el pago»: el operador necesita saber
+        // por cuánto tiene que volver la persona al banco, y ese número es lo
+        // primero que le van a preguntar en el mostrador.
+        if (! $this->estaPagado()) {
+            $faltan[] = sprintf(
+                'cubrir %s del costo (se cobró %s de %s)',
+                number_format($this->saldoPendiente(), 2, ',', '.'),
+                number_format($this->montoPagado(), 2, ',', '.'),
+                number_format((float) $this->monto_requerido, 2, ',', '.'),
+            );
+        }
+
         return $faltan;
     }
 
@@ -265,21 +308,90 @@ class Tramite extends Model
     }
 
     /**
+     * ¿TODOS los depósitos están controlados?
+     *
+     * Que el monto esté cubierto y que el dinero esté comprobado son dos cosas
+     * distintas: la suma sale de filas que tipeó una persona, y hasta que
+     * alguien MÁS mire la boleta contra el extracto, lo que hay es una
+     * declaración. Ver App\Enums\EstadoValidacionPago.
+     *
+     * Un trámite SIN depósitos devuelve true, y está bien: es el caso del rubro
+     * exento por ordenanza —costo cero— que se aprueba sin cobrar nada. Quien
+     * frena ahí es `estaPagado()`, que es otra pregunta.
+     *
+     * Usa la relación cargada cuando ya vino con `with('pagos')`. Sin esa
+     * comprobación, `$this->pagos()->where(...)` CONSULTA IGUAL aunque quien
+     * llamó haya hecho el eager loading.
+     */
+    public function pagosValidados(): bool
+    {
+        if ($this->relationLoaded('pagos')) {
+            return $this->pagos->every(fn (Pago $p): bool => $p->estaValidado());
+        }
+
+        return ! $this->pagos()->sinValidar()->exists();
+    }
+
+    /**
+     * Cuántos depósitos siguen frenando la aprobación, por estado.
+     *
+     * Se devuelven separados porque las dos salidas son distintas: un pendiente
+     * se valida, un observado hay que corregirlo antes. El mensaje de error lo
+     * dice, y la pantalla lo muestra.
+     *
+     * @return array{pendientes: int, observados: int}
+     */
+    public function pagosPorControlar(): array
+    {
+        $pagos = $this->relationLoaded('pagos') ? $this->pagos : $this->pagos()->get();
+
+        return [
+            'pendientes' => $pagos->where('estado_validacion', EstadoValidacionPago::Pendiente)->count(),
+            'observados' => $pagos->where('estado_validacion', EstadoValidacionPago::Observado)->count(),
+        ];
+    }
+
+    /**
      * ¿Se puede aprobar HOY?
      *
-     * Son dos condiciones y las dos hacen falta: que el salto de estado sea
-     * válido —no se aprueba lo ya resuelto— y que el monto esté cubierto. La
-     * segunda es la Regla C, y se comprueba contra la suma de los pagos y no
-     * contra un campo guardado que podría estar desfasado.
+     * SON TRES CONDICIONES Y LAS TRES HACEN FALTA:
+     *
+     *   - que el salto de estado sea válido — no se aprueba lo ya resuelto;
+     *   - que el monto esté cubierto (Regla C), contra la SUMA de los pagos y no
+     *     contra un campo guardado que podría estar desfasado;
+     *   - que todos esos depósitos estén CONTROLADOS.
+     *
+     * La tercera se agregó después, y es la que convierte el control en control:
+     * sin ella se podía aprobar un expediente sin que nadie hubiera abierto una
+     * sola boleta, y la columna de validación quedaba decorativa.
      */
     public function puedeAprobarse(): bool
     {
-        return $this->estado->puedePasarA(EstadoTramite::Aprobado) && $this->estaPagado();
+        return $this->estado->puedePasarA(EstadoTramite::Aprobado)
+            && $this->estaPagado()
+            && $this->pagosValidados();
     }
 
     public function puedeRechazarse(): bool
     {
         return $this->estado->puedePasarA(EstadoTramite::Rechazado);
+    }
+
+    /**
+     * ¿Se puede REABRIR para seguir trabajándolo?
+     *
+     * Es el camino de vuelta de un rechazo: el pescador trajo lo que faltaba y
+     * el expediente vuelve al borrador con sus depósitos y su historial.
+     *
+     * Solo mira el salto de estado. La otra condición —que el carnet no tenga
+     * YA otro expediente abierto— no se comprueba acá a propósito: exigiría una
+     * consulta por fila y el listado la haría por cada trámite de la página.
+     * La aplica `SolicitudCarnetService::reabrir()`, y su mensaje explica el
+     * caso mejor de lo que podría hacerlo un botón escondido.
+     */
+    public function puedeReabrirse(): bool
+    {
+        return $this->estado->puedePasarA(EstadoTramite::Pendiente);
     }
 
     /**

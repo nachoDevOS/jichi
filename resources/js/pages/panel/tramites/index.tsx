@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Eye, FilePlus2, FileText, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
@@ -12,8 +12,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha } from '@/lib/utils';
-import type { OpcionEnum, Paginado, PageProps } from '@/types';
+import { fecha, hace, hora } from '@/lib/utils';
+import type { OpcionEnum, Paginado } from '@/types';
 import type { TramiteFila } from '@/types/tramites';
 
 /** El listado de expedientes, con filtros por estado, tipo y gestión. */
@@ -40,7 +40,6 @@ export default function IndiceTramites({
     opcionesPorPagina: number[];
 }) {
     const { puede } = usePermisos();
-    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
     /*
@@ -98,7 +97,7 @@ export default function IndiceTramites({
 
     return (
         <LayoutPanel
-            titulo="Trámites"
+            titulo="Trámites de carnet"
             descripcion="Expedientes de emisión y actualización de carnets."
             acciones={
                 puede('tramites.crear') && (
@@ -214,9 +213,40 @@ export default function IndiceTramites({
                                     <th className="px-5 py-3 font-medium">ID</th>
                                     <th className="px-5 py-3 font-medium">Beneficiario</th>
                                     <th className="px-5 py-3 font-medium">Rubro</th>
-                                    <th className="px-5 py-3 font-medium">Tipo</th>
+                                    {/*
+                                        NO HAY COLUMNA «TIPO», y se sacó a pedido.
+
+                                        Decía «Emisión Inicial» en casi todas las
+                                        filas —es el caso normal: cada rubro nuevo
+                                        emite su carnet— así que gastaba una
+                                        columna para repetir lo mismo.
+
+                                        El dato NO se perdió: sigue en la base
+                                        (`tramites.tipo_tramite`), en la ficha del
+                                        trámite y en el filtro de acá arriba, que
+                                        es donde de verdad sirve: «mostrame solo
+                                        las actualizaciones».
+                                    */}
                                     <th className="px-5 py-3 font-medium">Estado</th>
-                                    <th className="px-5 py-3 text-right font-medium">Saldo</th>
+                                    {/*
+                                        TAMPOCO HAY COLUMNA «SALDO», y también se
+                                        sacó a pedido.
+
+                                        El motivo es de circuito, no de espacio:
+                                        el expediente se arma, se ENVÍA a revisión,
+                                        y ahí alguien lo abre y controla los
+                                        papeles Y los pagos antes de aprobar. O
+                                        sea, lo que la columna adelantaba se mira
+                                        igual, de a uno, en la ficha — y ahí está
+                                        completo: cuánto se requiere, cuánto entró,
+                                        con qué boleta y en qué fecha.
+
+                                        Puesto acá solo repetía un dato que nadie
+                                        decide desde el listado: `puedeAprobarse()`
+                                        ya exige el pago cubierto, así que un
+                                        trámite impago no se puede aprobar aunque
+                                        el revisor no haya mirado la columna.
+                                    */}
                                     {/*
                                         «Fecha de registro» y no «Fecha» a secas:
                                         es cuándo se CARGÓ el expediente acá, no
@@ -271,24 +301,36 @@ export default function IndiceTramites({
                                         </td>
                                         <td className="px-5 py-3">{t.rubro ?? '—'}</td>
                                         <td className="px-5 py-3">
-                                            <Badge color={t.tipo_color}>{t.tipo_etiqueta}</Badge>
-                                        </td>
-                                        <td className="px-5 py-3">
                                             <Badge color={t.estado_color}>{t.estado_etiqueta}</Badge>
                                         </td>
-                                        <td className="px-5 py-3 text-right tabular-nums">
-                                            {t.saldo_pendiente > 0 ? (
-                                                <span className="text-amber-700 dark:text-amber-400">
-                                                    {bs(t.saldo_pendiente, institucion.moneda)}
-                                                </span>
-                                            ) : (
-                                                <span className="text-emerald-700 dark:text-emerald-400">
-                                                    Pagado
-                                                </span>
+                                        {/*
+                                            TRES DATOS EN UNA CELDA, y cada uno
+                                            contesta otra pregunta:
+
+                                              la FECHA    para buscar el papel en
+                                                          el archivo;
+                                              la HORA     para ordenar dos
+                                                          expedientes del mismo
+                                                          día;
+                                              el «HACE»   para ver de un vistazo
+                                                          si entró recién o está
+                                                          esperando desde la
+                                                          semana pasada.
+
+                                            El «hace tanto» se calcula al pintar
+                                            y no se refresca solo: ver `hace()`
+                                            en lib/utils.ts.
+                                        */}
+                                        <td className="px-5 py-3">
+                                            <p className="tabular-nums">{fecha(t.created_at)}</p>
+                                            <p className="tabular-nums text-xs text-muted-foreground">
+                                                {hora(t.created_at)}
+                                            </p>
+                                            {t.created_at && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {hace(t.created_at)}
+                                                </p>
                                             )}
-                                        </td>
-                                        <td className="px-5 py-3 text-muted-foreground">
-                                            {fecha(t.created_at)}
                                         </td>
 
                                         <td className="px-5 py-3">
@@ -381,6 +423,7 @@ export default function IndiceTramites({
                         <p className="mt-2 font-medium">Esto no se puede deshacer.</p>
                     </>
                 }
+                confirmacion="Entiendo que se borran también los depósitos, los archivos adjuntos y —si corresponde— el carnet, y que no se puede deshacer."
                 etiquetaMotivo="¿Por qué se elimina?"
                 ayuda="Es lo ÚNICO que va a quedar del expediente: la fila desaparece y solo se guarda esta línea en la bitácora."
                 placeholder="Ej.: cargado dos veces por error, este es el duplicado."
