@@ -1,5 +1,18 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Banknote, Paperclip, Pencil, Plus, Ship, Trash2, TriangleAlert, X } from 'lucide-react';
+import {
+    Banknote,
+    Check,
+    Paperclip,
+    Pencil,
+    Plus,
+    Printer,
+    Send,
+    Ship,
+    Trash2,
+    TriangleAlert,
+    Undo2,
+    X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
@@ -51,24 +64,77 @@ export default function VerCupo({
     const { institucion } = usePage<PageProps>().props;
 
     const [eliminando, setEliminando] = useState(false);
+    const [rechazando, setRechazando] = useState(false);
+
+    /*
+     * FORMULARIO PROPIO PARA EL RECHAZO, separado del borrado. Los dos tienen un
+     * campo `motivo` pero distinto destino y distintas reglas: mezclados, el
+     * error de uno se pintaría en la ventana del otro —las dos leen
+     * `form.errors.motivo`— y el texto escrito para uno seguiría ahí al abrir el
+     * otro.
+     */
+    const rechazo = useForm({ motivo: '' });
+    const envio = useForm({});
 
     const borrado = useForm({ motivo: '' });
 
-    const [cobrando, setCobrando] = useState(false);
-
     /*
-     * EL MONTO ARRANCA EN EL SALDO ENTERO, que es el caso normal: se cobra todo.
-     * Quien está cargando el primero de dos depósitos lo baja, y el segundo
-     * vuelve a proponer lo que falte porque la pantalla se recarga con el saldo
-     * nuevo.
+     * ========================================================================
+     *  EL FORMULARIO ES UNA LISTA DE SECCIONES, NO UN PAGO
+     * ========================================================================
+     *
+     * Cada clic en «Agregar pago» suma una sección, y cada una es un depósito
+     * completo: monto, número de boleta, fecha y archivo. Se mandan todas
+     * juntas, y cada una sale con su propio recibo numerado.
+     *
+     * Por qué una lista y no un pago por vez: la persona llega al mostrador con
+     * las dos boletas en la mano. Cargarlas de a una obligaba a guardar, esperar
+     * la recarga y volver a abrir el formulario.
      */
-    const pago = useForm({
-        monto: String(cupo.saldo_pendiente),
+    const seccionNueva = (monto: number) => ({
+        // `key` estable para React: sin ella, quitar la sección del medio
+        // remonta las de abajo y les vacía el archivo elegido.
+        key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        monto: monto > 0 ? String(monto) : '',
         nro_transaccion: '',
         // Se propone hoy, que es lo normal: la boleta suele traerse el mismo día.
         fecha_deposito: new Date().toISOString().slice(0, 10),
         comprobante: null as File | null,
     });
+
+    const pago = useForm({ pagos: [] as ReturnType<typeof seccionNueva>[] });
+
+    const cobrando = pago.data.pagos.length > 0;
+
+    /*
+     * LO QUE SUMAN LAS SECCIONES, para saber si con esto alcanza.
+     *
+     * `Number('')` da 0 y no NaN, así que una sección recién agregada no rompe
+     * la cuenta mientras el operador todavía no escribió el monto.
+     */
+    const sumaSecciones = pago.data.pagos.reduce((s, x) => s + Number(x.monto || 0), 0);
+    const faltaDespues = Math.round((cupo.saldo_pendiente - sumaSecciones) * 100) / 100;
+
+    function agregarSeccion() {
+        // La primera propone el saldo entero —el caso normal es cobrar todo— y
+        // las siguientes, lo que quede sin cubrir.
+        pago.setData('pagos', [...pago.data.pagos, seccionNueva(faltaDespues)]);
+    }
+
+    function quitarSeccion(key: string) {
+        pago.setData('pagos', pago.data.pagos.filter((x) => x.key !== key));
+    }
+
+    function cambiarSeccion(key: string, campo: string, valor: string | File | null) {
+        pago.setData(
+            'pagos',
+            pago.data.pagos.map((x) => (x.key === key ? { ...x, [campo]: valor } : x)),
+        );
+    }
+
+    /** El error que el servidor devolvió para la sección `i`. */
+    const errorDe = (i: number, campo: string): string | undefined =>
+        (pago.errors as Record<string, string | undefined>)[`pagos.${i}.${campo}`];
 
     return (
         <LayoutPanel
@@ -128,6 +194,56 @@ export default function VerCupo({
                             <Trash2 className="size-4" />
                             Eliminar
                         </Button>
+                    )}
+
+                    {/*
+                        ENVIAR A REVISIÓN. `puede_enviarse` ya trae las dos
+                        condiciones adentro: pendiente Y con el monto cubierto.
+                        Con solo el estado, el botón se ofrecería sobre un cupo a
+                        medio pagar y el servidor lo rechazaría.
+                    */}
+                    {puede('aprovechamientos.enviar') && cupo.puede_enviarse && (
+                        <Button
+                            onClick={() =>
+                                envio.post(route('aprovechamientos.enviar', cupo.id), {
+                                    preserveScroll: true,
+                                })
+                            }
+                            disabled={envio.processing}
+                        >
+                            <Send className="size-4" />
+                            Enviar a revisión
+                        </Button>
+                    )}
+
+                    {/*
+                        APROBAR Y RECHAZAR son de SUPERVISIÓN, y van juntas: quien
+                        puede firmar puede devolver. Solo sobre lo presentado.
+                    */}
+                    {puede('aprovechamientos.aprobar') && cupo.puede_revisarse && (
+                        <>
+                            <Button
+                                onClick={() =>
+                                    envio.patch(route('aprovechamientos.aprobar', cupo.id), {
+                                        preserveScroll: true,
+                                    })
+                                }
+                                disabled={envio.processing}
+                                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                                <Check className="size-4" />
+                                Aprobar
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                onClick={() => setRechazando(true)}
+                                className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                            >
+                                <Undo2 className="size-4" />
+                                Rechazar
+                            </Button>
+                        </>
                     )}
 
                     {puede('caja.cobrar') && !cupo.pagado && (
@@ -197,9 +313,26 @@ export default function VerCupo({
                             <p className="flex items-start gap-2 rounded-md bg-sky-50 p-3 text-sm text-sky-900 dark:bg-sky-500/10 dark:text-sky-200">
                                 <Banknote className="mt-0.5 size-4 shrink-0" />
                                 <span>
-                                    <strong>Pendiente de pago.</strong> Todavía no autoriza a pescar:
-                                    lo que habilita es la concesión cobrada. Mientras tanto se puede
-                                    corregir o eliminar.
+                                    <strong>Pendiente.</strong> Todavía no autoriza a pescar. Cargue
+                                    los depósitos hasta cubrir el monto y recién ahí se puede enviar
+                                    a revisión. Mientras tanto se puede corregir o eliminar.
+                                </span>
+                            </p>
+                        )}
+
+                        {/*
+                            EN REVISIÓN TAMPOCO AUTORIZA, y conviene decirlo: el
+                            monto ya está cubierto, así que sin este aviso se
+                            leería como «listo» y alguien intentaría emitir una
+                            faena para descubrirlo con el error.
+                        */}
+                        {cupo.estado === 'en_revision' && (
+                            <p className="flex items-start gap-2 rounded-md bg-indigo-50 p-3 text-sm text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-200">
+                                <Send className="mt-0.5 size-4 shrink-0" />
+                                <span>
+                                    <strong>En revisión.</strong> Los depósitos cubren el monto y el
+                                    expediente está presentado. Todavía no autoriza a pescar: hace
+                                    falta que alguien verifique las boletas y lo apruebe.
                                 </span>
                             </p>
                         )}
@@ -294,15 +427,32 @@ export default function VerCupo({
                             Es el mismo cobro —sale con su recibo numerado y entra
                             al arqueo—, así que pide el permiso de caja.
                         */}
-                        {puede('caja.cobrar') && !cupo.pagado && (
-                            <Button
-                                size="sm"
-                                onClick={() => setCobrando((v) => !v)}
-                                variant={cobrando ? 'outline' : 'default'}
-                            >
-                                {cobrando ? <X className="size-4" /> : <Plus className="size-4" />}
-                                {cobrando ? 'Cancelar' : 'Agregar pago'}
-                            </Button>
+                        {/*
+                            SOLO MIENTRAS ADMITE PAGOS. En revisión el monto ya
+                            está cubierto y el expediente presentado; aprobado, la
+                            plata que entre de más no es de este trámite.
+                        */}
+                        {puede('caja.cobrar') && cupo.admite_pagos && (
+                            <div className="flex gap-2">
+                                {cobrando && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            pago.setData('pagos', []);
+                                            pago.clearErrors();
+                                        }}
+                                    >
+                                        <X className="size-4" />
+                                        Cancelar
+                                    </Button>
+                                )}
+
+                                <Button size="sm" onClick={agregarSeccion}>
+                                    <Plus className="size-4" />
+                                    Agregar pago
+                                </Button>
+                            </div>
                         )}
                     </CardHeader>
 
@@ -312,76 +462,110 @@ export default function VerCupo({
                                 onSubmit={(e) => {
                                     e.preventDefault();
                                     /*
-                                     * `forceFormData` es obligatorio cuando hay
-                                     * archivo: sin él Inertia manda el cuerpo como
-                                     * JSON y el adjunto se pierde en el camino, sin
+                                     * `forceFormData` es obligatorio: sin él
+                                     * Inertia manda el cuerpo como JSON y los
+                                     * archivos se pierden en el camino, sin
                                      * ningún error que lo explique.
                                      */
                                     pago.post(route('aprovechamientos.pagar', cupo.id), {
-                                        // Siempre hay archivo, así que siempre
-                                        // va como multipart.
                                         forceFormData: true,
                                         preserveScroll: true,
-                                        onSuccess: () => {
-                                            setCobrando(false);
-                                            pago.reset();
-                                        },
+                                        onSuccess: () => pago.reset(),
                                     });
                                 }}
-                                className="mx-5 space-y-4 rounded-md border border-border bg-secondary/30 p-4"
+                                className="mx-5 space-y-4"
                             >
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Campo
-                                        etiqueta="Monto del depósito"
-                                        htmlFor="monto"
-                                        error={pago.errors.monto}
-                                        ayuda={`Quedan ${bs(cupo.saldo_pendiente, institucion.moneda)} por cobrar.`}
-                                        obligatorio
+                                {/* El error general del arreglo: «agregue al
+                                    menos uno», o el que devuelve el servicio. */}
+                                {pago.errors.pagos && (
+                                    <p className="text-sm text-destructive">{pago.errors.pagos}</p>
+                                )}
+
+                                {pago.data.pagos.map((s, i) => (
+                                    <div
+                                        key={s.key}
+                                        className="space-y-4 rounded-md border border-border bg-secondary/30 p-4"
                                     >
-                                        <Input
-                                            id="monto"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={pago.data.monto}
-                                            onChange={(e) => pago.setData('monto', e.target.value)}
-                                            aria-invalid={Boolean(pago.errors.monto)}
-                                        />
-                                    </Campo>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-sm font-medium">Depósito {i + 1}</p>
 
+                                            {/* QUITAR ESTA SECCIÓN. Va por `key` y
+                                                no por índice: por índice, quitar
+                                                la del medio corre a las de abajo
+                                                y se llevan el archivo equivocado. */}
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => quitarSeccion(s.key)}
+                                                aria-label={`Quitar el depósito ${i + 1}`}
+                                                title="Quitar este depósito"
+                                                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </Button>
+                                        </div>
 
-                                    <Campo
-                                        etiqueta="Fecha del depósito"
-                                        htmlFor="fecha_deposito"
-                                        error={pago.errors.fecha_deposito}
-                                        ayuda="La que dice la boleta, no la de hoy: un depósito del viernes puede cargarse el lunes."
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="fecha_deposito"
-                                            type="date"
-                                            value={pago.data.fecha_deposito}
-                                            onChange={(e) =>
-                                                pago.setData('fecha_deposito', e.target.value)
-                                            }
-                                            aria-invalid={Boolean(pago.errors.fecha_deposito)}
-                                        />
-                                    </Campo>
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <Campo
+                                                etiqueta="Monto del depósito"
+                                                htmlFor={`monto-${s.key}`}
+                                                error={errorDe(i, 'monto')}
+                                                obligatorio
+                                            >
+                                                <Input
+                                                    id={`monto-${s.key}`}
+                                                    type="number"
+                                                    step="0.01"
+                                                    min={0}
+                                                    value={s.monto}
+                                                    onChange={(e) =>
+                                                        cambiarSeccion(s.key, 'monto', e.target.value)
+                                                    }
+                                                    aria-invalid={Boolean(errorDe(i, 'monto'))}
+                                                />
+                                            </Campo>
 
-                                    <Campo
+                                            <Campo
+                                                etiqueta="Fecha del depósito"
+                                                htmlFor={`fecha-${s.key}`}
+                                                error={errorDe(i, 'fecha_deposito')}
+                                                ayuda="La que dice la boleta, no la de hoy."
+                                                obligatorio
+                                            >
+                                                <Input
+                                                    id={`fecha-${s.key}`}
+                                                    type="date"
+                                                    value={s.fecha_deposito}
+                                                    onChange={(e) =>
+                                                        cambiarSeccion(
+                                                            s.key,
+                                                            'fecha_deposito',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    aria-invalid={Boolean(errorDe(i, 'fecha_deposito'))}
+                                                />
+                                            </Campo>
+
+                                            <Campo
                                                 etiqueta="N° de transacción"
-                                                htmlFor="nro_transaccion"
-                                                error={pago.errors.nro_transaccion}
+                                                htmlFor={`nro-${s.key}`}
+                                                error={errorDe(i, 'nro_transaccion')}
                                                 ayuda="No se puede repetir: una misma boleta no respalda dos pagos."
                                                 obligatorio
                                             >
                                                 <Input
-                                                    id="nro_transaccion"
-                                                    value={pago.data.nro_transaccion}
+                                                    id={`nro-${s.key}`}
+                                                    value={s.nro_transaccion}
                                                     onChange={(e) =>
-                                                        pago.setData('nro_transaccion', e.target.value)
+                                                        cambiarSeccion(
+                                                            s.key,
+                                                            'nro_transaccion',
+                                                            e.target.value,
+                                                        )
                                                     }
-                                                    aria-invalid={Boolean(pago.errors.nro_transaccion)}
+                                                    aria-invalid={Boolean(errorDe(i, 'nro_transaccion'))}
                                                     placeholder="0012345678"
                                                     className="font-mono"
                                                     maxLength={60}
@@ -390,32 +574,66 @@ export default function VerCupo({
 
                                             <Campo
                                                 etiqueta="Boleta del depósito"
-                                                htmlFor="comprobante"
-                                                error={pago.errors.comprobante}
+                                                htmlFor={`comprobante-${s.key}`}
+                                                error={errorDe(i, 'comprobante')}
                                                 ayuda="Foto o PDF, hasta 3 MB."
                                                 obligatorio
                                             >
                                                 <SelectorArchivo
-                                                    id="comprobante"
-                                                    archivo={pago.data.comprobante}
-                                                    onElegir={(a) => pago.setData('comprobante', a)}
-                                                    error={pago.errors.comprobante}
+                                                    id={`comprobante-${s.key}`}
+                                                    archivo={s.comprobante}
+                                                    onElegir={(a) =>
+                                                        cambiarSeccion(s.key, 'comprobante', a)
+                                                    }
+                                                    error={errorDe(i, 'comprobante')}
                                                 />
                                             </Campo>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/*
+                                    LA CUENTA A LA VISTA, que es lo que decide si
+                                    el cupo se va a poder presentar: las secciones
+                                    tienen que cubrir el saldo entero.
+                                */}
+                                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-secondary/50 p-3 text-sm">
+                                    <span>
+                                        Suman{' '}
+                                        <strong className="tabular-nums">
+                                            {bs(sumaSecciones, institucion.moneda)}
+                                        </strong>{' '}
+                                        de {bs(cupo.saldo_pendiente, institucion.moneda)} pendientes
+                                    </span>
+
+                                    <span
+                                        className={
+                                            faltaDespues > 0
+                                                ? 'font-medium text-amber-700 dark:text-amber-400'
+                                                : 'font-medium text-emerald-700 dark:text-emerald-400'
+                                        }
+                                    >
+                                        {faltaDespues > 0
+                                            ? `Faltan ${bs(faltaDespues, institucion.moneda)}`
+                                            : 'Cubre el monto'}
+                                    </span>
                                 </div>
 
                                 <Button
                                     type="submit"
                                     disabled={
                                         pago.processing ||
-                                        Number(pago.data.monto) <= 0 ||
-                                        pago.data.fecha_deposito === '' ||
-                                        pago.data.comprobante === null ||
-                                        pago.data.nro_transaccion.trim() === ''
+                                        pago.data.pagos.some(
+                                            (s) =>
+                                                Number(s.monto) <= 0 ||
+                                                s.fecha_deposito === '' ||
+                                                s.nro_transaccion.trim() === '' ||
+                                                s.comprobante === null,
+                                        )
                                     }
                                 >
                                     <Banknote className="size-4" />
-                                    Registrar pago
+                                    Registrar {pago.data.pagos.length} depósito(s)
                                 </Button>
                             </form>
                         )}
@@ -436,6 +654,7 @@ export default function VerCupo({
                                             <th className="px-5 py-2.5 font-medium">Depositado</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Monto</th>
                                             <th className="px-5 py-2.5 font-medium">Cargado</th>
+                                            <th className="px-5 py-2.5" />
                                         </tr>
                                     </thead>
 
@@ -485,6 +704,26 @@ export default function VerCupo({
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fechaHora(p.cobrado_en)}
+                                                </td>
+
+                                                {/* EL RECIBO DEL TALONARIO, en
+                                                    PDF. Abre una pestaña porque
+                                                    lo que vuelve es un archivo y
+                                                    el visor del navegador es
+                                                    desde donde se imprime. */}
+                                                <td className="px-5 py-2.5 text-right">
+                                                    {puede('recibos.imprimir') && (
+                                                        <a
+                                                            href={route('recibos.imprimir', p.recibo_id)}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            title="Imprimir el recibo"
+                                                            aria-label={`Imprimir el recibo ${p.numero_recibo ?? ''}`}
+                                                            className="inline-flex text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+                                                        >
+                                                            <Printer className="size-4" />
+                                                        </a>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
@@ -597,6 +836,51 @@ export default function VerCupo({
                 EliminarCupoRequest: si acá fuera menor, el botón se habilitaría
                 y el servidor rechazaría igual.
             */}
+            {/*
+                RECHAZAR PIDE MOTIVO, y no casilla: no es destructivo —el cupo
+                vuelve a pendiente con sus pagos intactos— pero sí es lo único
+                que le dice a ventanilla QUÉ corregir. Sin el texto, el
+                expediente rebota: se vuelve a presentar igual.
+            */}
+            <ConfirmarConMotivo
+                abierto={rechazando}
+                titulo="Rechazar y devolver a ventanilla"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            El cupo de <strong>{cupo.beneficiario ?? 'el pescador'}</strong> vuelve a
+                            PENDIENTE.
+                        </p>
+                        <p>
+                            Los depósitos ya cargados <strong>no se tocan</strong>: siguen colgando
+                            del cupo, así que ventanilla corrige lo que haga falta y lo vuelve a
+                            presentar sin recargar nada.
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo del rechazo"
+                ayuda="Es lo que va a leer quien tenga que corregirlo. Queda en la auditoría con su nombre."
+                placeholder="La boleta DEP-0002 no figura en el extracto del banco."
+                textoConfirmar="Rechazar"
+                valor={rechazo.data.motivo}
+                onCambiar={(v) => rechazo.setData('motivo', v)}
+                error={rechazo.errors.motivo}
+                procesando={rechazo.processing}
+                onCancelar={() => {
+                    setRechazando(false);
+                    rechazo.reset();
+                }}
+                onConfirmar={() =>
+                    rechazo.patch(route('aprovechamientos.rechazar', cupo.id), {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            setRechazando(false);
+                            rechazo.reset();
+                        },
+                    })
+                }
+            />
+
             <ConfirmarConMotivo
                 abierto={eliminando}
                 titulo="Eliminar este aprovechamiento"

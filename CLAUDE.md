@@ -682,7 +682,12 @@ Los cuatro tienen que pasar.
   correcta y da verde con la duplicada al lado. Al probar una auditoría, contar
   las filas, no leer la primera. Se descubrió mirando la tabla en el navegador.
 - **Agregar un estado a un enum rompe cosas que no se ven, y el compilador no
-  avisa de ninguna.** Al sumar `pendiente` a `EstadoAprovechamiento` los `match`
+  avisa de ninguna.** Pasó TRES veces con `EstadoAprovechamiento` —al sumar
+  `pendiente` y al sumar `en_revision`— y siempre en el mismo lugar: el scope
+  `enCurso()` y los servicios que enumeran estados a mano. **Al sumar un estado,
+  la lista de lugares a revisar es fija:** los scopes del modelo, los
+  `match`/`if` de los servicios que comparan contra un caso concreto, y las
+  banderas `puede_*` que el controlador manda a la pantalla. Al sumar `pendiente` a `EstadoAprovechamiento` los `match`
   sí fallaron —eso sí lo marca PHP—, pero lo caro fue lo otro: cada lugar que
   preguntaba `vigentes()` pasó a contestar «no» para el estado nuevo, en
   silencio. Dos ejemplos reales, los dos encontrados por un ensayo y no leyendo:

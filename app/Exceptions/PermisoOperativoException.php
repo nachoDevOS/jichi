@@ -89,6 +89,21 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
+     * El cupo está presentado y esperando una firma.
+     *
+     * Mensaje propio y no el de «pendiente de pago»: acá la plata YA entró, y
+     * decirle al operador que cobre lo mandaría a buscar un depósito que no
+     * existe. Lo que falta es una firma, y eso no se resuelve en la ventanilla.
+     */
+    public static function cupoEnRevision(): self
+    {
+        return new self(
+            'El aprovechamiento está EN REVISIÓN y todavía no autoriza a pescar. '.
+            'Los depósitos ya están cargados: falta que lo aprueben.',
+        );
+    }
+
+    /**
      * La faena pedida no entra en lo que queda del cupo.
      *
      * Se dicen los DOS números y no solo «no alcanza», porque lo que el

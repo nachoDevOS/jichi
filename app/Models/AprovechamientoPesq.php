@@ -421,6 +421,11 @@ class AprovechamientoPesq extends Model
      *     `vigentes()` no se podría emitir la credencial hasta cobrar el cupo, y
      *     la ventanilla no podría cobrar las dos cosas de una.
      *
+     * EN REVISIÓN entra por los dos motivos a la vez: ocupa el lugar igual —si no
+     * contara, alguien podría recibir un segundo cupo mientras el primero está
+     * presentado— y el carnet tiene que poder emitirse mientras tanto, porque lo
+     * único que necesita del cupo es el volumen, que ya está decidido.
+     *
      * NO incluye `agotado` —eso no cambió— ni, obviamente, los vencidos.
      */
     public function scopeEnCurso(Builder $query): Builder
@@ -428,6 +433,7 @@ class AprovechamientoPesq extends Model
         return $query
             ->whereIn($this->qualifyColumn('estado'), [
                 EstadoAprovechamiento::Pendiente,
+                EstadoAprovechamiento::EnRevision,
                 EstadoAprovechamiento::Activo,
             ])
             ->whereDate($this->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString());

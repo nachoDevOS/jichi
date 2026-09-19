@@ -176,18 +176,30 @@ export type TipoActor = 'pescador' | 'comercializador';
 /**
  * Espejo de App\Enums\EstadoAprovechamiento.
  *
- *     PENDIENTE ──[se cobra entero]──▶ ACTIVO ──▶ AGOTADO | VENCIDO
- *     (borrador)
+ *     PENDIENTE ──[enviar, con el monto cubierto]──▶ EN REVISIÓN
+ *     (borrador)                                         │
+ *          ▲                              ┌──────────────┴──────────────┐
+ *          └──────────[rechazar]──────────┤                             │
+ *                                    [aprobar]                          │
+ *                                         │                             │
+ *                                      ACTIVO ──▶ AGOTADO | VENCIDO ────┘
  *
- * `pendiente` es el BORRADOR: otorgado y sin cobrar. Es el único estado en que
- * el cupo se edita y se elimina, y el único en que NO autoriza a pescar — lo
- * que habilita es la concesión pagada.
+ * `pendiente` es el BORRADOR: otorgado y sin cobrar del todo. Es el único estado
+ * en que el cupo se edita, se elimina y admite depósitos.
+ *
+ * `en_revision` es el expediente PRESENTADO: la plata está y falta que alguien
+ * firme. Tampoco autoriza a pescar — recién lo hace al aprobarse.
  *
  * `vencido` y `agotado` son distintos a propósito: se le acabó el tiempo o se
  * le acabaron los kilos, y al pescador se le explica distinto aunque los dos
  * terminen en un trámite nuevo.
  */
-export type EstadoAprovechamiento = 'pendiente' | 'activo' | 'vencido' | 'agotado';
+export type EstadoAprovechamiento =
+    | 'pendiente'
+    | 'en_revision'
+    | 'activo'
+    | 'vencido'
+    | 'agotado';
 
 /**
  * Espejo de App\Enums\ModalidadAprovechamiento.

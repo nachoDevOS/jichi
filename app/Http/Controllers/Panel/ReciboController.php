@@ -2,17 +2,22 @@
 
 namespace App\Http\Controllers\Panel;
 
+use App\Enums\ConceptoRecibo;
 use App\Http\Controllers\Controller;
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
+use App\Models\Configuracion;
 use App\Models\GuiaMovimiento;
 use App\Models\Pago;
 use App\Models\Recibo;
 use App\Support\Paginacion;
+use App\Support\ReciboImpreso;
 use App\Support\Sql;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as RespuestaHttp;
 
 /**
  * ============================================================================
@@ -42,6 +47,15 @@ use Inertia\Response;
  */
 class ReciboController extends Controller
 {
+    /**
+     * Cuántos renglones tiene el cuadro de importes como mínimo.
+     *
+     * El talonario de papel trae tres rayas impresas: con un solo cobro, el
+     * cuadro quedaría alto y vacío, y con menos de tres el recibo dejaría de
+     * parecerse al papel que la gente conoce.
+     */
+    private const RENGLONES_MINIMOS = 3;
+
     /**
      * LISTADO — GET /panel/recibos
      */
@@ -164,5 +178,115 @@ class ReciboController extends Controller
             $x instanceof GuiaMovimiento => $x->codigo_guia.' · '.$x->ruta,
             default => null,
         };
+    }
+
+    /**
+     * ========================================================================
+     *  IMPRIMIR — GET /panel/recibos/{recibo}/imprimir
+     * ========================================================================
+     *
+     * Dibuja el talonario verde del SEDAG en media carta apaisada. La maqueta
+     * está en `views/documentos/recibo-oficial.blade.php` y se adapta con
+     * App\Support\ReciboImpreso, que expone lo que ese Blade pide sin obligar a
+     * reescribirlo: es una maqueta de coordenadas fijas, medida contra el papel.
+     */
+    public function imprimir(Recibo $recibo): RespuestaHttp
+    {
+        /*
+         * Los pagos van con `morphWith` y NO con `with('pagable.beneficiario')`:
+         * Eloquent no sabe qué es `pagable` hasta que lee la fila, así que lo
+         * segundo se IGNORA en silencio y cada renglón dispararía su consulta.
+         */
+        $recibo->load(['pagos' => fn ($q) => $q->with([
+            'pagable' => fn ($m) => $m->morphWith([
+                Carnet::class => ['tipoCarnet'],
+                AprovechamientoPesq::class => ['categoria'],
+                GuiaMovimiento::class => [],
+            ]),
+        ])]);
+
+        $impreso = ReciboImpreso::desde(
+            $recibo,
+            // El lugar de emisión es configurable: el día que se abra una
+            // segunda ventanilla no hay que tocar código.
+            (string) Configuracion::obtener('documentos.lugar_emision', 'Trinidad - Beni'),
+        );
+
+        $pdf = Pdf::loadView('documentos.recibo-oficial', [
+            'recibo' => $impreso,
+            'fecha' => $impreso->fechaEnCasilleros(),
+
+            /*
+             * SIEMPRE MARCA «DEPÓSITO». En esta unidad no se cobra en efectivo
+             * ni por QR: todo pago es un depósito bancario, así que la casilla
+             * de efectivo del papel queda vacía por construcción.
+             */
+            'esDeposito' => true,
+
+            'renglones' => array_map(
+                fn (array $linea): array => [
+                    'descripcion' => $linea['descripcion'],
+                    'monto' => number_format($linea['monto'], 2, ',', '.'),
+                ],
+                $impreso->lineas(),
+            ),
+            'total' => number_format($impreso->monto(), 2, ',', '.'),
+
+            // Renglones en blanco para que el cuadro conserve su alto aunque
+            // haya un solo cobro.
+            'blancos' => max(0, self::RENGLONES_MINIMOS - count($impreso->lineas())),
+
+            // Las seis casillas del papel, en el orden impreso. Salen del enum y
+            // no escritas en la plantilla: agregar una mañana es tocar un lugar.
+            'casillas' => ConceptoRecibo::cases(),
+
+            /*
+             * LAS IMÁGENES SON COPIAS A MEDIDA Y VAN EMBEBIDAS EN BASE64.
+             *
+             * No son `icon.png` ni `sedag.png`: esos miden más de 2000 px de
+             * lado y embebidos hacían un PDF de 5,4 MB por recibo. Las copias de
+             * `recibo-*` están al tamaño en que se dibujan y pesan 59 KB juntas,
+             * con el sello ya PRE-ATENUADO en el archivo —`opacity` es de lo
+             * menos confiable que tiene DomPDF—.
+             *
+             * Y en base64 porque DomPDF no es un navegador: una ruta se resuelve
+             * contra el disco con las restricciones de `chroot` y en producción
+             * termina en un recuadro vacío.
+             */
+            'escudo' => $this->imagenEmbebida('image/recibo-escudo.png'),
+            'selloSedag' => $this->imagenEmbebida('image/recibo-sello.png'),
+        ])
+            // MEDIA CARTA APAISADA: 612 x 396 puntos = 8,5" x 5,5".
+            ->setPaper([0, 0, 612, 396])
+            /*
+             * Sin subsetting, DomPDF mete las dos tipografías COMPLETAS en cada
+             * PDF —unas 380 KB cada una— aunque el recibo use ochenta caracteres
+             * contados. Medido en su momento: 930 KB, de los cuales 734 eran las
+             * fuentes.
+             *
+             * Se activa acá y no en `config/dompdf.php` a propósito: ese archivo
+             * lo publica el paquete y conviene dejarlo tal cual para poder
+             * compararlo cuando se actualice.
+             */
+            ->setOption('enable_font_subsetting', true);
+
+        // `stream` y no `download`: se abre en el visor del navegador, que es
+        // desde donde el operador aprieta imprimir.
+        return $pdf->stream("recibo-{$impreso->numeroImpreso()}.pdf");
+    }
+
+    /**
+     * Una imagen del disco, lista para incrustar.
+     *
+     * Sin el archivo el recibo sale igual, solo que sin escudo: es preferible a
+     * un 500 que deje a ventanilla sin poder entregar nada.
+     */
+    private function imagenEmbebida(string $rutaRelativa): string
+    {
+        $ruta = public_path($rutaRelativa);
+
+        return is_file($ruta)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($ruta))
+            : '';
     }
 }

@@ -99,6 +99,17 @@ export interface CupoFila {
     puede_editarse: boolean;
     puede_eliminarse: boolean;
 
+    /**
+     * Las tres del circuito de revisión, resueltas en el servidor.
+     *
+     * `puede_enviarse` NO es «el estado es pendiente»: es eso Y que los
+     * depósitos cubran el monto entero. Deducirlo acá sería una segunda copia
+     * de la regla, y con un saldo que la pantalla puede tener viejo.
+     */
+    admite_pagos: boolean;
+    puede_enviarse: boolean;
+    puede_revisarse: boolean;
+
     monto: number;
     saldo_pendiente: number;
     pagado: boolean;

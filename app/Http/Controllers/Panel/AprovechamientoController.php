@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\EliminarCupoRequest;
 use App\Http\Requests\Panel\OtorgarCupoRequest;
+use App\Http\Requests\Panel\RechazarCupoRequest;
 use App\Http\Requests\Panel\RegistrarPagoCupoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
@@ -17,6 +18,7 @@ use App\Models\Pago;
 use App\Models\PermisoFaena;
 use App\Services\CobrarService;
 use App\Services\OtorgarCupoService;
+use App\Services\RevisarCupoService;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -375,22 +377,23 @@ class AprovechamientoController extends Controller
 
     /**
      * ========================================================================
-     *  CARGAR UN DEPÓSITO DESDE LA FICHA — POST /panel/aprovechamientos/{id}/pagos
+     *  CARGAR LOS DEPÓSITOS — POST /panel/aprovechamientos/{id}/pagos
      * ========================================================================
      *
-     * Es el MISMO cobro que el de Caja con el trámite ya elegido: termina en
-     * `CobrarService::cobrar()` y sale con su recibo numerado. Existe porque el
-     * caso que se repite es cargar DOS depósitos seguidos por un mismo cupo, y
-     * yendo a Caja hay que volver a buscar a la persona en cada vuelta.
+     * Acepta VARIOS de una vez, porque la pantalla es repetible: el operador
+     * agrega una sección por cada depósito que trajo la persona y los manda
+     * todos juntos. Cada uno sale con su propio recibo numerado —así lo pide el
+     * correlativo de caja— y entra al arqueo del día.
      *
      * ------------------------------------------------------------------------
-     *  LA BOLETA SE SUBE ANTES DE ABRIR LA TRANSACCIÓN
+     *  LOS ARCHIVOS SE SUBEN ANTES DE ABRIR NINGUNA TRANSACCIÓN
      * ------------------------------------------------------------------------
      *
-     * Una transacción de base NO deshace escrituras en disco: subiendo adentro,
+     * Una transacción de base NO deshace escrituras en disco. Subiendo adentro,
      * un cobro que falle —saldo movido por otra ventanilla, boleta repetida—
-     * dejaría el archivo huérfano para siempre. Por eso se sube acá y los
-     * `catch` lo borran.
+     * dejaría archivos huérfanos para siempre. Se suben todos acá, y si algo
+     * falla el `catch` los borra TODOS, incluidos los de las líneas que sí
+     * habían pasado.
      */
     public function pagar(
         RegistrarPagoCupoRequest $request,
@@ -400,48 +403,129 @@ class AprovechamientoController extends Controller
         $datos = $request->validated();
         $aprovechamiento->loadMissing('beneficiario');
 
-        $comprobante = app(StorageController::class)->file($request->file('comprobante'), 'comprobantes');
+        /*
+         * SE COMPRUEBA EL ESTADO ANTES DE SUBIR NADA. Un cupo en revisión o ya
+         * aprobado no admite pagos, y descubrirlo después de escribir cinco
+         * archivos obligaría a borrarlos.
+         */
+        if (! $aprovechamiento->admitePagos()) {
+            return back()->withErrors([
+                'pagos' => CupoInvalidoException::noAdmitePagos(
+                    $aprovechamiento->estado->etiqueta(),
+                )->getMessage(),
+            ]);
+        }
+
+        $subidos = [];
 
         try {
-            $recibo = $caja->cobrar(
-                [['tipo' => 'cupo', 'id' => $aprovechamiento->id, 'monto' => (float) $datos['monto']]],
-                // Por defecto, los datos del pescador: el recibo se emite a su
-                // nombre salvo que el mostrador diga otra cosa.
-                /*
-                 * `?? null` y no solo `?:`: `validated()` devuelve ÚNICAMENTE
-                 * las claves que vinieron en la petición, así que un campo
-                 * opcional que el formulario no manda no existe en el arreglo y
-                 * leerlo directo revienta con «Undefined array key».
-                 */
-                ($datos['nit_ci_factura'] ?? null) ?: ($aprovechamiento->beneficiario?->ci ?? 'S/N'),
-                ($datos['nombre_factura'] ?? null) ?: ($aprovechamiento->beneficiario?->nombreCompleto ?? 'Sin nombre'),
-                $datos['nro_transaccion'],
-                $datos['fecha_deposito'],
-                $comprobante,
-            );
-        } catch (CobroInvalidoException $e) {
-            Archivos::borrar($comprobante);
+            foreach ($datos['pagos'] as $i => $pago) {
+                $subidos[$i] = app(StorageController::class)
+                    ->file($request->file("pagos.{$i}.comprobante"), 'comprobantes');
+            }
 
-            // Cuelga del MONTO porque es el único campo con el que el operador
-            // puede reaccionar: lo que falla es cuánto se está cobrando.
-            return back()->withInput()->withErrors(['monto' => $e->getMessage()]);
+            $nit = ($datos['nit_ci_factura'] ?? null) ?: ($aprovechamiento->beneficiario?->ci ?? 'S/N');
+            $nombre = ($datos['nombre_factura'] ?? null)
+                ?: ($aprovechamiento->beneficiario?->nombreCompleto ?? 'Sin nombre');
+
+            foreach ($datos['pagos'] as $i => $pago) {
+                $caja->cobrar(
+                    [['tipo' => 'cupo', 'id' => $aprovechamiento->id, 'monto' => (float) $pago['monto']]],
+                    $nit,
+                    $nombre,
+                    $pago['nro_transaccion'],
+                    $pago['fecha_deposito'],
+                    $subidos[$i],
+                );
+            }
+        } catch (CobroInvalidoException $e) {
+            foreach ($subidos as $ruta) {
+                Archivos::borrar($ruta);
+            }
+
+            // Cuelga de `pagos` porque lo que falla es cuánto se está cobrando,
+            // y el operador corrige los montos de las secciones.
+            return back()->withInput()->withErrors(['pagos' => $e->getMessage()]);
         } catch (\Throwable $e) {
-            Archivos::borrar($comprobante);
+            foreach ($subidos as $ruta) {
+                Archivos::borrar($ruta);
+            }
 
             throw $e;
         }
 
         $cupo = $aprovechamiento->refresh();
+        $cuantos = count($datos['pagos']);
 
         return redirect()
             ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', $cupo->estaPagado()
-                ? "Pago registrado con el recibo {$recibo->numero_recibo}. El cupo quedó cubierto y ya autoriza faenas."
+            ->with('exito', $cupo->saldoPendiente() <= 0.0
+                ? sprintf(
+                    '%d depósito(s) registrado(s). El monto quedó cubierto: ya se puede enviar a revisión.',
+                    $cuantos,
+                )
                 : sprintf(
-                    'Pago registrado con el recibo %s. Quedan %s Bs por cobrar.',
-                    $recibo->numero_recibo,
+                    '%d depósito(s) registrado(s). Quedan %s Bs por cobrar.',
+                    $cuantos,
                     number_format($cupo->saldoPendiente(), 2, ',', '.'),
                 ));
+    }
+
+    /**
+     * ENVIAR A REVISIÓN — POST /panel/aprovechamientos/{id}/enviar
+     *
+     * Ventanilla declara que el expediente está completo. Las dos condiciones
+     * —estado y monto cubierto— las vuelve a mirar el servicio con la fila
+     * bloqueada.
+     */
+    public function enviar(AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
+    {
+        try {
+            $revision->enviar($aprovechamiento);
+        } catch (CupoInvalidoException $e) {
+            return back()->withErrors(['general' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('aprovechamientos.show', $aprovechamiento)
+            ->with('exito', 'Enviado a revisión. Queda esperando la firma de quien lo aprueba.');
+    }
+
+    /**
+     * APROBAR — PATCH /panel/aprovechamientos/{id}/aprobar
+     *
+     * Recién acá el cupo autoriza faenas.
+     */
+    public function aprobar(AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
+    {
+        try {
+            $revision->aprobar($aprovechamiento);
+        } catch (CupoInvalidoException $e) {
+            return back()->withErrors(['general' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('aprovechamientos.show', $aprovechamiento)
+            ->with('exito', 'Aprobado. El aprovechamiento quedó activo y ya autoriza faenas.');
+    }
+
+    /**
+     * RECHAZAR — PATCH /panel/aprovechamientos/{id}/rechazar
+     *
+     * Vuelve a PENDIENTE con el motivo escrito. Los pagos ya cargados siguen
+     * ahí: ventanilla corrige y lo vuelve a presentar sin recargar nada.
+     */
+    public function rechazar(RechazarCupoRequest $request, AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
+    {
+        try {
+            $revision->rechazar($aprovechamiento, $request->validated()['motivo']);
+        } catch (CupoInvalidoException $e) {
+            return back()->withErrors(['motivo' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('aprovechamientos.show', $aprovechamiento)
+            ->with('exito', 'Rechazado y devuelto a ventanilla. El motivo quedó en la auditoría.');
     }
 
     // ------------------------------------------------------------------
@@ -557,6 +641,18 @@ class AprovechamientoController extends Controller
              */
             'puede_editarse' => $cupo->puedeEditarse(),
             'puede_eliminarse' => $cupo->puedeEliminarse(),
+
+            /*
+             * LAS TRES DEL CIRCUITO DE REVISIÓN, resueltas en el servidor.
+             *
+             * `puede_enviarse` no es «el estado es pendiente»: es eso Y que los
+             * depósitos cubran el monto. Deducirlo en React sería una segunda
+             * copia de la regla, y encima con el saldo que la pantalla conoce,
+             * que puede estar viejo.
+             */
+            'admite_pagos' => $cupo->admitePagos(),
+            'puede_enviarse' => $cupo->puedeEnviarseARevision(),
+            'puede_revisarse' => $cupo->puedeRevisarse(),
 
             'monto' => $cupo->montoACobrar(),
             'saldo_pendiente' => $cupo->saldoPendiente(),

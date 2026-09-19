@@ -148,6 +148,17 @@ class EmitirFaenaService
             }
 
             /*
+             * Y EL OTRO ESTADO QUE NO HABILITA: presentado y sin firmar.
+             *
+             * Va aparte del anterior porque lo que falta es distinto —ahí plata,
+             * acá una firma— y mandar al operador a cobrar un cupo ya cubierto
+             * lo haría buscar un depósito que no existe.
+             */
+            if ($cupo->estado === EstadoAprovechamiento::EnRevision) {
+                throw PermisoOperativoException::cupoEnRevision();
+            }
+
+            /*
              * EL TOPE SOLO SE HACE CUMPLIR EN MODO ESTRICTO.
              *
              * La comprobación va acá adentro —con la fila del cupo bloqueada— y

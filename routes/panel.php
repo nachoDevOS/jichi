@@ -197,7 +197,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     });
 
     /*
-     * CARGAR UN DEPÓSITO DESDE LA FICHA DEL CUPO.
+     * CARGAR LOS DEPÓSITOS DESDE LA FICHA DEL CUPO.
      *
      * El permiso es el de CAJA y no uno de aprovechamientos, porque esto es un
      * cobro: sale con recibo numerado y entra al arqueo del día. Que la pantalla
@@ -206,6 +206,34 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     Route::post('/aprovechamientos/{aprovechamiento}/pagos', [AprovechamientoController::class, 'pagar'])
         ->middleware('permiso:caja.cobrar')
         ->name('aprovechamientos.pagar');
+
+    /*
+     * ========================================================================
+     *  EL CIRCUITO DE REVISIÓN
+     * ========================================================================
+     *
+     *     PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ ACTIVO
+     *          ▲                       │
+     *          └──────[rechazar]───────┘
+     *
+     * ENVIAR es de VENTANILLA: quien carga los depósitos declara que el
+     * expediente está completo. APROBAR y RECHAZAR son de SUPERVISIÓN: quien
+     * firma mira las boletas contra el extracto del banco.
+     *
+     * Son dos permisos distintos a propósito. Con uno solo, la misma persona
+     * cargaría la plata y se la aprobaría, y el control del medio no existiría.
+     */
+    Route::post('/aprovechamientos/{aprovechamiento}/enviar', [AprovechamientoController::class, 'enviar'])
+        ->middleware('permiso:aprovechamientos.enviar')
+        ->name('aprovechamientos.enviar');
+
+    Route::middleware('permiso:aprovechamientos.aprobar')->group(function () {
+        Route::patch('/aprovechamientos/{aprovechamiento}/aprobar', [AprovechamientoController::class, 'aprobar'])
+            ->name('aprovechamientos.aprobar');
+
+        Route::patch('/aprovechamientos/{aprovechamiento}/rechazar', [AprovechamientoController::class, 'rechazar'])
+            ->name('aprovechamientos.rechazar');
+    });
 
     /*
      * ELIMINAR es de SUPERVISIÓN: borrar la fila la hace desaparecer, y lo único
@@ -408,6 +436,18 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         Route::get('/caja/cobrar', [CajaController::class, 'create'])->name('caja.create');
         Route::post('/caja', [CajaController::class, 'store'])->name('caja.store');
     });
+
+    /*
+     * IMPRIMIR va ANTES de '/recibos/{recibo}'… no: van los dos con parámetro,
+     * así que el orden entre ellos no importa. Lo que sí importa es el PERMISO:
+     * imprimir tiene el suyo —`recibos.imprimir`— y no el de ver.
+     *
+     * Entregar el papel numerado es un acto distinto de consultarlo: quien
+     * audita la serie puede necesitar verla sin poder emitir comprobantes.
+     */
+    Route::get('/recibos/{recibo}/imprimir', [ReciboController::class, 'imprimir'])
+        ->middleware('permiso:recibos.imprimir')
+        ->name('recibos.imprimir');
 
     Route::get('/recibos/{recibo}', [ReciboController::class, 'show'])
         ->middleware('permiso:caja.ver')

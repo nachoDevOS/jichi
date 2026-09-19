@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\EstadoAprovechamiento;
 use App\Exceptions\CobroInvalidoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;

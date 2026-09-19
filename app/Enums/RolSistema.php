@@ -98,6 +98,13 @@ enum RolSistema: string
              */
             'aprovechamientos.editar',
 
+            /*
+             * ENVIAR A REVISIÓN es de ventanilla: quien cargó los depósitos
+             * declara que el expediente está completo. No es aprobarlo — eso
+             * está en supervisión, y son dos personas distintas a propósito.
+             */
+            'aprovechamientos.enviar',
+
             'carnets.crear',
             // Imprimir el plástico es un hecho con fecha propia
             // (`fecha_generacion` en el modelo anterior): por eso es su propio
@@ -163,6 +170,19 @@ enum RolSistema: string
              * esto es otra cosa.
              */
             'caja.anular',
+
+            /*
+             * APROBAR Y RECHAZAR un aprovechamiento presentado.
+             *
+             * Es el control del circuito: quien firma mira las boletas contra el
+             * extracto del banco y recién ahí el cupo autoriza a pescar. Con el
+             * mismo permiso que enviar, la misma persona cargaría la plata y se
+             * la aprobaría, y el control no existiría.
+             *
+             * Uno solo para las dos acciones, como `carnets.revocar`: quien
+             * puede aprobar puede rechazar.
+             */
+            'aprovechamientos.aprobar',
 
             /*
              * ELIMINAR UN CUPO ES DE SUPERVISIÓN, aunque solo se pueda sobre un

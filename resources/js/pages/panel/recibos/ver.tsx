@@ -1,10 +1,12 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { Paperclip, ReceiptText, TriangleAlert } from 'lucide-react';
+import { Paperclip, Printer, ReceiptText, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fechaHora } from '@/lib/utils';
+import { usePermisos } from '@/hooks/use-permisos';
+import { bs, cn, fechaHora } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { ReciboFicha } from '@/types/caja';
 
@@ -26,6 +28,7 @@ import type { ReciboFicha } from '@/types/caja';
  * que no entró.
  */
 export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
+    const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
 
     return (
@@ -33,10 +36,31 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
             titulo={`Recibo ${recibo.numero_recibo}`}
             descripcion={`${recibo.nombre_factura} · ${fechaHora(recibo.emitido_en)}`}
             acciones={
-                <Button variant="outline" onClick={() => router.visit(route('caja.index'))}>
-                    <ReceiptText className="size-4" />
-                    Volver a caja
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={() => router.visit(route('caja.index'))}>
+                        <ReceiptText className="size-4" />
+                        Volver a caja
+                    </Button>
+
+                    {/*
+                        IMPRIMIR ABRE UNA PESTAÑA, no navega con Inertia: lo que
+                        vuelve es un PDF, y el visor del navegador es desde donde
+                        el operador aprieta imprimir. Con `router.visit` Inertia
+                        esperaría una respuesta suya y no sabría qué hacer con el
+                        archivo.
+                    */}
+                    {puede('recibos.imprimir') && (
+                        <a
+                            href={route('recibos.imprimir', recibo.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={cn(buttonVariants({ variant: 'default' }))}
+                        >
+                            <Printer className="size-4" />
+                            Imprimir recibo
+                        </a>
+                    )}
+                </div>
             }
         >
             <Head title={`Recibo ${recibo.numero_recibo}`} />

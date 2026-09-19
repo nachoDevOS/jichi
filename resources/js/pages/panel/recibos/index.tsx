@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ReceiptText, Search, TriangleAlert } from 'lucide-react';
+import { Printer, ReceiptText, Search, TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
 import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
+import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fechaHora } from '@/lib/utils';
 import type { PageProps, Paginado } from '@/types';
@@ -42,6 +43,7 @@ export default function IndiceRecibos({
     filtros: { buscar: string | null; desde: string | null; hasta: string | null; por_pagina: number };
     opcionesPorPagina: number[];
 }) {
+    const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
@@ -156,6 +158,7 @@ export default function IndiceRecibos({
                                                 <th className="px-5 py-2.5 font-medium">Concepto</th>
                                                 <th className="px-5 py-2.5 text-right font-medium">Total</th>
                                                 <th className="px-5 py-2.5 font-medium">Emitido</th>
+                                                <th className="px-5 py-2.5" />
                                             </tr>
                                         </thead>
 
@@ -205,6 +208,25 @@ export default function IndiceRecibos({
 
                                                     <td className="px-5 py-2.5 text-muted-foreground">
                                                         {fechaHora(r.emitido_en)}
+                                                    </td>
+
+                                                    {/* Imprimir abre una pestaña:
+                                                        lo que vuelve es un PDF y
+                                                        el visor del navegador es
+                                                        desde donde se imprime. */}
+                                                    <td className="px-5 py-2.5 text-right">
+                                                        {puede('recibos.imprimir') && (
+                                                            <a
+                                                                href={route('recibos.imprimir', r.id)}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                title="Imprimir el recibo"
+                                                                aria-label={`Imprimir el recibo ${r.numero_recibo}`}
+                                                                className="inline-flex text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+                                                            >
+                                                                <Printer className="size-4" />
+                                                            </a>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
