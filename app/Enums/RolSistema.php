@@ -9,10 +9,9 @@ namespace App\Enums;
  *  POR AHORA HAY UN SOLO ROL, Y ES A PROPÓSITO
  * ----------------------------------------------------------------------------
  *
- * El módulo de carnets arranca con `administrador` haciendo todo. Supervisor,
- * operador de ventanilla y solo-lectura se agregarán cuando la unidad defina
- * quién firma qué; mientras tanto, inventar roles que nadie usa solo obliga a
- * mantenerlos.
+ * El sistema arranca con `administrador` haciendo todo. Supervisor, operador de
+ * ventanilla y solo-lectura se agregarán cuando la unidad defina quién firma
+ * qué; mientras tanto, inventar roles que nadie usa solo obliga a mantenerlos.
  *
  * LO QUE SÍ QUEDA ARMADO es la lista de permisos, y las rutas los exigen uno por
  * uno (ver el middleware `permiso:` en routes/panel.php). Esa parte no se saca
@@ -39,15 +38,25 @@ enum RolSistema: string
     public function descripcion(): string
     {
         return match ($this) {
-            self::Administrador => 'Control total del sistema: beneficiarios, carnets, rubros, trámites, faenas, guías, pagos y configuración.',
+            self::Administrador => 'Control total del sistema: beneficiarios, aprovechamientos, '.
+                'carnets, faenas, guías, caja y configuración.',
         };
     }
 
     /**
      * Permisos asignados al rol durante el seeding.
      *
-     * Los bloques están separados por área aunque hoy el único rol se los lleve
-     * todos. Es lo que permite que agregar un rol mañana sea escribir una línea
+     * ------------------------------------------------------------------------
+     *  LOS BLOQUES SIGUEN EL FLUJO DE TRABAJO, NO EL ABECEDARIO
+     * ------------------------------------------------------------------------
+     *
+     * `lectura` es mirar. `operacion` es lo que hace ventanilla todos los días.
+     * `supervision` es lo que ROMPE algo ya emitido —anular, revocar— y por eso
+     * no puede estar en las mismas manos que emitir. `administracion` es el
+     * catálogo y las cuentas, que se tocan una vez cada tanto.
+     *
+     * Están separados aunque hoy el único rol se los lleve todos. Es lo que
+     * permite que agregar un rol mañana sea escribir una línea
      * —`self::Operador => [...$lectura, ...$operacion]`— en vez de volver a
      * clasificar veinte permisos sueltos.
      *
@@ -58,104 +67,142 @@ enum RolSistema: string
         $lectura = [
             'dashboard.ver',
             'beneficiarios.ver',
+            'aprovechamientos.ver',
             'carnets.ver',
-            'rubros.ver',
-            'tramites.ver',
             'faenas.ver',
             'guias.ver',
-            'pagos.ver',
+            'caja.ver',
+            'catalogos.ver',
             'reportes.ver',
         ];
 
         $operacion = [
             'beneficiarios.crear',
             'beneficiarios.editar',
-            'tramites.crear',
-            'tramites.editar',
+
+            /*
+             * OTORGAR LA BOLSA MADRE ES DE VENTANILLA.
+             *
+             * Es el paso 2 del flujo del pescador y va antes del carnet: sin
+             * cupo definido no se sabe qué imprimir en el plástico. Lo que NO
+             * es de ventanilla es AMPLIARLO después, que está abajo.
+             */
+            'aprovechamientos.crear',
+
+            /*
+             * CORREGIR EL BORRADOR TAMBIÉN ES DE VENTANILLA.
+             *
+             * Solo corre mientras el cupo está PENDIENTE DE PAGO: es arreglar
+             * una carga equivocada con el pescador todavía enfrente, no cambiar
+             * una autorización entregada. En cuanto entra plata el permiso deja
+             * de alcanzar, porque el estado ya no lo permite.
+             */
+            'aprovechamientos.editar',
+
+            'carnets.crear',
+            // Imprimir el plástico es un hecho con fecha propia
+            // (`fecha_generacion` en el modelo anterior): por eso es su propio
+            // permiso y no viene incluido en `carnets.crear`.
+            'carnets.imprimir',
+
             /*
              * EMITIR FAENAS Y GUÍAS ES DE VENTANILLA, no de supervisión.
              *
              * Son papeles del talonario que se llenan en el mostrador y se
              * entregan en el acto: no hay nada que firmar después. Pedir un
              * permiso de supervisión los frenaría todos los días por algo que
-             * ya está autorizado —el carnet vigente es la autorización—.
+             * ya está autorizado — el carnet vigente ES la autorización.
              *
              * ANULARLOS sí es de supervisión: ver el bloque de abajo.
              */
             'faenas.crear',
             'guias.crear',
-            'pagos.registrar',
-            // Imprimir el carnet y entregarlo en mano son dos hechos distintos y
-            // quedan registrados con su propia fecha, por eso son dos permisos.
-            'carnets.generar',
-            'carnets.entregar',
-            // El RECIBO OFICIAL que se le entrega al pescador en el mostrador.
-            // Es de ventanilla y no de supervisión: lo imprime quien atiende, no
-            // quien aprueba. Sigue el mismo criterio que `carnets.generar`.
+
+            /*
+             * CERRAR un permiso también es de ventanilla, y es el otro medio
+             * circuito: la faena se completa cuando el pescador vuelve y
+             * descarga, y la guía cuando la carga llega a destino. Son hechos
+             * que se registran en el mostrador, no decisiones que alguien firme.
+             *
+             * Recién ahí los kilos de la faena quedan firmes contra el cupo.
+             */
+            'faenas.completar',
+            'guias.cerrar',
+
+            // Cobrar y entregar el comprobante numerado: el mostrador entero.
+            'caja.cobrar',
             'recibos.imprimir',
         ];
 
         $supervision = [
             /*
-             * NO HAY `tramites.revisar`, y se quitó a propósito.
+             * AMPLIAR UN CUPO YA OTORGADO es distinto de otorgarlo.
              *
-             * Existía para el paso PENDIENTE ──▶ EN REVISIÓN cuando ese paso
-             * significaba «un supervisor toma el expediente para mirarlo». Hoy
-             * significa lo contrario: es ventanilla la que ENVÍA el expediente
-             * cuando terminó de armarlo, así que esa ruta pide `tramites.editar`
-             * —el permiso de quien lo arma— y no uno de supervisión.
-             *
-             * Lo que sí es de supervisión es lo que viene después: aprobar y
-             * rechazar. Y ahí está el punto de la separación de funciones —
-             * quien arma no firma.
+             * Otorgar es aplicar la escala que corresponde. Ampliar es darle a
+             * alguien más kilos de los que su escala le daba, y eso es
+             * justamente lo que el cupo viene a limitar.
              */
-            'tramites.aprobar',
-            'tramites.rechazar',
-            // Suspender y anular un carnet son medidas sancionatorias: el día
-            // que exista el rol de ventanilla, no las tendrá.
-            //
-            // `carnets.suspender` reemplazó a `habilitaciones.suspender`: con un
-            // carnet por rubro, cortar una actividad es suspender su carnet.
+            'aprovechamientos.ampliar',
+
             /*
-             * CONTROLAR LOS DEPÓSITOS es de supervisión, no de ventanilla.
-             *
-             * Quien carga la boleta no puede darla por buena —eso lo impide
-             * además `Pago::puedeValidarlo()`— así que el permiso tiene que
-             * estar en otras manos, o el control no existe.
+             * REVOCAR un carnet es una medida sancionatoria, y no se revierte:
+             * el día que exista el rol de ventanilla, no la tendrá.
              */
-            'pagos.validar',
-            'carnets.suspender',
-            'carnets.anular',
+            'carnets.revocar',
+
             /*
-             * Anular una faena o una guía quema un número del talonario para
-             * siempre —no se desanula— y deja un hueco que hay que poder
-             * explicar. Por eso no lo tiene quien emite.
+             * ANULAR UNA GUÍA quema un número del talonario para siempre —no se
+             * desanula— y deja un hueco que hay que poder explicar. Por eso no
+             * lo tiene quien emite.
+             *
+             * NO HAY `faenas.anular`, y no es un olvido: `EstadoFaena` no tiene
+             * un estado anulado. Una faena emitida de más no se borra ni se
+             * anula — se deja VENCER, y al vencer libera su volumen sola. El
+             * número del talonario queda ocupado igual, que es lo que
+             * corresponde: la hoja se gastó.
              */
-            'faenas.anular',
             'guias.anular',
+
+            /*
+             * ANULAR UN COBRO no es corregirlo.
+             *
+             * Corregir deja la fila y su historial: se ve qué decía antes y
+             * quién lo cambió. Anular hace desaparecer dinero declarado de un
+             * recibo ya entregado, y lo único que queda es la línea de
+             * `auditorias`. Quien atiende el mostrador corrige lo que tipeó;
+             * esto es otra cosa.
+             */
+            'caja.anular',
+
+            /*
+             * ELIMINAR UN CUPO ES DE SUPERVISIÓN, aunque solo se pueda sobre un
+             * borrador sin pagos ni faenas.
+             *
+             * Corregir deja la fila y su historial; borrar la hace desaparecer y
+             * lo único que queda es la línea de `auditorias`. Mismo criterio que
+             * `caja.anular`: quien atiende el mostrador arregla lo que tipeó,
+             * hacer desaparecer un registro es otra cosa.
+             */
+            'aprovechamientos.eliminar',
+
             'reportes.exportar',
             'auditoria.ver',
         ];
 
         $administracion = [
             'beneficiarios.eliminar',
-            'tramites.eliminar',
+
             /*
-             * QUITAR UN DEPÓSITO NO ES CORREGIRLO, y por eso no va con
-             * `pagos.registrar`.
-             *
-             * Corregir deja la fila y su historial: se ve qué decía antes y
-             * quién lo cambió. Quitar la hace desaparecer —del expediente y de
-             * la suma cobrada— y lo único que queda es la línea de
-             * `auditorias`. Es el mismo criterio que separa `tramites.editar`
-             * de `tramites.eliminar`: quien atiende el mostrador corrige lo que
-             * tipeó; hacer desaparecer dinero declarado es otra cosa.
+             * LOS TRES CATÁLOGOS VAN CON UN SOLO PERMISO —asociaciones, escala
+             * de aprovechamiento y tipos de carnet— porque los tres cambian por
+             * la MISMA vía: una resolución. Quien puede tocar la tarifa del
+             * carnet puede tocar la de la escala; separarlos daría tres
+             * permisos que en la práctica se otorgan siempre juntos.
              */
-            'pagos.eliminar',
+            'catalogos.gestionar',
+
             'usuarios.gestionar',
             'roles.gestionar',
-            // El catálogo de rubros y sus tarifas cambia por ordenanza.
-            'rubros.gestionar',
             'configuracion.gestionar',
         ];
 

@@ -1,9 +1,9 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus, Search, Ship } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
 import { Paginacion } from '@/components/ui/paginacion';
@@ -15,17 +15,22 @@ import type { OpcionEnum, Paginado } from '@/types';
 import type { FaenaFila } from '@/types/faenas';
 
 /**
- * El listado de faenas: los permisos por salida de pesca.
+ * ============================================================================
+ *  LISTADO DE PERMISOS DE FAENA
+ * ============================================================================
  *
  * ----------------------------------------------------------------------------
- *  NO HAY BOTÓN DE EDITAR NI DE BORRAR
+ *  LAS CADUCADAS SE MARCAN, Y ES LO MÁS ÚTIL DE ESTA PANTALLA
  * ----------------------------------------------------------------------------
  *
- * Una faena es un papel del talonario que la persona se llevó en el momento.
- * Editarla dejaría el sistema diciendo una cosa y el papel otra; borrarla
- * dejaría un hueco en la serie y liberaría un número que el índice único
- * volvería a aceptar. Una faena mal emitida se ANULA desde su ficha, con el
- * motivo escrito, y se emite otra con un número nuevo.
+ * Una faena que se pasó de fecha y sigue ACTIVA es un papel que alguien se
+ * llevó y del que nadie registró la vuelta. El comando diario la marca como
+ * vencida, pero entre corrida y corrida queda acá a la vista — y el dato es
+ * accionable: hay que ir a buscarla, no esperar.
+ *
+ * El aviso sale de `caducada`, que llega resuelto del servidor: la pantalla no
+ * compara fechas, porque `new Date('2026-12-31')` en JavaScript se interpreta
+ * como medianoche UTC y en UTC-4 devuelve el día anterior.
  */
 export default function IndiceFaenas({
     faenas,
@@ -34,13 +39,7 @@ export default function IndiceFaenas({
     opcionesPorPagina,
 }: {
     faenas: Paginado<FaenaFila>;
-    filtros: {
-        buscar: string | null;
-        estado: string | null;
-        desde: string | null;
-        hasta: string | null;
-        por_pagina: number;
-    };
+    filtros: { buscar: string | null; estado: string | null; por_pagina: number };
     estados: OpcionEnum[];
     opcionesPorPagina: number[];
 }) {
@@ -50,175 +49,161 @@ export default function IndiceFaenas({
     function filtrar(valores: Record<string, string | number | null>) {
         router.get(
             route('faenas.index'),
-            {
-                buscar,
-                estado: filtros.estado,
-                desde: filtros.desde,
-                hasta: filtros.hasta,
-                por_pagina: filtros.por_pagina,
-                ...valores,
-            },
+            { buscar, estado: filtros.estado, ...valores },
             { preserveState: true, preserveScroll: true, replace: true },
         );
     }
 
     return (
         <LayoutPanel
-            titulo="Trámites de faena"
-            descripcion="Permisos por salida de pesca, emitidos sobre un carnet de pescador vigente."
+            titulo="Permisos de faena"
+            descripcion="Una por salida. Cada faena descuenta kilos de la bolsa madre del pescador."
             acciones={
                 puede('faenas.crear') && (
                     <Button onClick={() => router.visit(route('faenas.create'))}>
                         <Plus className="size-4" />
-                        Nueva faena
+                        Emitir faena
                     </Button>
                 )
             }
         >
-            <Head title="Faenas" />
+            <Head title="Permisos de faena" />
 
-            <Card>
-                {/* La misma barra de todos los listados: «Mostrar N» a la
-                    izquierda, filtros y buscador a la derecha. */}
-                <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-12 sm:items-end">
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-3">
-                        Mostrar
-                        <Select
-                            className="w-auto"
-                            value={filtros.por_pagina}
-                            onChange={(e) => filtrar({ por_pagina: e.target.value })}
-                            aria-label="Registros por página"
-                        >
-                            {opcionesPorPagina.map((n) => (
-                                <option key={n} value={n}>
-                                    {n}
-                                </option>
-                            ))}
-                        </Select>
-                        registros
-                    </label>
-
-                    <Select
-                        className="sm:col-span-2"
-                        value={filtros.estado ?? ''}
-                        onChange={(e) => filtrar({ estado: e.target.value || null })}
-                        aria-label="Estado"
-                    >
-                        <option value="">Todos los estados</option>
-                        {estados.map((e) => (
-                            <option key={e.value} value={e.value}>
-                                {e.label}
-                            </option>
-                        ))}
-                    </Select>
-
-                    <Input
-                        type="date"
-                        className="sm:col-span-2"
-                        value={filtros.desde ?? ''}
-                        onChange={(e) => filtrar({ desde: e.target.value || null })}
-                        aria-label="Salidas desde"
-                    />
-
-                    <Input
-                        type="date"
-                        className="sm:col-span-2"
-                        value={filtros.hasta ?? ''}
-                        onChange={(e) => filtrar({ hasta: e.target.value || null })}
-                        aria-label="Salidas hasta"
-                    />
-
+            {/* `min-w-0`: sin él la tarjeta se estira al ancho de la tabla y el
+                que termina con barra de desplazamiento es el documento entero. */}
+            <Card className="min-w-0">
+                <CardContent className="space-y-4 p-0">
                     <form
-                        className="relative sm:col-span-3"
-                        onSubmit={(e) => {
+                        onSubmit={(e: FormEvent) => {
                             e.preventDefault();
                             filtrar({});
                         }}
+                        className="flex flex-wrap gap-2 p-5 pb-0"
                     >
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            className="pl-9"
-                            placeholder="Nº, embarcación o titular…"
                             value={buscar}
                             onChange={(e) => setBuscar(e.target.value)}
-                            aria-label="Buscar faenas"
+                            placeholder="Buscar por pescador o número de faena…"
+                            className="min-w-48 flex-1"
                         />
+
+                        <Select
+                            value={filtros.estado ?? ''}
+                            onChange={(e) => filtrar({ estado: e.target.value || null })}
+                            className="w-auto"
+                        >
+                            <option value="">Todos los estados</option>
+                            {estados.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                    {o.label}
+                                </option>
+                            ))}
+                        </Select>
+
+                        <Select
+                            value={filtros.por_pagina}
+                            onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
+                            className="w-auto"
+                        >
+                            {opcionesPorPagina.map((n) => (
+                                <option key={n} value={n}>
+                                    {n} filas
+                                </option>
+                            ))}
+                        </Select>
+
+                        <Button type="submit" variant="outline">
+                            <Search className="size-4" />
+                        </Button>
                     </form>
-                </div>
 
-                {faenas.data.length === 0 ? (
-                    <EstadoVacio
-                        icono={Ship}
-                        titulo="Sin faenas"
-                        descripcion="No hay permisos de salida que coincidan con el filtro."
-                    />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                <tr>
-                                    <th className="px-5 py-3 font-medium">Nº permiso</th>
-                                    <th className="px-5 py-3 font-medium">Titular</th>
-                                    <th className="px-5 py-3 font-medium">Embarcación</th>
-                                    <th className="px-5 py-3 font-medium">Salida → desembarque</th>
-                                    <th className="px-5 py-3 text-right font-medium">Autorizado</th>
-                                    <th className="px-5 py-3 font-medium">Estado</th>
-                                </tr>
-                            </thead>
+                    {faenas.data.length === 0 ? (
+                        <EstadoVacio
+                            icono={Ship}
+                            titulo="Sin faenas emitidas"
+                            descripcion={
+                                filtros.buscar || filtros.estado
+                                    ? 'Ninguna coincide con los filtros.'
+                                    : 'La faena cuelga del carnet de pescador: la persona necesita carnet vigente y cupo con saldo.'
+                            }
+                        />
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                        <tr>
+                                            <th className="px-5 py-2.5 font-medium">N°</th>
+                                            <th className="px-5 py-2.5 font-medium">Pescador</th>
+                                            <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
+                                            <th className="px-5 py-2.5 font-medium">Estado</th>
+                                            <th className="px-5 py-2.5 font-medium">Salida</th>
+                                            <th className="px-5 py-2.5 font-medium">Límite</th>
+                                        </tr>
+                                    </thead>
 
-                            <tbody className="divide-y divide-border">
-                                {faenas.data.map((f) => (
-                                    <tr key={f.id} className="hover:bg-secondary/50">
-                                        <td className="px-5 py-3">
-                                            <Link
-                                                href={route('faenas.show', f.id)}
-                                                className="font-mono text-xs text-primary hover:underline"
-                                            >
-                                                {f.nro_permiso}
-                                            </Link>
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <p className="font-medium">{f.beneficiario ?? '—'}</p>
-                                            <p className="font-mono text-xs text-muted-foreground">
-                                                {f.carnet_registro ?? '—'}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <p>{f.embarcacion ?? '—'}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {f.comandante_barco ?? '—'}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-3 text-muted-foreground">
-                                            {fecha(f.fecha_salida)} → {fecha(f.fecha_desembarque)}
-                                        </td>
-                                        <td className="px-5 py-3 text-right font-medium tabular-nums">
-                                            {f.cantidad ?? '—'}
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
+                                    <tbody className="divide-y divide-border">
+                                        {faenas.data.map((f) => (
+                                            <tr key={f.id} className="hover:bg-secondary/50">
+                                                <td className="px-5 py-2.5">
+                                                    <Link
+                                                        href={route('faenas.show', f.id)}
+                                                        className="font-mono font-medium tabular-nums text-primary hover:underline"
+                                                    >
+                                                        {String(f.numero_faena).padStart(4, '0')}
+                                                    </Link>
+                                                </td>
 
-                                            {/*
-                                                El saldo se avisa acá y no en una
-                                                columna aparte: la mayoría están
-                                                pagadas, y una columna casi
-                                                siempre vacía gasta ancho que en
-                                                el celular no sobra.
-                                            */}
-                                            {!f.pagada && f.estado === 'emitido' && (
-                                                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                                                    Debe {f.saldo.toFixed(2)}
-                                                </p>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                                <td className="px-5 py-2.5">
+                                                    <p className="font-medium">{f.beneficiario ?? '—'}</p>
+                                                    <p className="font-mono text-xs text-muted-foreground">
+                                                        {f.carnet_codigo ?? '—'}
+                                                    </p>
+                                                </td>
 
-                <Paginacion paginado={faenas} />
+                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    {/*
+                                                        Tachado cuando NO consume cupo: es lo que
+                                                        hace que la suma cuadre con el saldo del
+                                                        aprovechamiento.
+                                                    */}
+                                                    <span
+                                                        className={
+                                                            f.consume_cupo
+                                                                ? undefined
+                                                                : 'text-muted-foreground line-through'
+                                                        }
+                                                    >
+                                                        {f.kilos_extraidos} kg
+                                                    </span>
+                                                </td>
+
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
+                                                    {f.caducada && (
+                                                        <Badge color="amber" className="ml-1">
+                                                            sin cerrar
+                                                        </Badge>
+                                                    )}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                    {fecha(f.fecha_salida)}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                    {fecha(f.fecha_limite)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Paginacion paginado={faenas} />
+                        </>
+                    )}
+                </CardContent>
             </Card>
         </LayoutPanel>
     );

@@ -1,394 +1,518 @@
 # Modelo Entidad-Relación — Jichi
 
-Sistema de carnets de pesca del Gobierno Autónomo Departamental del Beni.
-PostgreSQL 18. Generado desde el esquema real (`storage/app/jichi-esquema.sql`).
+Sistema de credenciales y permisos de pesca del Gobierno Autónomo Departamental
+del Beni. **PostgreSQL 18** (corre igual en SQLite).
 
-Las 27 tablas de la base se dividen en tres grupos:
+Describe el núcleo rehecho el **18/09/2026**. Las diez tablas del dominio se
+crean en `database/migrations/2026_09_18_*`; **las migraciones quedaron cortas a
+propósito y el porqué de cada decisión vive acá.**
 
-| Grupo | Tablas | Qué son |
-| --- | --- | --- |
-| **Dominio** | `beneficiarios`, `rubros`, `carnets`, `tramites`, `pagos`, `faenas`, `guias`, `guia_detalles` | El negocio. Son las que se modelan acá |
-| **Soporte** | `users`, `correlativos`, `configuraciones`, `auditorias`, `accesos` | Operación del sistema |
-| **Infraestructura** | `roles`, `permissions`, `model_has_roles`, `model_has_permissions`, `role_has_permissions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `sessions`, `migrations` | Laravel y el paquete de permisos. No son del negocio |
+> El modelo ANTERIOR —`rubros`, `tramites`, `faenas`, `guias`,
+> `guia_detalles`— ya no existe en la base. Sus migraciones quedaron en
+> `database/migrations-anterior/`, que Laravel no escanea.
 
 ---
 
-## 1. Diagrama del dominio
-
-```mermaid
-erDiagram
-    BENEFICIARIOS ||--o{ CARNETS : "obtiene"
-    RUBROS        ||--o{ CARNETS : "es la actividad de"
-    CARNETS       ||--o{ TRAMITES : "recibe"
-    RUBROS        ||--o{ TRAMITES : "se solicita en"
-    CARNETS       ||--o{ FAENAS : "autoriza salidas de"
-    CARNETS       ||--o{ GUIAS : "autoriza traslados de"
-    GUIAS         ||--o{ GUIA_DETALLES : "traslada"
-    TRAMITES      ||--o{ PAGOS : "se cubre con (pagable)"
-    FAENAS        ||--o{ PAGOS : "se cubre con (pagable)"
-    GUIAS         ||--o{ PAGOS : "se cubre con (pagable)"
-
-    BENEFICIARIOS {
-        bigint    id PK
-        varchar   ci_nit "UQ parcial junto con complemento"
-        varchar   complemento "complemento del CI boliviano"
-        varchar   expedido "BN, LP, SC, CB..."
-        varchar   primerNombre
-        varchar   segundoNombre "mucha gente no tiene"
-        varchar   apellidoPaterno
-        varchar   apellidoMaterno
-        varchar   apellidoCasado "sin el de: se agrega al imprimir"
-        date      fechaNacimiento
-        varchar   genero "masculino | femenino"
-        varchar   nacionalidad
-        text      direccion
-        varchar   ciudad
-        varchar   provincia
-        varchar   telefono
-        varchar   email
-        varchar   foto
-        timestamp deleted_at "borrado logico"
-    }
-
-    RUBROS {
-        bigint  id PK
-        varchar nombre UK
-        text    descripcion
-        numeric costo "tarifa vigente en Bs"
-        boolean requiere_capacidad "si se autoriza por volumen (kilos)"
-        boolean emite_faenas "si de sus carnets cuelgan faenas"
-        boolean emite_guias "si de sus carnets cuelgan guias"
-        varchar estado "activo | inactivo"
-    }
-
-    CARNETS {
-        bigint   id PK
-        bigint   beneficiario_id FK "UQ junto con rubro_id y gestion"
-        bigint   rubro_id FK "la actividad que habilita"
-        varchar  firma_validacion UK "16 chars: identifica el carnet"
-        smallint gestion "UQ junto con beneficiario_id y rubro_id"
-        varchar  asociacion "copia de tramites.asociacion"
-        numeric  capacidad_kg "cupo autorizado en kilos"
-        date     fecha_emision
-        date     fecha_vencimiento
-        varchar  estado "vigente | suspendido | vencido | anulado"
-    }
-
-    TRAMITES {
-        bigint    id PK
-        bigint    carnet_id FK
-        bigint    rubro_id FK
-        varchar   tipo_tramite "emision_inicial | actualizacion"
-        varchar   estado "pendiente | en_revision | aprobado | rechazado"
-        varchar   ciFile "fotocopia de carnet de identidad"
-        varchar   certAsociacionFile "certificado de la asociacion"
-        varchar   asociacion
-        numeric   capacidad_kg
-        numeric   monto_requerido "copia de rubros.costo"
-        timestamp fecha_solicitud
-        timestamp fecha_revision "cuando se tomo para revisar"
-        timestamp fecha_aprobacion
-        timestamp fecha_generacion "cuando se imprimio"
-        timestamp fecha_entrega
-        text      observaciones
-        text      motivo_rechazo
-    }
-
-    PAGOS {
-        bigint    id PK
-        varchar   pagable_type "Tramite | Faena | Guia — SIN clave foranea"
-        bigint    pagable_id "id dentro de esa tabla"
-        varchar   nro_transaccion UK
-        numeric   monto
-        varchar   urlFile "comprobante escaneado del deposito"
-        timestamp fecha_pago
-        text      observaciones
-        bigint    registrado_por FK "SET NULL. Quien lo cargo"
-        varchar   estado_validacion "pendiente | validado | observado"
-        bigint    validado_por FK "SET NULL. NO puede ser el mismo"
-        timestamp validado_at
-        text      motivo_observacion "obligatorio al observar"
-    }
-
-    FAENAS {
-        bigint  id PK
-        bigint  carnet_id FK "carnet de un rubro con emite_faenas"
-        varchar nro_permiso UK "numero del talonario de papel"
-        varchar nro_recibo
-        numeric monto "tarifa por salida, copia congelada"
-        varchar embarcacion
-        varchar propietario
-        varchar comandante_barco
-        varchar matricula_naval
-        varchar nro_kardex
-        varchar region_desde
-        varchar region_hasta
-        date    fecha_salida "obligatoria: abre la ventana"
-        date    fecha_desembarque "obligatoria: la cierra"
-        numeric cantidad_autorizada_kg "tope de ESTA salida"
-        varchar estado "emitido | anulado"
-    }
-
-    GUIAS {
-        bigint  id PK
-        bigint  carnet_id FK "carnet de un rubro con emite_guias"
-        varchar nro_guia UK "numero del talonario de papel"
-        varchar nro_recibo
-        varchar origen_lugar
-        varchar origen_depto
-        varchar origen_provincia
-        varchar origen_distrito
-        varchar destino_lugar
-        varchar destino_depto
-        varchar destino_provincia
-        varchar destino_distrito
-        varchar tipo_transporte "fluvial | aerea | terrestre"
-        varchar transporte_nombre
-        varchar transporte_placa
-        numeric capacidad_maxima "del vehiculo, no del permiso"
-        text    observaciones
-        varchar estado "emitido | anulado"
-    }
-
-    GUIA_DETALLES {
-        bigint  id PK
-        bigint  guia_id FK "CASCADE"
-        varchar especie "texto libre: no hay padron"
-        varchar condicion "fresco | congelado | seco | salado"
-        numeric cantidad_kg
-        numeric precio_unitario
-        numeric imponible "lo que dice el papel. NO se recalcula"
-    }
+## 1. El diagrama
 
 ```
+                        ┌──────────────────┐
+                        │  beneficiarios   │  la persona, UNA sola vez
+                        └────────┬─────────┘
+             ┌───────────────────┼───────────────────┐
+             │                   │                   │
+    ┌────────▼─────────┐ ┌───────▼────────┐ ┌────────▼──────────┐
+    │ aprovechamientos │ │    carnets     │ │ guias_movimiento  │
+    │      _pesq       │◄┤ (pescador o    │ │ (un traslado)     │
+    │ (el cupo en kg)  │ │ comercializador)│ └───────────────────┘
+    └────────┬─────────┘ └───────┬────────┘
+             │                   │
+             └────────┬──────────┘
+                      │
+             ┌────────▼─────────┐
+             │  permisos_faena  │  una salida de pesca
+             └──────────────────┘
 
-### Cómo se lee
+    ┌──────────┐        ┌────────────────────────────────────┐
+    │ recibos  │──────< │ pagos  (polimórfico: pagable_type) │
+    └──────────┘        └───────┬────────────────────────────┘
+                                │
+                  ┌─────────────┼─────────────┐
+                  ▼             ▼             ▼
+               carnets   aprovechamientos   guias
+                              _pesq       _movimiento
 
-| Relación | Cardinalidad | En palabras |
-| --- | --- | --- |
-| `beneficiarios` → `carnets` | 1 : 0..N | Una persona tiene un carnet **por gestión**. Varios años, varios carnets; el mismo año, uno solo |
-| `rubros` → `carnets` | 1 : N | Un carnet habilita UNA actividad; una actividad tiene muchos carnets emitidos |
-| `carnets` → `tramites` | 1 : 0..N | Cada rubro pedido es un trámite distinto colgado del mismo carnet |
-| `rubros` → `tramites` | 1 : 0..N | Un trámite pide exactamente un rubro |
-| `tramites` → `pagos` | 1 : 0..N | Un trámite se cubre con uno o varios depósitos |
-| `carnets` → `faenas` | 1 : 0..N | Un carnet de Pescador autoriza muchas salidas al año, una por faena |
-| `carnets` → `guias` | 1 : 0..N | Un carnet de Comercializador ampara muchos traslados al año |
-| `guias` → `guia_detalles` | 1 : N | Una guía traslada varias especies, cada una con su condición y sus kilos |
-| `faenas` → `pagos` | 1 : 0..N | Se cobran como el trámite: uno o varios depósitos |
-| `guias` → `pagos` | 1 : 0..N | Ídem |
-| `tramites` → *recibo* | 1 : 0..1 | **Sin tabla.** El comprobante se arma al vuelo; existe desde que hay `fecha_revision` |
-
-**`pagos` ES POLIMÓRFICA, Y ESO SIGNIFICA QUE PERDIÓ SU CLAVE FORÁNEA.** Las tres cosas que se cobran —el trámite, la faena y la guía— se pagan igual: uno o varios depósitos, cada uno con su boleta y su número de transacción. Modelarlas con tres tablas obligaría a triplicar el índice único de `nro_transaccion`, y entonces DEJARÍA de ser único: la misma boleta podría pagar un trámite y una faena, que es justo el fraude que ese índice viene a frenar.
-
-El costo es real y hay que tenerlo presente: **el motor ya no puede garantizar que `pagable_id` apunte a algo que existe**, ni impedir que se borre lo pagado. Por eso las tres tablas de destino van con `RESTRICT` hacia arriba y ninguna se borra en el uso normal. Esa integridad la sostiene la aplicación, igual que en `auditorias`.
-
-**Acá había un N:M y ya no lo hay** (esto es aparte, y es historia). `carnets` ↔ `rubros` se resolvía con una entidad asociativa, `carnet_rubro`. Al pasar a **un carnet por rubro**, esa entidad quedó sin razón de ser: sus atributos son los del carnet, y su clave `(carnet_id, rubro_id)` es redundante con la del carnet. Se eliminó, y con ella el enum `EstadoHabilitacion`, cuyos dos valores se absorbieron en `EstadoCarnet`. **El carnet ES la habilitación.**
-
----
-
-## 2. Las reglas que el modelo impone
-
-Lo que hace interesante a este MER no son las claves foráneas sino las restricciones de unicidad. Cada una es una regla del negocio escrita en la base, no en el código.
-
-| Restricción | Tabla | Regla que garantiza |
-| --- | --- | --- |
-| `carnets_beneficiario_rubro_gestion_unique (beneficiario_id, rubro_id, gestion)` | `carnets` | **Una persona, un carnet por actividad y por año.** Es la regla que ordena todo el sistema |
-| `carnets_firma_validacion_unique` | `carnets` | El carnet **no tiene número**: se identifica por su firma de 16 caracteres, que además es la llave de la verificación pública |
-| `pagos_nro_transaccion_unique` | `pagos` | El mismo depósito no se carga dos veces |
-| `faenas_nro_permiso_unique` | `faenas` | Dos faenas con el mismo número serían dos papeles que dicen ser el mismo, y en un control nadie sabría cuál vale |
-| `guias_nro_guia_unique` | `guias` | Ídem para la guía de transporte |
-| `rubros_nombre_unique` | `rubros` | No hay dos rubros con el mismo nombre |
-| `correlativos_serie_anio_unique` | `correlativos` | Fuente del número de recibo: una fila por serie y año |
-| `beneficiarios_ci_unico` | `beneficiarios` | Un CI + complemento por persona — tiene truco, ver abajo |
-
-### El índice de `beneficiarios` es parcial, y tiene que serlo
-
-```sql
-CREATE UNIQUE INDEX beneficiarios_ci_unico
-    ON beneficiarios (ci_nit, COALESCE(complemento, ''))
-    WHERE deleted_at IS NULL;
+    Catálogos que alimentan lo de arriba:
+      asociaciones · categorias_aprovechamiento · tipos_carnet
 ```
 
-Dos detalles que no se ven a simple vista:
+**El orden de ventanilla, que es el que explica las dependencias:**
 
-- **`WHERE deleted_at IS NULL`** en lugar de meter `deleted_at` dentro del `UNIQUE`. En SQL `NULL != NULL`, así que un índice sobre `(ci_nit, deleted_at)` no bloquearía nada: todos los registros activos tienen `deleted_at` en NULL y el motor los considera distintos entre sí. El índice parcial solo mira los vivos.
-- **`COALESCE(complemento, '')`** porque el complemento del CI boliviano es opcional, y sin eso dos personas con el mismo CI y complemento NULL tampoco chocarían.
-
----
-
-## 3. Borrado: qué se cae y qué resiste
-
-Las claves foráneas no son todas iguales, y ahí se lee el valor que el sistema le da a cada cosa.
-
-| Clave foránea | Acción | Por qué |
-| --- | --- | --- |
-| `carnets.beneficiario_id` → `beneficiarios` | `RESTRICT` | No se borra a alguien que tiene carnets emitidos |
-| `tramites.carnet_id` → `carnets` | `RESTRICT` | No se borra un carnet con expedientes |
-| `tramites.rubro_id` → `rubros` | `RESTRICT` | No se borra un rubro que alguien solicitó |
-| `carnets.rubro_id` → `rubros` | `RESTRICT` | Ni uno con carnets emitidos: el catálogo se inactiva, no se borra |
-| `faenas.carnet_id` → `carnets` | `RESTRICT` | Una faena circuló por el río: no se borra con el carnet |
-| `guias.carnet_id` → `carnets` | `RESTRICT` | Ídem: la guía acompañó carga real |
-| `guia_detalles.guia_id` → `guias` | `CASCADE` | La única cascada del módulo: el detalle no vale sin su guía, y el formulario reescribe la grilla entera |
-| `pagos.pagable_id` → *(nada)* | **sin clave foránea** | Es polimórfica. Lo cubren los `RESTRICT` de arriba, no el motor |
-| `pagos.registrado_por` → `users` | `SET NULL` | El usuario se da de baja y el depósito tiene que seguir siendo legible |
-| `pagos.validado_por` → `users` | `SET NULL` | Ídem. **No puede ser el mismo que `registrado_por`**, y eso lo impide el servicio, no la base |
-| `auditorias.user_id` → `users` | `SET NULL` | El registro histórico no se borra con el usuario |
-| `accesos.user_id` → `users` | `SET NULL` | Ídem |
-
-Esos `SET NULL` son el patrón de **documento emitido**: lo que ya salió impreso y está en la calle no puede cambiar ni desaparecer porque se modifique el registro que lo originó.
-
----
-
-## 4. Desnormalización deliberada
-
-Hay campos repetidos a propósito. No son un error de diseño: son copias congeladas al momento de emitir.
-
-| Campo copiado | Viene de | Cuándo se copia | Por qué |
-| --- | --- | --- | --- |
-| `tramites.monto_requerido` | `rubros.costo` | Al registrar el trámite | Si mañana sube la tarifa, el trámite viejo sigue debiendo lo que decía cuando se presentó |
-| `carnets.asociacion` | `tramites.asociacion` | Al emitir el carnet | Queda impreso en el plástico |
-| `carnets.capacidad_kg` | `tramites.capacidad_kg` | **Solo al aprobar** | El cupo autorizado es el de esa aprobación. Lo que venga en blanco NO pisa lo que ya había |
-| `carnets.asociacion` | `tramites.asociacion` | **Solo al aprobar** | Igual que el cupo: el carnet nace en NULL y se llena con la primera firma |
-
-**Las dos columnas de `capacidad_kg` no son el mismo dato.** `tramites` guarda lo **pedido**; `carnets`, lo **autorizado**. Entre el registro y la aprobación valen cosas distintas: quien tiene 600 kg autorizados y pide 850 sigue rigiendo por 600 hasta que se cobre y se firme. Con una sola columna, el pedido pisaría al vigente antes de pagarse — y un rechazo posterior no tendría a dónde volver.
-
-La regla general: **un documento emitido guarda su propio texto**, no una referencia a algo que puede cambiar.
-
----
-
-## 5. Estados: los dominios de valores
-
-Todos van en columnas `varchar`, nunca en tipos `ENUM` nativos de PostgreSQL — así agregar un estado no exige `ALTER TYPE` ni bloquear la tabla. Los valores válidos los definen los enums de PHP en `app/Enums/`.
-
-| Tabla.columna | Valores | Enum |
-| --- | --- | --- |
-| `tramites.estado` | `pendiente`, `en_revision`, `aprobado`, `rechazado` | `EstadoTramite` |
-| `tramites.tipo_tramite` | `emision_inicial`, `actualizacion` | `TipoTramite` |
-| `carnets.estado` | `vigente`, `vencido`, `anulado` | `EstadoCarnet` |
-| `rubros.estado` | `activo`, `inactivo` | `EstadoRubro` |
-| `faenas.estado` | `emitido`, `anulado` | `EstadoPermiso` |
-| `guias.estado` | `emitido`, `anulado` | `EstadoPermiso` (el mismo) |
-| `guias.tipo_transporte` | `fluvial`, `aerea`, `terrestre` | `TipoTransporte` |
-| `guia_detalles.condicion` | `fresco`, `congelado`, `seco`, `salado` | `CondicionProducto` |
-| `pagos.estado_validacion` | `pendiente`, `validado`, `observado` | `EstadoValidacionPago` |
-| `pagos.pagable_type` | `App\Models\Tramite`, `App\Models\Faena`, `App\Models\Guia` | *(sin enum: lo escribe Eloquent)* |
-
-**`EstadoPermiso` tiene DOS valores y esa pobreza es deliberada.** Un trámite recorre un circuito porque es un expediente; una faena y una guía se llenan en el mostrador, se cobran y se entregan en el acto — nacen valiendo. Y se ANULAN en vez de borrarse: el número salió de un talonario de papel, ya se gastó, y un hueco en la serie no se puede explicar después.
-
-### El ciclo de vida del trámite
-
-```mermaid
-stateDiagram-v2
-    [*] --> pendiente : registrar
-    pendiente --> en_revision : enviar — nace el RECIBO
-    pendiente --> [*] : eliminar, con motivo
-    en_revision --> aprobado : aprobar — el carnet queda habilitado
-    en_revision --> rechazado : rechazar, con motivo
-    aprobado --> [*]
-    rechazado --> [*]
+```
+1. beneficiario   se registra una vez
+2. cupo           se otorga (nace PENDIENTE) ─┐
+3. carnet         se emite con ese cupo       ├─ se cobran juntos
+4. caja           un recibo cubre los dos ────┘  y el cupo pasa a ACTIVO
+5. faena / guía   recién ahí se puede trabajar
 ```
 
-`pendiente` es un **borrador**, y eso explica qué se puede hacer en cada estado: se edita y se elimina, pero no se aprueba ni se rechaza. El salto directo `pendiente → aprobado` no existe, a propósito: con él, quien carga la solicitud podría aprobarla sin que nadie más la mire.
+---
 
-**Impreso y entregado no son estados sino fechas** — `fecha_generacion` y `fecha_entrega`. Un estado obligaría a sincronizar dos columnas que pueden contradecirse; una fecha en NULL dice «todavía no pasó» y no hay forma de que mienta.
+## 2. Las tablas, una por una
+
+### `asociaciones` — el gremio
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `nombre` | string(160) | |
+| `sigla` | string(20) null | Es lo que entra en el renglón angosto del carnet |
+| `estado` | string(20) | `EstadoAsociacion`. Activo / inactivo |
+
+**Nunca se borra una fila.** Los carnets y las guías ya emitidas apuntan acá; una
+asociación borrada los dejaría huérfanos. Para sacarla de circulación se pone
+`estado = inactivo`, que la quita de los desplegables sin tocar lo histórico.
+
+**El índice único es PARCIAL** (`WHERE deleted_at IS NULL`). Meter `deleted_at`
+dentro de un `unique()` no sirve: en SQL `NULL != NULL`, así que todas las filas
+vivas se considerarían distintas entre sí y el índice no bloquearía nada. Con el
+WHERE, el nombre queda libre recién cuando la fila se da de baja. SQLite entiende
+la misma sintaxis.
 
 ---
 
-## 6. Diagrama de soporte
+### `categorias_aprovechamiento` — la escala oficial
 
-```mermaid
-erDiagram
-    USERS ||--o{ AUDITORIAS : "genera"
-    USERS ||--o{ ACCESOS : "registra"
-    USERS }o--o{ ROLES : "tiene"
-    ROLES }o--o{ PERMISSIONS : "otorga"
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `nro_escala` | smallint, único | 1 a 7, el orden oficial |
+| `modalidad` | string(30) | `ModalidadAprovechamiento` |
+| `descripcion_kg` | string(160) | El texto literal de la resolución |
+| `kilos_min` / `kilos_max` | decimal(12,2) | |
+| `valor_bs` | decimal(10,2) | |
+| `estado` | boolean | Vigente o derogada |
 
-    USERS {
-        bigint    id PK
-        varchar   name
-        varchar   email UK
-        varchar   password
-        varchar   ci
-        varchar   cargo
-        varchar   telefono
-        boolean   activo
-        timestamp ultimo_acceso_at
-        timestamp deleted_at "borrado logico"
-    }
+**Por qué es una tabla y no un `match()` en código.** La escala la fija una
+resolución y cambia sin avisar a nadie que programe. Escrita en PHP, actualizarla
+es un despliegue; en una tabla, es una pantalla. Mismo criterio que
+`tipos_carnet`.
 
-    AUDITORIAS {
-        bigint  id PK
-        bigint  user_id FK "SET NULL"
-        varchar evento
-        varchar auditable_type "relacion polimorfica"
-        bigint  auditable_id
-        jsonb   valores_anteriores
-        jsonb   valores_nuevos
-        varchar descripcion
-        varchar ip
-        text    user_agent
-        varchar url
-    }
+**Por qué se guarda `descripcion_kg` si ya están min y max.** Porque el texto
+oficial no siempre es la lectura literal del rango: el tramo más alto dice
+«1001 kg Hasta 2000 Kg PAICHE», y ese «PAICHE» no está en ningún número. El
+documento impreso tiene que decir lo que dice la resolución, no lo que el sistema
+deduzca de dos decimales.
 
-    ACCESOS {
-        bigint  id PK
-        bigint  user_id FK "SET NULL"
-        varchar email
-        varchar evento
-        varchar ip
-        text    user_agent
-        varchar session_id
-    }
+**Por qué los kilos van en decimal.** La balanza pesa con decimales y los topes se
+comparan contra ese peso. Con enteros, un cupo de 100,5 kg caería fuera del primer
+tramo por redondeo y el sistema cobraría el siguiente.
 
-    CORRELATIVOS {
-        bigint   id PK
-        varchar  serie "UQ junto con anio"
-        smallint anio
-        integer  ultimo_numero
-    }
+**`modalidad` vive acá y no en el formulario de otorgamiento.** La fija la
+resolución al definir el tramo, no el operador al atender. Puesta allá, dos cupos
+del mismo tramo podrían terminar con reglas distintas.
 
-    CONFIGURACIONES {
-        bigint  id PK
-        varchar clave UK
-        text    valor
-        varchar tipo
-        varchar grupo
-        varchar etiqueta
-        text    descripcion
-        boolean publico
-    }
+| Modalidad | Cupo | ¿Se amplía? |
+| --- | --- | --- |
+| `escala_general` | acumulativo y consumible | **Sí** |
+| `especie_especial` | cuota de la especie, tasación fija (paiche) | **No**: agotada, se tramita de nuevo |
+
+**Por qué es un enum y no una columna `es_paiche`.** Porque el criterio no es la
+especie sino el RÉGIMEN. Mañana la resolución puede sumar otra especie, y con un
+booleano llamado por la especie habría que renombrar la columna —o peor, dejarla
+mintiendo—.
+
+---
+
+### `tipos_carnet` — el catálogo de credenciales
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `nombre` | string(120), único | |
+| `precio_bs` | decimal(10,2) | El arancel de HOY |
+| `estado` | boolean | |
+
+**El precio se copia al cobrar, no se lee de acá al imprimir.** Un carnet emitido
+en marzo a 80 Bs tiene que seguir diciendo 80 Bs en agosto aunque el arancel haya
+subido a 100. Esta columna sirve para armar el cobro; lo cobrado de verdad queda
+en `pagos`, que no se recalcula.
+
+**No confundirlo con `carnets.tipo_actor`.** `tipo_actor` es la REGLA —qué
+habilita el documento, qué puede emitir— y vive en un enum de PHP porque de ella
+cuelga lógica. `tipos_carnet` es el CATÁLOGO —cómo se llama y cuánto sale— y vive
+en una tabla porque de él no cuelga ninguna decisión. **Nunca se decide nada con
+un `match` sobre este nombre.**
+
+---
+
+### `beneficiarios` — la persona
+
+| Grupo | Columnas |
+| --- | --- |
+| Documento | `ci`, `complemento`, `expedido` |
+| Nombre | `primerNombre`, `segundoNombre`, `apellidoPaterno`, `apellidoMaterno`, `apellidoCasado` |
+| Personales | `fechaNacimiento`, `genero`, `nacionalidad` |
+| Contacto | `direccion`, `ciudad`, `provincia`, `telefono`, `email`, `foto` |
+
+**Es una tabla unificada y NO tiene columna de rol, a propósito.** Quien pesca y
+además comercializa es UNA persona con DOS credenciales, no dos fichas. El rol
+vive en `carnets.tipo_actor`, que es del documento. Guardarlo acá obligaría a
+duplicar la ficha, y desde el momento en que hay dos filas ya no se sabe cuál
+corregir: un cambio de teléfono entra en una y la otra queda vieja para siempre.
+
+**El nombre va partido en cinco columnas porque así llega**: la cédula boliviana
+lo trae separado. Partirlo después con código no se puede acertar siempre —«María
+del Carmen Justiniano de Áñez» no tiene una regla que la resuelva—.
+`apellidoCasado` se guarda sin el «de»: con el «de» adentro, buscar «Justiniano»
+no encontraría a esa persona.
+
+**No hay columna `nombreCompleto`**: se arma en el modelo, así no puede quedar
+desfasado de sus partes.
+
+> ⚠️ **De `primerNombre` en adelante van en camelCase.** En PostgreSQL eso obliga
+> a entrecomillar en SQL escrito a mano: `SELECT "primerNombre"`. Sin comillas el
+> motor pasa el nombre a minúscula y responde `column "primernombre" does not
+> exist`. Eloquent entrecomilla solo; el problema aparece con `whereRaw` /
+> `orderByRaw`. Ver `Beneficiario::SQL_NOMBRE`.
+
+**El único parcial va sobre `ci` SOLO**, no sobre `(ci, complemento)`: el
+complemento es parte del MISMO documento, no un documento distinto. Incluyéndolo,
+cargar a la misma persona una vez con complemento y otra sin él pasaría el
+control — y esa persona sacaría dos credenciales del mismo tipo, cada una con su
+propia bolsa madre: el doble de cupo del que le corresponde.
+
+**Sin `created_by` / `updated_by`**: quién cargó y quién modificó ya lo guarda
+`auditorias`, con el detalle de lo que cambió.
+
+---
+
+### `aprovechamientos_pesq` — la bolsa madre
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `beneficiario_id` | FK RESTRICT | |
+| `categoria_aprov_id` | FK RESTRICT | Bajo qué tramo se otorgó |
+| `modalidad` | string(30) | **Copiada** del tramo |
+| `volumen_total_kg` | decimal(12,2) | **Copiado** del techo del tramo |
+| `tipo_embarcacion` | string(120) null | El renglón del talonario |
+| `estado` | string(20) | `EstadoAprovechamiento` |
+| `fecha_emision` / `fecha_vencimiento` | date | Vence con la gestión |
+
+```
+PENDIENTE ──[se cobra ENTERO]──▶ ACTIVO ──▶ AGOTADO | VENCIDO
+(borrador)
+
+  editar    ✔                      ✘         ✘         ✘
+  eliminar  ✔                      ✘         ✘         ✘
+  faenas    ✘                      ✔         ✘         ✘
+  ampliar   ✔ (sigue pendiente)    ✔         ✔         ✘
 ```
 
-`auditorias` usa una **relación polimórfica** (`auditable_type` + `auditable_id`): apunta a cualquier modelo del sistema sin necesidad de una clave foránea por tabla. Por eso no tiene flechas hacia el dominio en el diagrama — esa integridad la sostiene la aplicación, no el motor.
+**Nace PENDIENTE y solo la caja lo activa.** `CobrarService` lo pasa a `activo`
+cuando el saldo llega a cero, y no hay ningún otro camino: la concesión pagada ES
+la autorización. Se exige el saldo COMPLETO, no una cuota — si media cuota
+alcanzara, habilitarse costaría un boliviano.
 
-`correlativos` y `configuraciones` son **tablas sueltas**, sin relaciones. La segunda son pares clave-valor con los parámetros del sistema. La primera es un contador genérico que hoy **nadie usa**: alimentaba la serie del talonario de recibos y quedó libre al retirarse esa tabla. No se borró porque un correlativo es justamente el dato que no se puede derivar — ver `CorrelativoService`.
+**Eliminar un cupo pendiente es una BAJA LÓGICA.** La fila queda con
+`deleted_at`, el scope global la esconde de todo —incluida la regla de una bolsa
+por persona, que por eso no bloquea a nadie— y el motivo queda en `auditorias`.
 
-> **NO HAY TABLA `recibos`.** El comprobante se ARMA al vuelo con los datos de
-> `beneficiarios`, `carnets`, `rubros`, `tramites` y `pagos` cada vez que
-> alguien lo imprime; su número es el id del trámite y su fecha es
-> `tramites.fecha_revision`. Ver `App\Support\ReciboArmado`, que explica qué se
-> gana y qué se pierde con eso.
+**Pendiente es un borrador, y eso es lo que lo hace corregible.** Mientras no
+entró plata, equivocarse de tramo se arregla corrigiendo la fila y un cupo cargado
+por error se elimina con el motivo escrito. En cuanto entra el primer boliviano
+hay un recibo numerado con el detalle impreso, y cambiar lo que ese papel dice por
+detrás no es una corrección.
+
+**Por qué cuelga del beneficiario y no del carnet.** El orden real de ventanilla
+es: primero se define el cupo, después se emite el plástico —el carnet necesita
+saber qué volumen imprimir—. Colgándolo del carnet habría que crear el carnet
+primero y actualizarlo después, y entre las dos operaciones existiría una
+credencial impresa sin cupo. Por eso la referencia va al revés, en
+`carnets.aprovechamiento_id`.
+
+**Por qué se copian `volumen_total_kg` y `modalidad`.** Porque la escala cambia
+por resolución. Un cupo otorgado en marzo bajo una escala de 500 kg no puede pasar
+a valer 800 en agosto porque alguien editó el catálogo. `categoria_aprov_id` queda
+solo como referencia de bajo qué escala se otorgó. Derivar la modalidad por la
+relación al leer sería el mismo error: un `join` que devuelve el valor de HOY para
+una decisión que se tomó en marzo.
+
+**El saldo NO se guarda en ninguna columna.** Es
+`volumen_total_kg − suma de las faenas que consumen cupo`, y se calcula al leer
+con `AprovechamientoPesq::saldoKg()`. Una columna `saldo` hay que actualizarla en
+cada alta, cada anulación y cada corrección, y se olvida una sola vez para que el
+número quede mintiendo para siempre sin ningún error que lo delate.
+
+**`tipo_embarcacion` es texto libre y nullable.** Es el renglón «Tipo de
+Embarcación» del talonario verde. No hay padrón de embarcaciones ni nomenclatura
+fija —«canoa», «peque-peque», «bote», «chalana», «deslizador»— y un catálogo
+cerrado obligaría a dar de alta un tipo nuevo con el pescador esperando en la
+ventanilla. Nullable porque el renglón del papel tampoco es obligatorio.
+
+**RESTRICT y no CASCADE** en las dos claves: borrar a una persona no puede
+llevarse por delante su historial de cupos, que es lo que respalda cuánto se pescó
+bajo su nombre.
 
 ---
 
-## 7. El recorrido completo, un paso por línea
+### `carnets` — la credencial
 
-1. Se registra un **beneficiario**, o se busca uno existente por CI.
-2. Se presenta un **trámite** pidiendo un **rubro**. El sistema decide solo si es `emision_inicial` —y crea el **carnet de ese rubro**— o `actualizacion` —y reutiliza el que ya existe—.
-3. Se cargan uno o más **pagos** con su boleta escaneada, hasta cubrir `monto_requerido`.
-4. Se **envía a revisión**: en la misma transacción nace el **recibo** numerado, y el pescador se va con ese papel.
-5. Se **aprueba**: el cupo y la asociación se consolidan en el **carnet** y recién ahí la persona queda habilitada.
-6. Se **imprime** el carnet (`fecha_generacion`) y se **entrega** (`fecha_entrega`).
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `beneficiario_id`, `asociacion_id`, `tipo_carnet_id` | FK RESTRICT | |
+| `aprovechamiento_id` | FK **nullable**, nullOnDelete | Solo el pescador |
+| `tipo_actor` | string(20) | `TipoActor`: pescador / comercializador |
+| `codigo_carnet` | string(40), **único global** | Lo impreso en el plástico |
+| `estado` | string(20) | `EstadoCarnet` |
 
-Y ahí **recién empieza el trabajo de todos los días**, que es lo que el carnet habilita:
+**`aprovechamiento_id` es nullable y eso es la regla, no un descuido.** La pesca
+se autoriza por VOLUMEN —tantos kilos, contrastables contra una guía de
+transporte—; la comercialización no. Quién lleva cupo lo dice
+`TipoActor::requiereAprovechamiento()`, **NUNCA un match sobre el nombre del tipo
+de carnet**: `tipos_carnet` es un catálogo que edita la unidad, y el mismo
+documento figura como «Carnet de Pescador» o «Pescador Artesanal» según quién lo
+cargó.
 
-7. Con un carnet de **Pescador** vigente se emite una **faena** por cada salida: embarcación, comandante, de tal día a tal día, con tanto autorizado en kilos.
-8. Con un carnet de **Comercializador** vigente se emite una **guía** por cada carga trasladada, con su **detalle** especie por especie.
-9. Las dos se cobran con **pagos**, la misma tabla que cubre el trámite.
-10. **Cada depósito se controla**: alguien abre la boleta, la compara contra el extracto del banco y la VALIDA u OBSERVA. Un trámite con alguna boleta sin controlar no se puede aprobar.
+De esa bandera cuelgan cuatro cosas: el formulario muestra u oculta el campo, la
+validación lo exige o lo **prohíbe**, la ficha lo muestra o no, y el plástico
+imprime el renglón CUPO o le da la tira entera al tipo de actor.
 
-Qué puede emitir cada carnet lo dicen `rubros.emite_faenas` y `rubros.emite_guias`, **nunca el nombre del rubro**: el catálogo lo edita la unidad desde el panel y el mismo rubro figura como «Pescador» o como «Faena» según quién lo cargó.
+**`nullOnDelete` y no restrict**: sin el cupo, el carnet sigue siendo un documento
+válido —se emitió y se entregó— y lo único que pierde es la referencia. Dejarlo en
+RESTRICT trabaría la baja sin proteger nada que importe.
+
+**El código es único GLOBAL y no por tipo**: un control en ruta lee un código y
+tiene que llegar a UN documento, sin preguntar antes de qué tipo es.
+
+**Qué se imprime y qué no.** Se imprime lo que NO cambia después de que el
+plástico sale de la impresora: el nombre, el tipo de actor, la asociación, el cupo
+y las fechas. **El ESTADO no se imprime**: un carnet se revoca después de impreso
+y la tarjeta no se entera.
+
+**El carnet acepta un cupo PENDIENTE.** Lo único que necesita de él es el volumen
+que va impreso, y eso ya está decidido al otorgarlo; el carnet también nace sin
+pagar y los dos se cobran juntos en el mismo recibo. Por eso `EmitirCarnetService`
+usa el scope `enCurso()` —pendiente o activo, en fecha— y no `vigentes()`.
 
 ---
 
-Ver también: [ARQUITECTURA.md](ARQUITECTURA.md) · [modulos/CARNETS.md](modulos/CARNETS.md) · [modulos/RECIBOS.md](modulos/RECIBOS.md)
+### `permisos_faena` — una salida
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `aprovechamiento_id` | FK RESTRICT | De dónde salen los kilos |
+| `carnet_id` | FK RESTRICT | Quién los extrae |
+| `numero_faena` | int | Hoja del talonario |
+| `kilos_extraidos` | decimal(12,2) | |
+| `fecha_salida` / `fecha_limite` | date | Máximo **1 mes** |
+| `estado` | string(20) | `EstadoFaena` |
+
+**Por qué apunta a dos cosas a la vez.** `aprovechamiento_id` es de dónde SALEN
+LOS KILOS —la bolsa contra la que se descuenta— y `carnet_id` es QUIÉN LOS EXTRAE
+—la credencial que un control en el río va a pedir—. Las dos apuntan a la misma
+persona, pero por caminos distintos y con vidas distintas: el cupo se renueva por
+resolución y el carnet por gestión, y no siempre en la misma fecha. Guardar solo
+una obligaría a deducir la otra, y la deducción falla justamente en el caso raro.
+
+**El único es `(aprovechamiento_id, numero_faena)`, no global**: cada bolsa madre
+arranca su numeración en 1, que es como se llena el papel.
+
+**`fecha_limite` se guarda calculada** en vez de derivarla al leer: si mañana la
+resolución cambia el plazo a quince días, los permisos ya emitidos tienen que
+seguir venciendo cuando dice el papel que el pescador tiene en la mano.
+
+**No se edita ni se borra: se vence o se completa.** El número sale de un talonario
+de papel que el pescador se llevó. Borrar la fila deja un hueco en la serie que
+nadie puede explicar y libera un número que el índice único volvería a aceptar.
+
+**Una faena ACTIVA ya consume cupo**, aunque no se haya descargado nada. Es lo
+contrario de lo intuitivo y es el punto del cupo: si solo contaran las
+completadas, un pescador podría tener diez faenas abiertas por el volumen entero
+cada una. Lo que libera el volumen es que la faena VENZA sin cerrarse — ahí la
+salida no ocurrió.
+
+---
+
+### `guias_movimiento` — un traslado
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `beneficiario_com_id` | FK RESTRICT | **Quien comercializa** |
+| `asociacion_id` | FK RESTRICT | |
+| `codigo_guia` | string(40), único | |
+| `origen` / `destino` | string(160) | |
+| `peso_total_kg` | decimal(12,2) | |
+| `es_piscicultura` | boolean | **50% de descuento** |
+| `fecha_emision` / `fecha_vencimiento` | **dateTime** | Máximo **5 días** |
+| `estado` | string(20) | `EstadoGuia` |
+
+**Se llama `beneficiario_com_id` y no `beneficiario_id`** porque acá la persona
+entra en un papel concreto: es quien comercializa. El nombre largo evita que
+alguien la confunda con el pescador que extrajo la carga, que es otra persona y no
+está en esta tabla.
+
+**`es_piscicultura` no es un dato descriptivo: es plata.** Marcado, el arancel se
+cobra al 50% — el pescado de criadero no sale del río, así que no consume el
+recurso que la tasa viene a proteger. El descuento se aplica en UN SOLO lugar,
+`GuiaMovimiento::factorArancel()`, y no se replica en el controlador ni en React:
+escrito en tres lados, el día que la resolución cambie el 50% a 40% se corrige en
+dos y el tercero sigue cobrando mal sin que nadie lo note.
+
+**Las fechas son `dateTime` y no `date`** porque los cinco días se cuentan desde
+la HORA de emisión: una guía emitida a las 18:00 del lunes vence a las 18:00 del
+sábado, no a la medianoche del viernes. Con `date` se le regalaría o se le
+quitaría al transportista casi un día.
+
+> Por lo mismo, al mandarlas a React van con `toIso8601String()` —son MOMENTOS—
+> mientras que las de faenas y carnets van con `toDateString()`.
+
+---
+
+### `recibos` — la cabecera del comprobante
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `numero_recibo` | string(40), único | `REC-2026-0016` |
+| `monto_total` | decimal(12,2) | Suma **congelada** |
+| `concepto` | text | Tal como se imprime |
+| `nit_ci_factura` / `nombre_factura` | string | **Copiados** al emitir |
+
+**Por qué el recibo es una tabla y no se arma al vuelo.** Porque `numero_recibo`
+es un CORRELATIVO DE CAJA, y un correlativo es justamente el dato que no se puede
+derivar de otras tablas: no es el id de ningún trámite ni una cuenta de filas.
+Contabilidad audita esa serie.
+
+Y porque el comprobante tiene que ser **inmutable**. Armado al vuelo, corregir un
+apellido en la ficha cambiaría los comprobantes ya entregados y una reimpresión de
+marzo saldría distinta de la original.
+
+**El número va como string y no como entero** aunque el talonario lo escriba
+pelado: la serie lleva prefijo y año, y el año que viene el contador vuelve a 1.
+Como entero, el 1 de 2027 chocaría con el 1 de 2026. Se reserva con
+`CorrelativoService`, que bloquea la fila del contador para que dos ventanillas
+cobrando al mismo tiempo nunca saquen el mismo.
+
+**El nombre y el NIT se copian** porque el comprobante puede emitirse a nombre de
+un tercero —la empresa que paga por el pescador— y tiene que seguir diciendo lo
+mismo dentro de cinco años.
+
+**`monto_total` también se guarda, y no es redundante**: es la suma de los pagos en
+el momento de emitir. Recalcularla al leer haría que el papel entregado cambiara si
+después se corrige un abono. Ver `Recibo::montoCalculado()` para el contraste entre
+lo impreso y lo que hay hoy.
+
+---
+
+### `pagos` — el detalle, abono por abono
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `recibo_id` | FK **CASCADE** | |
+| `pagable_type` / `pagable_id` | morphs | Carnet, cupo o guía |
+| `monto_parcial` | decimal(12,2) | **Este abono**, no el total |
+| `metodo_pago` | string(20) | `MetodoPago` |
+
+**Por qué es polimórfica.** Se cobran tres cosas distintas y las tres se pagan
+igual. Una tabla por cada una obligaría a repetir el mismo circuito de caja tres
+veces, y peor: `numero_recibo` dejaría de ser único global, así que el mismo papel
+podría amparar un carnet y una guía sin que nada lo impida.
+
+> ⚠️ **El costo: se pierde la clave foránea.** El motor no puede exigir que
+> `pagable_id` exista, porque no sabe en qué tabla buscarlo. La integridad la
+> sostienen los RESTRICT de las otras tablas y la aplicación, no la base.
+
+> ⚠️ **No se precarga con `with('pagable.beneficiario')`.** Eloquent no sabe qué
+> es `pagable` hasta que lee la fila, así que lo escrito así se **ignora en
+> silencio** y el N+1 sigue ahí. Va con `morphWith`, declarando qué traer para
+> cada tipo. Ver `CajaController::index()`.
+
+**CASCADE y no RESTRICT, al revés que en el resto del sistema**: un pago sin
+recibo no es nada —no se puede imprimir, no entra en ningún arqueo y no se sabe
+quién lo cobró—. Si algún día se anula un recibo entero, su detalle se va con él.
+
+**Por qué `monto_parcial` y no `monto`.** Porque el nombre dice la regla: un
+trámite se puede pagar en cuotas. Un carnet de 80 Bs admite dos filas de 40, cada
+una con su recibo y su fecha. **Lo que se debe NO se guarda en ninguna columna**:
+es el precio menos la suma de estas filas, y se calcula al leer con el trait
+`Pagable` — guardado, quedaría desfasado en cuanto alguien corrija un abono.
+
+**`morphs()` crea las dos columnas MÁS el índice compuesto**
+`(pagable_type, pagable_id)`, que es el que resuelve la consulta caliente:
+«cuánto se pagó de ESTE carnet». En ese orden y no al revés, porque el tipo es lo
+que primero acota.
+
+---
+
+## 3. Borrado lógico: las diez tablas lo tienen
+
+**Todas** las tablas del dominio llevan `softDeletes()` y su modelo usa el trait.
+Nada del dominio se borra de verdad: se da de baja, la fila queda con
+`deleted_at` y el scope global la saca de todas las consultas.
+
+Es lo que corresponde para un sistema de documentos oficiales: cada fila lleva el
+nombre de una persona y respalda —o respaldó— un papel. Que alguien haya cargado
+2000 kg a nombre de Fulano y lo haya dado de baja cinco minutos después es
+exactamente el tipo de cosa que después hay que poder mirar.
+
+### Qué hay que cuidar cuando una tabla pasa a borrado lógico
+
+**1. Los índices únicos cambian de significado.** Una fila dada de baja sigue
+ocupando su valor, así que hay que decidir tabla por tabla si el valor se libera
+o queda quemado:
+
+| Único | Tipo | Por qué |
+| --- | --- | --- |
+| `asociaciones.nombre` | **parcial** | Catálogo: dada de baja, el nombre se libera |
+| `categorias_aprovechamiento.nro_escala` | **parcial** | Ídem: la escala 3 tiene que poder volver a cargarse |
+| `tipos_carnet.nombre` | **parcial** | Ídem |
+| `beneficiarios.ci` | **parcial** | Una ficha dada de baja libera la cédula |
+| `carnets.codigo_carnet` | **global** | El plástico ya salió y está en la calle |
+| `guias_movimiento.codigo_guia` | **global** | El papel ya se entregó |
+| `recibos.numero_recibo` | **global** | Correlativo que Contabilidad audita: el hueco es lo que la hace auditable |
+| `permisos_faena (aprovechamiento_id, numero_faena)` | **global** | La hoja del talonario se gastó |
+
+> El criterio en una línea: **el catálogo libera, el papel entregado no.**
+
+**2. `unique()` con `deleted_at` adentro NO sirve**, y es la trampa que más se
+repite: en SQL `NULL != NULL`, así que todas las filas vivas se considerarían
+distintas entre sí. Va índice PARCIAL con `WHERE deleted_at IS NULL`. SQLite
+entiende la misma sintaxis.
+
+**3. Las reglas de unicidad de negocio siguen valiendo solas**, porque el scope
+global excluye lo dado de baja. La de «una bolsa vigente por persona» es la que
+importa acá: si NO excluyera las bajas, dar de baja un cupo dejaría a esa persona
+sin poder recibir otro nunca más.
+
+> ⚠️ **`pagos.recibo_id` es `cascadeOnDelete`, y eso es del MOTOR: no se dispara
+> con una baja lógica.** Dar de baja un recibo dejaría sus pagos vivos y visibles
+> en caja, colgando de un comprobante que ya no está. Hoy nada da de baja
+> recibos; el día que algo lo haga, la baja tiene que arrastrar el detalle a
+> mano.
+
+---
+
+## 4. Convenciones que valen para todo el esquema
+
+| Regla | Por qué |
+| --- | --- |
+| **Enums en columnas `string`**, nunca ENUM nativo de PostgreSQL | Sumar un estado no exige `ALTER TYPE` ni bloquear la tabla. Los valores válidos los impone el enum de PHP y el cast del modelo |
+| **Todas las tablas del dominio llevan `softDeletes()`** | Cada fila respalda un papel con el nombre de alguien: se da de baja, no se borra |
+| **Índices únicos con borrado lógico: parciales en catálogos, globales en papeles** | Ver la sección 3 |
+| **RESTRICT por defecto**, CASCADE solo en `pagos → recibos` | Borrar no puede llevarse por delante un historial que respalda papeles entregados |
+| **El orden del `Schema::create()` es siempre el mismo**: `id` → claves foráneas → datos → estado → fechas del negocio → índices → `timestamps()` → `softDeletes()` | Las diez tablas terminan iguales. No cambia el esquema: es convención de lectura |
+| **Lo copiado se congela** (`volumen_total_kg`, `modalidad`, `monto_total`, `nombre_factura`) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
+| **Lo calculable NO se guarda** (saldo en kg, saldo en Bs) | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
+
+**Tablas de soporte**, fuera del dominio: `users`, `correlativos`,
+`configuraciones`, `auditorias`, `accesos`. Más las de Laravel y las de
+`spatie/laravel-permission`.
+
+---
+
+## 5. Dónde está cada cosa
+
+| Qué | Dónde |
+| --- | --- |
+| El esquema | `database/migrations/2026_09_18_*` |
+| Las reglas de negocio | `app/Services/` |
+| Los estados y sus transiciones | `app/Enums/` |
+| El esquema anterior | `database/migrations-anterior/` (Laravel no lo escanea) |
+| El registro de cómo se llegó acá | [docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md) |

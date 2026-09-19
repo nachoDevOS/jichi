@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers\Panel;
 
-use App\Enums\EstadoPermiso;
+use App\Enums\EstadoFaena;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Panel\GuardarFaenaRequest;
+use App\Http\Requests\Panel\CompletarFaenaRequest;
+use App\Http\Requests\Panel\EmitirFaenaRequest;
+use App\Models\AprovechamientoPesq;
+use App\Models\Beneficiario;
 use App\Models\Carnet;
-use App\Models\Faena;
-use App\Services\FaenaService;
+use App\Models\PermisoFaena;
+use App\Services\EmitirFaenaService;
 use App\Support\Paginacion;
-use App\Support\Sql;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,26 +20,30 @@ use Inertia\Response;
 
 /**
  * ============================================================================
- *  MÓDULO FAENAS — el permiso por salida de pesca
+ *  PERMISOS DE FAENA — una salida de pesca (paso 4 del flujo)
  * ============================================================================
  *
- * EL CONTROLADOR NO DECIDE NADA, igual que `TramiteController`. Si el carnet
- * emite faenas, si está vigente, si el número del talonario ya se usó: todo eso
- * vive en `FaenaService`. Acá se traduce la petición, se llama al servicio y se
- * convierte lo que devuelva —o la excepción que lance— en un redirect.
+ *     carnet (pescador) ──▶ faena ──▶ descuenta kilos de la bolsa madre
  *
  * ----------------------------------------------------------------------------
- *  NO HAY EDICIÓN, Y NO ES UN OLVIDO
+ *  NO HAY `edit`, NI `update`, NI `destroy`
  * ----------------------------------------------------------------------------
  *
- * Una faena es un papel del talonario que la persona se lleva en el momento.
- * Editarla después dejaría el sistema diciendo una cosa y el papel otra, sin que
- * nadie pueda notar la diferencia en un control del río. Una faena mal emitida
- * se ANULA —con su motivo escrito— y se emite otra con un número nuevo.
+ * El número sale de un TALONARIO DE PAPEL que el pescador se llevó. Borrar la
+ * fila deja un hueco en la serie que nadie puede explicar y libera un número
+ * que el índice único volvería a aceptar, así que dos salidas distintas podrían
+ * terminar diciendo ser la misma hoja.
+ *
+ * Y TAMPOCO SE ANULA: `EstadoFaena` no tiene ese estado. Una faena emitida de
+ * más se deja VENCER, y al vencer libera su volumen sola. El número queda
+ * ocupado igual, que es lo correcto — la hoja se gastó.
+ *
+ * Lo único que se escribe después de emitir es COMPLETAR, que registra la
+ * vuelta y admite corregir los kilos contra la balanza.
  */
 class FaenaController extends Controller
 {
-    public function __construct(private readonly FaenaService $faenas) {}
+    public function __construct(private readonly EmitirFaenaService $servicio) {}
 
     /**
      * LISTADO — GET /panel/faenas
@@ -47,249 +53,246 @@ class FaenaController extends Controller
         $filtros = [
             'buscar' => $request->string('buscar')->trim()->value() ?: null,
             'estado' => $request->string('estado')->trim()->value() ?: null,
-            'desde' => $request->date('desde')?->toDateString(),
-            'hasta' => $request->date('hasta')?->toDateString(),
             'por_pagina' => Paginacion::filas($request),
         ];
 
-        $faenas = Faena::query()
+        $faenas = PermisoFaena::query()
             /*
-             * Sin este eager loading, pintar 15 filas son 46 consultas: cada una
-             * pediría su carnet, el beneficiario de ese carnet y sus pagos.
-             *
-             * OJO CON LAS COLUMNAS DE `beneficiarios`: el accesor
-             * `nombreCompleto` se arma con cinco, y si alguna falta devuelve una
-             * cadena vacía —no un error— y la columna sale en blanco sin que
-             * nada lo explique.
+             * OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
+             * partes del nombre porque `nombreCompleto` las lee todas. Una
+             * columna que un método consulta y no está en el select vuelve null
+             * y el método contesta cualquier cosa, sin ningún error.
              */
             ->with([
-                'carnet:id,beneficiario_id,rubro_id,gestion',
-                'carnet.beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                'carnet:id,beneficiario_id,codigo_carnet,tipo_actor',
+                'carnet.beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
             ])
-            // Lo cobrado de cada faena, en la misma consulta. Ver
-            // Faena::montoPagado(), que usa este atributo si ya está.
-            ->withSum('pagos', 'monto')
-
-            ->when($filtros['estado'], fn ($q, $e) => $q->where('faenas.estado', $e))
-            ->when($filtros['desde'], fn ($q, $d) => $q->whereDate('fecha_salida', '>=', $d))
-            ->when($filtros['hasta'], fn ($q, $h) => $q->whereDate('fecha_salida', '<=', $h))
-
-            /*
-             * La búsqueda acepta el número del permiso, la embarcación y el
-             * titular — las tres formas en que se pregunta en el mostrador.
-             *
-             * whereHas genera un EXISTS: filtra sin multiplicar filas como haría
-             * un join.
-             */
-            ->when($filtros['buscar'], fn ($q, $t) => $q->where(function ($sub) use ($t) {
-                // Sql::like() porque PostgreSQL necesita ILIKE para no
-                // distinguir mayúsculas y SQLite ya lo hace con LIKE.
-                $sub->where('nro_permiso', Sql::like(), "%{$t}%")
-                    ->orWhere('embarcacion', Sql::like(), "%{$t}%")
-                    ->orWhereHas('carnet.beneficiario', fn ($b) => $b->buscar($t));
-            }))
-
-            // Por id y no por fecha: `fecha_salida` empata —varias faenas del
-            // mismo día— y con la fecha sola el orden entre ellas lo decide el
-            // motor, así que una fila puede repetirse al pasar de página.
-            ->orderByDesc('faenas.id')
+            ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
+                fn ($s) => $s
+                    ->whereHas('carnet.beneficiario', fn ($b) => $b->buscar($termino))
+                    ->orWhere('numero_faena', 'like', '%'.preg_replace('/\D/', '', $termino).'%'),
+            ))
+            ->when($filtros['estado'], fn ($q, $estado) => $q->where('permisos_faena.estado', $estado))
+            ->latest('fecha_salida')
+            ->latest('numero_faena')
             ->paginate($filtros['por_pagina'])
             ->withQueryString()
-            ->through(fn (Faena $f): array => $this->resumir($f));
+            ->through($this->resumir(...));
 
         return Inertia::render('panel/faenas/index', [
             'faenas' => $faenas,
             'filtros' => $filtros,
-            // El catálogo sale del servidor y no escrito en React: los valores
-            // son los del enum, y repetidos en el frontend algún día dirían
-            // cosas distintas.
-            'estados' => EstadoPermiso::opciones(),
+            'estados' => EstadoFaena::opciones(),
             'opcionesPorPagina' => Paginacion::OPCIONES,
         ]);
     }
 
     /**
-     * FORMULARIO DE ALTA — GET /panel/faenas/crear
+     * FORMULARIO — GET /panel/faenas/crear
      *
-     * Acepta `?carnet=` para llegar con el carnet ya elegido desde su ficha, que
-     * es el camino más corto: el operador ya tiene la persona en pantalla.
+     * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
+     * buscador ya resuelto.
      */
     public function create(Request $request): Response
     {
-        $carnet = null;
-
-        if ($id = $request->integer('carnet')) {
-            /*
-             * OJO CON LAS COLUMNAS QUE SE PIDEN DE `rubros`.
-             *
-             * `emite_faenas` y `emite_guias` TIENEN QUE ESTAR: `puedeEmitirFaenas()`
-             * las lee, y si no vinieron en el select devuelven null —no un error—
-             * así que el carnet se descartaba en silencio y el formulario abría
-             * vacío sin que nada lo explicara. Es la misma trampa que con las cinco
-             * columnas del nombre del beneficiario.
-             */
-            $carnet = Carnet::query()
-                ->with([
-                    'beneficiario:id,ci_nit,complemento,expedido,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
-                    'rubro:id,nombre,emite_faenas,emite_guias',
-                ])
-                ->find($id);
-
-            // Si el carnet no emite faenas se descarta en silencio y el
-            // formulario abre con el buscador vacío. Rebotar con un error sería
-            // peor: el operador no pidió nada malo, llegó por un enlace viejo.
-            if ($carnet && ! $carnet->puedeEmitirFaenas()) {
-                $carnet = null;
-            }
-        }
+        $beneficiario = $request->integer('beneficiario')
+            ? Beneficiario::query()->find($request->integer('beneficiario'))
+            : null;
 
         return Inertia::render('panel/faenas/crear', [
-            'carnetElegido' => $carnet ? $this->resumirCarnet($carnet) : null,
-            // La tarifa vigente, para que el formulario la muestre ya cargada.
-            'montoSugerido' => Faena::TARIFA,
+            'beneficiario' => $beneficiario ? [
+                'id' => $beneficiario->id,
+                'nombreCompleto' => $beneficiario->nombreCompleto,
+                'documento_identidad' => $beneficiario->documento_identidad,
+                'foto_url' => $beneficiario->foto_url,
+
+                /*
+                 * Los carnets llegan con la MISMA forma que devuelve el
+                 * autocompletado, para que la pantalla trate igual a la persona
+                 * preseleccionada y a la que se busca a mano. Sin eso habría dos
+                 * caminos en el componente, y uno de los dos se queda viejo.
+                 */
+                'carnets_vigentes' => $beneficiario->carnets()
+                    ->vigentes()
+                    ->with([
+                        'tipoCarnet:id,nombre',
+                        'aprovechamiento' => fn ($a) => $a
+                            ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                            ->withMax('faenas', 'numero_faena'),
+                    ])
+                    ->get()
+                    ->map($this->resumirCarnetParaEmitir(...))
+                    ->values()
+                    ->all(),
+            ] : null,
+
+            'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
+
+            /*
+             * En modo FLEXIBLE el formulario no puede frenar por exceder el
+             * cupo, así que tiene que dejar de decir que lo va a hacer: el aviso
+             * pasa de «no entra en el cupo» a «va a quedar por encima». Sin este
+             * dato la pantalla mentiría en la mitad de los despliegues.
+             */
+            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
         ]);
     }
 
     /**
-     * ALTA — POST /panel/faenas
+     * EMITIR — POST /panel/faenas
      */
-    public function store(GuardarFaenaRequest $request): RedirectResponse
+    public function store(EmitirFaenaRequest $request): RedirectResponse
     {
-        $carnet = Carnet::findOrFail($request->integer('carnet_id'));
+        $datos = $request->validated();
 
         try {
-            $faena = $this->faenas->emitir($carnet, $request->validated());
+            $faena = $this->servicio->emitir(
+                Carnet::query()->findOrFail($datos['carnet_id']),
+                (int) $datos['numero_faena'],
+                (float) $datos['kilos_extraidos'],
+                now()->parse($datos['fecha_salida']),
+            );
         } catch (PermisoOperativoException $e) {
-            // El mensaje está escrito para que lo lea el operador. withInput
-            // devuelve lo tipeado para que no tenga que cargarlo de nuevo.
-            return back()->withInput()->with('error', $e->getMessage());
+            /*
+             * El mensaje vuelve como error del campo que el operador puede
+             * corregir. Las reglas del carnet no tienen arreglo desde este
+             * formulario —hay que ir a emitir o renovar el carnet— así que se
+             * cuelgan de `carnet_id`; el exceso de cupo y el número repetido sí
+             * se corrigen acá.
+             */
+            $campo = match (true) {
+                str_contains($e->getMessage(), 'quedan') => 'kilos_extraidos',
+                str_contains($e->getMessage(), 'número') => 'numero_faena',
+                default => 'carnet_id',
+            };
+
+            return back()->withInput()->withErrors([$campo => $e->getMessage()]);
         }
 
         return redirect()
-            ->route('faenas.show', $faena->id)
-            ->with('exito', "Faena {$faena->nro_permiso} emitida.");
+            ->route('faenas.show', $faena)
+            ->with('exito', "Faena N° {$faena->numero_faena} emitida. Vence el {$faena->fecha_limite->format('d/m/Y')}.");
     }
 
     /**
      * FICHA — GET /panel/faenas/{faena}
      */
-    public function show(Faena $faena): Response
+    public function show(PermisoFaena $faena): Response
     {
         $faena->load([
-            'carnet.beneficiario',
-            'carnet.rubro:id,nombre',
-            'pagos',
+            'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,asociacion_id',
+            'carnet.beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+            'carnet.asociacion:id,nombre,sigla',
+            'aprovechamiento.categoria',
         ]);
 
         return Inertia::render('panel/faenas/ver', [
             'faena' => [
                 ...$this->resumir($faena),
-                'propietario' => $faena->propietario,
-                'matricula_naval' => $faena->matricula_naval,
-                'nro_kardex' => $faena->nro_kardex,
-                'nro_recibo' => $faena->nro_recibo,
-                'region_desde' => $faena->region_desde,
-                'region_hasta' => $faena->region_hasta,
-                'observaciones' => $faena->observaciones,
-                'dias_autorizados' => $faena->diasAutorizados(),
-                // Lo decide el modelo y no la pantalla, igual que los `puede_*`
-                // del trámite: escrita otra vez en React, la regla terminaría
-                // diciendo algo distinto que el servidor.
-                'vigente' => $faena->estaVigente(),
-                'puede_anularse' => $faena->estaEmitida(),
-            ],
+                'asociacion' => $faena->carnet?->asociacion?->sigla ?? $faena->carnet?->asociacion?->nombre,
 
-            'beneficiario' => [
-                'id' => $faena->carnet?->beneficiario?->id,
-                'nombreCompleto' => $faena->carnet?->beneficiario?->nombreCompleto,
-                'documento_identidad' => $faena->carnet?->beneficiario?->documento_identidad,
-                'foto_url' => $faena->carnet?->beneficiario?->foto_url,
+                /*
+                 * EL CUPO DEL QUE SALIERON LOS KILOS.
+                 *
+                 * Va en la ficha porque es la pregunta que sigue: «¿le queda
+                 * para otra salida?». Sin esto habría que ir al módulo de cupos
+                 * a buscarlo.
+                 */
+                'cupo' => $faena->aprovechamiento ? [
+                    'id' => $faena->aprovechamiento->id,
+                    'escala' => $faena->aprovechamiento->categoria?->nro_escala,
+                    'volumen_total_kg' => (float) $faena->aprovechamiento->volumen_total_kg,
+                    'saldo_kg' => $faena->aprovechamiento->saldoKg(),
+                    'porcentaje_usado' => $faena->aprovechamiento->porcentajeUsado(),
+                ] : null,
             ],
-
-            'carnet' => [
-                'id' => $faena->carnet?->id,
-                'registro' => $faena->carnet?->registro(),
-                'rubro' => $faena->carnet?->rubro?->nombre,
-                'gestion' => $faena->carnet?->gestion,
-                'vigente' => $faena->carnet?->estaVigente() ?? false,
-            ],
-
-            'pagos' => $faena->pagos->map(fn ($p): array => [
-                'id' => $p->id,
-                'nro_transaccion' => $p->nro_transaccion,
-                'monto' => (float) $p->monto,
-                'fecha_pago' => $p->fecha_pago?->toIso8601String(),
-                'comprobante_url' => $p->comprobante_url,
-            ])->all(),
         ]);
     }
 
     /**
-     * ANULAR — PATCH /panel/faenas/{faena}/anular
-     *
-     * PATCH y no GET, por lo mismo que los pasos del circuito del trámite: un
-     * verbo de lectura que escribe se dispara solo. Alcanza con que el navegador
-     * precargue el enlace o que alguien lo comparta por chat para que una faena
-     * quede anulada sin que nadie la haya tocado.
+     * COMPLETAR — PATCH /panel/faenas/{faena}/completar
      */
-    public function anular(Request $request, Faena $faena): RedirectResponse
+    public function completar(CompletarFaenaRequest $request, PermisoFaena $faena): RedirectResponse
     {
+        $kilos = $request->validated()['kilos_extraidos'] ?? null;
+
         try {
-            $this->faenas->anular($faena, $request->string('motivo')->trim()->value());
+            $this->servicio->completar($faena, $kilos !== null ? (float) $kilos : null);
         } catch (PermisoOperativoException $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->withErrors(['kilos_extraidos' => $e->getMessage()]);
         }
 
-        return back()->with('exito', "Faena {$faena->nro_permiso} anulada.");
+        return redirect()
+            ->route('faenas.show', $faena)
+            ->with('exito', 'Faena completada. El volumen quedó firme contra el cupo.');
     }
 
+    // ------------------------------------------------------------------
+    //  Auxiliares
+    // ------------------------------------------------------------------
+
     /**
-     * Los campos que comparten el listado y la ficha.
+     * Un carnet como lo necesita el formulario de emisión.
      *
-     * Vive acá y no en el modelo porque es PRESENTACIÓN: qué se muestra y cómo.
-     * Las reglas —si está vigente, cuánto falta pagar— las contesta el modelo.
+     * Es la MISMA forma que devuelve `BeneficiarioController::buscar()`, a
+     * propósito: la pantalla trata igual a la persona preseleccionada y a la que
+     * se busca a mano, así que hay un solo camino en el componente.
      *
      * @return array<string, mixed>
      */
-    private function resumir(Faena $faena): array
+    private function resumirCarnetParaEmitir(Carnet $carnet): array
     {
         return [
-            'id' => $faena->id,
-            'nro_permiso' => $faena->nro_permiso,
-            'estado' => $faena->estado->value,
-            'estado_etiqueta' => $faena->estado->etiqueta(),
-            'estado_color' => $faena->estado->color(),
-            'embarcacion' => $faena->embarcacion,
-            'comandante_barco' => $faena->comandante_barco,
-            'fecha_salida' => $faena->fecha_salida?->toDateString(),
-            'fecha_desembarque' => $faena->fecha_desembarque?->toDateString(),
-            'cantidad_autorizada_kg' => (float) $faena->cantidad_autorizada_kg,
-            'cantidad' => $faena->cantidadLegible(),
-            'monto' => (float) $faena->monto,
-            'monto_pagado' => $faena->montoPagado(),
-            'saldo' => $faena->saldoPendiente(),
-            'pagada' => $faena->estaPagada(),
-            'carnet_id' => $faena->carnet_id,
-            'carnet_registro' => $faena->carnet?->registro(),
-            'beneficiario' => $faena->carnet?->beneficiario?->nombreCompleto,
+            'id' => $carnet->id,
+            'codigo' => $carnet->codigo_legible,
+            'tipo' => $carnet->tipoCarnet?->nombre,
+            'tipo_actor' => $carnet->tipo_actor->value,
+            'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
+            'puede_emitir_faenas' => $carnet->puedeEmitirFaenas(),
+            'puede_emitir_guias' => $carnet->puedeEmitirGuias(),
+            'saldo_kg' => $carnet->aprovechamiento?->saldoKg(),
+            'siguiente_numero_faena' => $carnet->aprovechamiento
+                ? (int) ($carnet->aprovechamiento->faenas_max_numero_faena ?? 0) + 1
+                : null,
         ];
     }
 
     /**
-     * El carnet tal como lo muestra el buscador del formulario.
+     * Los datos de una faena que pintan el listado y la ficha.
+     *
+     * `vigente`, `consume_cupo` y `puede_completarse` llegan RESUELTOS: las tres
+     * son reglas —la primera mira el estado Y la fecha, la segunda sale del
+     * enum, la tercera exige que esté en curso— y deducirlas en la pantalla
+     * sería una segunda copia de cada una.
      *
      * @return array<string, mixed>
      */
-    private function resumirCarnet(Carnet $carnet): array
+    private function resumir(PermisoFaena $faena): array
     {
         return [
-            'id' => $carnet->id,
-            'registro' => $carnet->registro(),
-            'gestion' => $carnet->gestion,
-            'rubro' => $carnet->rubro?->nombre,
-            'beneficiario' => $carnet->beneficiario?->nombreCompleto,
-            'documento_identidad' => $carnet->beneficiario?->documento_identidad,
-            'capacidad' => $carnet->capacidadLegible(),
+            'id' => $faena->id,
+            'numero_faena' => $faena->numero_faena,
+            'etiqueta' => $faena->etiqueta,
+
+            'carnet_id' => $faena->carnet_id,
+            'carnet_codigo' => $faena->carnet?->codigo_legible,
+            'beneficiario_id' => $faena->carnet?->beneficiario_id,
+            'beneficiario' => $faena->carnet?->beneficiario?->nombreCompleto,
+
+            'kilos_extraidos' => (float) $faena->kilos_extraidos,
+
+            'estado' => $faena->estado->value,
+            'estado_etiqueta' => $faena->estado->etiqueta(),
+            'estado_color' => $faena->estado->color(),
+            'vigente' => $faena->estaVigente(),
+            // Una faena vencida LIBERA su volumen: la salida no ocurrió.
+            'consume_cupo' => $faena->consumeCupo(),
+            'caducada' => $faena->estaCaducada(),
+            'puede_completarse' => $faena->estado === EstadoFaena::Activo,
+
+            // Son DÍAS, no instantes: con toDateString().
+            'fecha_salida' => $faena->fecha_salida?->toDateString(),
+            'fecha_limite' => $faena->fecha_limite?->toDateString(),
         ];
     }
 }

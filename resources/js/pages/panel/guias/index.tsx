@@ -1,56 +1,63 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Plus, Search, Truck } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
 import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { fecha } from '@/lib/utils';
-import type { OpcionEnum, Paginado } from '@/types';
+import { bs, fechaHora } from '@/lib/utils';
+import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { GuiaFila } from '@/types/guias';
 
 /**
- * El listado de guías únicas de transporte.
+ * ============================================================================
+ *  LISTADO DE GUÍAS DE MOVIMIENTO
+ * ============================================================================
  *
- * Mismo criterio que el de faenas: NO hay editar ni borrar. El número salió del
- * talonario y el papel viaja con la carga; una guía mal emitida se ANULA y se
- * emite otra. Lo único que se corrige es el DETALLE, desde la ficha, porque el
- * peso real recién se conoce en la balanza.
+ * ----------------------------------------------------------------------------
+ *  SE BUSCA POR ORIGEN Y DESTINO, NO SOLO POR PERSONA
+ * ----------------------------------------------------------------------------
+ *
+ * Es la pregunta que trae a alguien a esta pantalla: «¿qué salió para Santa
+ * Cruz esta semana?». Un buscador que solo mire el nombre del comercializador
+ * obligaría a saber de antemano a quién buscar, que es justo lo que no se sabe.
+ *
+ * Las fechas se muestran con `fechaHora()` y no con `fecha()`: los cinco días
+ * se cuentan desde el instante de emisión, así que la hora es el dato que
+ * decide la vigencia.
  */
 export default function IndiceGuias({
     guias,
     filtros,
     estados,
-    transportes,
     opcionesPorPagina,
 }: {
     guias: Paginado<GuiaFila>;
     filtros: {
         buscar: string | null;
         estado: string | null;
-        transporte: string | null;
+        piscicultura: boolean | null;
         por_pagina: number;
     };
     estados: OpcionEnum[];
-    transportes: OpcionEnum[];
     opcionesPorPagina: number[];
 }) {
     const { puede } = usePermisos();
+    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
-    function filtrar(valores: Record<string, string | number | null>) {
+    function filtrar(valores: Record<string, string | number | boolean | null>) {
         router.get(
             route('guias.index'),
             {
                 buscar,
                 estado: filtros.estado,
-                transporte: filtros.transporte,
-                por_pagina: filtros.por_pagina,
+                piscicultura: filtros.piscicultura,
                 ...valores,
             },
             { preserveState: true, preserveScroll: true, replace: true },
@@ -59,149 +66,175 @@ export default function IndiceGuias({
 
     return (
         <LayoutPanel
-            titulo="Trámites de guía"
-            descripcion="Guía única de transporte de productos ictícolas, sobre un carnet de comercializador vigente."
+            titulo="Guías de movimiento"
+            descripcion="Una por traslado. Valen 5 días desde la hora de emisión."
             acciones={
                 puede('guias.crear') && (
                     <Button onClick={() => router.visit(route('guias.create'))}>
                         <Plus className="size-4" />
-                        Nueva guía
+                        Emitir guía
                     </Button>
                 )
             }
         >
-            <Head title="Guías de transporte" />
+            <Head title="Guías de movimiento" />
 
-            <Card>
-                <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-12 sm:items-end">
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-3">
-                        Mostrar
-                        <Select
-                            className="w-auto"
-                            value={filtros.por_pagina}
-                            onChange={(e) => filtrar({ por_pagina: e.target.value })}
-                            aria-label="Registros por página"
-                        >
-                            {opcionesPorPagina.map((n) => (
-                                <option key={n} value={n}>
-                                    {n}
-                                </option>
-                            ))}
-                        </Select>
-                        registros
-                    </label>
-
-                    <Select
-                        className="sm:col-span-2 sm:col-start-5"
-                        value={filtros.estado ?? ''}
-                        onChange={(e) => filtrar({ estado: e.target.value || null })}
-                        aria-label="Estado"
-                    >
-                        <option value="">Todos los estados</option>
-                        {estados.map((e) => (
-                            <option key={e.value} value={e.value}>
-                                {e.label}
-                            </option>
-                        ))}
-                    </Select>
-
-                    <Select
-                        className="sm:col-span-2"
-                        value={filtros.transporte ?? ''}
-                        onChange={(e) => filtrar({ transporte: e.target.value || null })}
-                        aria-label="Tipo de transporte"
-                    >
-                        <option value="">Todo transporte</option>
-                        {transportes.map((t) => (
-                            <option key={t.value} value={t.value}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </Select>
-
+            {/* `min-w-0`: sin él la tarjeta se estira al ancho de la tabla y el
+                que termina con barra de desplazamiento es el documento entero. */}
+            <Card className="min-w-0">
+                <CardContent className="space-y-4 p-0">
                     <form
-                        className="relative sm:col-span-3"
-                        onSubmit={(e) => {
+                        onSubmit={(e: FormEvent) => {
                             e.preventDefault();
                             filtrar({});
                         }}
+                        className="flex flex-wrap gap-2 p-5 pb-0"
                     >
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            className="pl-9"
-                            placeholder="Nº, transportista, destino…"
                             value={buscar}
                             onChange={(e) => setBuscar(e.target.value)}
-                            aria-label="Buscar guías"
+                            placeholder="Buscar por código, persona, origen o destino…"
+                            className="min-w-48 flex-1"
                         />
+
+                        <Select
+                            value={filtros.estado ?? ''}
+                            onChange={(e) => filtrar({ estado: e.target.value || null })}
+                            className="w-auto"
+                        >
+                            <option value="">Todos los estados</option>
+                            {estados.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                    {o.label}
+                                </option>
+                            ))}
+                        </Select>
+
+                        <Select
+                            value={filtros.piscicultura === null ? '' : String(filtros.piscicultura)}
+                            onChange={(e) =>
+                                filtrar({ piscicultura: e.target.value === '' ? null : e.target.value })
+                            }
+                            className="w-auto"
+                        >
+                            <option value="">Todo origen</option>
+                            <option value="1">Piscicultura</option>
+                            <option value="0">De río</option>
+                        </Select>
+
+                        <Select
+                            value={filtros.por_pagina}
+                            onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
+                            className="w-auto"
+                        >
+                            {opcionesPorPagina.map((n) => (
+                                <option key={n} value={n}>
+                                    {n} filas
+                                </option>
+                            ))}
+                        </Select>
+
+                        <Button type="submit" variant="outline">
+                            <Search className="size-4" />
+                        </Button>
                     </form>
-                </div>
 
-                {guias.data.length === 0 ? (
-                    <EstadoVacio
-                        icono={Truck}
-                        titulo="Sin guías"
-                        descripcion="No hay guías de transporte que coincidan con el filtro."
-                    />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                <tr>
-                                    <th className="px-5 py-3 font-medium">Nº guía</th>
-                                    <th className="px-5 py-3 font-medium">Titular</th>
-                                    <th className="px-5 py-3 font-medium">Recorrido</th>
-                                    <th className="px-5 py-3 font-medium">Transporte</th>
-                                    <th className="px-5 py-3 text-right font-medium">Kg</th>
-                                    <th className="px-5 py-3 font-medium">Estado</th>
-                                </tr>
-                            </thead>
+                    {guias.data.length === 0 ? (
+                        <EstadoVacio
+                            icono={Truck}
+                            titulo="Sin guías emitidas"
+                            descripcion={
+                                filtros.buscar || filtros.estado || filtros.piscicultura !== null
+                                    ? 'Ninguna coincide con los filtros.'
+                                    : 'La guía cuelga del carnet de comercializador: la persona necesita credencial vigente de esa actividad.'
+                            }
+                        />
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                        <tr>
+                                            <th className="px-5 py-2.5 font-medium">Código</th>
+                                            <th className="px-5 py-2.5 font-medium">Comercializador</th>
+                                            <th className="px-5 py-2.5 font-medium">Ruta</th>
+                                            <th className="px-5 py-2.5 text-right font-medium">Carga</th>
+                                            <th className="px-5 py-2.5 font-medium">Estado</th>
+                                            <th className="px-5 py-2.5 text-right font-medium">Cobro</th>
+                                            <th className="px-5 py-2.5 font-medium">Vence</th>
+                                        </tr>
+                                    </thead>
 
-                            <tbody className="divide-y divide-border">
-                                {guias.data.map((g) => (
-                                    <tr key={g.id} className="hover:bg-secondary/50">
-                                        <td className="px-5 py-3">
-                                            <Link
-                                                href={route('guias.show', g.id)}
-                                                className="font-mono text-xs text-primary hover:underline"
-                                            >
-                                                {g.nro_guia}
-                                            </Link>
-                                            <p className="text-xs text-muted-foreground">
-                                                {fecha(g.fecha)}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <p className="font-medium">{g.beneficiario ?? '—'}</p>
-                                            <p className="font-mono text-xs text-muted-foreground">
-                                                {g.carnet_registro ?? '—'}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-3 text-muted-foreground">
-                                            {g.origen_lugar ?? '—'} → {g.destino_lugar ?? '—'}
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <Badge color={g.transporte_color}>
-                                                {g.transporte_etiqueta}
-                                            </Badge>
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                {g.transporte_nombre ?? '—'}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-3 text-right font-medium tabular-nums">
-                                            {g.total_kg.toFixed(2)}
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                    <tbody className="divide-y divide-border">
+                                        {guias.data.map((g) => (
+                                            <tr key={g.id} className="hover:bg-secondary/50">
+                                                <td className="px-5 py-2.5">
+                                                    <Link
+                                                        href={route('guias.show', g.id)}
+                                                        className="font-mono font-medium text-primary hover:underline"
+                                                    >
+                                                        {g.codigo_guia}
+                                                    </Link>
+                                                </td>
 
-                <Paginacion paginado={guias} />
+                                                <td className="px-5 py-2.5">
+                                                    <p className="font-medium">{g.comercializador ?? '—'}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {g.asociacion ?? '—'}
+                                                    </p>
+                                                </td>
+
+                                                <td className="px-5 py-2.5">{g.ruta}</td>
+
+                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    {g.peso_total_kg} kg
+                                                    {/*
+                                                        La marca de piscicultura va acá y no en una
+                                                        columna propia: es un atributo de la CARGA, y
+                                                        además explica por qué esa fila cobró la
+                                                        mitad.
+                                                    */}
+                                                    {g.es_piscicultura && (
+                                                        <Badge color="sky" className="ml-2">
+                                                            criadero
+                                                        </Badge>
+                                                    )}
+                                                </td>
+
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
+                                                    {g.caducada && (
+                                                        <Badge color="amber" className="ml-1">
+                                                            sin cerrar
+                                                        </Badge>
+                                                    )}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    {g.pagado ? (
+                                                        <span className="text-emerald-700 dark:text-emerald-400">
+                                                            Pagado
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-amber-700 dark:text-amber-400">
+                                                            debe {bs(g.saldo_pendiente, institucion.moneda)}
+                                                        </span>
+                                                    )}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                    {fechaHora(g.fecha_vencimiento)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Paginacion paginado={guias} />
+                        </>
+                    )}
+                </CardContent>
             </Card>
         </LayoutPanel>
     );

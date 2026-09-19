@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Enums\EstadoCarnet;
+use App\Enums\TipoActor;
 use App\Http\Controllers\Controller;
 use App\Models\Carnet;
 use App\Support\Archivos;
@@ -32,7 +33,7 @@ use Illuminate\Http\Response;
  * un controlador donde la mitad de los `use` son de impresión.
  *
  * ----------------------------------------------------------------------------
- *  NO ESCRIBE NADA: NI EL PDF, NI EL ESTADO DEL TRÁMITE
+ *  NO ESCRIBE NADA: NI EL PDF, NI EL ESTADO DEL CARNET
  * ----------------------------------------------------------------------------
  *
  * El PDF no se guarda en disco: se deduce entero de la fila del carnet, así que
@@ -40,32 +41,27 @@ use Illuminate\Http\Response;
  * limpiar —y con el disco en s3, uno que no se puede borrar—. Por eso esto
  * tampoco pasa por StorageController.
  *
- * Y NO marca el trámite como impreso. Eso sigue siendo un acto aparte
- * —`PATCH /tramites/{tramite}/generar`— porque son dos cosas distintas: ver el
- * documento en pantalla no es haberlo sacado en la impresora de credenciales.
- * Si esta ruta marcara, alcanzaría con que alguien abriera la vista previa —o
- * con que el navegador precargara el enlace— para que el expediente quedara
- * declarando un plástico que nunca existió.
+ * Y no marca nada como impreso. Ver el documento en pantalla no es haberlo
+ * sacado en la impresora de credenciales: si esta ruta marcara, alcanzaría con
+ * que alguien abriera la vista previa —o con que el navegador precargara el
+ * enlace— para que el sistema declarara un plástico que nunca existió.
  *
  * ----------------------------------------------------------------------------
- *  LO QUE EL PLÁSTICO NO DICE: NI LOS RUBROS NI EL CUPO EN KILOS
+ *  QUÉ IMPRIME Y QUÉ NO
  * ----------------------------------------------------------------------------
  *
- * Y es la decisión de fondo del módulo. El carnet es UNO por persona y por
- * gestión Y POR RUBRO, y ese rubro no cambia nunca: es parte de la llave que
- * identifica al documento. Por eso el rubro y el cupo SÍ van impresos, al revés
- * de lo que decía este mismo comentario con el modelo anterior.
+ * EL CRITERIO ES QUÉ NO CAMBIA después de que el plástico sale de la impresora.
  *
- * Con el carnet viejo —uno por persona, con los rubros colgados— una adición de
- * octubre dejaba vieja cualquier lista impresa: el plástico diría MENOS de lo
- * que la persona está autorizada a hacer, que es peor que no decir nada. Hoy no
- * existe esa operación; sumar una actividad emite otro carnet, con su propio
- * plástico.
+ * VAN IMPRESOS la actividad y el cupo. La actividad (`tipo_actor`) es parte de
+ * lo que el carnet ES y no cambia nunca; sin ella, dos carnets de la misma
+ * persona serían plásticos idénticos. El cupo va porque es el número que un
+ * control contrasta contra una guía de transporte.
  *
- * LO QUE SIGUE SIN IMPRIMIRSE es el estado. Un carnet se suspende o se anula
- * DESPUÉS de impreso y el plástico no se entera, así que si vale HOY se consulta
- * escaneando el QR. Es el mismo criterio de siempre —en un documento impreso va
- * lo que no cambia— aplicado a lo que de verdad cambia.
+ * NO VA EL ESTADO. Un carnet se revoca DESPUÉS de impreso y el plástico no se
+ * entera, así que si vale HOY se consulta con el código en la verificación
+ * pública. Imprimir un estado que puede quedar viejo es peor que no imprimirlo.
+ *
+ * TAMPOCO VA LA GESTIÓN, y es nuevo: el código ya la lleva adentro («PES26…»).
  *
  * Por eso mismo puede ser GET, igual que el recibo.
  */
@@ -92,24 +88,31 @@ class CarnetImpresionController extends Controller
      */
     public function imprimir(Carnet $carnet): Response|RedirectResponse
     {
-        $carnet->load([
-            'beneficiario',
-            // requiere_capacidad NO es opcional en este select: de ella
-            // depende que el renglón CUPO salga o no. Sin la columna,
-            // requiereCapacidad() leería null y el cupo no se imprimiría nunca.
-            'rubro:id,nombre,requiere_capacidad',
-        ]);
+        /*
+         * OJO CON PEDIR COLUMNAS SUELTAS EN EL with(): `aprovechamiento` va
+         * ENTERO porque `Carnet::cupoImpreso()` lee `volumen_total_kg`, y el
+         * beneficiario va completo porque se usan el nombre en cinco partes, el
+         * domicilio y la foto. Una columna que un método consulta y no está en
+         * el select vuelve null, y el método contesta cualquier cosa sin ningún
+         * error: el renglón CUPO saldría vacío en un carnet perfectamente
+         * válido.
+         */
+        $carnet->load(['beneficiario', 'asociacion', 'aprovechamiento']);
 
         /*
-         * La regla de si hay algo que imprimir vive en el modelo, y es la misma
-         * que le contesta a la pantalla en `puede_imprimirse`. Se vuelve a
-         * preguntar acá porque esconder el botón en React es comodidad, no
-         * seguridad: la dirección se puede escribir a mano.
+         * UN CARNET REVOCADO NO SE IMPRIME.
+         *
+         * Se vuelve a comprobar acá aunque la pantalla ya esconda el botón:
+         * esconderlo en React es comodidad, no seguridad — la dirección se
+         * puede escribir a mano.
+         *
+         * Un carnet VENCIDO sí se imprime, y la diferencia importa: puede hacer
+         * falta reponer el plástico de una gestión cerrada para un trámite o un
+         * reclamo. Lo que el plástico nunca dice es si vale HOY; eso se consulta
+         * con el código.
          */
-        if (! $carnet->puedeImprimirse()) {
-            return back()->with('error', $carnet->estado === EstadoCarnet::Anulado
-                ? 'El carnet está anulado: no se puede imprimir.'
-                : 'El carnet todavía no tiene ningún trámite aprobado. La habilitación nace al aprobar.');
+        if ($carnet->estado === EstadoCarnet::Revocado) {
+            return back()->with('error', 'El carnet está revocado: no se puede imprimir.');
         }
 
         return $this->pdf($carnet);
@@ -180,72 +183,7 @@ class CarnetImpresionController extends Controller
         // `stream` y no `download`: se abre en el visor del navegador, que es
         // desde donde el operador aprieta imprimir. Un archivo descargado
         // obligaría a buscarlo en la carpeta de descargas y abrirlo aparte.
-        return $pdf->stream("carnet-{$carnet->registro()}.pdf");
-    }
-
-    /**
-     * ========================================================================
-     *  LOS SIETE RENGLONES DE LA TARJETA
-     * ========================================================================
-     *
-     * Son los mismos, en el mismo orden, que dibuja la vista previa del panel
-     * (`components/panel/tramites/vista-previa-carnet.tsx`). Si se agrega uno
-     * acá hay que agregarlo allá, o la vista previa pasa a prometer una tarjeta
-     * distinta de la que sale impresa.
-     *
-     * Cada fila es una LISTA de celdas porque una de ellas —Gestión y Vence—
-     * lleva dos: en una CR80 no entran ocho líneas sueltas, y son los dos datos
-     * que se leen juntos.
-     *
-     * ------------------------------------------------------------------------
-     *  POR QUÉ EL ANCHO DEL RÓTULO SE CALCULA ACÁ
-     * ------------------------------------------------------------------------
-     *
-     * En la pantalla el rótulo mide lo que mide su palabra («CIUDAD:» ocupa
-     * menos que «ASOCIACIÓN:») porque es un `flex` con `shrink-0`. DomPDF no
-     * tiene flex, y la forma de pedirle lo mismo a una tabla —`width: 1%` más
-     * `white-space: nowrap`— la respeta según la versión.
-     *
-     * Así que se mide acá: 2,4 pt por carácter a 4,3 pt de cuerpo en negrita,
-     * más el hueco de los dos puntos. Es una aproximación, y alcanza: si sobra
-     * un punto la caja del valor arranca un pelo más a la derecha, no se rompe
-     * nada.
-     *
-     * ------------------------------------------------------------------------
-     *  LOS MOLDES
-     * ------------------------------------------------------------------------
-     *
-     * Un renglón sin dato NO sale en blanco: sale con su texto atenuado
-     * diciendo qué falta. Es la misma decisión de la vista previa — una caja
-     * vacía en una credencial se lee como un error del sistema, y «Sin cargar
-     * en la ficha» le dice al operador exactamente dónde ir a completarlo.
-     *
-     * @return array<int, array<int, array{rotulo: string, valor: string, molde: string, ancho_rotulo: float, ancho_valor?: float}>>
-     */
-    private function filas(Carnet $carnet): array
-    {
-        $beneficiario = $carnet->beneficiario;
-        $sinCargar = 'Sin cargar en la ficha';
-
-        return [
-            [$this->celda('NOMBRE', $beneficiario?->nombreCompleto, 'Sin nombre en la ficha')],
-            [$this->celda('ASOCIACIÓN', $carnet->asociacion, 'Sin asociación declarada')],
-            [$this->celda('CIUDAD', $beneficiario?->ciudad, $sinCargar)],
-            [$this->celda('PROVINCIA', $beneficiario?->provincia, $sinCargar)],
-            [$this->celda('DIRECCIÓN', $beneficiario?->direccion, $sinCargar)],
-
-            /*
-             * Gestión y Vence comparten renglón —es la única fila con dos
-             * celdas—, y el reparto del ancho es el mismo de la vista previa: la
-             * fecha necesita más lugar que el año.
-             */
-            [
-                $this->celda('GESTIÓN', (string) $carnet->gestion, '—', 30),
-                $this->celda('VENCE', $carnet->fecha_vencimiento?->format('d/m/Y'), '—', 46),
-            ],
-
-            [$this->celda('REGISTRO', $carnet->registro(), '000000')],
-        ];
+        return $pdf->stream("carnet-{$carnet->codigo_carnet}.pdf");
     }
 
     /**
@@ -464,15 +402,14 @@ class CarnetImpresionController extends Controller
         $campos = [
             $this->campo('NOMBRE', $beneficiario?->nombreCompleto, 'Sin nombre en la ficha', $anchoValor),
 
-            $this->campo('ASOCIACIÓN', $carnet->asociacion, 'Sin asociación declarada', $anchoValor),
+            $this->campo('ASOCIACIÓN', $carnet->asociacion?->nombre, 'Sin asociación declarada', $anchoValor),
 
             /*
                  * CIUDAD Y PROVINCIA VAN CADA UNA EN SU RENGLON, a pedido.
                  *
-                 * Compartieron uno mientras el rubro ocupaba una tira: eran los
-                 * dos valores mas cortos y mas repetidos del padron, asi que se
-                 * los junto para no pasar de seis renglones. Al sacarse el
-                 * renglon del rubro se libero el lugar.
+                 * Compartieron uno mientras la actividad ocupaba una tira: eran
+                 * los dos valores mas cortos y mas repetidos del padron. Al irse
+                 * la actividad al TITULO se libero el lugar.
                  *
                  * Y con eso vuelve «PROVINCIA» entera: se abreviaba a «PROV.»
                  * porque el rotulo del SEGUNDO par tiene una caja de 32 pt y a
@@ -485,32 +422,20 @@ class CarnetImpresionController extends Controller
             $this->campo('DIRECCIÓN', $beneficiario?->direccion, $sinCargar, $anchoValor),
 
             /*
-                 * EL REGISTRO CIERRA LA LISTA, como en el plastico, Y LLEVA LA
-                 * GESTION AL LADO: es el unico renglon con dos pares.
+                 * EL CÓDIGO CIERRA LA LISTA, como en el plastico, Y LLEVA EL
+                 * CUPO AL LADO cuando la actividad se autoriza por volumen.
                  *
-                 * Van juntos porque el numero solo no alcanza. El registro se
-                 * reinicia con cada gestion -es el id del carnet, y los carnets
-                 * son por ano-, asi que el 000002 de 2026 y el de 2027 son dos
-                 * credenciales distintas con el mismo numero impreso. Quien lee
-                 * el plastico en un control necesita los dos datos a la vez.
-                 *
-                 * Comparten renglon y no ocupan uno propio porque en una CR80 no
-                 * entran siete lineas sueltas sin apretar todo lo demas; el
-                 * registro son seis digitos fijos y le sobra media tira.
-                 *
-                 * NO VA LA FECHA DE VENCIMIENTO, y se saco a pedido: todos los
-                 * carnets de una gestion vencen el mismo dia -el 31 de
-                 * diciembre, ver Carnet::vencimientoDeGestion()- asi que la
-                 * gestion ya lo dice. Y si la pregunta es si HOY vale, la fecha
-                 * impresa nunca fue la respuesta: un carnet puede estar anulado
-                 * con su fecha intacta. Eso se consulta en el panel.
+                 * El codigo solo alcanza para identificar la credencial: es
+                 * unico GLOBAL y lleva el año adentro, asi que no hace falta
+                 * imprimir la gestion al lado como pasaba con el registro del
+                 * modelo anterior.
                  */
             $this->renglonRegistro($carnet),
         ];
 
         return [
             /*
-             * EL TITULO DE LA TARJETA, con el rubro adentro.
+             * EL TITULO DE LA TARJETA, con la actividad adentro.
              *
              * ----------------------------------------------------------------
              *  DECIA «CEDULA» A SECAS, Y EL MOTIVO SE DIO VUELTA
@@ -518,13 +443,10 @@ class CarnetImpresionController extends Controller
              *
              * Con el modelo viejo el carnet era UNO para todas las actividades
              * de una persona, asi que nombrar una en el titulo habria dicho algo
-             * que el documento no era. Hoy el carnet es de UN rubro y ese rubro
-             * es parte de la llave que lo identifica: el titulo puede decirlo, y
-             * conviene que lo diga — es lo que se lee de lejos, antes que
-             * cualquier renglon.
-             *
-             * Sin rubro cargado se cae a «CEDULA» a secas, que es lo que decia
-             * antes: un titulo que termina en «DE» seria peor que uno corto.
+             * que el documento no era. Hoy el carnet es de UNA actividad y esa
+             * actividad es parte de lo que el documento ES: el titulo puede
+             * decirlo, y conviene que lo diga — es lo que se lee de lejos, antes
+             * que cualquier renglon.
              */
             'titulo' => $this->titulo($carnet),
 
@@ -567,7 +489,7 @@ class CarnetImpresionController extends Controller
      *
      *     CEDULA DE PESCADOR          18 car.  ~118 pt   entra holgado
      *     CEDULA DE COMERCIALIZADOR   25 car.  ~164 pt   entra
-     *     un rubro de 30+ caracteres            se pasa   -> clase `largo`
+     *     una actividad de 30+ caracteres      se pasa   -> clase `largo`
      *
      * NO SE RECORTA, se achica: es la misma regla que los renglones —ver
      * texto()—. Un titulo cortado en «CEDULA DE COMERCIALIZA» no identifica
@@ -588,11 +510,15 @@ class CarnetImpresionController extends Controller
      */
     private function titulo(Carnet $carnet): array
     {
-        $rubro = trim((string) $carnet->rubro?->nombre);
-
-        $texto = $rubro !== ''
-            ? mb_strtoupper("Cédula de {$rubro}")
-            : 'CÉDULA';
+        /*
+         * LA ACTIVIDAD SALE DEL ENUM Y NO DEL NOMBRE DEL TIPO DE CARNET.
+         *
+         * `tipos_carnet` es un catálogo que la unidad edita: el mismo documento
+         * figura como «Carnet de Pescador» o «Pescador Artesanal» según quién lo
+         * cargó, y el título impreso no puede depender de eso. `tipo_actor` es
+         * la regla, y no cambia.
+         */
+        $texto = mb_strtoupper('Cédula de '.$carnet->tipo_actor->etiqueta());
 
         return [
             'texto' => $texto,
@@ -629,32 +555,28 @@ class CarnetImpresionController extends Controller
      * guia de transporte— y el plastico lo imprime. La comercializacion no:
      * habilita a trasladar y vender, sin tope propio.
      *
-     * Lo dice el catalogo (`rubros.requiere_capacidad`), no una lista de nombres
-     * escrita aca: el mismo rubro figura como «Pescador» o como «Faena» segun
-     * quien lo cargo, y los que vengan por ordenanza entran sin pasar por codigo.
-     *
-     * DEVUELVE NULL cuando no corresponde, y la plantilla no dibuja la tira. Un
-     * recuadro vacio se lee como un dato que falta, y en un documento de
-     * identidad un campo en blanco invita a completarlo a mano.
-     *
-     * VA SIN ROTULO, a pedido: «800 KG» se lee solo. La unidad de medida hace de
-     * etiqueta, que es lo que ya pasaba en la cedula de papel.
-     *
-     * PASA POR texto() como los demas valores: mide contra su tira y se achica
-     * si no entra, en vez de cortarse.
-     *
-     * @return array{valor: string, molde: string, cuerpo: float, lineas: int}|null
+     * Lo dice `TipoActor::requiereAprovechamiento()`, no una lista de nombres
+     * escrita aca ni el nombre del tipo de carnet: ese nombre es un catalogo que
+     * la unidad edita, y el mismo documento figura de dos formas distintas segun
+     * quien lo cargo.
      */
     private function cupo(Carnet $carnet): ?array
     {
-        if (! $carnet->rubro?->requiereCapacidad()) {
+        /*
+         * LO DECIDE EL ENUM, NUNCA EL NOMBRE DEL TIPO DE CARNET. La pesca se
+         * autoriza por volumen —tantos kilos, contrastables contra una guía de
+         * transporte—; la comercialización no.
+         */
+        $kilos = $carnet->cupoImpreso();
+
+        if ($kilos === null) {
             return null;
         }
 
         return $this->texto(
-            $carnet->capacidadLegible(),
+            rtrim(rtrim(number_format($kilos, 2, ',', '.'), '0'), ',').' KG',
             '— KG',
-            self::ANCHO_TRIPLE_CUPO,
+            self::ANCHO_VALOR_ANGOSTO,
             self::CUERPO_VALOR,
         );
     }
@@ -668,29 +590,18 @@ class CarnetImpresionController extends Controller
      *  POR QUE LOS TRES JUNTOS
      * ------------------------------------------------------------------------
      *
-     * REGISTRO y GESTION van juntos desde siempre: el numero solo no alcanza
-     * porque se reinicia con cada gestion —es el id del carnet, y los carnets
-     * son por ano—, asi que el 000002 de 2026 y el de 2027 son dos credenciales
-     * distintas con el mismo numero impreso.
+     * EL CODIGO SOLO ALCANZA. En el modelo anterior el renglon era REGISTRO +
+     * GESTION y los dos hacian falta juntos, porque el registro era el id del
+     * carnet y se reiniciaba con cada año. Hoy `codigo_carnet` es unico GLOBAL y
+     * lleva el año adentro, asi que la gestion seria el mismo dato dos veces.
      *
-     * EL CUPO SE SUMO A ESE RENGLON en vez de ocupar uno propio. Como renglon
-     * la tarjeta llegaba a SIETE y habia que apretar el salto de 14 a 12 pt;
-     * como tira suelta bajo la cedula quedaba lejos del resto de los datos. Acá
+     * EL CUPO SE SUMO A ESE RENGLON en vez de ocupar uno propio. Como renglon la
+     * tarjeta llegaba a SIETE y habia que apretar el salto de 14 a 12 pt. Aca
      * vuelve a la columna de datos —donde lo traia la cedula de papel— sin
      * costar una linea.
      *
-     * ------------------------------------------------------------------------
-     *  EL CUPO NO LLEVA ROTULO
-     * ------------------------------------------------------------------------
-     *
-     * A pedido, y se sostiene: «800 KG» se lee solo, la unidad hace de etiqueta.
-     * Ademas en un renglon de tres no hay lugar para un tercer rotulo — los
-     * 176 pt de la tira ya estan repartidos entre REGISTRO, GESTION y los tres
-     * valores.
-     *
-     * CUANDO LA ACTIVIDAD NO LLEVA CUPO el renglon vuelve al reparto de dos,
-     * con las tiras anchas de siempre. No es un caso raro: la comercializacion
-     * no tiene tope propio.
+     * CUANDO LA ACTIVIDAD NO LLEVA CUPO el codigo se queda con la tira entera.
+     * No es un caso raro: la comercializacion no tiene tope propio.
      *
      * @return array<string, mixed>
      */
@@ -698,18 +609,33 @@ class CarnetImpresionController extends Controller
     {
         $cupo = $this->cupo($carnet);
 
+        /*
+         * ====================================================================
+         *  LA GESTIÓN YA NO SE IMPRIME, Y NO ES UN OLVIDO
+         * ====================================================================
+         *
+         * Con el modelo anterior el renglón era REGISTRO + GESTIÓN, y los dos
+         * hacían falta juntos: el registro era el id del carnet y se reiniciaba
+         * con cada año, así que el 000002 de 2026 y el de 2027 eran dos
+         * credenciales distintas con el mismo número impreso.
+         *
+         * Hoy el identificador es `codigo_carnet`, que es ÚNICO GLOBAL y LLEVA
+         * EL AÑO ADENTRO —«PES26…»—. Imprimir la gestión al lado sería escribir
+         * dos veces el mismo dato y gastar una tira que el cupo necesita.
+         */
         if ($cupo === null) {
-            return $this->campo('REGISTRO', $carnet->registro(), '000000', self::ANCHO_VALOR_ANGOSTO) + [
-                'segundo' => $this->campo('GESTIÓN', (string) $carnet->gestion, '—', self::ANCHO_VALOR_ANGOSTO),
-            ];
+            return $this->campo('CÓDIGO', $carnet->codigo_legible, '—', self::ANCHO_VALOR);
         }
 
-        // 'triple' es la variante de reparto: el Blade la convierte en una clase
-        // que angosta las dos primeras tiras y abre la tercera.
-        return $this->campo('REGISTRO', $carnet->registro(), '000000', self::ANCHO_TRIPLE_REGISTRO) + [
-            'reparto' => 'triple',
-            'segundo' => $this->campo('GESTIÓN', (string) $carnet->gestion, '—', self::ANCHO_TRIPLE_GESTION),
-            'tercero' => $cupo,
+        /*
+         * Con cupo, el renglón se parte en dos pares. El CUPO no lleva rótulo
+         * propio —«800 KG» se lee solo, la unidad hace de etiqueta— pero acá sí
+         * lo lleva, y corto: el rótulo del SEGUNDO par tiene una caja de 32 pt y
+         * a 6,1 pt en negrita cada carácter mide ~3,7, así que «CUPO» entra con
+         * holgura y «APROVECHAMIENTO» se desbordaría en silencio.
+         */
+        return $this->campo('CÓDIGO', $carnet->codigo_legible, '—', self::ANCHO_VALOR_ANGOSTO) + [
+            'segundo' => ['rotulo' => 'CUPO', 'alto' => self::ALTO_UNA_LINEA] + $cupo,
         ];
     }
 

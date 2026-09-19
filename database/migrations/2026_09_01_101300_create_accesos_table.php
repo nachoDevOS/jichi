@@ -16,6 +16,9 @@ return new class extends Migration
             $table->string('ip', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->string('session_id')->nullable();
+            // La columna suelta y NO timestamps(), a propósito: esto es una
+            // bitácora y una fila nunca se modifica, así que `updated_at`
+            // siempre valdría lo mismo que `created_at`.
             $table->timestamp('created_at')->nullable();
 
             $table->index(['user_id', 'created_at']);

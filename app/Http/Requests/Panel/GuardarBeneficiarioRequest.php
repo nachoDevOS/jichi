@@ -46,8 +46,13 @@ class GuardarBeneficiarioRequest extends FormRequest
              * Unicidad de la cédula.
              *
              * La regla replica el índice único PARCIAL de la base
-             * (`beneficiarios_ci_unico`): la combinación ci_nit + complemento no
-             * puede repetirse entre registros VIVOS.
+             * (`beneficiarios_ci_unico`): `ci` no puede repetirse entre
+             * registros VIVOS.
+             *
+             * VA SOBRE `ci` SOLA, sin el complemento, igual que el índice. El
+             * complemento es parte del MISMO documento, no de otro: metiéndolo
+             * en la comparación, cargar a la misma persona una vez con
+             * complemento y otra sin él pasaría los dos controles.
              *
              * whereNull('deleted_at') es lo que deja fuera a los dados de baja,
              * y ->ignore() excluye al registro que se está editando.
@@ -56,12 +61,10 @@ class GuardarBeneficiarioRequest extends FormRequest
              * índice garantiza, pero su error es ilegible; esta regla es la que
              * pinta el mensaje bajo el campo.
              */
-            'ci_nit' => [
+            'ci' => [
                 'required', 'string', 'max:30',
-                Rule::unique('beneficiarios', 'ci_nit')
-                    ->where(fn ($q) => $q
-                        ->whereNull('deleted_at')
-                        ->where('complemento', $this->input('complemento')))
+                Rule::unique('beneficiarios', 'ci')
+                    ->where(fn ($q) => $q->whereNull('deleted_at'))
                     ->ignore($idActual),
             ],
             'complemento' => ['nullable', 'string', 'max:5'],
@@ -119,8 +122,8 @@ class GuardarBeneficiarioRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'ci_nit.required' => 'El número de cédula es obligatorio.',
-            'ci_nit.unique' => 'Ya existe un beneficiario registrado con esa cédula y complemento.',
+            'ci.required' => 'El número de cédula es obligatorio.',
+            'ci.unique' => 'Ya existe un beneficiario registrado con esa cédula.',
             'expedido.in' => 'El lugar de expedición no es un departamento válido.',
             'primerNombre.required' => 'El primer nombre es obligatorio.',
             'apellidoPaterno.required' => 'El apellido paterno es obligatorio.',
@@ -143,7 +146,7 @@ class GuardarBeneficiarioRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'ci_nit' => trim((string) $this->input('ci_nit')),
+            'ci' => trim((string) $this->input('ci')),
             'complemento' => filled($this->input('complemento'))
                 ? strtoupper(trim((string) $this->input('complemento')))
                 : null,
@@ -171,7 +174,7 @@ class GuardarBeneficiarioRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'ci_nit' => 'cédula de identidad',
+            'ci' => 'cédula de identidad',
             'expedido' => 'lugar de expedición',
             'primerNombre' => 'primer nombre',
             'segundoNombre' => 'segundo nombre',

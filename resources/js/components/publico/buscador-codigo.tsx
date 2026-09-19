@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 /**
- * Caja para escribir a mano la firma del carnet.
+ * Caja para escribir a mano el código del carnet.
  *
- * Lo normal es llegar acá escaneando el QR, que ya la trae en la URL. Este
+ * Lo normal es llegar acá escaneando el QR, que ya lo trae en la URL. Este
  * formulario es el plan B: cuando el QR está borroso, mojado o el teléfono no
  * tiene cámara.
  *
@@ -15,22 +15,21 @@ import { Input } from '@/components/ui/input';
  *  UN SOLO CAMPO, Y ES LA LLAVE ENTERA
  * ----------------------------------------------------------------------------
  *
- * El carnet no tiene número: se identifica por su firma de validación, dieciséis
- * caracteres alfanuméricos generados al azar. Antes eran dos campos —un código
- * público y esta firma— porque el código era predecible y hacía falta un segundo
- * dato que lo protegiera; al retirarse el código, la firma cumple los dos
- * papeles.
+ * El carnet se identifica por su `codigo_carnet`, que es único global y va
+ * impreso en el plástico. Es lo único que hay que saber para consultarlo.
  *
- * Eso funciona porque es IMPREDECIBLE: 16 caracteres alfanuméricos son ~8 · 10^24
- * combinaciones, y la ruta limita a 20 intentos por minuto.
+ * Que esté impreso significa que no es un secreto, así que lo que protege del
+ * barrido automático NO es el código sino el límite de intentos por minuto de
+ * la ruta. Por eso conviene que el código lleve una parte al azar al generarse:
+ * uno correlativo se recorre entero probando de 1 en adelante.
  *
- * Al enviar hace POST a /verificar y el controlador redirige a /verificar/{firma}.
+ * Al enviar hace POST a /verificar y el controlador redirige a /verificar/{codigo}.
  * Podría haber sido un GET, pero con POST el dato no queda en el historial del
  * navegador de una computadora compartida.
  */
-export function BuscadorCodigo({ firmaInicial }: { firmaInicial?: string | null }) {
+export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | null }) {
     const { data, setData, post, processing, errors } = useForm({
-        firma: firmaInicial ?? '',
+        codigo: codigoInicial ?? '',
     });
 
     function enviar(e: FormEvent) {
@@ -46,23 +45,22 @@ export function BuscadorCodigo({ firmaInicial }: { firmaInicial?: string | null 
                 acá dejaba un hueco raro en uno de los dos. */}
             <form onSubmit={enviar} className="mx-auto flex max-w-md gap-2">
                 <Input
-                    value={data.firma}
+                    value={data.codigo}
                     // Se guarda en mayúsculas: se convierte mientras se escribe
-                    // para que no falle por tipearla en minúscula, que es como
+                    // para que no falle por tipearlo en minúscula, que es como
                     // arranca el teclado del teléfono.
-                    onChange={(e) => setData('firma', e.target.value.toUpperCase())}
-                    placeholder="Firma del carnet — ej. 4K7R J2MX P9TQ 3WHB"
+                    onChange={(e) => setData('codigo', e.target.value.toUpperCase())}
+                    placeholder="Código del carnet — ej. PES2 6000 0017"
                     /*
-                     * Dieciséis es el largo exacto, pero el tope es generoso a
-                     * propósito —24 y no 16— porque la firma se imprime en grupos
-                     * para poder leerla, y quien la copia escribe los espacios o
-                     * los guiones. Cortarle la mano al llegar a 16 le comería el
-                     * final sin decirle por qué; el servidor limpia los
-                     * separadores antes de validar.
+                     * El tope es generoso a propósito: el código se imprime en
+                     * grupos de cuatro para poder leerlo, y quien lo copia
+                     * escribe los espacios o los guiones. Cortarle la mano al
+                     * llegar al largo exacto le comería el final sin decirle por
+                     * qué; el servidor limpia los separadores antes de validar.
                      */
-                    maxLength={24}
-                    aria-label="Firma de validación del carnet"
-                    aria-invalid={Boolean(errors.firma)}
+                    maxLength={50}
+                    aria-label="Código del carnet"
+                    aria-invalid={Boolean(errors.codigo)}
                     // font-mono: en monoespaciado no se confunden 0 con O ni 1 con l.
                     className="font-mono tracking-wider"
                 />
@@ -77,9 +75,9 @@ export function BuscadorCodigo({ firmaInicial }: { firmaInicial?: string | null 
                 </Button>
             </form>
 
-            {errors.firma && (
+            {errors.codigo && (
                 <p className="mt-3 text-center text-sm text-destructive" role="alert">
-                    {errors.firma}
+                    {errors.codigo}
                 </p>
             )}
         </>

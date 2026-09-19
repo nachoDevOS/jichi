@@ -15,10 +15,12 @@ import type { EstadoCarnet } from '@/types';
 /** Lo que se muestra de un carnet en la pantalla pública. */
 export interface CarnetPublico {
     /**
-     * El número impreso en el carnet: 000013. Es lo que el inspector compara
-     * contra el plástico; la firma no se imprime, va solo dentro del QR.
+     * El código impreso en el carnet, en grupos de cuatro: «PES2 6000 0017».
+     * Es el único dato de esta pantalla que también está en el plástico, así
+     * que es lo que el inspector cruza para confirmar que el acta corresponde
+     * a la credencial que tiene en la mano.
      */
-    registro: string;
+    codigo: string;
     titular: string | null;
     /** Enmascarado: solo los últimos 3 dígitos ('••••779'). */
     documento_titular: string;
@@ -37,22 +39,20 @@ export interface CarnetPublico {
     /** Frase para el inspector: «Carnet auténtico y vigente...». */
     mensaje: string;
     /**
-     * Solo los rubros HABILITADOS, sin los suspendidos. Un rubro suspendido no
-     * autoriza a trabajar, y mostrarlo —aunque fuera en rojo— arriesga que el
-     * inspector lea la fila y no el color.
-     */
-    /**
-     * La actividad que el carnet autoriza. UNA, no una lista: el carnet es de un
-     * solo rubro.
+     * La actividad que el carnet autoriza: «Pescador» o «Comercializador».
      *
-     * Viene en `null` cuando el carnet no está vigente —vencido, suspendido o
-     * anulado— y no es un olvido: mostrar la actividad, aunque fuera marcada en
-     * rojo, arriesga que el inspector lea la fila y no el color. Lo que no
-     * habilita, no aparece.
+     * Es UNA, no una lista: cada actividad es un carnet propio, y quien hace
+     * las dos tiene dos credenciales con dos códigos distintos.
+     *
+     * Viene en `null` cuando el carnet no está vigente, y no es un olvido:
+     * mostrar la actividad —aunque fuera marcada en rojo— arriesga que el
+     * inspector lea la fila y no el sello. Lo que no habilita, no aparece.
      */
-    rubro: string | null;
-    /** El cupo autorizado: «600 KG». Null por lo mismo que `rubro`. */
-    capacidad: string | null;
+    actividad: string | null;
+    /** El nombre del catálogo: «Carnet de Pescador». Null por lo mismo. */
+    tipo_carnet: string | null;
+    /** Los kilos autorizados. Null si es comercializador: no lleva cupo. */
+    cupo_kg: number | null;
 }
 
 /** Datos institucionales que se muestran en el encabezado y el pie. */

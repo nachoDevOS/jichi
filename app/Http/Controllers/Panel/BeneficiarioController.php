@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\GuardarBeneficiarioRequest;
+use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Support\Archivos;
 use App\Support\Paginacion;
-use App\Support\SituacionCarnet;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -166,7 +166,7 @@ class BeneficiarioController extends Controller
         return Inertia::render('panel/beneficiarios/ver', [
             'beneficiario' => [
                 ...$beneficiario->only([
-                    'id', 'ci_nit', 'complemento', 'expedido', 'primerNombre',
+                    'id', 'ci', 'complemento', 'expedido', 'primerNombre',
                     'segundoNombre', 'apellidoPaterno', 'apellidoMaterno',
                     'apellidoCasado', 'genero', 'nacionalidad', 'direccion',
                     'ciudad', 'provincia', 'telefono', 'email',
@@ -180,42 +180,64 @@ class BeneficiarioController extends Controller
 
             'gestion' => $gestion,
 
-            // Lo que debe en total, sumando los trámites no rechazados.
+            // Lo que debe en total, sumando carnets, cupos y guías sin cubrir.
             'deuda' => $beneficiario->deudaTotal(),
 
             /*
-             * EL DATO QUE DECIDE EL PRÓXIMO TRÁMITE — Regla A.
+             * ================================================================
+             *  SUS CREDENCIALES — el paso 3 del flujo
+             * ================================================================
              *
-             * Qué ACTIVIDADES tiene cubiertas esta persona este año, porque de
-             * eso depende lo que la pantalla ofrece: los rubros que ya tienen
-             * carnet no se pueden volver a pedir, y los que no, sí.
+             * Es una LISTA porque una persona puede tener DOS carnets vigentes
+             * al mismo tiempo: quien pesca y además comercializa. El rol es del
+             * documento (`tipo_actor`), no de la ficha, y por eso acá no hay que
+             * elegir «cuál es el carnet» de nadie.
              *
-             * Es una LISTA y no un objeto, y ese es el cambio del modelo nuevo:
-             * antes había un carnet por persona y gestión, así que la pregunta
-             * tenía una sola respuesta. El sistema lo vuelve a calcular al
-             * registrar, con la fila bloqueada; esto es solo para la vista.
+             * OJO CON PEDIR COLUMNAS SUELTAS EN EL with(): `tipoCarnet` va
+             * ENTERO porque `Carnet::montoACobrar()` lee `precio_bs`, y si esa
+             * columna no viene el saldo sale mal sin ningún error.
              */
-            'carnetsGestion' => $beneficiario->carnetsDeGestion($gestion)
+            'carnets' => $beneficiario->carnets()
+                ->with(['asociacion:id,nombre,sigla', 'tipoCarnet', 'aprovechamiento'])
+                ->withSum('pagos', 'monto_parcial')
+                ->orderByDesc('fecha_emision')
+                ->get()
                 ->map($this->resumirCarnet(...))
-                ->values()
                 ->all(),
 
             /*
-             * EL HISTORIAL COMPLETO, de todas las gestiones.
+             * ================================================================
+             *  SUS BOLSAS MADRE — el paso 2, y el que explica las faenas
+             * ================================================================
              *
-             * Se cargan con with() para traer el rubro de cada uno en pocas
-             * consultas. Sin eso, pintar 5 carnets serían 6 consultas — y con un
-             * carnet por actividad la lista creció: una persona con tres rubros
-             * y dos años de antigüedad tiene seis filas acá.
+             * Se manda el SALDO en kilos y no solo el volumen otorgado, porque
+             * es lo único accionable: «tiene 500 kg» no dice si puede salir a
+             * pescar mañana, y «le quedan 20» sí.
+             *
+             * `withSum` sobre las faenas que consumen cupo es lo que evita una
+             * consulta agregada por fila al calcular ese saldo.
              */
-            'carnets' => $beneficiario->carnets()
-                ->with('rubro:id,nombre')
-                ->withCount('tramites')
-                ->orderByDesc('gestion')
+            'cupos' => $beneficiario->aprovechamientos()
+                ->with('categoria')
+                ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                ->withSum('pagos', 'monto_parcial')
+                ->orderByDesc('fecha_emision')
                 ->get()
-                ->map(fn ($c): array => [
-                    ...$this->resumirCarnet($c),
-                    'tramites_count' => $c->tramites_count,
+                ->map(fn (AprovechamientoPesq $a): array => [
+                    'id' => $a->id,
+                    'escala' => $a->categoria?->nro_escala,
+                    'descripcion' => $a->categoria?->descripcion_kg,
+                    'volumen_total_kg' => (float) $a->volumen_total_kg,
+                    'kilos_consumidos' => $a->kilosConsumidos(),
+                    'saldo_kg' => $a->saldoKg(),
+                    'porcentaje_usado' => $a->porcentajeUsado(),
+                    'estado' => $a->estado->value,
+                    'estado_etiqueta' => $a->estado->etiqueta(),
+                    'estado_color' => $a->estado->color(),
+                    'vigente' => $a->estaVigente(),
+                    'saldo_pendiente' => $a->saldoPendiente(),
+                    'fecha_emision' => $a->fecha_emision?->toDateString(),
+                    'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
                 ])
                 ->all(),
         ]);
@@ -229,7 +251,7 @@ class BeneficiarioController extends Controller
         return Inertia::render('panel/beneficiarios/editar', [
             'beneficiario' => [
                 ...$beneficiario->only([
-                    'id', 'ci_nit', 'complemento', 'expedido', 'primerNombre',
+                    'id', 'ci', 'complemento', 'expedido', 'primerNombre',
                     'segundoNombre', 'apellidoPaterno', 'apellidoMaterno',
                     'apellidoCasado', 'genero', 'nacionalidad', 'direccion',
                     'ciudad', 'provincia', 'telefono', 'email',
@@ -308,21 +330,40 @@ class BeneficiarioController extends Controller
             return [];
         }
 
-        $gestion = (int) now()->format('Y');
-
         return Beneficiario::query()
             ->buscar($termino)
             /*
-             * Se traen los carnets de la gestión CON su rubro y el
-             * nombre de cada rubro, todo en la misma tanda de consultas.
+             * Se traen los carnets VIGENTES con su tipo, todo en la misma tanda
+             * de consultas.
              *
              * Sin esto, armar la situación de diez personas serían veintiuna
              * consultas —el clásico N+1— y encima disparadas en cada tecleada
-             * del operador.
+             * del operador. Pasó de verdad: dieciocho consultas por tecla, con
+             * el `with()` escrito pero llamando después a un método del modelo
+             * que consultaba igual. Ver Beneficiario::carnetVigenteDe().
              */
-            ->with([
-                'carnets' => fn ($q) => $q->where('gestion', $gestion),
-                'carnets.rubro:id,nombre',
+            /*
+             * EL CUPO VIAJA CON EL CARNET, y los dos agregados con él.
+             *
+             * `withSum` de las faenas da el saldo en kilos y `withMax` el último
+             * número del talonario. Los dos son subconsultas sobre la relación
+             * YA precargada, así que no agregan una consulta por fila: sin
+             * ellos, pintar diez resultados serían veinte consultas más, y
+             * disparadas en cada tecleada.
+             *
+             * Van acá y no en un endpoint propio del módulo de faenas porque la
+             * pregunta es la misma —«¿qué puede hacer esta persona hoy?»— y
+             * partirla en dos viajes se nota justo cuando el operador acaba de
+             * hacer clic.
+             */
+            ->with(['carnets' => fn ($q) => $q
+                ->vigentes()
+                ->with([
+                    'tipoCarnet:id,nombre',
+                    'aprovechamiento' => fn ($a) => $a
+                        ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                        ->withMax('faenas', 'numero_faena'),
+                ]),
             ])
             ->ordenAlfabetico()
             ->limit(10)
@@ -341,16 +382,42 @@ class BeneficiarioController extends Controller
                 'direccion' => $b->direccion,
 
                 /*
-                 * TODO lo que la pantalla necesita para decidir qué ofrecer:
-                 * si tiene carnet, cuál, si sigue vigente, qué rubros ya tiene y
-                 * cuáles quedan bloqueados.
+                 * QUÉ PUEDE EMITIR ESTA PERSONA HOY, ya resuelto.
                  *
                  * Va en el mismo payload que la búsqueda y no en una segunda
                  * petición al elegir a la persona: son diez filas ya cargadas, y
                  * un viaje más al servidor justo cuando el operador acaba de
                  * hacer clic se nota.
+                 *
+                 * La pantalla NO lo deduce: recibe `puede_emitir_faenas` y
+                 * `puede_emitir_guias` calculados por el modelo. Un `if` sobre
+                 * el nombre del tipo de carnet en React sería una segunda copia
+                 * de la regla, y se desincroniza en cuanto alguien renombre una
+                 * fila del catálogo.
                  */
-                'situacion' => SituacionCarnet::para($b, $gestion),
+                'carnets_vigentes' => $b->carnets->map(fn (Carnet $c): array => [
+                    'id' => $c->id,
+                    'codigo' => $c->codigo_legible,
+                    'tipo' => $c->tipoCarnet?->nombre,
+                    'tipo_actor' => $c->tipo_actor->value,
+                    'tipo_actor_etiqueta' => $c->tipo_actor->etiqueta(),
+                    'puede_emitir_faenas' => $c->puedeEmitirFaenas(),
+                    'puede_emitir_guias' => $c->puedeEmitirGuias(),
+
+                    /*
+                     * Lo que el formulario de faena necesita para abrir con los
+                     * dos campos difíciles ya resueltos: cuántos kilos quedan y
+                     * qué número de talonario propone.
+                     *
+                     * El número es una PROPUESTA, no una imposición: sale de un
+                     * papel que el operador tiene en la mano, y si no coincide
+                     * hay algo que conviene mirar antes de seguir.
+                     */
+                    'saldo_kg' => $c->aprovechamiento?->saldoKg(),
+                    'siguiente_numero_faena' => $c->aprovechamiento
+                        ? (int) ($c->aprovechamiento->faenas_max_numero_faena ?? 0) + 1
+                        : null,
+                ])->values()->all(),
             ])
             ->all();
     }
@@ -360,32 +427,41 @@ class BeneficiarioController extends Controller
     // ------------------------------------------------------------------
 
     /**
-     * Los datos de un carnet que pinta la ficha. NULL si no hay carnet.
+     * Los datos de un carnet que pinta la ficha.
      *
-     * MANDA EL REGISTRO, NO LA FIRMA. El registro es el número corto impreso
-     * en el plástico —el id rellenado con ceros—: es por el que pregunta la
-     * gente y no abre nada. La firma sí abre la verificación pública, así que
-     * viaja únicamente dentro del QR y se muestra en una sola pantalla del
-     * panel, la ficha del carnet, para poder dictarla si el QR queda ilegible.
+     * LA ACTIVIDAD VA PRIMERO. Con dos carnets posibles por persona, sin
+     * `tipo_actor` los dos se ven idénticos en la lista y el operador no sabe
+     * cuál está mirando.
      *
-     * @return array<string, mixed>|null
+     * Se manda `vigente` YA RESUELTO y no el estado a secas: la columna de
+     * estado puede estar desfasada —`vencido` lo escribe un comando diario— así
+     * que la pantalla no puede deducirlo comparando fechas por su cuenta. Es la
+     * misma razón por la que van `codigo` legible y `saldo_pendiente` armados
+     * desde acá.
+     *
+     * @return array<string, mixed>
      */
     private function resumirCarnet(Carnet $carnet): array
     {
         return [
             'id' => $carnet->id,
-            // El número impreso en el carnet: 000013. Ver Carnet::registro().
-            'registro' => $carnet->registro(),
-            // La actividad que habilita. Con un carnet por rubro es lo primero
-            // que hay que mostrar: sin esto, dos carnets de la misma persona se
-            // ven idénticos en la ficha.
-            'rubro' => $carnet->rubro?->nombre,
-            'capacidad' => $carnet->capacidadLegible(),
-            'gestion' => $carnet->gestion,
+            // En grupos de cuatro: «PES2 6000 0017». Se guarda sin separadores.
+            'codigo' => $carnet->codigo_legible,
+            'tipo' => $carnet->tipoCarnet?->nombre,
+            'tipo_actor' => $carnet->tipo_actor->value,
+            'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
+            'tipo_actor_color' => $carnet->tipo_actor->color(),
+            'asociacion' => $carnet->asociacion?->sigla ?? $carnet->asociacion?->nombre,
+            // Los kilos impresos en el plástico, o null si es comercializador.
+            // Lo decide TipoActor::requiereAprovechamiento(), nunca el nombre
+            // del tipo de carnet. Ver Carnet::cupoImpreso().
+            'cupo_kg' => $carnet->cupoImpreso(),
             'estado' => $carnet->estado->value,
             'estado_etiqueta' => $carnet->estado->etiqueta(),
             'estado_color' => $carnet->estado->color(),
             'vigente' => $carnet->estaVigente(),
+            'monto' => $carnet->montoACobrar(),
+            'saldo_pendiente' => $carnet->saldoPendiente(),
             'fecha_emision' => $carnet->fecha_emision?->toDateString(),
             'fecha_vencimiento' => $carnet->fecha_vencimiento?->toDateString(),
         ];

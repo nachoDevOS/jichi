@@ -1,4 +1,4 @@
-import type { EstadoTramite, TipoTramite } from '@/types';
+import type { EstadoCarnet, TipoActor } from '@/types';
 
 /**
  * Tipos del panel principal.
@@ -17,42 +17,67 @@ import type { EstadoTramite, TipoTramite } from '@/types';
 export interface ResumenDelDia {
     fecha: string;
     gestion: number;
-    tramites_hoy: number;
+
     /**
-     * Pendientes MÁS en revisión, de todas las gestiones. Un expediente que
-     * alguien tomó para revisar sigue sin resolverse, y un expediente viejo sin
-     * resolver sigue siendo trabajo.
+     * Cuánta gente está habilitada HOY. El servidor lo calcula mirando el
+     * estado Y la fecha de vencimiento: la columna de estado sola puede estar
+     * desfasada, porque `vencido` lo escribe un comando diario.
      */
-    tramites_abiertos: number;
-    /** De esos, cuántos ya tiene alguien en la mano. */
-    tramites_en_revision: number;
-    /** De los abiertos, los que ya están cobrados y solo esperan la firma. */
-    listos_para_aprobar: number;
-    carnets_gestion: number;
     carnets_vigentes: number;
+
+    /** Emitidos en la gestión, vigentes o no. La diferencia alimenta el desglose. */
+    carnets_gestion: number;
+
+    /** Bolsas madre con fecha vigente: de ellas salen los kilos de las faenas. */
+    cupos_activos: number;
+
+    faenas_vigentes: number;
+    guias_vigentes: number;
+
+    /** Lo emitido hoy sumando carnets, faenas y guías: el pulso del día. */
+    documentos_hoy: number;
+
     recaudado_hoy: number;
     recaudado_mes: number;
+
+    /** Lo que falta cobrar, sumando los tres trámites que se cobran. */
+    por_cobrar: number;
 }
 
 /**
  * Una jornada de la serie de los últimos catorce días.
  *
- * Es lo que dibujan las líneas chicas al pie de los cuatro indicadores. Cada
- * fila trae los DOS valores del día porque las dos series salen del mismo
- * recorrido en PHP: separarlas obligaría a mandar el calendario dos veces.
+ * Es lo que dibujan las líneas chicas al pie de los indicadores. Cada fila trae
+ * los DOS valores del día porque las dos series salen del mismo recorrido en
+ * PHP: separarlas obligaría a mandar el calendario dos veces.
  */
 export interface ActividadDia {
     /** Clave ordenable: '2026-09-16'. */
     dia: string;
     /** Lo que se muestra al pasar el mouse: '16 sep.'. */
     etiqueta: string;
-    tramites: number;
+    /** Carnets + faenas + guías emitidas ese día. */
+    documentos: number;
     recaudado: number;
 }
 
-/** Una barra del gráfico de carnets por rubro. */
-export interface CarnetsPorRubro {
-    rubro: string;
+/** Una barra del gráfico de carnets vigentes por tipo del catálogo. */
+export interface CarnetsPorTipo {
+    tipo: string;
+    cantidad: number;
+}
+
+/**
+ * Pescadores contra comercializadores, entre los carnets vigentes.
+ *
+ * Sale del enum y no de la base para que los dos aparezcan aunque uno esté en
+ * cero: un valor que no vuelve en la consulta haría que el bloque mienta por
+ * omisión.
+ */
+export interface CarnetsPorActor {
+    tipo: TipoActor;
+    etiqueta: string;
+    color: string;
     cantidad: number;
 }
 
@@ -65,49 +90,40 @@ export interface RecaudacionMes {
     total: number;
 }
 
-/**
- * Emisiones iniciales contra adiciones de rubro.
- *
- * Es el número que muestra cómo está funcionando la Regla A: cuánta gente saca
- * carnet por primera vez este año y cuánta ya lo tenía.
- */
-export interface TramitesPorTipo {
-    tipo: TipoTramite;
-    etiqueta: string;
-    color: string;
-    cantidad: number;
-}
-
-/** Una fila de la tabla de últimos expedientes. */
-export interface UltimoTramite {
+/** Una fila de la tabla de últimas credenciales emitidas. */
+export interface UltimoCarnet {
     id: number;
-    carnet_registro: string | null;
+    /** En grupos de cuatro: «PES2 6000 0017». Se guarda sin separadores. */
+    codigo: string;
     beneficiario: string | null;
-    rubro: string | null;
-    tipo_etiqueta: string;
-    tipo_color: string;
-    estado: EstadoTramite;
+    asociacion: string | null;
+    tipo_actor: TipoActor;
+    tipo_actor_etiqueta: string;
+    tipo_actor_color: string;
+    estado: EstadoCarnet;
     estado_etiqueta: string;
     estado_color: string;
-    monto_requerido: number;
+    monto: number;
     saldo_pendiente: number;
-    fecha_solicitud: string | null;
+    /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
+    fecha_emision: string | null;
 }
 
 /**
- * El aviso de fin de gestión.
+ * Lo que está por caducar o ya caducó sin cerrarse.
  *
- * TODOS los carnets vigentes vencen el mismo día —el 31 de diciembre—, así que
- * esto no es una lista de casos sueltos como en un sistema de vencimientos
- * escalonados: es cuánta gente va a tener que renovar de golpe, y con cuánto
- * tiempo.
+ * Las dos últimas cifras no son avisos de vencimiento sino de TRABAJO SIN
+ * CERRAR: una faena o una guía que se pasó de fecha y sigue activa es un papel
+ * que alguien se llevó y del que nadie registró la vuelta.
  */
-export interface AvisoCierreGestion {
-    fecha_vencimiento: string;
-    dias_restantes: number;
-    cantidad: number;
-    /** Aprobados cuyo carnet todavía no se imprimió: trabajo de ventanilla. */
-    sin_imprimir: number;
-    /** Impresos y sin entregar: carnets esperando en el cajón. */
-    sin_entregar: number;
+export interface Avisos {
+    gestion: number;
+    /** Con cuántos días de anticipación se avisa. Lo fija el servidor. */
+    dias_aviso: number;
+    carnets_por_vencer: number;
+    cupos_por_vencer: number;
+    /** Sin kilos, aunque la fecha no haya llegado: se resuelve con una ampliación. */
+    cupos_agotados: number;
+    faenas_vencidas: number;
+    guias_vencidas: number;
 }

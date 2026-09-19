@@ -1,4 +1,4 @@
-import type { EstadoCarnet } from '@/types';
+import type { EstadoAprovechamiento, EstadoCarnet, TipoActor } from '@/types';
 
 /**
  * Tipos del módulo Beneficiarios.
@@ -49,7 +49,7 @@ export interface BeneficiarioFila {
  */
 export interface BeneficiarioFicha {
     id: number;
-    ci_nit: string;
+    ci: string;
     complemento: string | null;
     expedido: string | null;
     primerNombre: string;
@@ -74,7 +74,7 @@ export interface BeneficiarioFicha {
 
 /** Lo que el formulario de alta y edición manda de vuelta. */
 export interface FormularioBeneficiario {
-    ci_nit: string;
+    ci: string;
     complemento: string;
     expedido: string;
     primerNombre: string;
@@ -98,108 +98,119 @@ export interface FormularioBeneficiario {
     _method?: 'put';
 }
 
+
 /**
  * El resumen de un carnet que muestra la ficha del beneficiario.
  *
- * NO trae la firma: esa es la llave de la verificación pública y solo viaja a la
- * ficha del carnet. Acá va el registro, que es por lo que la gente pregunta.
+ * ----------------------------------------------------------------------------
+ *  LA ACTIVIDAD VA PRIMERO, Y NO ES UN DETALLE DE ORDEN
+ * ----------------------------------------------------------------------------
+ *
+ * Una persona puede tener DOS carnets vigentes a la vez —quien pesca y además
+ * comercializa—, así que sin `tipo_actor` las dos filas se ven idénticas y el
+ * operador no sabe cuál está mirando.
+ *
+ * `vigente` llega YA RESUELTO del servidor y la pantalla no lo deduce: la
+ * columna `estado` puede estar desfasada, porque «vencido» lo escribe un
+ * comando que corre una vez al día. Ver Carnet::estaVigente().
  */
 export interface CarnetResumen {
     id: number;
-    /** El número impreso en el carnet: 000013. Es el id con ceros adelante. */
-    registro: string;
-    gestion: number;
+    /** En grupos de cuatro: «PES2 6000 0017». Se guarda sin separadores. */
+    codigo: string;
+    /** El nombre del catálogo: «Carnet de Pescador». Es texto, no una regla. */
+    tipo: string | null;
+    /** La regla: de acá cuelga qué puede emitir y si lleva cupo. */
+    tipo_actor: TipoActor;
+    tipo_actor_etiqueta: string;
+    tipo_actor_color: string;
+    /** La que certificó al beneficiario. Se imprime en la tarjeta. */
+    asociacion: string | null;
+    /**
+     * Los kilos impresos en el plástico, o null si es comercializador.
+     *
+     * Lo decide `TipoActor::requiereAprovechamiento()` en el servidor, NUNCA un
+     * `if` sobre el nombre del tipo de carnet: ese nombre es un catálogo que la
+     * unidad edita, y el mismo documento figura de dos formas distintas según
+     * quién lo cargó.
+     */
+    cupo_kg: number | null;
     estado: EstadoCarnet;
     estado_etiqueta: string;
     estado_color: string;
-    /** Calculado contra la fecha, no leído del estado. Ver Carnet::estaVigente(). */
     vigente: boolean;
+    monto: number;
+    /** Lo que falta cobrar. Se corta en cero: pagar de más no da saldo a favor. */
+    saldo_pendiente: number;
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
-    tramites_count?: number;
-    /** La actividad del carnet. Es lo que distingue dos filas del mismo año. */
-    rubro: string | null;
-    /** El cupo ya escrito como va impreso: «600 KG». */
-    capacidad: string | null;
 }
 
 /**
- * Un carnet de la gestión en curso: UNA actividad.
+ * Una BOLSA MADRE de la persona: el cupo anual en kilos.
  *
- * Reemplaza al par `CarnetDeLaGestion` + `RubroDelCarnet` del modelo anterior,
- * donde el carnet era uno solo y traía adentro la lista de rubros habilitados.
- * Hoy cada actividad es un carnet, así que lo que era una lista anidada pasó a
- * ser una lista de estos.
+ * Se manda el SALDO y no solo el volumen otorgado porque es lo único
+ * accionable: «tiene 500 kg» no dice si puede salir a pescar mañana, y «le
+ * quedan 20» sí.
  */
-export interface CarnetDeLaGestion {
+export interface CupoResumen {
     id: number;
-    /**
-     * El número que va IMPRESO en el plástico: 000013. Es el id del carnet
-     * rellenado con ceros, así que es corto, se dicta de memoria y se compara
-     * de un vistazo entre dos credenciales.
-     *
-     * La firma NO viaja acá: es la llave de la verificación pública y no tiene
-     * nada que hacer en un autocompletado. Ver Carnet::registro().
-     */
-    registro: string;
-
-    /** La actividad que habilita. Es lo que distingue dos carnets del año. */
-    rubro_id: number;
-    rubro: string | null;
-
-    gestion: number;
-    /** La que certificó al beneficiario al emitir. Se imprime en la tarjeta. */
-    asociacion: string | null;
-    /** El cupo ya escrito como va impreso: «600 KG». Null si no se cargó. */
-    capacidad: string | null;
-    estado: EstadoCarnet;
+    /** El tramo de la escala oficial: 1 a 7. */
+    escala: number | null;
+    /** El texto literal de la resolución: «201 Kg Hasta 500 Kg». */
+    descripcion: string | null;
+    volumen_total_kg: number;
+    /** Lo comprometido por las faenas que consumen cupo (todas menos las vencidas). */
+    kilos_consumidos: number;
+    saldo_kg: number;
+    porcentaje_usado: number;
+    estado: EstadoAprovechamiento;
     estado_etiqueta: string;
     estado_color: string;
-    /** Calculado contra la fecha, no leído del estado. Ver Carnet::estaVigente(). */
     vigente: boolean;
-    /** Si se le puede presentar un trámite de actualización. */
-    admite_tramites: boolean;
+    saldo_pendiente: number;
+    fecha_emision: string | null;
     fecha_vencimiento: string | null;
 }
 
 /**
- * Qué tiene esta persona en la gestión en curso.
+ * Un carnet vigente, tal como lo devuelve el autocompletado.
  *
- * Lo arma App\Support\SituacionCarnet y responde las preguntas que el
- * formulario de trámite necesita antes de ofrecer nada:
- *
- *   - ¿qué actividades ya tiene cubiertas este año?
- *   - ¿cuáles siguen vigentes y cuáles están cortadas?
- *   - ¿qué rubros puede pedir sin chocar con nada?
- *
- * OJO CON LA PREGUNTA QUE YA NO SE PUEDE HACER: «¿es emisión inicial o
- * actualización?» no tiene una respuesta para toda la persona, porque depende
- * del RUBRO que se esté por pedir. Alguien con carnet de Pescador pide una
- * emisión inicial si elige Comercializador, y una actualización si elige
- * Pescador. La pantalla lo resuelve mirando `rubros_ocupados`.
- *
- * ES PARA LA PANTALLA, NO ES LA REGLA. El servidor vuelve a comprobar todo al
- * registrar: entre que el operador ve esto y aprieta guardar pueden pasar
- * minutos, y en el medio otra ventanilla pudo haber emitido el mismo carnet.
+ * LAS DOS BANDERAS LLEGAN CALCULADAS y la pantalla no las deduce. Un `if` sobre
+ * el tipo en React sería una segunda copia de la regla, y se desincroniza en
+ * cuanto alguien renombre una fila del catálogo o cambie la vigencia del cupo.
+ * Ver Carnet::puedeEmitirFaenas() y ::puedeEmitirGuias().
  */
-export interface SituacionBeneficiario {
-    gestion: number;
-    /** Si tiene AL MENOS UNO. Ya no significa «tiene EL carnet». */
-    tiene_carnet: boolean;
-    /** Uno por actividad. Vacío si no sacó ninguno este año. */
-    carnets: CarnetDeLaGestion[];
+export interface CarnetVigenteSugerido {
+    id: number;
+    codigo: string;
+    tipo: string | null;
+    tipo_actor: TipoActor;
+    tipo_actor_etiqueta: string;
+    /** Exige además una bolsa madre con saldo, no solo que sea de pescador. */
+    puede_emitir_faenas: boolean;
+    puede_emitir_guias: boolean;
+
     /**
-     * Los ids de rubro que el selector tiene que dejar deshabilitados.
+     * Kilos que quedan en la bolsa madre. Null si el carnet no lleva cupo.
      *
-     * Incluye los SUSPENDIDOS —la autorización existe, solo que cortada, y lo
-     * que corresponde es que un supervisor la levante— y los ANULADOS, porque
-     * el carnet anulado sigue ocupando su lugar en el índice único y la base no
-     * dejaría emitir otro del mismo rubro ese año.
+     * Viene con el resultado de la búsqueda y no en un segundo viaje: el
+     * formulario de faena lo necesita apenas se elige el carnet, y pedirlo
+     * aparte se nota justo cuando el operador acaba de hacer clic.
      */
-    rubros_ocupados: number[];
+    saldo_kg: number | null;
+
+    /**
+     * El número de talonario que el sistema PROPONE. Null si no lleva cupo.
+     *
+     * Es una propuesta y no una imposición: el número sale de la hoja que el
+     * operador tiene en la mano, y si no coincide hay algo que conviene mirar
+     * antes de seguir, no autocorregir en silencio.
+     */
+    siguiente_numero_faena: number | null;
 }
 
-/** Una coincidencia del autocompletado del formulario de trámite. */
+/** Una coincidencia del autocompletado de los formularios de emisión. */
 export interface BeneficiarioSugerido {
     id: number;
     nombreCompleto: string;
@@ -209,13 +220,16 @@ export interface BeneficiarioSugerido {
     /*
      * El domicilio, que se imprime en el carnet debajo de la asociación.
      *
-     * Sale de la FICHA del beneficiario y no del formulario de trámite: son
-     * datos del padrón. Si están mal, se corrigen editando a la persona —no
-     * cargando otro trámite—.
+     * Sale de la FICHA del beneficiario y no del formulario de emisión: son
+     * datos del padrón. Si están mal, se corrigen editando a la persona.
      */
     ciudad: string | null;
     provincia: string | null;
     direccion: string | null;
 
-    situacion: SituacionBeneficiario;
+    /**
+     * Sus credenciales vigentes. Vacío si no tiene ninguna, y en ese caso lo
+     * que corresponde es emitirle una antes de cualquier otra cosa.
+     */
+    carnets_vigentes: CarnetVigenteSugerido[];
 }

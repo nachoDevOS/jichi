@@ -134,4 +134,63 @@ return [
         */
     ],
 
+    /*
+    | Guías de movimiento: lo que cuesta amparar un traslado.
+    |
+    | LA TARIFA VIVE ACÁ Y NO EN UNA TABLA porque hoy es UN solo valor para
+    | todas las guías: una tabla de una fila es una pantalla de mantenimiento
+    | que nadie va a abrir y una consulta por cada guía emitida. El día que se
+    | vuelva una escala —por destino, por volumen— pasa a `GuiaMovimiento::
+    | montoACobrar()` leer esa tabla, y el resto del circuito de cobro no se
+    | entera.
+    |
+    | El DESCUENTO de piscicultura no está acá sino en
+    | `GuiaMovimiento::DESCUENTO_PISCICULTURA`, y la diferencia es deliberada:
+    | la tarifa es un número que la unidad ajusta, el descuento es una REGLA de
+    | la resolución. Puesto en configuración, alguien lo apaga desde una
+    | pantalla y el sistema empieza a cobrarle de más al criadero sin que quede
+    | registro de quién lo decidió.
+    */
+    'guias' => [
+        'tarifa_base' => (float) env('JICHI_GUIA_TARIFA_BASE', 50),
+    ],
+
+    /*
+    | Aprovechamiento pesquero: qué tan duro es el tope de la bolsa madre.
+    |
+    | ----------------------------------------------------------------------------
+    |  ESTRICTO (por defecto): el cupo es un LÍMITE
+    | ----------------------------------------------------------------------------
+    |
+    | Al emitir una faena se comprueba que los kilos entren en el saldo. Cuando
+    | llega a cero el aprovechamiento pasa a `agotado` y no se emiten más
+    | permisos: el pescador tiene que tramitar uno nuevo —elegir el tramo, pagar
+    | en caja, recibo nuevo— o pedir una ampliación.
+    |
+    | Es el modo que la resolución describe, y por eso es el valor por defecto:
+    | un sistema que arranca sin control y hay que acordarse de encender no
+    | controla nada.
+    |
+    | ----------------------------------------------------------------------------
+    |  FLEXIBLE: el cupo es una REFERENCIA
+    | ----------------------------------------------------------------------------
+    |
+    | Se omite la comprobación del tope y las faenas se emiten sin límite,
+    | aunque superen el volumen otorgado. Existe para dos situaciones reales:
+    | poner al día un padrón donde el papel ya fue más allá del cupo, y arrancar
+    | en una unidad que todavía no tiene la escala cargada del todo.
+    |
+    | LO QUE NO HACE ES BORRAR EL DATO. El exceso se sigue midiendo —ver
+    | `AprovechamientoPesq::kilosExcedidos()`— y las pantallas lo muestran, así
+    | que al volver a estricto se sabe exactamente quién está por encima.
+    |
+    | Se lee con config() y NUNCA con env() fuera de este archivo: con
+    | `config:cache` activo, env() devuelve null y el error es silencioso — el
+    | sistema creería que el modo es flexible y dejaría de controlar el cupo sin
+    | avisar.
+    */
+    'aprovechamiento' => [
+        'estricto' => (bool) env('APROVECHAMIENTO_ESTRICTO', true),
+    ],
+
 ];

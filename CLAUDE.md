@@ -6,6 +6,53 @@ Departamental del Beni, Bolivia.
 **Laravel 13 · PHP 8.3 · Inertia 2 · React 19 · TypeScript · Tailwind 4 ·
 PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
 
+---
+
+> # ⚠️ EL NÚCLEO DE DATOS SE REHIZO EL 18/09/2026 — ESTE ARCHIVO ESTÁ VIEJO
+>
+> Todo lo que sigue —«El dominio en cinco líneas», el circuito del trámite, la
+> tabla de estados, los rubros, los recibos armados al vuelo— describe el
+> modelo **ANTERIOR**, y ya no existe en la base. Sigue sirviendo para entender
+> el código del panel, que todavía está escrito contra él; **no** para entender
+> el esquema.
+>
+> **La base corre hoy sobre `jichi1` con este esqueleto:**
+>
+> ```
+> beneficiario ──< carnet (pescador)        ──< permiso_faena   (una por salida)
+>              ──< carnet (comercializador) ──< guia_movimiento (una por traslado)
+>              ──< aprovechamiento_pesq  ─── la bolsa madre: el cupo en kilos
+>
+> recibo ──< pago ──(polimórfico)──▶ Carnet | AprovechamientoPesq | GuiaMovimiento
+> ```
+>
+> | Ya no existe | Lo reemplaza |
+> | --- | --- |
+> | `rubros`, `carnet_rubro` | `carnets.tipo_actor` (enum `TipoActor`) + `tipos_carnet` (catálogo) |
+> | `tramites` y su circuito de estados | Nada: el documento se emite y se cobra; no hay expediente |
+> | `faenas`, `guias`, `guia_detalles` | `permisos_faena`, `guias_movimiento` |
+> | recibo armado al vuelo | tabla `recibos`, con correlativo propio y datos copiados |
+> | `pagos.monto` | `pagos.monto_parcial` + `pagos.recibo_id` (se admite pagar en cuotas) |
+> | `beneficiarios.ci_nit` | `beneficiarios.ci` |
+>
+> **Qué leer para ponerse al día, en este orden:**
+> [docs/MER.md](docs/MER.md) —**está al día y es la fuente del esquema**— →
+> [docs/sesiones/09-2026/2026-09-18.md](docs/sesiones/09-2026/2026-09-18.md) →
+> `app/Traits/Pagable.php`.
+>
+> **Las migraciones son cortas a propósito: el porqué de cada decisión está en
+> `MER.md`, no en ellas.** Las anteriores quedaron en
+> `database/migrations-anterior/` como referencia; Laravel no las corre.
+>
+> **El panel NO está portado:** controladores, `app/Services/`, `app/Support/` y
+> las pantallas de React siguen nombrando `Rubro`, `Tramite`, `Faena` y `Guia`,
+> y las columnas que leen ya no existen. Ese es el trabajo siguiente.
+>
+> Las secciones que SÍ siguen valiendo enteras: **«Reglas que no se rompen»**,
+> **«Verificar antes de dar algo por terminado»** y **«Trampas conocidas»**.
+
+---
+
 ## Antes de tocar nada — y antes de leer código
 
 > **NO leas el sistema entero para entenderlo.** Está documentado a propósito
@@ -333,7 +380,53 @@ React.**
     escribe. `SubidaArchivosTest` revisa el código fuente y falla si aparece un
     atajo nuevo.
 
-12. **Toda sesión de trabajo se registra.** Al terminar de trabajar hay que
+12. **MIENTRAS EL NÚCLEO SE ESTÉ ARMANDO, NO SE AGREGAN MIGRACIONES DE
+    PARCHE.** Una columna nueva va DENTRO de la migración que crea su tabla, no
+    en un `add_x_to_y` aparte.
+
+    El motivo es práctico: el responsable del proyecto rearma la base con
+    `migrate:fresh` cada vez que el esquema cambia, así que un archivo de parche
+    solo agrega ruido a un esquema que igual se va a construir de cero. Y de paso
+    el comentario de la columna queda al lado del resto de la tabla, que es donde
+    alguien lo va a buscar.
+
+    **Al editar una migración ya corrida hay que avisar que hay que volver a
+    migrar**, y verificarlo antes: se arma el esquema completo en una base
+    descartable —`DB_CONNECTION=sqlite DB_DATABASE=<archivo> php artisan
+    migrate:fresh --seed`— y recién ahí se dice que funciona. Nunca sobre la base
+    de trabajo.
+
+    Esto deja de valer el día que el sistema esté en producción con datos reales:
+    ahí una migración editada es una migración que nadie va a volver a correr.
+
+    **Y la migración se mantiene CORTA.** El porqué de cada decisión de esquema
+    va en [docs/MER.md](docs/MER.md), tabla por tabla; en la migración queda el
+    encabezado de cuatro líneas y, a lo sumo, un renglón por columna que no se
+    explica sola. Una migración con ensayos de treinta líneas no la lee nadie, y
+    lo que hay que consultar de verdad —«¿por qué este índice es parcial?»— queda
+    enterrado entre las diez tablas en vez de estar junto a las otras nueve.
+
+    **El orden dentro del `Schema::create()` es siempre el mismo**, y
+    `timestamps()` + `softDeletes()` van **al final de todo**, después de los
+    índices:
+
+    ```
+    id → claves foráneas → datos → estado → fechas del negocio
+       → índices → timestamps() → softDeletes()
+    ```
+
+    El orden de esas llamadas no cambia el esquema —los índices se crean después
+    de las columnas igual—, así que es una convención de lectura: las diez tablas
+    terminan iguales y se sabe de memoria dónde mirar.
+
+    **Y `softDeletes()` va en TODAS las tablas del dominio**, con el trait
+    `SoftDeletes` en su modelo. Nada del dominio se borra de verdad: cada fila
+    lleva el nombre de una persona y respalda un papel. Al sumar una tabla nueva
+    hay que decidir además de qué lado caen sus índices únicos —**el catálogo
+    libera el valor, el papel entregado lo deja quemado**—; está tabulado en
+    [docs/MER.md](docs/MER.md#3-borrado-lógico-las-diez-tablas-lo-tienen).
+
+13. **Toda sesión de trabajo se registra.** Al terminar de trabajar hay que
     dejar el registro en `docs/sesiones/MM-AAAA/AAAA-MM-DD.md`, copiando
     [docs/sesiones/_plantilla.md](docs/sesiones/_plantilla.md). Un archivo por
     día. Cada trabajo lleva su problema, la tabla de archivos modificados y la
@@ -408,6 +501,12 @@ Los cuatro tienen que pasar.
   del bucket vive en `jichi.archivos.prefijo_s3`.
 - **Orden de rutas:** `/beneficiarios/crear` y `/beneficiarios/buscar` van ANTES
   de `/beneficiarios/{beneficiario}`, o esas palabras se toman como id.
+- **`cascadeOnDelete` NO se dispara con una baja lógica.** Es una restricción
+  del MOTOR y solo corre en un DELETE de verdad; `$modelo->delete()` sobre una
+  tabla con `SoftDeletes` es un UPDATE. `pagos.recibo_id` es CASCADE, así que
+  dar de baja un recibo dejaría sus pagos vivos y visibles en caja, colgando de
+  un comprobante que ya no está. Hoy nada da de baja recibos; el día que algo lo
+  haga, la baja tiene que arrastrar el detalle a mano.
 - **Índices únicos con borrado lógico:** nunca incluir `deleted_at` en un
   `unique()`. En SQL `NULL != NULL`, así que el índice no bloquea nada. Usar
   índice parcial `WHERE deleted_at IS NULL` (ver la migración de
@@ -520,6 +619,111 @@ Los cuatro tienen que pasar.
   beneficiarios hacía 18 consultas por tecleada con el eager loading puesto—. Un
   método del modelo que lo use debe preguntar antes con `relationLoaded()`; ver
   `Beneficiario::carnetDeGestion()`.
+- **`php artisan serve` LEE EL `.env` UNA SOLA VEZ, y REINICIAR EL SERVIDOR NO
+  ES LO QUE PARECE.** Es la trampa más cara de este proyecto hasta ahora: costó
+  dos diagnósticos equivocados.
+
+  El proceso es un árbol de tres:
+
+  ```
+  php artisan serve          ← LEE el .env, una vez, al arrancar
+    └── cmd.exe
+          └── php -S ...     ← el que atiende, hereda el entorno YA congelado
+  ```
+
+  `artisan serve` **vigila el `.env` y reinicia solo al hijo** cuando cambia.
+  Entonces el hijo aparece con hora de recién —parece reiniciado, y hasta
+  coincide al segundo con la hora del archivo— pero recibe las variables del
+  padre, que son las del arranque. Como Dotenv **no pisa** variables que ya
+  existen en el entorno, cada request vuelve a leer el valor viejo. Puede seguir
+  así durante días.
+
+  El síntoma no delata nada de esto: sale como `relation "..." does not exist`
+  sobre una tabla que uno acaba de migrar y puede ver en el gestor.
+
+  **Antes de dudar del esquema, mirar qué base dice el error**: el mensaje trae
+  `(Connection: pgsql, ..., Database: X)`. Y para saber quién quedó viejo, mirar
+  la hora de arranque del **padre**, no la del que escucha el puerto:
+
+  ```sh
+  # PowerShell: todos los php con su hora de arranque y su línea de comando
+  Get-CimInstance Win32_Process -Filter "Name = 'php.exe'" | ForEach-Object {
+      $p = Get-Process -Id $_.ProcessId; "$($_.ProcessId)  $($p.StartTime)  $($_.CommandLine)"
+  }
+  ```
+
+  Acá el padre de todo es `composer run dev` → `artisan dev`, que levanta
+  `serve`, `queue:listen` y Vite: **hay que cortar ESO**, no el servidor solo.
+  `queue:listen` arrastra el mismo entorno viejo.
+- **`withSum()` devuelve NULL cuando no hay filas, no cero.** Es lo que
+  contesta `sum()` en SQL sobre un conjunto vacío, y rompe el patrón de
+  «reusar el agregado si vino en la consulta»: escrito como
+  `if ($this->pagos_sum_monto === null) { consultar }`, justamente la fila SIN
+  pagos —la que más aparece en un listado— se cae a la consulta agregada suelta,
+  con el `withSum` puesto, viéndose correcto y sin ningún error. El N+1 sigue
+  ahí para la mitad de las filas. Se pregunta si la CLAVE EXISTE:
+  `array_key_exists('pagos_sum_monto_parcial', $this->getAttributes())`. Ver
+  `App\Traits\Pagable::montoPagado()` y
+  `AprovechamientoPesq::kilosConsumidos()`.
+- **El trait `Auditable` YA registra el borrado: escribir la auditoría a mano
+  deja DOS filas.** Engancha `created`, `updated` y `deleted`, así que un
+  servicio que además llame a `registrarAuditoria('eliminado', …)` duplica el
+  hecho — y la copia automática va SIN motivo, porque el motivo viaja por
+  `$modelo->motivoAuditoria`. El historial muestra el mismo borrado dos veces,
+  una de ellas sin ninguna explicación. La forma correcta es dejar el motivo y
+  borrar:
+
+  ```php
+  $modelo->motivoAuditoria = $motivo;
+  $modelo->delete();
+  ```
+
+  **Y el ensayo tampoco lo delata si busca con `first()`:** devuelve la fila
+  correcta y da verde con la duplicada al lado. Al probar una auditoría, contar
+  las filas, no leer la primera. Se descubrió mirando la tabla en el navegador.
+- **Agregar un estado a un enum rompe cosas que no se ven, y el compilador no
+  avisa de ninguna.** Al sumar `pendiente` a `EstadoAprovechamiento` los `match`
+  sí fallaron —eso sí lo marca PHP—, pero lo caro fue lo otro: cada lugar que
+  preguntaba `vigentes()` pasó a contestar «no» para el estado nuevo, en
+  silencio. Dos ejemplos reales, los dos encontrados por un ensayo y no leyendo:
+  el carnet de pescador dejó de poder emitirse —exigía un cupo ya cobrado— y la
+  regla de «una bolsa por persona» dejó de contar los cupos sin pagar, así que se
+  podían otorgar cinco y quedarse con el mejor. **Al sumar un estado, buscar
+  todos los scopes y helpers que enumeran estados y decidir uno por uno de qué
+  lado cae el nuevo.**
+- **Un método que «revive» un registro puede activar lo que nunca se autorizó.**
+  `ampliar()` escribía `estado = Activo` a secas para revivir un cupo agotado;
+  cuando apareció `pendiente`, ampliar pasó a habilitar para pescar un cupo sin
+  cobrar — la puerta de atrás del cobro. Un `update` de estado a un valor fijo
+  hay que mirarlo de nuevo cada vez que se suma un estado del que ese valor no
+  debería alcanzarse.
+- **Probar una pantalla con `curl` y la cabecera `X-Inertia` devuelve 409, no
+  la página.** Inertia compara la versión del manifiesto de assets y responde
+  `409 Conflict` con `X-Inertia-Location` cuando no coincide —que es siempre, si
+  el número se inventa—. **Se pide sin ninguna cabecera de Inertia:** las props
+  viajan igual, adentro del atributo `data-page` del HTML, y se leen con un
+  `grep` del nombre de la clave. Un 409 acá NO es un error de la pantalla.
+- **Una bandera de configuración que apaga una validación tiene que llegar a la
+  PANTALLA, o la pantalla miente.** Con `APROVECHAMIENTO_ESTRICTO=false` el
+  servidor acepta una faena que se pasa del cupo, y el formulario la seguía
+  frenando con «no entra en el cupo»: una regla inventada en React sobre algo
+  que el sistema permite, sin ningún mensaje que lo explicara. El patrón que
+  quedó es separar el HECHO de la CONSECUENCIA —`excede` y `bloquea`— y mandar
+  el modo como prop. Ver `FaenaController::create()` y `faenas/crear.tsx`.
+- **`estaVigente()` mezcla estado y fecha, y eso esconde botones.** Un cupo
+  AGOTADO no está vigente —su estado no habilita— y es exactamente el que hay
+  que poder ampliar. La misma confusión mordió dos veces el mismo día: primero
+  escondiendo «Ampliar cupo», después diciendo «no tiene un aprovechamiento
+  vigente» al emitir una faena, lo que mandaba al operador a otorgar uno nuevo
+  que la regla de una bolsa por persona iba a rechazar. **Antes de usar
+  `estaVigente()` como permiso, preguntarse qué se está preguntando de verdad**:
+  hay `estaEnFecha()`, `puedeAmpliarse()`, `admiteAmpliacion()` y
+  `puedeEmitirFaena()`, y cada una mira cosas distintas.
+- **`monto` NO es una columna de `aprovechamientos_pesq`.** Lo que se cobra lo
+  calcula `montoACobrar()` leyendo el `valor_bs` de la escala con la que se
+  otorgó. Pedirlo como propiedad devuelve vacío en silencio —la misma trampa que
+  `pluck()` sobre una columna inexistente— y un ensayo que lo compare contra la
+  tarifa da en rojo por el lado equivocado.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **LAS PRUEBAS NO AVISAN SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Corren

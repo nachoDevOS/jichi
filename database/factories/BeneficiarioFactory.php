@@ -23,16 +23,16 @@ class BeneficiarioFactory extends Factory
             /*
              * La cédula se arma con unique() y no con un número al azar.
              *
-             * La tabla tiene un índice único parcial sobre (ci_nit,
-             * complemento): dos números repetidos en una tanda de 40 haría
-             * fallar el seeder con un error de base de datos, y con números al
-             * azar de 7 dígitos la repetición es más probable de lo que parece.
+             * La tabla tiene un índice único parcial sobre `ci`: dos números
+             * repetidos en una tanda de cuarenta harían fallar el seeder con un
+             * error de base de datos, y con números al azar de 7 dígitos la
+             * repetición es más probable de lo que parece.
              */
-            'ci_nit' => (string) fake()->unique()->numberBetween(1000000, 9999999),
+            'ci' => (string) fake()->unique()->numberBetween(1000000, 9999999),
             // En mayúscula, igual que lo guarda el formulario: el complemento se
-            // normaliza en GuardarBeneficiarioRequest::prepareForValidation(), y
-            // la factory no pasa por ahí. Sin el strtoupper, los datos sembrados
-            // muestran «8112684-8z» donde el sistema real muestra «8112684-8Z».
+            // normaliza en el Request, y la factory no pasa por ahí. Sin el
+            // strtoupper, los datos sembrados muestran «8112684-8z» donde el
+            // sistema real muestra «8112684-8Z».
             'complemento' => fake()->boolean(15) ? strtoupper(fake()->bothify('#?')) : null,
             'expedido' => fake()->randomElement(array_keys(config('jichi.expedido'))),
 
@@ -72,6 +72,21 @@ class BeneficiarioFactory extends Factory
             // Se guarda SIN el «de»: lo agrega el modelo al armar el nombre. Ver
             // Beneficiario::nombreCompleto().
             'apellidoCasado' => fake()->lastName(),
+        ]);
+    }
+
+    /**
+     * Sin segundo nombre ni apellido materno: el caso mínimo.
+     *
+     * Es el que más rompe maquetas —el nombre queda corto y los cálculos de
+     * encogido del carnet no se disparan— así que conviene tenerlo siempre en
+     * los datos de prueba en vez de esperar que salga por azar.
+     */
+    public function nombreCorto(): static
+    {
+        return $this->state(fn (): array => [
+            'segundoNombre' => null,
+            'apellidoMaterno' => null,
         ]);
     }
 }

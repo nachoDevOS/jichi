@@ -1,165 +1,120 @@
-import type { EstadoCarnet, EstadoTramite } from '@/types';
+import type { EstadoCarnet, TipoActor } from '@/types';
 
 /**
- * Tipos del módulo Carnets.
+ * Tipos del módulo Carnets — la credencial anual.
  *
- * Lo arma App\Http\Controllers\Panel\CarnetController.
+ * Describen, campo por campo, lo que arma
+ * App\Http\Controllers\Panel\CarnetController.
+ *
+ * ============================================================================
+ *  LAS TRES BANDERAS LLEGAN RESUELTAS, Y NINGUNA SE DEDUCE EN LA PANTALLA
+ * ============================================================================
+ *
+ *   - `vigente` mira el estado Y la fecha, porque la columna de estado la
+ *     escribe un comando diario y entre corrida y corrida miente.
+ *   - `cupo_kg` depende del TIPO DE ACTOR, que es un enum del servidor, nunca
+ *     del nombre del tipo de carnet — ese nombre es un catálogo editable.
+ *   - `puede_emitir_faenas` exige además una bolsa madre con saldo.
+ *
+ * Un `if` sobre el nombre del tipo en React sería una segunda copia de esas
+ * reglas, y se rompería en silencio en cuanto alguien renombre una fila.
  */
 
-/** Una fila del listado de carnets emitidos. */
+/** Un carnet, tal como lo pintan el listado y la ficha. */
 export interface CarnetFila {
     id: number;
-    /** El número impreso en el carnet: 000013. */
-    registro: string;
-    gestion: number;
-    beneficiario_id: number | null;
+    beneficiario_id: number;
     beneficiario: string | null;
-    documento_identidad: string | null;
-    estado: EstadoCarnet;
-    estado_etiqueta: string;
-    estado_color: string;
-    /** Calculado contra la fecha, no leído del estado. */
-    vigente: boolean;
-    /** La actividad del carnet. Es lo que distingue dos filas del mismo titular. */
-    rubro: string | null;
-    /** El cupo ya escrito como va impreso: «600 KG». Null si no se cargó. */
-    capacidad: string | null;
-    fecha_emision: string | null;
-    fecha_vencimiento: string | null;
-}
 
-/**
- * La ficha del carnet.
- *
- * Trae las DOS cosas, y cumplen papeles distintos:
- *
- *   REGISTRO  el número corto impreso en el plástico. Es público, no abre nada,
- *             y sirve para nombrar el carnet en ventanilla.
- *   FIRMA     el secreto que abre la verificación pública. NO se imprime: viaja
- *             solo dentro del QR.
- *
- * La firma se muestra en ESTA pantalla y en ninguna otra del panel, por un
- * motivo concreto: si el QR de alguien queda ilegible, esta es la única forma
- * de recuperarla y dictársela para que pueda verificar su carnet.
- */
-export interface CarnetFicha {
-    id: number;
-    gestion: number;
+    /** En grupos de cuatro: «PES2 6K7R J2M». Se guarda sin separadores. */
+    codigo: string;
+
+    /** El nombre del catálogo: «Carnet de Pescador». Es texto, no una regla. */
+    tipo: string | null;
+    /** La regla: de acá cuelga qué puede emitir y si lleva cupo. */
+    tipo_actor: TipoActor;
+    tipo_actor_etiqueta: string;
+    tipo_actor_color: string;
+    asociacion: string | null;
+
+    /** Los kilos impresos en el plástico. Null en un comercializador. */
+    cupo_kg: number | null;
+
     estado: EstadoCarnet;
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
-    /** Si se le puede presentar un trámite de actualización. */
-    admite_tramites: boolean;
+    /** Negativo si ya venció. Null si no tiene fecha. */
+    dias_para_vencer: number | null;
 
-    /**
-     * LA ACTIVIDAD DEL CARNET Y SU CUPO.
-     *
-     * Ocupan el lugar que tenía la lista `habilitaciones`: con un carnet por
-     * rubro no hay lista que mostrar, hay UN rubro y UN cupo, y los dos van
-     * impresos en el plástico.
-     */
-    rubro: string | null;
-    rubro_descripcion: string | null;
-    /** En kilos, para mostrar o comparar. `null` es «sin definir», no cero. */
-    capacidad_kg: number | null;
-    /** El mismo dato ya escrito como va impreso: «600 KG». */
-    capacidad: string | null;
-    /**
-     * Si esta actividad se autoriza por volumen.
-     *
-     * La ficha esconde el bloque del cupo cuando es `false`: mostrar «Cupo
-     * autorizado: sin definir» en un carnet de Comercializador no informa nada
-     * y sugiere que falta cargar un dato que no existe.
-     */
-    requiere_capacidad: boolean;
-
-    /**
-     * QUÉ PERMISO OPERATIVO PUEDE EMITIR ESTE CARNET.
-     *
-     * Lo decide el servidor —Carnet::puedeEmitirFaenas()— e incluye la vigencia,
-     * así que un carnet suspendido devuelve `false` y el botón no aparece.
-     */
     puede_emitir_faenas: boolean;
     puede_emitir_guias: boolean;
 
-    /**
-     * Si el RUBRO emite ese papel, sin mirar la vigencia.
-     *
-     * Es lo que decide si la sección se muestra: un carnet vencido ya no puede
-     * emitir, pero sigue teniendo que mostrar lo que emitió en su momento.
-     */
-    emite_faenas: boolean;
-    emite_guias: boolean;
+    monto: number;
+    saldo_pendiente: number;
+    pagado: boolean;
 
-    /** El total, que puede ser mayor que las 10 filas que trae la ficha. */
-    total_faenas: number;
-    total_guias: number;
-
-    /** Si el botón de suspender corresponde: solo desde vigente. */
-    puede_suspenderse: boolean;
-    /** Si corresponde el de levantar la suspensión: solo desde suspendido. */
-    puede_rehabilitarse: boolean;
-
+    /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
-    /** El número impreso en el carnet: 000013. */
-    registro: string;
-    /** En grupos de cuatro. Solo para dictarla cuando el QR no se puede leer. */
-    firma: string;
-    /** La dirección completa que se codifica en el QR impreso. */
-    url_verificacion: string;
-    /**
-     * Si el plástico se puede sacar. Lo decide Carnet::puedeImprimirse() y no
-     * esta pantalla: hace falta que el carnet no esté anulado y que tenga al
-     * menos un trámite APROBADO — el carnet nace con el trámite pendiente, y
-     * hasta que alguien lo firme no autoriza a nada.
-     */
-    puede_imprimirse: boolean;
 }
 
-/** El titular, tal como lo muestra la ficha del carnet. */
-export interface TitularCarnet {
-    id: number | null;
-    nombreCompleto: string | null;
-    documento_identidad: string | null;
+/** El carnet con el detalle que solo pinta la ficha. */
+export interface CarnetFicha extends CarnetFila {
     foto_url: string | null;
-    fechaNacimiento: string | null;
+    documento_identidad: string | null;
+    ciudad: string | null;
+    provincia: string | null;
+    /** El nombre completo de la asociación; en la tira del carnet va la sigla. */
+    asociacion_nombre: string | null;
+
+    /**
+     * La bolsa madre que respalda el cupo impreso. Null en un comercializador.
+     *
+     * Trae el SALDO y no solo el volumen porque es lo que decide si hoy se le
+     * puede emitir una faena, que es la pregunta que trae a alguien a esta
+     * ficha.
+     */
+    cupo: {
+        id: number;
+        volumen_total_kg: number;
+        saldo_kg: number;
+        porcentaje_usado: number;
+        vigente: boolean;
+    } | null;
 }
 
-/** Un expediente del carnet, en la pestaña de historial. */
-export interface TramiteDelCarnet {
+/** Una asociación elegible en el formulario de emisión. */
+export interface AsociacionElegible {
     id: number;
-    rubro: string | null;
-    tipo_etiqueta: string;
-    estado: EstadoTramite;
-    estado_etiqueta: string;
-    estado_color: string;
-    monto_requerido: number;
-    fecha_solicitud: string | null;
+    nombre: string;
+    sigla: string | null;
 }
 
-/** Una faena del carnet, en la ficha. Las últimas 10. */
-export interface FaenaDelCarnet {
+/** Un tipo de carnet elegible, con su arancel. */
+export interface TipoElegible {
     id: number;
-    nro_permiso: string;
-    estado_etiqueta: string;
-    estado_color: string;
-    embarcacion: string | null;
-    fecha_salida: string | null;
-    fecha_desembarque: string | null;
-    /** Ya escrito como va en el papel: «450 KG». */
-    cantidad: string | null;
+    nombre: string;
+    precio_bs: number;
 }
 
-/** Una guía del carnet, en la ficha. Las últimas 10. */
-export interface GuiaDelCarnet {
-    id: number;
-    nro_guia: string;
-    estado_etiqueta: string;
-    estado_color: string;
-    transporte_etiqueta: string;
-    destino_lugar: string | null;
-    total_kg: number;
-    fecha: string | null;
+/**
+ * El cupo vigente de la persona elegida, si lo tiene.
+ *
+ * La pantalla lo usa para avisar ANTES de guardar que un carnet de pescador sin
+ * cupo va a ser rechazado. El servidor lo comprueba igual dentro de la
+ * transacción; esto evita el viaje en falso.
+ */
+export interface CupoVigente {
+    volumen_total_kg: number;
+    saldo_kg: number;
+}
+
+/** Lo que el formulario de emisión manda de vuelta. */
+export interface FormularioCarnet {
+    beneficiario_id: number | null;
+    asociacion_id: number | string;
+    tipo_carnet_id: number | string;
+    tipo_actor: TipoActor | '';
+    fecha_emision: string;
 }

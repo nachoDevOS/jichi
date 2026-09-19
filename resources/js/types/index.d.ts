@@ -157,12 +157,80 @@ export type TipoTramite = 'emision_inicial' | 'actualizacion';
 /**
  * Espejo de App\Enums\EstadoCarnet.
  *
- * `suspendido` llegó al absorber el enum EstadoHabilitacion, que ya no existe:
- * con un carnet por rubro, cortar una actividad es suspender su carnet.
+ * `vencido` lo escribe un comando que corre una vez al día, así que esta
+ * columna puede estar desfasada: para saber si un carnet vale HOY, el servidor
+ * mira además `fecha_vencimiento`. La pantalla recibe la respuesta ya
+ * calculada y no la vuelve a deducir.
  */
-export type EstadoCarnet = 'vigente' | 'suspendido' | 'vencido' | 'anulado';
+export type EstadoCarnet = 'activo' | 'revocado' | 'vencido';
 
-/** Espejo de App\Enums\EstadoRubro. */
+/**
+ * Espejo de App\Enums\TipoActor.
+ *
+ * Es del DOCUMENTO, no de la persona: quien pesca y además comercializa tiene
+ * una ficha y dos carnets. De acá cuelga qué puede emitir cada credencial
+ * —faenas o guías— y si lleva cupo en kilos.
+ */
+export type TipoActor = 'pescador' | 'comercializador';
+
+/**
+ * Espejo de App\Enums\EstadoAprovechamiento.
+ *
+ *     PENDIENTE ──[se cobra entero]──▶ ACTIVO ──▶ AGOTADO | VENCIDO
+ *     (borrador)
+ *
+ * `pendiente` es el BORRADOR: otorgado y sin cobrar. Es el único estado en que
+ * el cupo se edita y se elimina, y el único en que NO autoriza a pescar — lo
+ * que habilita es la concesión pagada.
+ *
+ * `vencido` y `agotado` son distintos a propósito: al pescador se le dice algo
+ * distinto en cada caso —en uno renueva, en el otro pide ampliación de cupo—.
+ */
+export type EstadoAprovechamiento = 'pendiente' | 'activo' | 'vencido' | 'agotado';
+
+/**
+ * Espejo de App\Enums\ModalidadAprovechamiento.
+ *
+ * El RÉGIMEN bajo el que se autoriza el cupo, y lo que cambia entre los dos es
+ * una sola cosa: si se puede AMPLIAR sin volver a tramitar.
+ *
+ *   - `escala_general`   — cupo acumulativo. Las faenas lo descuentan y se
+ *                          recarga ampliándolo.
+ *   - `especie_especial` — paiche y lo que la resolución sume. Tasación fija y
+ *                          NO se amplía: agotado, hay que tramitar de nuevo.
+ *
+ * Vive en el TRAMO de la escala —la fija la resolución, no el operador— y se
+ * COPIA al cupo al otorgarlo, por lo mismo que el volumen: reclasificar el
+ * tramo no puede cambiarle el régimen a lo ya otorgado.
+ */
+export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
+
+/** Espejo de App\Enums\EstadoFaena. */
+export type EstadoFaena = 'activo' | 'completado' | 'vencido';
+
+/** Espejo de App\Enums\EstadoGuia. */
+export type EstadoGuia = 'activa' | 'cerrada' | 'anulada';
+
+/** Espejo de App\Enums\MetodoPago. */
+export type MetodoPago = 'efectivo' | 'transferencia' | 'qr';
+
+/**
+ * Espejo de App\Enums\EstadoAsociacion.
+ *
+ * Una asociación NO se borra: se pone inactiva. Los carnets y las guías ya
+ * emitidas apuntan a ella, y una asociación inactiva desaparece de los
+ * desplegables de alta pero los documentos históricos la siguen mostrando — que
+ * es lo correcto, porque la persona pertenecía a ella cuando se le emitió el
+ * carnet.
+ */
+export type EstadoAsociacion = 'activo' | 'inactivo';
+
+/**
+ * Espejo de App\Enums\EstadoRubro.
+ *
+ * ⚠️ Los rubros ya no existen en la base. El tipo queda mientras las pantallas
+ * del modelo anterior sigan compilando; se va con ellas.
+ */
 export type EstadoRubro = 'activo' | 'inactivo';
 
 /**

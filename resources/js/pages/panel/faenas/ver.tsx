@@ -1,359 +1,268 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Ban, BadgeCheck, Receipt, Ship, User } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { BadgeCheck, CalendarX, CheckCheck, Waves } from 'lucide-react';
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
+import { Input } from '@/components/ui/input';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha, fechaHora } from '@/lib/utils';
-import type { CarnetDeFaena, FaenaFicha, PagoDePermiso } from '@/types/faenas';
+import { fecha } from '@/lib/utils';
+import type { FaenaFicha } from '@/types/faenas';
 
 /**
- * La ficha de una faena.
+ * ============================================================================
+ *  LA FICHA DE UNA FAENA
+ * ============================================================================
  *
  * ----------------------------------------------------------------------------
- *  LA ÚNICA ACCIÓN ES ANULAR, Y EXIGE MOTIVO
+ *  CERRAR LA FAENA ES LA ACCIÓN, Y ESTÁ ARRIBA DE TODO
  * ----------------------------------------------------------------------------
  *
- * No hay «editar»: el papel del talonario ya está en manos del pescador, y
- * cambiar el sistema sin poder cambiar el papel deja a los dos diciendo cosas
- * distintas. Tampoco hay «eliminar»: el número ya se gastó y un hueco en la
- * serie no se puede explicar después.
+ * Quien abre esta pantalla casi siempre viene porque el pescador volvió. Por
+ * eso el formulario de cierre es lo primero, con los kilos declarados ya
+ * puestos: en la mayoría de los casos coinciden con la balanza y alcanza con
+ * confirmar.
  *
- * El motivo es obligatorio porque es lo ÚNICO que va a quedar explicando por qué
- * ese número dejó de valer.
+ * ----------------------------------------------------------------------------
+ *  COMPLETAR NO CAMBIA EL SALDO, Y ESO SORPRENDE
+ * ----------------------------------------------------------------------------
+ *
+ * Los kilos ya estaban descontados desde que la faena se emitió: una faena
+ * ACTIVA consume cupo aunque no se haya descargado nada. Si solo contaran las
+ * completadas, un pescador podría tener diez faenas abiertas por el volumen
+ * entero cada una.
+ *
+ * Lo que sí mueve el saldo es CORREGIR los kilos al cerrar.
  */
-export default function VerFaena({
-    faena,
-    beneficiario,
-    carnet,
-    pagos,
-}: {
-    faena: FaenaFicha;
-    beneficiario: {
-        id: number | null;
-        nombreCompleto: string | null;
-        documento_identidad: string | null;
-        foto_url: string | null;
-    };
-    carnet: CarnetDeFaena;
-    pagos: PagoDePermiso[];
-}) {
+export default function VerFaena({ faena }: { faena: FaenaFicha }) {
     const { puede } = usePermisos();
-    const [confirmando, setConfirmando] = useState(false);
+    const [cerrando, setCerrando] = useState(false);
 
-    const form = useForm({ motivo: '' });
-
-    function anular() {
-        form.patch(route('faenas.anular', faena.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setConfirmando(false);
-                form.reset();
-            },
-        });
-    }
+    const form = useForm({ kilos_extraidos: String(faena.kilos_extraidos) });
 
     return (
         <LayoutPanel
-            titulo={`Faena ${faena.nro_permiso}`}
-            descripcion="Permiso por salida de pesca."
+            titulo={faena.etiqueta}
+            descripcion={`${faena.beneficiario ?? '—'} · ${faena.carnet_codigo ?? ''}`}
             acciones={
-                faena.puede_anularse &&
-                puede('faenas.anular') && (
-                    <Button variant="destructive" onClick={() => setConfirmando(true)}>
-                        <Ban className="size-4" />
-                        Anular
-                    </Button>
-                )
+                <div className="flex flex-wrap gap-2">
+                    {faena.beneficiario_id !== null && (
+                        <Button
+                            variant="outline"
+                            onClick={() => router.visit(route('beneficiarios.show', faena.beneficiario_id!))}
+                        >
+                            Ver al pescador
+                        </Button>
+                    )}
+
+                    {faena.cupo && (
+                        <Button
+                            variant="outline"
+                            onClick={() => router.visit(route('aprovechamientos.show', faena.cupo!.id))}
+                        >
+                            <Waves className="size-4" />
+                            Ver cupo
+                        </Button>
+                    )}
+
+                    {/*
+                        `puede_completarse` llega resuelto: exige que la faena
+                        esté EN CURSO. Sobre una vencida no se puede — al vencer
+                        ya devolvió los kilos, y completarla los volvería a
+                        descontar de un cupo que se repuso.
+                    */}
+                    {puede('faenas.completar') && faena.puede_completarse && (
+                        <Button onClick={() => setCerrando((v) => !v)}>
+                            <CheckCheck className="size-4" />
+                            Registrar la vuelta
+                        </Button>
+                    )}
+                </div>
             }
         >
-            <Head title={`Faena ${faena.nro_permiso}`} />
+            <Head title={faena.etiqueta} />
 
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="space-y-6 lg:col-span-2">
-                    <Card>
-                        <CardHeader className="flex-row items-center justify-between gap-3">
-                            <CardTitle>Permiso</CardTitle>
-                            <div className="flex items-center gap-2">
-                                <Badge color={faena.estado_color}>{faena.estado_etiqueta}</Badge>
-
-                                {/*
-                                    «Vigente» no es lo mismo que «emitida»: mira
-                                    además la ventana de fechas Y el carnet. Un
-                                    carnet suspendido en marzo no deja vigentes
-                                    las faenas de febrero. Lo decide el servidor.
-                                */}
-                                {faena.estado === 'emitido' && (
-                                    <Badge color={faena.vigente ? 'emerald' : 'slate'}>
-                                        {faena.vigente ? 'Autoriza hoy' : 'Fuera de fecha'}
-                                    </Badge>
-                                )}
-                            </div>
-                        </CardHeader>
-
-                        <CardContent className="grid gap-4 sm:grid-cols-2">
-                            <Dato etiqueta="Nº de permiso" valor={faena.nro_permiso} mono />
-                            <Dato etiqueta="Nº de recibo" valor={faena.nro_recibo} mono />
-                            <Dato etiqueta="Salida" valor={fecha(faena.fecha_salida)} />
-                            <Dato etiqueta="Desembarque" valor={fecha(faena.fecha_desembarque)} />
-                            <Dato
-                                etiqueta="Días autorizados"
-                                valor={faena.dias_autorizados ? `${faena.dias_autorizados}` : null}
-                            />
-                            <Dato etiqueta="Cantidad autorizada" valor={faena.cantidad} destacado />
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Embarcación y recorrido</CardTitle>
-                        </CardHeader>
-                        <CardContent className="grid gap-4 sm:grid-cols-2">
-                            <Dato etiqueta="Embarcación" valor={faena.embarcacion} />
-                            <Dato etiqueta="Comandante" valor={faena.comandante_barco} />
-                            <Dato etiqueta="Propietario" valor={faena.propietario} />
-                            <Dato etiqueta="Matrícula naval" valor={faena.matricula_naval} mono />
-                            <Dato etiqueta="Nº de kardex" valor={faena.nro_kardex} mono />
-                            <Dato etiqueta="Región de salida" valor={faena.region_desde} />
-                            <Dato etiqueta="Región de destino" valor={faena.region_hasta} />
-                        </CardContent>
-                    </Card>
-
-                    {faena.observaciones && (
-                        <Card>
+                    {cerrando && faena.puede_completarse && (
+                        <Card className="border-emerald-300 bg-emerald-50/50 dark:border-emerald-500/40 dark:bg-emerald-500/5">
                             <CardHeader>
-                                <CardTitle>Observaciones</CardTitle>
+                                <CardTitle>Registrar la vuelta</CardTitle>
                             </CardHeader>
+
                             <CardContent>
-                                {/* whitespace-pre-line: el motivo de la anulación
-                                    se antepone con un salto de línea. */}
-                                <p className="whitespace-pre-line text-sm">{faena.observaciones}</p>
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        form.patch(route('faenas.completar', faena.id), {
+                                            preserveScroll: true,
+                                            onSuccess: () => setCerrando(false),
+                                        });
+                                    }}
+                                    className="space-y-4"
+                                >
+                                    <Campo
+                                        etiqueta="Kilos descargados"
+                                        htmlFor="kilos_extraidos"
+                                        error={form.errors.kilos_extraidos}
+                                        ayuda="Viene con lo declarado al salir. Corríjalo solo si la balanza dijo otra cosa; hacia arriba se vuelve a comprobar el cupo."
+                                        className="max-w-xs"
+                                    >
+                                        <Input
+                                            id="kilos_extraidos"
+                                            type="number"
+                                            step="0.01"
+                                            min={0}
+                                            value={form.data.kilos_extraidos}
+                                            onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
+                                            aria-invalid={Boolean(form.errors.kilos_extraidos)}
+                                        />
+                                    </Campo>
+
+                                    <div className="flex gap-2">
+                                        <Button type="submit" disabled={form.processing}>
+                                            Completar faena
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setCerrando(false)}
+                                        >
+                                            Cancelar
+                                        </Button>
+                                    </div>
+                                </form>
                             </CardContent>
                         </Card>
                     )}
 
                     <Card>
-                        <CardHeader className="flex-row items-center justify-between gap-3">
-                            <CardTitle>Cobro</CardTitle>
-                            <Badge color={faena.pagada ? 'emerald' : 'amber'}>
-                                {faena.pagada ? 'Cubierto' : `Debe ${bs(faena.saldo)}`}
-                            </Badge>
+                        <CardHeader>
+                            <CardTitle>La salida</CardTitle>
                         </CardHeader>
 
                         <CardContent className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <Dato etiqueta="Costo" valor={bs(faena.monto)} />
-                                <Dato etiqueta="Cobrado" valor={bs(faena.monto_pagado)} />
-                                <Dato etiqueta="Saldo" valor={bs(faena.saldo)} destacado />
-                            </div>
+                            <Situacion faena={faena} />
 
-                            {pagos.length === 0 ? (
-                                /*
-                                 * El alta de pagos de faenas todavía no tiene
-                                 * pantalla: `PagoTramiteService` solo sabe de
-                                 * trámites. Se dice en vez de mostrar un botón
-                                 * que no existe, para que nadie lo busque.
-                                 */
-                                <p className="text-sm text-muted-foreground">
-                                    Sin depósitos registrados.
-                                </p>
-                            ) : (
-                                <ul className="divide-y divide-border rounded-md border border-border">
-                                    {pagos.map((p) => (
-                                        <li
-                                            key={p.id}
-                                            className="flex items-center justify-between gap-3 p-3 text-sm"
-                                        >
-                                            <div className="min-w-0">
-                                                <p className="font-mono text-xs">{p.nro_transaccion}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {fechaHora(p.fecha_pago)}
-                                                </p>
-                                            </div>
-
-                                            <span className="tabular-nums">{bs(p.monto)}</span>
-
-                                            {p.comprobante_url && (
-                                                <a
-                                                    href={p.comprobante_url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    Boleta
-                                                </a>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+                                <Dato etiqueta="Kilos" valor={`${faena.kilos_extraidos} kg`} />
+                                <Dato etiqueta="Salida" valor={fecha(faena.fecha_salida)} />
+                                <Dato etiqueta="Límite" valor={fecha(faena.fecha_limite)} />
+                                <Dato etiqueta="Asociación" valor={faena.asociacion ?? '—'} />
+                            </dl>
                         </CardContent>
                     </Card>
                 </div>
 
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Titular</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
-                                    {beneficiario.foto_url ? (
-                                        <img
-                                            src={beneficiario.foto_url}
-                                            alt=""
-                                            className="size-full object-cover"
-                                        />
-                                    ) : (
-                                        <User className="size-5 text-muted-foreground" />
-                                    )}
-                                </div>
+                <Card className="h-fit">
+                    <CardHeader>
+                        <CardTitle>Cupo del que salió</CardTitle>
+                    </CardHeader>
 
-                                <div className="min-w-0">
-                                    <p className="truncate font-medium">
-                                        {beneficiario.nombreCompleto ?? '—'}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {beneficiario.documento_identidad ?? '—'}
-                                    </p>
-                                </div>
-                            </div>
+                    <CardContent className="space-y-3 text-sm">
+                        {faena.cupo === null ? (
+                            <p className="text-muted-foreground">Sin cupo asociado.</p>
+                        ) : (
+                            <>
+                                <Dato etiqueta="Escala" valor={String(faena.cupo.escala ?? '—')} />
+                                <BarraSaldo cupo={faena.cupo} />
 
-                            {beneficiario.id && (
-                                <Link
-                                    href={route('beneficiarios.show', beneficiario.id)}
-                                    className="text-sm text-primary hover:underline"
-                                >
-                                    Ver ficha del beneficiario
-                                </Link>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Carnet</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <BadgeCheck className="size-5 shrink-0 text-muted-foreground" />
-                                <div className="min-w-0">
-                                    <p className="font-mono text-sm">{carnet.registro ?? '—'}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {carnet.rubro} {carnet.gestion}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/*
-                                Si el carnet dejó de valer, la faena tampoco
-                                autoriza — aunque sus fechas todavía no hayan
-                                pasado. Se avisa acá porque es donde el operador
-                                va a buscar la explicación.
-                            */}
-                            {!carnet.vigente && (
-                                <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                                    El carnet ya no está vigente, así que esta faena tampoco autoriza.
+                                {/*
+                                    Se dice explícitamente si ESTA faena está
+                                    pesando sobre ese saldo: una vencida no, y sin
+                                    la aclaración el número de arriba parece no
+                                    cuadrar con la lista de faenas.
+                                */}
+                                <p className="text-xs text-muted-foreground">
+                                    {faena.consume_cupo
+                                        ? 'Esta faena está descontando sus kilos del saldo.'
+                                        : 'Esta faena venció: sus kilos volvieron al cupo.'}
                                 </p>
-                            )}
-
-                            {carnet.id && (
-                                <Link
-                                    href={route('carnets.show', carnet.id)}
-                                    className="text-sm text-primary hover:underline"
-                                >
-                                    Ver carnet
-                                </Link>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Atajos</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm">
-                            <Link
-                                href={route('faenas.index')}
-                                className="flex items-center gap-2 text-primary hover:underline"
-                            >
-                                <Ship className="size-4" />
-                                Todas las faenas
-                            </Link>
-
-                            <Link
-                                href={route('pagos.index', { buscar: '' })}
-                                className="flex items-center gap-2 text-primary hover:underline"
-                            >
-                                <Receipt className="size-4" />
-                                Libro de caja
-                            </Link>
-                        </CardContent>
-                    </Card>
-                </div>
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
-
-            <ConfirmarConMotivo
-                abierto={confirmando}
-                titulo={`Anular la faena ${faena.nro_permiso}`}
-                descripcion={
-                    <>
-                        El número del talonario queda usado para siempre: no se puede volver a
-                        emitir con él. Para reemplazar este permiso hay que sacar otro con un
-                        número nuevo.
-                    </>
-                }
-                etiquetaMotivo="Motivo de la anulación"
-                ayuda="Es lo único que va a explicar después por qué este número no vale."
-                placeholder="Ej.: el formulario se anuló por error de tipeo en la embarcación."
-                textoConfirmar="Anular faena"
-                valor={form.data.motivo}
-                onCambiar={(v) => form.setData('motivo', v)}
-                error={form.errors.motivo}
-                procesando={form.processing}
-                onConfirmar={anular}
-                onCancelar={() => setConfirmando(false)}
-            />
         </LayoutPanel>
     );
 }
 
 /**
- * Un par etiqueta/valor de la ficha.
+ * En qué situación está la salida, en una frase.
  *
- * Vive acá y no en `components/ui/` porque es la forma de ESTA pantalla y de la
- * de guías; subirlo a un componente compartido antes de tener un tercer uso
- * sería inventar una abstracción para dos casos.
+ * Los tres casos se resuelven con banderas que ya llegaron del servidor. El que
+ * importa es el del medio: una faena que se pasó de fecha y sigue activa es un
+ * papel que alguien se llevó y del que nadie registró la vuelta — no es una
+ * previsión, es algo que hay que ir a buscar.
  */
-function Dato({
-    etiqueta,
-    valor,
-    mono = false,
-    destacado = false,
+function Situacion({ faena }: { faena: FaenaFicha }) {
+    if (faena.caducada) {
+        return (
+            <Marco
+                clase="bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
+                icono={<CalendarX className="mt-0.5 size-5 shrink-0" />}
+                titulo="Venció sin cerrarse"
+                texto="El pescador se llevó el papel y nadie registró la vuelta. Sus kilos ya volvieron al cupo; el número del talonario queda ocupado igual."
+            />
+        );
+    }
+
+    if (faena.vigente) {
+        return (
+            <Marco
+                clase="bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200"
+                icono={<BadgeCheck className="mt-0.5 size-5 shrink-0" />}
+                titulo="En curso"
+                texto={`Autoriza a pescar hasta el ${fecha(faena.fecha_limite)}. Sus kilos ya están descontados del cupo.`}
+            />
+        );
+    }
+
+    return (
+        <Marco
+            clase="bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
+            icono={<CheckCheck className="mt-0.5 size-5 shrink-0" />}
+            titulo={faena.estado_etiqueta}
+            texto={
+                faena.estado === 'completado'
+                    ? 'El pescador volvió y descargó. El volumen quedó firme contra el cupo.'
+                    : 'La salida ya no autoriza nada.'
+            }
+        />
+    );
+}
+
+function Marco({
+    clase,
+    icono,
+    titulo,
+    texto,
 }: {
-    etiqueta: string;
-    valor: ReactNode;
-    /** Para números y códigos: se alinean mejor en monoespaciada. */
-    mono?: boolean;
-    destacado?: boolean;
+    clase: string;
+    icono: React.ReactNode;
+    titulo: string;
+    texto: string;
 }) {
     return (
+        <div className={`flex items-start gap-3 rounded-md p-4 text-sm ${clase}`}>
+            {icono}
+            <div>
+                <p className="font-medium">{titulo}</p>
+                <p className="opacity-80">{texto}</p>
+            </div>
+        </div>
+    );
+}
+
+function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+    return (
         <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</p>
-            <p
-                className={[
-                    'mt-0.5',
-                    mono ? 'font-mono text-sm' : 'text-sm',
-                    destacado ? 'font-semibold' : '',
-                ].join(' ')}
-            >
-                {valor || '—'}
-            </p>
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</dt>
+            <dd className="font-medium tabular-nums">{valor}</dd>
         </div>
     );
 }

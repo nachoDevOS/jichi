@@ -1,9 +1,9 @@
 import { Head, usePage } from '@inertiajs/react';
-import { BadgeCheck, CheckCheck, FileText, Wallet } from 'lucide-react';
+import { BadgeCheck, FileText, Wallet, Waves } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { MiniBarras, MiniLinea } from '@/components/panel/dashboard/mini-grafico';
-import { PanelCierreGestion } from '@/components/panel/dashboard/panel-cierre-gestion';
-import { TablaUltimosTramites } from '@/components/panel/dashboard/tabla-ultimos-tramites';
+import { PanelAvisos } from '@/components/panel/dashboard/panel-avisos';
+import { TablaUltimosCarnets } from '@/components/panel/dashboard/tabla-ultimos-carnets';
 import { DesglosePie, WidgetEstadistica } from '@/components/panel/dashboard/widget-estadistica';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,12 +12,12 @@ import { bs } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type {
     ActividadDia,
-    AvisoCierreGestion,
-    CarnetsPorRubro,
+    Avisos,
+    CarnetsPorActor,
+    CarnetsPorTipo,
     RecaudacionMes,
     ResumenDelDia,
-    TramitesPorTipo,
-    UltimoTramite,
+    UltimoCarnet,
 } from '@/types/dashboard';
 
 /**
@@ -30,13 +30,13 @@ import type {
  * tablero.
  *
  * El motivo es concreto y se medía: los dos gráficos usan `recharts`, y por
- * arrastrarla el tablero pesaba **373 kB** — más que React entero—. Es la
+ * arrastrarla el tablero pesaba **373 kB** —más que React entero—. Es la
  * pantalla a la que cae TODO el mundo apenas entra, así que ese peso lo pagaba
  * cada persona en cada ingreso, antes de ver un solo número.
  *
- * Y los números son lo accionable: «cuántos trámites hay sin resolver», «cuánto
- * se recaudó hoy». Los gráficos son contexto. Separándolos, lo importante
- * aparece de inmediato y lo demás llega un instante después, solo.
+ * Y los números son lo accionable: «cuánta gente está habilitada», «cuánto se
+ * recaudó hoy». Los gráficos son contexto. Separándolos, lo importante aparece
+ * de inmediato y lo demás llega un instante después, solo.
  *
  * LAS LÍNEAS CHICAS DE LOS CUATRO INDICADORES NO PASAN POR ACÁ: están dibujadas
  * a mano en SVG justamente para no volver a meter recharts arriba de todo y
@@ -47,12 +47,12 @@ import type {
  * El `fallback` es un recuadro de la MISMA altura —ver GraficoCargando—, así
  * la página no salta cuando el gráfico aparece.
  */
-const GraficoCarnetsPorRubro = lazy(() =>
-    import('@/components/panel/dashboard/grafico-carnets-por-rubro').then((m) => ({
+const GraficoCarnetsPorTipo = lazy(() =>
+    import('@/components/panel/dashboard/grafico-carnets-por-tipo').then((m) => ({
         // lazy() espera un módulo con `default`, y estos componentes se exportan
         // por nombre —como todos los del sistema—. Esto los adapta sin tener que
         // cambiar la forma en que se exportan.
-        default: m.GraficoCarnetsPorRubro,
+        default: m.GraficoCarnetsPorTipo,
     })),
 );
 
@@ -73,20 +73,20 @@ export default function Dashboard({
     gestion,
     resumen,
     porDia,
-    porRubro,
+    porTipoCarnet,
     porMes,
-    porTipo,
-    ultimosTramites,
-    porVencer,
+    porActor,
+    ultimosCarnets,
+    avisos,
 }: {
     gestion: number;
     resumen: ResumenDelDia;
     porDia: ActividadDia[];
-    porRubro: CarnetsPorRubro[];
+    porTipoCarnet: CarnetsPorTipo[];
     porMes: RecaudacionMes[];
-    porTipo: TramitesPorTipo[];
-    ultimosTramites: UltimoTramite[];
-    porVencer: AvisoCierreGestion;
+    porActor: CarnetsPorActor[];
+    ultimosCarnets: UltimoCarnet[];
+    avisos: Avisos;
 }) {
     const { institucion } = usePage<PageProps>().props;
 
@@ -99,28 +99,26 @@ export default function Dashboard({
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <WidgetEstadistica
                         tono={1}
-                        icono={FileText}
-                        etiqueta="Trámites sin resolver"
-                        valor={String(resumen.tramites_abiertos)}
-                        // El dato accionable no es cuántos hay, sino cuántos se
-                        // pueden resolver ya: los que están cobrados.
-                        pie={`${resumen.listos_para_aprobar} listos para aprobar`}
+                        icono={BadgeCheck}
+                        etiqueta="Carnets vigentes"
+                        valor={String(resumen.carnets_vigentes)}
+                        pie={`${resumen.carnets_gestion} emitidos en la gestión`}
                     >
                         {/*
-                            Los dos pedazos son EXCLUYENTES —un expediente está
-                            en revisión o está pendiente, nunca en las dos—, que
-                            es lo que la barra necesita para no mentir. «Listos
-                            para aprobar» no entra acá justamente por eso: los
-                            cobrados están repartidos entre los dos estados y
-                            sumarlos como un tercer pedazo contaría gente dos
-                            veces. Va como texto arriba.
+                            Un carnet emitido este año puede estar vigente o no
+                            —vencido, revocado—, así que los dos pedazos suman
+                            exactamente los emitidos de la gestión y la barra no
+                            puede mentir.
                         */}
                         <DesglosePie
                             partes={[
-                                { etiqueta: 'en revisión', cantidad: resumen.tramites_en_revision },
+                                { etiqueta: 'vigentes', cantidad: resumen.carnets_vigentes },
                                 {
-                                    etiqueta: 'pendientes',
-                                    cantidad: resumen.tramites_abiertos - resumen.tramites_en_revision,
+                                    etiqueta: 'no vigentes',
+                                    cantidad: Math.max(
+                                        0,
+                                        resumen.carnets_gestion - resumen.carnets_vigentes,
+                                    ),
                                 },
                             ]}
                         />
@@ -128,38 +126,35 @@ export default function Dashboard({
 
                     <WidgetEstadistica
                         tono={2}
-                        icono={CheckCheck}
-                        etiqueta="Trámites de hoy"
-                        valor={String(resumen.tramites_hoy)}
-                        pie="Movimiento de los últimos 14 días"
+                        icono={FileText}
+                        etiqueta="Documentos de hoy"
+                        valor={String(resumen.documentos_hoy)}
+                        pie="Carnets, faenas y guías · últimos 14 días"
                     >
                         {/* Barras y no línea: son conteos enteros. Ver el
                             comentario de MiniBarras. */}
                         <MiniBarras
-                            valores={porDia.map((d) => d.tramites)}
+                            valores={porDia.map((d) => d.documentos)}
                             className="h-10 w-full"
                         />
                     </WidgetEstadistica>
 
                     <WidgetEstadistica
                         tono={3}
-                        icono={BadgeCheck}
-                        etiqueta={`Carnets vigentes ${gestion}`}
-                        valor={String(resumen.carnets_vigentes)}
-                        pie={`${resumen.carnets_gestion} emitidos en la gestión`}
+                        icono={Waves}
+                        etiqueta="Permisos vigentes"
+                        valor={String(resumen.faenas_vigentes + resumen.guias_vigentes)}
+                        pie={`${resumen.cupos_activos} cupo(s) de pesca activo(s)`}
                     >
                         {/*
-                            Un carnet emitido este año puede estar vigente o no
-                            —vencido, anulado—, así que los dos pedazos suman
-                            exactamente los emitidos de la gestión.
+                            Faenas y guías son EXCLUYENTES —un permiso es de uno
+                            o del otro tipo, nunca de los dos—, que es lo que la
+                            barra necesita para que los pedazos sumen el total.
                         */}
                         <DesglosePie
                             partes={[
-                                { etiqueta: 'vigentes', cantidad: resumen.carnets_vigentes },
-                                {
-                                    etiqueta: 'no vigentes',
-                                    cantidad: resumen.carnets_gestion - resumen.carnets_vigentes,
-                                },
+                                { etiqueta: 'faenas', cantidad: resumen.faenas_vigentes },
+                                { etiqueta: 'guías', cantidad: resumen.guias_vigentes },
                             ]}
                         />
                     </WidgetEstadistica>
@@ -169,7 +164,9 @@ export default function Dashboard({
                         icono={Wallet}
                         etiqueta="Recaudado este mes"
                         valor={bs(resumen.recaudado_mes, institucion.moneda)}
-                        pie={`Hoy: ${bs(resumen.recaudado_hoy, institucion.moneda)}`}
+                        // El dato accionable no es cuánto entró, sino cuánto
+                        // falta entrar: eso es trabajo de cobranza pendiente.
+                        pie={`Hoy: ${bs(resumen.recaudado_hoy, institucion.moneda)} · Por cobrar: ${bs(resumen.por_cobrar, institucion.moneda)}`}
                     >
                         <MiniLinea
                             valores={porDia.map((d) => d.recaudado)}
@@ -186,29 +183,29 @@ export default function Dashboard({
                         <GraficoRecaudacionMensual datos={porMes} moneda={institucion.moneda} />
                     </Suspense>
 
-                    <TiposDeTramite datos={porTipo} gestion={gestion} />
+                    <RepartoPorActividad datos={porActor} gestion={gestion} />
                 </div>
 
-                {/* -------------------------------------- Rubros y fin de gestión */}
+                {/* ------------------------------------------ Tipos y avisos */}
                 <div className="grid gap-4 lg:grid-cols-4">
                     <Suspense
                         fallback={
                             <GraficoCargando
-                                titulo="Carnets por rubro"
+                                titulo="Carnets por tipo"
                                 alto="h-72"
                                 className="lg:col-span-2"
                             />
                         }
                     >
-                        <GraficoCarnetsPorRubro datos={porRubro} gestion={gestion} />
+                        <GraficoCarnetsPorTipo datos={porTipoCarnet} gestion={gestion} />
                     </Suspense>
 
-                    <PanelCierreGestion aviso={porVencer} gestion={gestion} />
+                    <PanelAvisos avisos={avisos} />
                 </div>
 
                 {/* ----------------------------------------------------- Tabla */}
                 <div className="grid gap-4 lg:grid-cols-3">
-                    <TablaUltimosTramites tramites={ultimosTramites} moneda={institucion.moneda} />
+                    <TablaUltimosCarnets carnets={ultimosCarnets} moneda={institucion.moneda} />
                 </div>
             </div>
         </LayoutPanel>
@@ -250,25 +247,25 @@ function GraficoCargando({
 }
 
 /**
- * Emisiones iniciales contra adiciones de rubro.
+ * Pescadores contra comercializadores, entre los carnets vigentes.
  *
- * Es el número que muestra cómo está funcionando la Regla A: cuánta gente saca
- * carnet por primera vez este año y cuánta ya lo tenía y viene a sumar
- * actividades. Va como dos cifras y no como gráfico porque son dos valores: un
- * gráfico de torta con dos porciones no agrega nada que el número no diga.
+ * Va como dos cifras y no como gráfico porque son dos valores: una torta con
+ * dos porciones no agrega nada que el número no diga, y costaría traer
+ * recharts a la parte de arriba de la pantalla —que es justo lo que la carga
+ * diferida vino a evitar—.
  */
-function TiposDeTramite({ datos, gestion }: { datos: TramitesPorTipo[]; gestion: number }) {
+function RepartoPorActividad({ datos, gestion }: { datos: CarnetsPorActor[]; gestion: number }) {
     const total = datos.reduce((suma, d) => suma + d.cantidad, 0);
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Tipos de trámite</CardTitle>
+                <CardTitle>Por actividad</CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                    Gestión {gestion} · {total} trámite(s)
+                    Gestión {gestion} · {total} carnet(s) vigente(s)
                 </p>
 
                 {datos.map((d) => (

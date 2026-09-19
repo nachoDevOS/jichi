@@ -13,57 +13,64 @@ use Inertia\Response;
 
 /**
  * ============================================================================
- *  VERIFICACIÓN PÚBLICA — la única pantalla sin sesión del sistema
+ *  VERIFICACIÓN PÚBLICA DE CARNETS — la única pantalla sin sesión
  * ============================================================================
  *
- * Es la URL que apunta el QR impreso en cada carnet. Un pescador muestra su
- * documento, el inspector lo escanea con el teléfono y cae acá, que le dice si
- * el carnet es real, si está vigente y para qué rubros habilita.
+ * Un pescador muestra su carnet, el inspector lee el código con el teléfono y
+ * cae en esta pantalla, que le dice si el documento es real, si está vigente y
+ * qué actividad autoriza. Por eso NO puede pedir login.
  *
  * ----------------------------------------------------------------------------
- *  UN SOLO DATO: LA FIRMA DE VALIDACIÓN
+ *  HACE FALTA UN SOLO DATO: EL CÓDIGO DEL CARNET
  * ----------------------------------------------------------------------------
  *
- * El carnet no tiene número. Se identifica por su firma: dieciséis caracteres
- * alfanuméricos generados al azar, únicos, impresos en el plástico y dentro del
- * QR.
+ * `carnets.codigo_carnet` es único GLOBAL —no por tipo— justamente para esto:
+ * un control en ruta lee un código y tiene que llegar a UN documento, sin
+ * preguntar antes de qué tipo es.
  *
- * Antes hacían falta dos datos —un código público y una firma secreta— porque el
- * código era predecible. Al retirarse el código, la firma cumple los dos papeles,
- * y eso funciona porque es IMPREDECIBLE: 16 caracteres alfanuméricos son ~8 ·
- * 10^24 combinaciones. Con el throttle de la ruta, adivinar una no es posible en
- * la práctica.
+ * LO QUE ESTO CUESTA, Y HAY QUE TENERLO PRESENTE: el código va IMPRESO en el
+ * plástico, así que quien tenga el carnet en la mano —o una foto— puede
+ * consultarlo. Se aceptó porque lo que se muestra acá es deliberadamente poco:
+ * nombre, cédula enmascarada, actividad y vigencia. Nada que no esté ya en la
+ * tarjeta que esa persona está mirando.
  *
- * La contrapartida, y conviene tenerla presente: quien tenga la firma puede
- * consultar ese carnet. Es el mismo nivel de acceso que tiene quien sostiene el
- * plástico en la mano, así que está bien — pero ya no hay un dato «público» que
- * se pueda compartir sin dar también la consulta.
+ * Lo que sí protege del barrido automático es el `throttle` de la ruta. Un
+ * código corto y predecible sería adivinable, así que al generarlo conviene que
+ * lleve una parte al azar; eso es responsabilidad del módulo de carnets.
  *
  * ----------------------------------------------------------------------------
- *  LO QUE NO SE MUESTRA
+ *  REGLA DE ORO DE ESTA PARTE DEL SISTEMA
  * ----------------------------------------------------------------------------
  *
- * Nunca la cédula completa, ni dirección, ni teléfono, ni correo, ni el id
- * interno de ninguna tabla. El inspector necesita saber si el documento vale y
- * de quién es; todo lo demás sería exponer datos personales a cualquiera que
- * levante un carnet del suelo. Ver datosPublicos().
+ * Acá solo puede aparecer lo mínimo para constatar que un carnet es auténtico.
+ * Nunca la cédula completa, ni la dirección, ni el teléfono. Cada campo que se
+ * agregue queda expuesto a cualquiera. Ver datosPublicos().
  */
 class VerificacionController extends Controller
 {
-    public function show(?string $firma = null): Response
+    /**
+     * Largo mínimo aceptado antes de ir a la base.
+     *
+     * No es una regla de negocio sino un filtro barato: un código de dos letras
+     * no puede existir, y cortando acá una URL manipulada ni siquiera llega a
+     * consultar.
+     */
+    private const LARGO_MINIMO = 6;
+
+    public function show(?string $codigo = null): Response
     {
-        $carnet = $firma ? $this->buscarCarnet($firma) : null;
+        $carnet = $codigo ? $this->buscarCarnet($codigo) : null;
 
         return Inertia::render('publico/verificar', [
-            // Se devuelve lo que se buscó, en grupos: es lo que la pantalla
-            // muestra en el acta de «no encontrado».
-            'firma' => $firma ? Carnet::normalizarFirma($firma) : null,
+            // Se devuelve lo que se buscó: es lo que la pantalla muestra en el
+            // acta de «no encontrado».
+            'codigo' => $codigo ? Carnet::normalizarCodigo($codigo) : null,
             'carnet' => $carnet ? $this->datosPublicos($carnet) : null,
 
             // null = todavía no se buscó nada (se entró a /verificar a secas).
             // false = se buscó y no apareció. La pantalla dice cosas distintas
             // en cada caso, y con un solo booleano no se podrían distinguir.
-            'encontrado' => $firma === null ? null : $carnet !== null,
+            'encontrado' => $codigo === null ? null : $carnet !== null,
 
             'institucion' => [
                 'municipio' => Configuracion::obtener('municipio.nombre'),
@@ -74,69 +81,60 @@ class VerificacionController extends Controller
     }
 
     /**
-     * La firma escrita a mano, cuando el QR no se deja escanear.
+     * El código escrito a mano, cuando el QR no se deja escanear.
      *
-     * Se normaliza ANTES de validar, y eso no es un detalle: la firma se imprime
-     * en grupos —4K7R J2MX P9TQ 3WHB— y el ciudadano la copia tal cual, con
-     * espacios o guiones. Validando el texto crudo, cualquiera de esas dos formas
-     * daría «no tiene 16 caracteres» cuando en realidad está perfecta.
+     * Se normaliza ANTES de validar, y eso no es un detalle: el código se
+     * imprime en grupos de cuatro y la gente lo copia con los espacios. Sin
+     * normalizar primero, la validación rechazaría lo que el operador ve
+     * escrito en la tarjeta.
      */
     public function buscar(Request $request): RedirectResponse
     {
         $request->merge([
-            'firma' => Carnet::normalizarFirma((string) $request->input('firma')),
+            'codigo' => Carnet::normalizarCodigo((string) $request->input('codigo')),
         ]);
-
-        $largo = Carnet::LARGO_FIRMA;
 
         $validado = $request->validate([
-            // alpha_num sobre el texto ya normalizado: lo que llegue con
-            // símbolos raros queda corto y cae en la regla de tamaño.
-            'firma' => ['required', 'string', 'alpha_num', "size:{$largo}"],
+            'codigo' => ['required', 'string', 'alpha_num', 'min:'.self::LARGO_MINIMO, 'max:40'],
         ], [
-            'firma.required' => 'Ingrese la firma de validación impresa en el carnet.',
-            'firma.size' => "La firma de validación tiene {$largo} caracteres entre letras y números.",
-            'firma.alpha_num' => 'La firma de validación solo lleva letras y números.',
+            'codigo.required' => 'Ingrese el código impreso en el carnet.',
+            'codigo.min' => 'El código tiene al menos '.self::LARGO_MINIMO.' caracteres.',
+            'codigo.alpha_num' => 'El código solo lleva letras y números.',
         ]);
 
-        return redirect()->route('verificar.show', $validado['firma']);
+        return redirect()->route('verificar.show', $validado['codigo']);
     }
 
     /**
-     * Busca el carnet por su firma.
+     * Busca el carnet por su código.
      *
-     * ------------------------------------------------------------------------
-     *  SE COMPARA EN LA BASE, NO EN PHP
-     * ------------------------------------------------------------------------
-     *
-     * Cuando el carnet tenía un código público, la firma se traía y se comparaba
-     * con `hash_equals()` para no filtrar información por el TIEMPO que tarda:
-     * una comparación normal corta en el primer carácter distinto, y con
-     * suficientes intentos cronometrados una firma se puede reconstruir letra
-     * por letra.
-     *
-     * Ahora la firma es lo que se busca, así que la comparación la hace el índice
-     * de la base —que responde en el mismo tiempo encuentre o no— y no hay nada
-     * que filtrar. Lo que protege sigue siendo el tamaño del espacio: 16
-     * caracteres alfanuméricos, ~8 · 10^24 combinaciones, más el throttle de 20
-     * intentos por minuto de la ruta.
+     * La comparación la hace el ÍNDICE ÚNICO de la base, que responde en el
+     * mismo tiempo encuentre o no. Comparar en PHP obligaría a traer filas y a
+     * cuidarse del ataque por tiempo —una comparación normal corta en el primer
+     * carácter distinto—; acá no hay nada que filtrar.
      */
-    private function buscarCarnet(string $firma): ?Carnet
+    private function buscarCarnet(string $codigo): ?Carnet
     {
-        $normalizada = Carnet::normalizarFirma($firma);
+        $normalizado = Carnet::normalizarCodigo($codigo);
 
-        // Se corta antes de consultar si no tiene el largo exacto: una firma
-        // corta no puede existir, y así una URL manipulada no llega a la base.
-        if (strlen($normalizada) !== Carnet::LARGO_FIRMA) {
+        if (strlen($normalizado) < self::LARGO_MINIMO) {
             return null;
         }
 
         return Carnet::query()
+            /*
+             * OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
+             * partes del nombre porque `nombreCompleto` las lee todas, más `ci`
+             * para poder enmascararla. Una columna que el modelo consulta y no
+             * está en el select vuelve null y el accesor contesta cualquier
+             * cosa, sin ningún error.
+             */
             ->with([
-                'beneficiario:id,ci_nit,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
-                'rubro:id,nombre',
+                'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                'tipoCarnet:id,nombre',
+                'aprovechamiento',
             ])
-            ->where('firma_validacion', $normalizada)
+            ->where('codigo_carnet', $normalizado)
             ->first();
     }
 
@@ -151,19 +149,9 @@ class VerificacionController extends Controller
         $vigente = $carnet->estaVigente();
 
         return [
-            /*
-             * EL REGISTRO, NO LA FIRMA.
-             *
-             * Esta pantalla existe para que el inspector compare lo que ve en el
-             * teléfono contra el plástico que tiene en la mano, y en el plástico
-             * está impreso el registro: la firma va únicamente dentro del QR.
-             * Mostrar la firma acá sería mostrar un dato que no figura en ningún
-             * lado de la credencial, o sea nada que se pueda contrastar.
-             *
-             * Y el registro no agrega exposición: quien llegó a esta pantalla ya
-             * tuvo el carnet en la mano para escanearlo.
-             */
-            'registro' => $carnet->registro(),
+            // En grupos de cuatro, igual que va impreso: es lo que el inspector
+            // compara contra el plástico que tiene en la mano.
+            'codigo' => $carnet->codigo_legible,
             'titular' => $beneficiario?->nombreCompleto,
 
             /*
@@ -173,9 +161,13 @@ class VerificacionController extends Controller
              * persona le está mostrando, y no alcanza para que alguien que
              * encuentre un carnet tirado se haga con el número completo.
              */
-            'documento_titular' => $this->enmascarar((string) $beneficiario?->ci_nit),
+            'documento_titular' => $this->enmascarar((string) $beneficiario?->ci),
 
-            'gestion' => $carnet->gestion,
+            // La gestión se DERIVA de la fecha de emisión y no se guarda: el
+            // carnet ya no tiene columna `gestion`, y dos datos que dicen lo
+            // mismo terminan contradiciéndose.
+            'gestion' => (int) $carnet->fecha_emision?->format('Y'),
+
             'fecha_emision' => $carnet->fecha_emision?->toDateString(),
             'fecha_vencimiento' => $carnet->fecha_vencimiento?->toDateString(),
 
@@ -184,11 +176,11 @@ class VerificacionController extends Controller
             'estado_color' => $carnet->estado->color(),
 
             /*
-             * `vigente` NO es lo mismo que estado === 'vigente'.
+             * `vigente` NO es lo mismo que estado === 'activo'.
              *
              * Carnet::estaVigente() mira además la fecha, porque el estado lo
              * escribe un comando programado y entre corrida y corrida un carnet
-             * vencido ayer sigue diciendo «vigente» en la columna. Acá eso
+             * vencido ayer sigue diciendo «activo» en la columna. Acá eso
              * importaría de verdad: sería habilitar a alguien con un documento
              * caído.
              */
@@ -199,18 +191,19 @@ class VerificacionController extends Controller
             /*
              * LA ACTIVIDAD QUE ESTE CARNET AUTORIZA, Y SU CUPO.
              *
-             * Es UNA, no una lista: el carnet es de un solo rubro. Antes acá
-             * viajaba el arreglo de rubros habilitados del carnet, filtrando los
-             * suspendidos; hoy si el carnet está suspendido no hay nada que
-             * filtrar —el documento entero no habilita— y el campo va en null.
+             * Es UNA, no una lista: cada actividad es un carnet propio.
              *
-             * SE MANDA NULL Y NO EL NOMBRE cuando el carnet no está vigente, por
-             * el mismo motivo de siempre: mostrar la actividad —aunque fuera
-             * marcada en rojo— arriesga que el inspector lea la fila y no el
-             * color. Lo que no habilita, no aparece.
+             * SE MANDA NULL Y NO EL NOMBRE cuando el carnet no está vigente, y
+             * no es un olvido: mostrar la actividad —aunque fuera marcada en
+             * rojo— arriesga que el inspector lea la fila y no el color. Lo que
+             * no habilita, no aparece.
              */
-            'rubro' => $vigente ? $carnet->rubro?->nombre : null,
-            'capacidad' => $vigente ? $carnet->capacidadLegible() : null,
+            'actividad' => $vigente ? $carnet->tipo_actor->etiqueta() : null,
+            'tipo_carnet' => $vigente ? $carnet->tipoCarnet?->nombre : null,
+
+            // Solo el pescador lleva cupo. Lo decide el enum, nunca el nombre
+            // del tipo de carnet. Ver Carnet::cupoImpreso().
+            'cupo_kg' => $vigente ? $carnet->cupoImpreso() : null,
         ];
     }
 
@@ -221,14 +214,10 @@ class VerificacionController extends Controller
         }
 
         return match ($carnet->estado) {
-            EstadoCarnet::Anulado => 'Este carnet fue ANULADO por la autoridad competente y no habilita ninguna actividad.',
+            EstadoCarnet::Revocado => 'Este carnet fue REVOCADO por la autoridad competente y no habilita ninguna actividad.',
 
-            // La suspensión es temporal y reversible, y el texto lo dice: quien
-            // lo presenta puede estar esperando que se la levanten, y no es lo
-            // mismo que un documento dado de baja.
-            EstadoCarnet::Suspendido => 'Este carnet está SUSPENDIDO por la autoridad competente. '.
-                'Mientras dure la suspensión no habilita la actividad.',
-
+            // Cubre `Vencido` y también `Activo` con la fecha ya pasada, que es
+            // el caso en que la columna todavía no se actualizó.
             default => sprintf(
                 'Este carnet venció el %s. Corresponde tramitar el de la gestión en curso.',
                 $carnet->fecha_vencimiento?->format('d/m/Y') ?? '—',

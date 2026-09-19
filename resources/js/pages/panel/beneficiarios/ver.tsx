@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { BadgeCheck, FilePlus2, Pencil, Trash2, User } from 'lucide-react';
+import { BadgeCheck, Pencil, Trash2, User, Wallet, Waves } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,29 +9,46 @@ import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fecha } from '@/lib/utils';
 import type { PageProps } from '@/types';
-import type { BeneficiarioFicha, CarnetResumen } from '@/types/beneficiarios';
+import type { BeneficiarioFicha, CarnetResumen, CupoResumen } from '@/types/beneficiarios';
 
 /**
  * La ficha del beneficiario.
  *
- * Lo más útil de esta pantalla es el cartel de arriba a la derecha: dice, antes
- * de que el operador apriete nada, qué tipo de trámite le va a salir a esta
- * persona. Ver `AvisoProximoTramite`.
+ * ============================================================================
+ *  LA FICHA MUESTRA EL FLUJO DE ESTA PERSONA, EN ORDEN
+ * ============================================================================
+ *
+ * Arriba lo que debe, después sus CREDENCIALES —paso 3— y abajo sus CUPOS DE
+ * PESCA —paso 2—. Está al revés del flujo a propósito: el carnet es por lo que
+ * pregunta la gente en el mostrador, y el cupo es el detalle que se mira
+ * después, cuando alguien viene a sacar una faena.
+ *
+ * ----------------------------------------------------------------------------
+ *  CADA FILA ENLAZA A SU FICHA, Y ESO TIENE UNA CONDICIÓN
+ * ----------------------------------------------------------------------------
+ *
+ * `route()` de Ziggy REVIENTA si se le pide una ruta que no está declarada: no
+ * devuelve null ni una cadena vacía, tira una excepción y la pantalla entera
+ * queda en blanco. Así que un enlace a un módulo que todavía no existe no es
+ * «un enlace roto», es esta pantalla caída.
+ *
+ * Carnets y Aprovechamientos ya están, así que enlazan. Al agregar el enlace a
+ * Faenas o a Guías hay que declarar su ruta PRIMERO.
  */
 export default function VerBeneficiario({
     beneficiario,
     gestion,
     deuda,
-    carnetsGestion,
     carnets,
+    cupos,
 }: {
     beneficiario: BeneficiarioFicha;
     gestion: number;
     deuda: number;
-    /** Los carnets de la gestión en curso: uno por actividad. Vacío si no tiene. */
-    carnetsGestion: CarnetResumen[];
-    /** El historial completo, de todas las gestiones. */
+    /** Sus credenciales. Pueden ser DOS vigentes: pescador y comercializador. */
     carnets: CarnetResumen[];
+    /** Sus bolsas madre, de todas las gestiones. */
+    cupos: CupoResumen[];
 }) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
@@ -43,14 +60,34 @@ export default function VerBeneficiario({
             descripcion={beneficiario.documento_identidad}
             acciones={
                 <div className="flex flex-wrap gap-2">
-                    {puede('tramites.crear') && (
+                    {/*
+                        El atajo al paso 2 del flujo. Lleva el id en la URL para
+                        que el formulario abra con la persona ya elegida: quien
+                        viene de acá acaba de elegirla, y volver a pedírsela es
+                        hacerle repetir el paso.
+                    */}
+                    {puede('aprovechamientos.crear') && (
                         <Button
                             onClick={() =>
-                                router.visit(route('tramites.create', { beneficiario: beneficiario.id }))
+                                router.visit(
+                                    route('aprovechamientos.create', { beneficiario: beneficiario.id }),
+                                )
                             }
                         >
-                            <FilePlus2 className="size-4" />
-                            Nuevo trámite
+                            <Waves className="size-4" />
+                            Otorgar cupo
+                        </Button>
+                    )}
+
+                    {puede('carnets.crear') && (
+                        <Button
+                            variant="outline"
+                            onClick={() =>
+                                router.visit(route('carnets.create', { beneficiario: beneficiario.id }))
+                            }
+                        >
+                            <BadgeCheck className="size-4" />
+                            Emitir carnet
                         </Button>
                     )}
 
@@ -120,7 +157,7 @@ export default function VerBeneficiario({
 
                 {/* ------------------------------------------------ Columna derecha */}
                 <div className="space-y-6 lg:col-span-2">
-                    <AvisoProximoTramite carnets={carnetsGestion} gestion={gestion} />
+                    <ResumenDeCredenciales carnets={carnets} gestion={gestion} />
 
                     {deuda > 0 && (
                         <Card className="border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
@@ -129,14 +166,34 @@ export default function VerBeneficiario({
                                     Saldo pendiente: {bs(deuda, institucion.moneda)}
                                 </p>
                                 <p className="text-amber-800/80 dark:text-amber-200/80">
-                                    Suma de todos sus trámites no rechazados. Un trámite no se aprueba
-                                    hasta cubrir su costo.
+                                    Suma de lo que falta cobrar de sus carnets, cupos y guías. Se
+                                    puede pagar en cuotas: cada abono baja este número.
                                 </p>
+
+                                {/*
+                                    El atajo a caja. Solo aparece cuando hay algo
+                                    que cobrar —el bloque entero se dibuja con
+                                    `deuda > 0`— así que no hace falta volver a
+                                    preguntarlo acá.
+                                */}
+                                {puede('caja.cobrar') && (
+                                    <Button
+                                        className="mt-3"
+                                        onClick={() =>
+                                            router.visit(
+                                                route('caja.create', { beneficiario: beneficiario.id }),
+                                            )
+                                        }
+                                    >
+                                        <Wallet className="size-4" />
+                                        Cobrar
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
                     )}
 
-                    <Card>
+                    <Card className="min-w-0">
                         <CardHeader>
                             <CardTitle>Carnets</CardTitle>
                         </CardHeader>
@@ -150,33 +207,111 @@ export default function VerBeneficiario({
                                 <ul className="divide-y divide-border">
                                     {carnets.map((c) => (
                                         <li key={c.id} className="flex flex-wrap items-center gap-3 py-3">
+                                            {/*
+                                                El código va en grupos de cuatro —lo arma el
+                                                servidor— porque catorce caracteres seguidos no se
+                                                pueden dictar por teléfono ni tipear de un plástico
+                                                gastado.
+                                            */}
                                             <Link
                                                 href={route('carnets.show', c.id)}
                                                 className="font-mono text-sm font-medium tabular-nums text-primary hover:underline"
                                             >
-                                                {c.registro}
+                                                {c.codigo}
                                             </Link>
+
+                                            <Badge color={c.tipo_actor_color}>
+                                                {c.tipo_actor_etiqueta}
+                                            </Badge>
 
                                             <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
 
                                             <span className="text-sm text-muted-foreground">
-                                                Gestión {c.gestion} · vence {fecha(c.fecha_vencimiento)}
+                                                {c.asociacion ?? '—'} · vence{' '}
+                                                {fecha(c.fecha_vencimiento)}
                                             </span>
 
-                                            {/*
-                                                La actividad del carnet. Con un
-                                                carnet por rubro, sin esto las
-                                                filas de una misma gestión se ven
-                                                idénticas salvo por el número.
-                                            */}
-                                            <span className="ml-auto flex flex-wrap items-center gap-1">
-                                                <Badge color="slate">{c.rubro ?? '—'}</Badge>
-                                                {c.capacidad && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {c.capacidad}
+                                            <span className="ml-auto flex flex-wrap items-center gap-2 text-sm">
+                                                {/* Solo el pescador lleva cupo impreso. */}
+                                                {c.cupo_kg !== null && (
+                                                    <span className="text-muted-foreground">
+                                                        {c.cupo_kg} kg
+                                                    </span>
+                                                )}
+
+                                                {c.saldo_pendiente > 0 ? (
+                                                    <span className="tabular-nums text-amber-700 dark:text-amber-400">
+                                                        debe {bs(c.saldo_pendiente, institucion.moneda)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-emerald-700 dark:text-emerald-400">
+                                                        Pagado
                                                     </span>
                                                 )}
                                             </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="min-w-0">
+                        <CardHeader>
+                            <CardTitle>Cupos de pesca</CardTitle>
+                        </CardHeader>
+
+                        <CardContent>
+                            {cupos.length === 0 ? (
+                                <p className="py-6 text-center text-sm text-muted-foreground">
+                                    No tiene ningún aprovechamiento otorgado.
+                                </p>
+                            ) : (
+                                <ul className="divide-y divide-border">
+                                    {cupos.map((c) => (
+                                        <li key={c.id} className="space-y-1.5 py-3">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <Waves className="size-4 shrink-0 text-muted-foreground" />
+
+                                                <Link
+                                                    href={route('aprovechamientos.show', c.id)}
+                                                    className="text-sm font-medium text-primary hover:underline"
+                                                >
+                                                    Escala {c.escala ?? '—'}
+                                                </Link>
+
+                                                <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
+
+                                                <span className="text-sm text-muted-foreground">
+                                                    {c.descripcion ?? '—'} · vence{' '}
+                                                    {fecha(c.fecha_vencimiento)}
+                                                </span>
+
+                                                {/*
+                                                    EL SALDO ES LO ÚNICO ACCIONABLE. «Tiene 500 kg»
+                                                    no dice si puede salir a pescar mañana; «le
+                                                    quedan 20» sí.
+                                                */}
+                                                <span className="ml-auto text-sm tabular-nums">
+                                                    <strong>{c.saldo_kg}</strong>
+                                                    <span className="text-muted-foreground">
+                                                        {' '}
+                                                        / {c.volumen_total_kg} kg
+                                                    </span>
+                                                </span>
+                                            </div>
+
+                                            {/*
+                                                La barra va con un div de ancho porcentual y no con
+                                                una librería: para un solo valor, traer recharts
+                                                sería cargar 100 KB para dibujar un rectángulo.
+                                            */}
+                                            <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                                                <div
+                                                    className="h-full rounded-full bg-primary"
+                                                    style={{ width: `${c.porcentaje_usado}%` }}
+                                                />
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
@@ -189,9 +324,9 @@ export default function VerBeneficiario({
             <ConfirmarAccion
                 abierto={confirmarBaja}
                 titulo="¿Dar de baja al beneficiario?"
-                descripcion="Dejará de aparecer en el padrón y no podrá iniciar trámites nuevos. Sus carnets y pagos históricos se conservan."
+                descripcion="Dejará de aparecer en el padrón y no se le podrá emitir nada nuevo. Sus carnets, cupos y pagos históricos se conservan."
                 textoConfirmar="Dar de baja"
-                confirmacion="Entiendo que la persona deja el padrón y no va a poder iniciar trámites nuevos."
+                confirmacion="Entiendo que la persona deja el padrón y no se le va a poder emitir nada nuevo."
                 onCancelar={() => setConfirmarBaja(false)}
                 onConfirmar={() => router.delete(route('beneficiarios.destroy', beneficiario.id))}
             />
@@ -200,38 +335,36 @@ export default function VerBeneficiario({
 }
 
 /**
- * EL CARTEL QUE RESUME LA REGLA A.
+ * QUÉ PUEDE HACER ESTA PERSONA HOY.
  *
- * Le dice al operador, antes de que empiece a cargar nada, si a esta persona le
- * corresponde una emisión inicial o una actualización. No es la decisión
- * final —esa la toma el servidor, con la fila bloqueada, al registrar— pero
- * evita la sorpresa de cargar un trámite pensando que es otra cosa.
+ * ----------------------------------------------------------------------------
+ *  EL CARTEL MIRA LA VIGENCIA, NO LA CANTIDAD
+ * ----------------------------------------------------------------------------
+ *
+ * Tener carnets no es lo mismo que estar habilitado: uno vencido o revocado
+ * sigue en la lista de abajo —el historial no se borra— pero no autoriza nada.
+ * Por eso el cartel cuenta solo los `vigente`, que llegan ya resueltos del
+ * servidor contra el estado Y la fecha.
+ *
+ * Y nombra la ACTIVIDAD y no el tipo de carnet, porque es lo que decide qué
+ * puede emitir: un pescador saca faenas, un comercializador saca guías. Quien
+ * hace las dos cosas tiene dos carnets, y acá se ven los dos.
  */
-/**
- * QUÉ ACTIVIDADES TIENE CUBIERTAS ESTA PERSONA ESTE AÑO.
- *
- * Antes este cartel anunciaba el tipo del próximo trámite —«será una adición de
- * rubro»— y ya no puede: con un carnet por actividad, el tipo depende del RUBRO
- * que se elija, no de la persona. La misma persona hace una emisión inicial si
- * pide Comercializador y una actualización si pide Pescador.
- *
- * Así que ahora muestra el inventario, que es el dato del que sale la conclusión
- * en el formulario de trámite. Ver `SituacionBeneficiarioCard`, que hace lo
- * mismo del otro lado.
- */
-function AvisoProximoTramite({ carnets, gestion }: { carnets: CarnetResumen[]; gestion: number }) {
-    if (carnets.length === 0) {
+function ResumenDeCredenciales({ carnets, gestion }: { carnets: CarnetResumen[]; gestion: number }) {
+    const vigentes = carnets.filter((c) => c.vigente);
+
+    if (vigentes.length === 0) {
         return (
             <Card className="border-sky-300 bg-sky-50 dark:border-sky-500/40 dark:bg-sky-500/10">
                 <CardContent className="flex items-start gap-3 pt-5">
                     <BadgeCheck className="mt-0.5 size-5 shrink-0 text-sky-700 dark:text-sky-300" />
                     <div className="text-sm">
                         <p className="font-medium text-sky-900 dark:text-sky-200">
-                            Sin carnets de la gestión {gestion}
+                            Sin carnet vigente en la gestión {gestion}
                         </p>
                         <p className="text-sky-800/80 dark:text-sky-200/80">
-                            Cualquier rubro que solicite será una <strong>emisión inicial</strong>:
-                            se creará el carnet de esa actividad.
+                            Hasta que se le emita uno no puede sacar faenas ni guías: el carnet es la
+                            autorización anual, y los permisos operativos cuelgan de él.
                         </p>
                     </div>
                 </CardContent>
@@ -245,21 +378,21 @@ function AvisoProximoTramite({ carnets, gestion }: { carnets: CarnetResumen[]; g
                 <BadgeCheck className="mt-0.5 size-5 shrink-0 text-violet-700 dark:text-violet-300" />
                 <div className="min-w-0 text-sm">
                     <p className="font-medium text-violet-900 dark:text-violet-200">
-                        {carnets.length} carnet(s) en la gestión {gestion}
+                        {vigentes.length} carnet(s) vigente(s) en la gestión {gestion}
                     </p>
 
                     <p className="text-violet-800/80 dark:text-violet-200/80">
-                        Un carnet por actividad. Esas no se pueden volver a pedir este año;
-                        cualquier otro rubro emite un carnet nuevo.
+                        Cada actividad es un carnet propio. Quien pesca y además comercializa
+                        necesita los dos.
                     </p>
 
                     <ul className="mt-2 flex flex-wrap gap-1">
-                        {carnets.map((c) => (
+                        {vigentes.map((c) => (
                             <li key={c.id}>
-                                <Badge color={c.estado_color}>
-                                    {c.rubro ?? '—'}
+                                <Badge color={c.tipo_actor_color}>
+                                    {c.tipo_actor_etiqueta}
                                     <span className="ml-1 opacity-70">
-                                        · {c.estado_etiqueta.toLowerCase()}
+                                        · {c.tipo_actor === 'pescador' ? 'emite faenas' : 'emite guías'}
                                     </span>
                                 </Badge>
                             </li>

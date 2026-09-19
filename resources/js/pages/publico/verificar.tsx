@@ -21,13 +21,18 @@ import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
  * de un pescador con su teléfono, en el muelle, y cae acá.
  *
  * ----------------------------------------------------------------------------
- *  UN SOLO DATO: LA FIRMA
+ *  UN SOLO DATO: EL CÓDIGO DEL CARNET
  * ----------------------------------------------------------------------------
  *
- * El carnet no tiene número: se identifica por su firma de validación, dieciséis
- * caracteres alfanuméricos generados al azar y únicos. Es lo único que hay que
- * saber para consultarlo, y lo único que hace falta para no poder consultarlo:
- * ~8 · 10^24 combinaciones, más el límite de intentos por minuto de la ruta.
+ * El carnet se identifica por `codigo_carnet`, que es único GLOBAL —no por
+ * tipo— justamente para esto: un control en ruta lee un código y tiene que
+ * llegar a UN documento, sin preguntar antes de qué tipo es.
+ *
+ * ESE CÓDIGO VA IMPRESO EN EL PLÁSTICO, así que quien tenga el carnet en la
+ * mano puede consultarlo. Se aceptó porque lo que se muestra acá es
+ * deliberadamente poco: nada que no esté ya en la tarjeta que esa persona está
+ * mirando. Del barrido automático protege el límite de intentos por minuto de
+ * la ruta.
  *
  * ----------------------------------------------------------------------------
  *  EL DISEÑO: UN ACTA, NO UNA PANTALLA
@@ -46,7 +51,7 @@ import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
  *   VIGENTE   verde  — auténtico y habilita las actividades que lista
  *   VENCIDO   ámbar  — auténtico pero cerró la gestión: NO habilita
  *   ANULADO   rojo   — la institución lo dio de baja
- *   NO EXISTE gris   — ninguna credencial responde a esa firma
+ *   NO EXISTE gris   — ningún carnet responde a ese código
  *
  * «Vigente» lo decide `Carnet::estaVigente()` en PHP, que mira el estado Y la
  * fecha: el estado lo escribe un comando programado que corre una vez al día, y
@@ -63,14 +68,14 @@ import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
  * `VerificacionController::datosPublicos()`.
  */
 interface Props {
-    /** La firma que venía en la URL, normalizada. Null si se entró sin nada. */
-    firma: string | null;
+    /** El código que venía en la URL, ya normalizado. Null si se entró sin nada. */
+    codigo: string | null;
     /** El carnet hallado, o null. */
     carnet: CarnetPublico | null;
     /**
      * Tres estados posibles, y hay que distinguirlos:
      *   null   -> todavía no se buscó nada (se entró a /verificar pelado)
-     *   false  -> se buscó y no apareció: ninguna credencial tiene esa firma
+     *   false  -> se buscó y no apareció: ningún carnet tiene ese código
      *   true   -> se encontró
      * Con solo `carnet` no se podría separar «aún no buscaste» de «buscaste y no
      * existe», que son mensajes muy distintos.
@@ -79,7 +84,7 @@ interface Props {
     institucion: InstitucionPublica;
 }
 
-export default function Verificar({ firma, carnet, encontrado, institucion }: Props) {
+export default function Verificar({ codigo, carnet, encontrado, institucion }: Props) {
     // El splash solo tiene sentido cuando de verdad se verificó algo. Entrar a
     // /verificar sin código es buscar el formulario, no escanear un QR.
     const seVerifico = encontrado !== null;
@@ -91,7 +96,7 @@ export default function Verificar({ firma, carnet, encontrado, institucion }: Pr
             {seVerifico && <SplashVerificacion />}
 
             {/* Sin código todavía: se explica qué es esto y se ofrece el
-                formulario para tipear código y firma a mano. */}
+                formulario para tipear el código a mano. */}
             {!seVerifico && (
                 <HojaOficial institucion={institucion} esConstancia={false}>
                     <div className="mt-6 text-center">
@@ -104,19 +109,19 @@ export default function Verificar({ firma, carnet, encontrado, institucion }: Pr
                         </h1>
 
                         <p className="mx-auto mt-2.5 max-w-sm font-serif text-[13px] leading-relaxed text-slate-600">
-                            Escanee el código QR impreso en el carnet, o ingrese aquí la firma de
-                            validación que figura debajo del QR.
+                            Escanee el código QR impreso en el carnet, o ingrese aquí el código
+                            que figura debajo del QR.
                         </p>
                     </div>
 
                     <div className="mt-6">
-                        <BuscadorCodigo firmaInicial={firma} />
+                        <BuscadorCodigo codigoInicial={codigo} />
                     </div>
                 </HojaOficial>
             )}
 
             {/* Se buscó y no apareció. */}
-            {encontrado === false && <NoEncontrado firma={firma} institucion={institucion} />}
+            {encontrado === false && <NoEncontrado codigo={codigo} institucion={institucion} />}
 
             {/* Se encontró: el acta con el resultado. */}
             {carnet && <FichaCarnet carnet={carnet} institucion={institucion} />}
@@ -140,7 +145,7 @@ export default function Verificar({ firma, carnet, encontrado, institucion }: Pr
                         <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-white/70 uppercase">
                             Verificar otro carnet
                         </p>
-                        <BuscadorCodigo firmaInicial={null} />
+                        <BuscadorCodigo codigoInicial={null} />
                     </div>
                 </div>
             )}
@@ -157,16 +162,16 @@ export default function Verificar({ firma, carnet, encontrado, institucion }: Pr
  * dudar de si el sistema falló o si el documento es falso.
  *
  * EL TEXTO NO ACUSA A NADIE, y eso importa más de lo que parece. Puede ser un
- * carnet falso, pero también una firma mal tipeada, un QR borroso o un 0 leído
+ * carnet falso, pero también un código mal tipeado, un QR borroso o un 0 leído
  * como O. Acusar de falsificación a quien se equivocó en una letra sería un
  * problema real en una ventanilla pública. Se informa el hecho y se dice qué
  * hacer.
  */
 function NoEncontrado({
-    firma,
+    codigo,
     institucion,
 }: {
-    firma: string | null;
+    codigo: string | null;
     institucion: InstitucionPublica;
 }) {
     return (
@@ -184,10 +189,10 @@ function NoEncontrado({
 
             <div className="mt-4">
                 <p className="text-justify font-serif text-[13px] leading-relaxed text-slate-700">
-                    Se deja constancia de que, consultado el registro electrónico de carnets emitidos
-                    por esta institución, la firma de validación{' '}
+                    Se deja constancia de que, consultado el registro electrónico de carnets
+                    emitidos por esta institución, el código{' '}
                     <b className="font-mono text-[12px] font-bold tracking-wider break-all text-slate-900">
-                        {firma}
+                        {codigo}
                     </b>{' '}
                     NO corresponde a ningún carnet emitido.
                 </p>
@@ -196,8 +201,8 @@ function NoEncontrado({
             <div className="mt-6 border-l-4 border-slate-400/50 bg-slate-50 py-2.5 pr-3 pl-3.5">
                 <p className="text-[12px] leading-snug text-slate-700">
                     <b className="block font-semibold">Antes de dar por falso el carnet</b>
-                    Revise que la firma esté bien escrita —conviene confundir el 0 con la O y el 1
-                    con la I— o vuelva a escanear el código QR. Si la firma es correcta, acérquese a
+                    Revise que el código esté bien escrito —es fácil confundir el 0 con la O y el 1
+                    con la I— o vuelva a escanear el código QR. Si el código es correcto, acérquese a
                     las oficinas del SEDAG antes de dar por válido el documento.
                 </p>
             </div>

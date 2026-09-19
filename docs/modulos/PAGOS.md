@@ -1,3 +1,16 @@
+> # ⚠️ DESACTUALIZADO desde el 18/09/2026
+>
+> El núcleo de datos se rehízo desde cero: ya no existen `rubros`,
+> `tramites`, `faenas`, `guias` ni `guia_detalles`, y `beneficiarios`,
+> `carnets` y `pagos` cambiaron de columnas. Lo de abajo describe el modelo
+> ANTERIOR: sirve para entender el código del panel, que todavía está escrito
+> contra él, NO para entender el esquema.
+>
+> El esquema vigente está en las migraciones `database/migrations/2026_09_18_*`
+> y explicado en [docs/sesiones/09-2026/2026-09-18.md](../sesiones/09-2026/2026-09-18.md).
+
+---
+
 # Pagos — los depósitos y su control
 
 Un **trámite**, una **faena** o una **guía** se cubren con uno o varios depósitos

@@ -1,0 +1,134 @@
+import type { MetodoPago } from '@/types';
+
+/**
+ * Tipos del módulo Caja y Recibos — el circuito del dinero.
+ *
+ * Describen lo que arman `CajaController` y `ReciboController`.
+ *
+ * ============================================================================
+ *  DOS VISTAS DEL MISMO HECHO, Y NINGUNA REEMPLAZA A LA OTRA
+ * ============================================================================
+ *
+ *   - `PagoFila` es un ABONO: cada entrega de dinero, con su método y su
+ *     trámite. Es lo que se cuadra contra el efectivo del cajón al cerrar.
+ *   - `ReciboFila` es el PAPEL entregado, con su correlativo. Es lo que audita
+ *     Contabilidad.
+ *
+ * Un recibo agrupa varios abonos, así que las dos listas nunca tienen la misma
+ * cantidad de filas.
+ */
+
+/** Un abono, en el listado de caja. */
+export interface PagoFila {
+    id: number;
+    recibo_id: number;
+    numero_recibo: string | null;
+    /** A nombre de quién salió el comprobante. Puede ser un tercero. */
+    a_nombre_de: string | null;
+    /** «Credencial Pescador», «Guía de movimiento»… */
+    concepto: string;
+    /** De quién es el trámite que este abono paga. */
+    titular: string | null;
+    monto_parcial: number;
+    metodo_pago: MetodoPago;
+    metodo_etiqueta: string;
+    metodo_color: string;
+    /** Un MOMENTO —cuándo entró la plata—: se muestra con fechaHora(). */
+    cobrado_en: string | null;
+}
+
+/**
+ * Lo cobrado hoy, repartido por método.
+ *
+ * Es SIEMPRE del día de hoy, no del rango filtrado: es lo que se compara contra
+ * el efectivo del cajón antes de cerrar, y esa pregunta no cambia porque
+ * alguien esté mirando marzo.
+ *
+ * El reparto por método tampoco es decorativo: lo que hay que cuadrar contra el
+ * cajón es el EFECTIVO, y una transferencia no está ahí adentro.
+ */
+export interface ArqueoDelDia {
+    fecha: string;
+    total: number;
+    cantidad: number;
+    por_metodo: {
+        metodo: MetodoPago;
+        etiqueta: string;
+        color: string;
+        total: number;
+        cantidad: number;
+    }[];
+}
+
+/**
+ * Una deuda de la persona, lista para cobrar.
+ *
+ * `tipo` es una palabra corta —`carnet`, `cupo`, `guia`— y no un nombre de
+ * clase: el servidor la traduce con una lista blanca. Mandando la clase
+ * directo, cualquiera podría escribir otra en el navegador y el sistema crearía
+ * pagos apuntando a cualquier tabla.
+ */
+export interface DeudaCobrable {
+    tipo: 'carnet' | 'cupo' | 'guia';
+    id: number;
+    titulo: string;
+    detalle: string;
+    /** Lo que cuesta el trámite entero. */
+    monto: number;
+    /** Lo que falta. Se corta en cero: pagar de más no da saldo a favor. */
+    saldo: number;
+    /** Lo ya abonado, para que se vea que es una cuota y no el total. */
+    pagado: number;
+}
+
+/** Una línea del formulario de cobro. */
+export interface LineaCobro {
+    tipo: DeudaCobrable['tipo'];
+    id: number;
+    monto: number | string;
+}
+
+/** Lo que el formulario de cobro manda de vuelta. */
+export interface FormularioCobro {
+    lineas: LineaCobro[];
+    metodo_pago: MetodoPago | '';
+    nit_ci_factura: string;
+    nombre_factura: string;
+    concepto: string;
+}
+
+/** Un recibo, en el listado. */
+export interface ReciboFila {
+    id: number;
+    /** Correlativo de caja: «REC-2026-0016». Lo audita Contabilidad. */
+    numero_recibo: string;
+    nombre_factura: string;
+    nit_ci_factura: string;
+    concepto: string;
+    /**
+     * Lo que se IMPRIMIÓ, congelado al emitir.
+     *
+     * No se recalcula al leer: el papel entregado no puede cambiar porque
+     * después se corrija un abono.
+     */
+    monto_total: number;
+    /** Lo que HAY hoy en el detalle. Si difiere de lo impreso, no cuadra. */
+    monto_actual: number;
+    /** Con un céntimo de tolerancia, por el redondeo. Llega resuelto. */
+    cuadra: boolean;
+    pagos_count: number;
+    emitido_en: string | null;
+}
+
+/** El recibo con su detalle, en la ficha. */
+export interface ReciboFicha extends Omit<ReciboFila, 'pagos_count'> {
+    pagos: {
+        id: number;
+        concepto: string;
+        /** El trámite concreto: código, escala o ruta, más el titular. */
+        detalle: string | null;
+        monto_parcial: number;
+        metodo_etiqueta: string;
+        metodo_color: string;
+    }[];
+}

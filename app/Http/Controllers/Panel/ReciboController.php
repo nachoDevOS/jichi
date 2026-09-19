@@ -2,242 +2,164 @@
 
 namespace App\Http\Controllers\Panel;
 
-use App\Enums\ConceptoRecibo;
-use App\Enums\FormaPago;
 use App\Http\Controllers\Controller;
-use App\Models\Tramite;
-use App\Services\ReciboTramiteService;
-use App\Support\ReciboArmado;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Response;
+use App\Models\AprovechamientoPesq;
+use App\Models\Carnet;
+use App\Models\GuiaMovimiento;
+use App\Models\Pago;
+use App\Models\Recibo;
+use App\Support\Paginacion;
+use App\Support\Sql;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * ============================================================================
- *  IMPRESIÓN DEL RECIBO OFICIAL
+ *  RECIBOS — los comprobantes entregados
  * ============================================================================
  *
- * Arma el PDF del talonario verde y lo devuelve para imprimir. No decide nada:
- * el recibo ya existe —lo emitió ReciboTramiteService cuando el expediente pasó
- * a EN REVISIÓN— y acá solo se dibuja.
- *
  * ----------------------------------------------------------------------------
- *  EL PDF NO SE GUARDA
+ *  NO HAY `store`, NI `update`, NI `destroy`
  * ----------------------------------------------------------------------------
  *
- * Se arma en memoria y se manda al navegador. Guardarlo en disco no agregaría
- * nada: los datos del recibo están congelados en su fila —ver la migración de
- * `recibos`— así que el PDF de mañana sale idéntico al de hoy. Y sí traería el
- * problema de siempre: un archivo más que limpiar cuando el expediente se
- * borra, y que con el disco en s3 no se puede borrar.
+ * Un recibo NACE de un cobro: lo emite `CobrarService` junto con sus abonos, en
+ * la misma transacción. Un endpoint para crear uno suelto permitiría un
+ * comprobante numerado sin ningún pago detrás — un papel oficial que dice que
+ * entró plata que no entró.
  *
- * Por eso este controlador tampoco pasa por StorageController: no escribe nada.
+ * Y no se borra: `numero_recibo` es un correlativo que Contabilidad audita.
+ * Borrar una fila deja un hueco en la serie que nadie puede explicar.
  *
  * ----------------------------------------------------------------------------
- *  REIMPRIMIR DA EL MISMO NÚMERO
+ *  `monto_total` ESTÁ CONGELADO, Y LA PANTALLA MUESTRA SI DEJÓ DE CUADRAR
  * ----------------------------------------------------------------------------
  *
- * Siempre. El papel ya se entregó, y un segundo recibo con otro número por el
- * mismo pago dejaría a Contabilidad con dos comprobantes que no puede cuadrar.
- * Esa garantía la da el `unique` de `tramite_id` y la idempotencia de
- * ReciboTramiteService::emitir(), no este controlador.
+ * La columna es lo que se IMPRIMIÓ; `Recibo::montoCalculado()` es lo que HAY
+ * hoy en el detalle. Si alguien corrigió un abono después de entregar el papel,
+ * los dos números se separan — y eso es justamente lo que un arqueo tiene que
+ * poder detectar, no algo que convenga tapar recalculando al leer.
  */
 class ReciboController extends Controller
 {
     /**
-     * Cuántos renglones muestra como mínimo el cuadro «IMPORTE A PAGAR Bs.».
-     *
-     * El talonario de papel trae el cuadro con su alto fijo, tenga uno o tres
-     * cobros anotados. Si el recibo digital lo encogiera cuando hay un solo
-     * depósito —el caso más común— cada recibo saldría de un tamaño distinto y
-     * la pila archivada se vería despareja.
-     *
-     * Con más cobros el cuadro CRECE hacia abajo, que es lo que se pidió: el
-     * mínimo es un piso, no un techo.
+     * LISTADO — GET /panel/recibos
      */
-    private const RENGLONES_MINIMOS = 3;
+    public function index(Request $request): Response
+    {
+        $filtros = [
+            'buscar' => $request->string('buscar')->trim()->value() ?: null,
+            'desde' => $request->date('desde')?->toDateString(),
+            'hasta' => $request->date('hasta')?->toDateString(),
+            'por_pagina' => Paginacion::filas($request),
+        ];
 
-    public function __construct(private readonly ReciboTramiteService $recibos) {}
+        $recibos = Recibo::query()
+            ->withCount('pagos')
+            // El total de lo que HAY, para contrastarlo con lo impreso sin una
+            // consulta agregada por fila.
+            ->withSum('pagos', 'monto_parcial')
+            ->when($filtros['buscar'], function ($q, $termino) {
+                $operador = Sql::like($q->getConnection());
+                $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $termino).'%';
+
+                $q->where(fn ($s) => $s
+                    ->where('numero_recibo', $operador, mb_strtoupper($like))
+                    ->orWhere('nombre_factura', $operador, $like)
+                    ->orWhere('nit_ci_factura', $operador, $like));
+            })
+            ->when($filtros['desde'], fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
+            ->when($filtros['hasta'], fn ($q, $h) => $q->whereDate('created_at', '<=', $h))
+            ->latest('created_at')
+            ->paginate($filtros['por_pagina'])
+            ->withQueryString()
+            ->through(fn (Recibo $r): array => [
+                'id' => $r->id,
+                'numero_recibo' => $r->numero_recibo,
+                'nombre_factura' => $r->nombre_factura,
+                'nit_ci_factura' => $r->nit_ci_factura,
+                'concepto' => $r->concepto,
+                'monto_total' => (float) $r->monto_total,
+                'pagos_count' => $r->pagos_count,
+                /*
+                 * `cuadra` compara lo IMPRESO con lo que hay hoy. Llega
+                 * resuelto del servidor porque es una comparación con
+                 * tolerancia —un céntimo, por el redondeo— y escrita en React
+                 * sería una segunda copia de esa tolerancia.
+                 */
+                'cuadra' => abs((float) ($r->pagos_sum_monto_parcial ?? 0) - (float) $r->monto_total) < 0.01,
+                'monto_actual' => (float) ($r->pagos_sum_monto_parcial ?? 0),
+                'emitido_en' => $r->created_at?->toIso8601String(),
+            ]);
+
+        return Inertia::render('panel/recibos/index', [
+            'recibos' => $recibos,
+            'filtros' => $filtros,
+            'opcionesPorPagina' => Paginacion::OPCIONES,
+        ]);
+    }
 
     /**
-     * IMPRIMIR — GET /panel/tramites/{tramite}/recibo
-     *
-     * Es GET y no PATCH, al revés que los pasos del circuito: acá no se escribe
-     * nada. El recibo ya está emitido; esto solo lo dibuja. Que el navegador
-     * precargue este enlace no cambia ningún dato.
+     * FICHA — GET /panel/recibos/{recibo}
      */
-    public function imprimir(Tramite $tramite): Response|RedirectResponse
+    public function show(Recibo $recibo): Response
     {
         /*
-         * El recibo se ARMA acá mismo, con los datos del expediente. No hay
-         * ninguna fila que leer: la tabla `recibos` se retiró. Ver
-         * App\Support\ReciboArmado.
-         *
-         * La fecha impresa sale de `fecha_revision`, el día en que se cobró de
-         * verdad, y no de hoy: una reimpresión de un expediente de marzo sigue
-         * diciendo marzo.
+         * Igual que en el listado de caja: `pagable` es polimórfica y NO se
+         * precarga con `with('pagos.pagable.beneficiario')` — eso se ignora en
+         * silencio y el N+1 sigue ahí. Va con morphWith.
          */
-        $recibo = $this->recibos->armar($tramite);
+        $recibo->load(['pagos' => fn ($q) => $q->with([
+            'pagable' => fn ($m) => $m->morphWith([
+                Carnet::class => ['beneficiario', 'tipoCarnet'],
+                AprovechamientoPesq::class => ['beneficiario', 'categoria'],
+                GuiaMovimiento::class => ['comercializador'],
+            ]),
+        ])]);
 
-        if ($recibo === null) {
-            // Un expediente que nunca llegó a revisión. Todavía no hay nada
-            // cobrado que respaldar.
-            return back()->with(
-                'error',
-                'Este trámite todavía no tiene recibo: corresponde al tomar el expediente para revisión.',
-            );
-        }
+        return Inertia::render('panel/recibos/ver', [
+            'recibo' => [
+                'id' => $recibo->id,
+                'numero_recibo' => $recibo->numero_recibo,
+                'nombre_factura' => $recibo->nombre_factura,
+                'nit_ci_factura' => $recibo->nit_ci_factura,
+                'concepto' => $recibo->concepto,
+                'monto_total' => (float) $recibo->monto_total,
+                'monto_actual' => $recibo->montoCalculado(),
+                'cuadra' => $recibo->cuadra(),
+                'emitido_en' => $recibo->created_at?->toIso8601String(),
 
-        return $this->pdf($recibo);
+                'pagos' => $recibo->pagos
+                    ->map(fn (Pago $p): array => [
+                        'id' => $p->id,
+                        'concepto' => $p->concepto_detalle,
+                        'detalle' => $this->detalleDe($p),
+                        'monto_parcial' => (float) $p->monto_parcial,
+                        'metodo_etiqueta' => $p->metodo_pago->etiqueta(),
+                        'metodo_color' => $p->metodo_pago->color(),
+                    ])
+                    ->values()
+                    ->all(),
+            ],
+        ]);
     }
 
     /**
-     * Arma el PDF y lo manda al navegador para imprimir.
+     * Qué trámite concreto pagó este abono.
+     *
+     * El `match` va sobre la CLASE y no sobre el texto de `pagable_type`: es el
+     * mismo dato, pero así el analizador avisa cuando se agrega un cobrable y
+     * este método se olvida.
      */
-    private function pdf(ReciboArmado $recibo): Response
+    private function detalleDe(Pago $pago): ?string
     {
-        $pdf = Pdf::loadView('documentos.recibo-oficial', [
-            'recibo' => $recibo,
-            'fecha' => $recibo->fechaEnCasilleros(),
-            'esDeposito' => $recibo->forma_pago === FormaPago::Deposito,
+        $x = $pago->pagable;
 
-            // Los renglones del cuadro de importes y el total al pie.
-            'renglones' => $this->renglones($recibo),
-            'total' => $this->importeFormateado($recibo->monto),
-
-            // Cuántos renglones en blanco agregar para que el cuadro conserve su
-            // alto aunque haya un solo cobro. Ver RENGLONES_MINIMOS.
-            'blancos' => max(0, self::RENGLONES_MINIMOS - count($recibo->lineas())),
-
-            // Las seis casillas del papel, en el orden impreso. Salen del enum y
-            // no escritas en la plantilla: agregar una mañana es tocar un lugar.
-            'casillas' => ConceptoRecibo::cases(),
-
-            /*
-             * ====================================================================
-             *  LAS IMÁGENES SON COPIAS A MEDIDA, Y VAN EMBEBIDAS
-             * ====================================================================
-             *
-             * DOS COSAS, Y LAS DOS IMPORTAN.
-             *
-             * 1. NO SON `icon.png` NI `sedag.png`, que son los originales que usa
-             *    el panel: esos miden 2362 y 2048 píxeles de lado y pesan 2,8 MB
-             *    entre los dos. Embebidos, CADA recibo salía de 5,4 MB — y
-             *    ventanilla imprime decenas por día. Las copias de `recibo-*`
-             *    están al tamaño en que se dibujan y pesan 59 KB juntas.
-             *
-             *    El sello además viene PRE-ATENUADO en el archivo, con el gris
-             *    ya horneado. Podría hacerse con `opacity` en la hoja de
-             *    estilos, pero es de lo menos confiable que tiene DomPDF: según
-             *    la versión lo ignora y el sello sale a pleno color, tapando el
-             *    texto del recibo. En el archivo no puede fallar.
-             *
-             * 2. VAN EN BASE64 Y NO COMO RUTA. DomPDF corre del lado del
-             *    servidor y no tiene navegador: una ruta `/image/...` la
-             *    resolvería contra el disco con las restricciones de `chroot`, y
-             *    en producción —con el proyecto detrás de otro documento raíz—
-             *    termina en un recuadro vacío. Embebidas no dependen de nada.
-             */
-            'escudo' => $this->imagenEmbebida('image/recibo-escudo.png'),
-            'selloSedag' => $this->imagenEmbebida('image/recibo-sello.png'),
-        ])
-            /*
-             * MEDIA CARTA APAISADA: 612 x 396 puntos = 8,5" x 5,5".
-             *
-             * Es el tamaño del talonario de papel, y está acá y no en la
-             * plantilla porque es una decisión de impresión, no de diseño. Así
-             * el día que la unidad mande a hacer el talonario en otro formato se
-             * cambia un número y la plantilla no se entera.
-             */
-            ->setPaper([0, 0, 612, 396])
-
-            /*
-             * ====================================================================
-             *  SOLO LAS LETRAS QUE SE USAN — 734 KB de diferencia
-             * ====================================================================
-             *
-             * Sin esto, DomPDF mete DENTRO de cada PDF las dos tipografías
-             * COMPLETAS —DejaVu Sans normal y negrita, unas 380 KB cada una—
-             * aunque el recibo use ochenta caracteres contados. Medido: el PDF
-             * pesaba 930 KB y 734 KB eran las fuentes; las imágenes, 53 KB.
-             *
-             * Con el subsetting activo se embeben solo los glifos que el
-             * documento realmente dibuja. Sigue viéndose igual y sigue
-             * imprimiéndose igual, porque los acentos y la «ñ» que hacen falta
-             * están entre esos glifos.
-             *
-             * SE ACTIVA ACÁ Y NO EN config/dompdf.php a propósito. Ese archivo lo
-             * publica el paquete y la regla del proyecto es dejarlo tal cual
-             * viene: modificarlo hace mucho más difícil compararlo contra la
-             * versión nueva cuando el paquete se actualice. Puesto acá, además,
-             * queda al lado del documento al que afecta.
-             */
-            ->setOption('enable_font_subsetting', true);
-
-        // `stream` y no `download`: se abre en el visor del navegador, que es
-        // desde donde el operador aprieta imprimir. Un archivo descargado
-        // obligaría a buscarlo en la carpeta de descargas y abrirlo aparte.
-        return $pdf->stream("recibo-{$recibo->numeroImpreso()}.pdf");
-    }
-
-    /**
-     * Los renglones del cuadro, cada uno con su importe ya formateado.
-     *
-     * @return array<int, array{descripcion: string, monto: string}>
-     */
-    private function renglones(ReciboArmado $recibo): array
-    {
-        return array_map(fn (array $linea): array => [
-            'descripcion' => $linea['descripcion'],
-            'monto' => $this->importeFormateado($linea['monto']),
-        ], $recibo->lineas());
-    }
-
-    /**
-     * ========================================================================
-     *  EL IMPORTE, EN UNA SOLA COLUMNA
-     * ========================================================================
-     *
-     *      120     ->  '120,00'
-     *     1250.5   ->  '1.250,50'
-     *
-     * Punto para los miles y coma para los decimales, que es como se escribe un
-     * monto en Bolivia: 1.250,50 y no 1,250.50.
-     *
-     * ------------------------------------------------------------------------
-     *  LA CIFRA NO SE PARTE — SE PROBARON LAS DOS FORMAS ANTERIORES Y FALLARON
-     * ------------------------------------------------------------------------
-     *
-     * 1. UN DÍGITO POR CASILLERO —`[1][2][0][00]`— se leía **12000**: el espacio
-     *    entre celdas rompe el número y la coma decimal desaparece.
-     *
-     * 2. BOLIVIANOS Y CENTAVOS EN COLUMNAS SEPARADAS —`120 | 00`— se leía mejor,
-     *    pero seguía obligando al ojo a juntar dos cifras para entender una.
-     *
-     * Con el monto completo en una sola celda —`120,00`— no hay nada que juntar.
-     * Es un comprobante: la única propiedad que importa es que el número se lea
-     * de una y sin ambigüedad.
-     */
-    private function importeFormateado(float $monto): string
-    {
-        return number_format($monto, 2, ',', '.');
-    }
-
-    /**
-     * Una imagen de `public/` como data URI, para que DomPDF la dibuje sin
-     * depender de rutas ni de red.
-     */
-    private function imagenEmbebida(string $rutaRelativa): string
-    {
-        $ruta = public_path($rutaRelativa);
-
-        if (! is_file($ruta)) {
-            // Sin la imagen el recibo sale igual, solo que sin escudo. Es
-            // preferible a un error 500 que deje a ventanilla sin poder
-            // entregar nada.
-            return '';
-        }
-
-        return 'data:image/png;base64,'.base64_encode((string) file_get_contents($ruta));
+        return match (true) {
+            $x instanceof Carnet => $x->codigo_legible.' · '.($x->beneficiario?->nombreCompleto ?? '—'),
+            $x instanceof AprovechamientoPesq => 'Escala '.($x->categoria?->nro_escala ?? '—').' · '.($x->beneficiario?->nombreCompleto ?? '—'),
+            $x instanceof GuiaMovimiento => $x->codigo_guia.' · '.$x->ruta,
+            default => null,
+        };
     }
 }

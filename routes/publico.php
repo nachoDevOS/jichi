@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\Route;
  * combinaciones— y 60 intentos por minuto, acertar deja de ser una posibilidad
  * práctica.
  */
-Route::get('/verificar/{firma?}', [VerificacionController::class, 'show'])
+Route::get('/verificar/{codigo?}', [VerificacionController::class, 'show'])
     ->middleware('throttle:60,1')
     ->name('verificar.show');
 

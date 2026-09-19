@@ -1,0 +1,295 @@
+<?php
+
+namespace App\Http\Controllers\Panel;
+
+use App\Enums\MetodoPago;
+use App\Exceptions\CobroInvalidoException;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Panel\CobrarRequest;
+use App\Models\AprovechamientoPesq;
+use App\Models\Beneficiario;
+use App\Models\Carnet;
+use App\Models\GuiaMovimiento;
+use App\Models\Pago;
+use App\Services\CobrarService;
+use App\Support\Paginacion;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * ============================================================================
+ *  CAJA — el circuito del dinero
+ * ============================================================================
+ *
+ *     carnet | cupo | guía  ──▶  pagos (abonos)  ──▶  recibo numerado
+ *
+ * Es el tercer circuito del sistema y ATRAVIESA a los otros dos: no es un paso
+ * del flujo sino algo que puede pasar en cualquiera de ellos y varias veces.
+ *
+ * ----------------------------------------------------------------------------
+ *  ESTA PANTALLA MUESTRA ABONOS, NO RECIBOS
+ * ----------------------------------------------------------------------------
+ *
+ * Son dos vistas distintas del mismo hecho y las dos hacen falta:
+ *
+ *   - CAJA lista PAGOS: cada entrega de dinero, con su método y su trámite. Es
+ *     lo que se mira para cuadrar el efectivo del día contra lo que hay en el
+ *     cajón.
+ *   - RECIBOS lista los PAPELES entregados, con su número correlativo. Es lo
+ *     que audita Contabilidad.
+ *
+ * Un recibo agrupa varios pagos, así que las dos listas nunca tienen la misma
+ * cantidad de filas y ninguna reemplaza a la otra.
+ */
+class CajaController extends Controller
+{
+    public function __construct(private readonly CobrarService $servicio) {}
+
+    /**
+     * LISTADO DE ABONOS — GET /panel/caja
+     */
+    public function index(Request $request): Response
+    {
+        $filtros = [
+            'buscar' => $request->string('buscar')->trim()->value() ?: null,
+            'metodo' => $request->string('metodo')->trim()->value() ?: null,
+            'desde' => $request->date('desde')?->toDateString(),
+            'hasta' => $request->date('hasta')?->toDateString(),
+            'por_pagina' => Paginacion::filas($request),
+        ];
+
+        $pagos = Pago::query()
+            /*
+             * UNA RELACIÓN POLIMÓRFICA NO SE PRECARGA CON `with('pagable.x')`.
+             *
+             * Eloquent no sabe qué es `pagable` hasta que lee la fila, así que
+             * lo escrito así se IGNORA en silencio y el N+1 sigue ahí. Va con
+             * morphWith, declarando qué traer para cada tipo.
+             */
+            ->with([
+                'recibo:id,numero_recibo,nombre_factura',
+                'pagable' => fn ($m) => $m->morphWith([
+                    Carnet::class => ['beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
+                    AprovechamientoPesq::class => ['beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado', 'categoria'],
+                    GuiaMovimiento::class => ['comercializador:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
+                ]),
+            ])
+            ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
+                'recibo',
+                fn ($r) => $r->where('numero_recibo', 'like', '%'.mb_strtoupper($termino).'%')
+                    ->orWhere('nombre_factura', 'like', '%'.$termino.'%'),
+            ))
+            ->when($filtros['metodo'], fn ($q, $metodo) => $q->where('pagos.metodo_pago', $metodo))
+            /*
+             * EL RANGO SE FILTRA POR `created_at`, que es cuando entró la plata.
+             * `pagos` no tiene columna de fecha propia a propósito: una segunda
+             * fecha solo agregaría la posibilidad de que las dos se
+             * contradigan.
+             */
+            ->when($filtros['desde'], fn ($q, $d) => $q->whereDate('pagos.created_at', '>=', $d))
+            ->when($filtros['hasta'], fn ($q, $h) => $q->whereDate('pagos.created_at', '<=', $h))
+            ->latest('pagos.created_at')
+            ->paginate($filtros['por_pagina'])
+            ->withQueryString()
+            ->through(fn (Pago $p): array => [
+                'id' => $p->id,
+                'recibo_id' => $p->recibo_id,
+                'numero_recibo' => $p->recibo?->numero_recibo,
+                'a_nombre_de' => $p->recibo?->nombre_factura,
+                'concepto' => $p->concepto_detalle,
+                'titular' => $this->titularDe($p),
+                'monto_parcial' => (float) $p->monto_parcial,
+                'metodo_pago' => $p->metodo_pago->value,
+                'metodo_etiqueta' => $p->metodo_pago->etiqueta(),
+                'metodo_color' => $p->metodo_pago->color(),
+                // Es un MOMENTO: cuándo entró el dinero. Va con toIso8601String().
+                'cobrado_en' => $p->created_at?->toIso8601String(),
+            ]);
+
+        return Inertia::render('panel/caja/index', [
+            'pagos' => $pagos,
+            'filtros' => $filtros,
+            'metodos' => MetodoPago::opciones(),
+            'opcionesPorPagina' => Paginacion::OPCIONES,
+
+            /*
+             * EL ARQUEO DEL DÍA, siempre del día de HOY y no del rango filtrado.
+             *
+             * Es lo que se compara contra el efectivo del cajón antes de cerrar,
+             * y esa pregunta no cambia porque alguien esté mirando marzo. Un
+             * total que siguiera al filtro invitaría a cuadrar la caja contra el
+             * número equivocado.
+             */
+            'arqueo' => $this->arqueoDelDia(),
+        ]);
+    }
+
+    /**
+     * FORMULARIO DE COBRO — GET /panel/caja/cobrar
+     *
+     * Acepta `?beneficiario=7` para llegar desde la ficha de la persona.
+     */
+    public function create(Request $request): Response
+    {
+        $beneficiario = $request->integer('beneficiario')
+            ? Beneficiario::query()->find($request->integer('beneficiario'))
+            : null;
+
+        return Inertia::render('panel/caja/cobrar', [
+            'beneficiario' => $beneficiario ? [
+                'id' => $beneficiario->id,
+                'nombreCompleto' => $beneficiario->nombreCompleto,
+                'documento_identidad' => $beneficiario->documento_identidad,
+                'foto_url' => $beneficiario->foto_url,
+                'ci' => $beneficiario->ci,
+                'carnets_vigentes' => [],
+            ] : null,
+
+            'deudas' => $beneficiario ? $this->deudasDe($beneficiario) : [],
+            'metodos' => MetodoPago::opciones(),
+        ]);
+    }
+
+    /**
+     * COBRAR — POST /panel/caja
+     */
+    public function store(CobrarRequest $request): RedirectResponse
+    {
+        $datos = $request->validated();
+
+        try {
+            $recibo = $this->servicio->cobrar(
+                $datos['lineas'],
+                MetodoPago::from($datos['metodo_pago']),
+                $datos['nit_ci_factura'],
+                $datos['nombre_factura'],
+                $datos['concepto'] ?? null,
+            );
+        } catch (CobroInvalidoException $e) {
+            // El mensaje se cuelga de `lineas`: todas las reglas que puede
+            // romper son sobre qué se está cobrando y por cuánto.
+            return back()->withInput()->withErrors(['lineas' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('recibos.show', $recibo)
+            ->with('exito', "Recibo {$recibo->numero_recibo} emitido. Ya se puede imprimir.");
+    }
+
+    // ------------------------------------------------------------------
+    //  Auxiliares
+    // ------------------------------------------------------------------
+
+    /**
+     * Todo lo que esta persona debe hoy, listo para cobrar.
+     *
+     * ------------------------------------------------------------------------
+     *  SE JUNTAN LOS TRES TIPOS EN UNA SOLA LISTA
+     * ------------------------------------------------------------------------
+     *
+     * Porque así es como llega la persona al mostrador: con lo que debe, no con
+     * «los carnets por un lado y los cupos por otro». Y porque un mismo recibo
+     * puede cubrir los tres, que es justamente lo que el polimorfismo permite.
+     *
+     * Los `withSum` evitan una consulta agregada por fila al calcular cada
+     * saldo, y los `with` de los catálogos hacen falta porque `montoACobrar()`
+     * lee el precio del tipo de carnet y el valor de la escala.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function deudasDe(Beneficiario $beneficiario): array
+    {
+        $deudas = [];
+
+        foreach ($beneficiario->carnets()->with('tipoCarnet')->withSum('pagos', 'monto_parcial')->get() as $c) {
+            if ($c->saldoPendiente() > 0) {
+                $deudas[] = $this->linea('carnet', $c->id, 'Carnet '.$c->codigo_legible,
+                    $c->tipoCarnet?->nombre ?? $c->tipo_actor->etiqueta(), $c->montoACobrar(), $c->saldoPendiente());
+            }
+        }
+
+        foreach ($beneficiario->aprovechamientos()->with('categoria')->withSum('pagos', 'monto_parcial')->get() as $a) {
+            if ($a->saldoPendiente() > 0) {
+                $deudas[] = $this->linea('cupo', $a->id, 'Aprovechamiento escala '.($a->categoria?->nro_escala ?? '—'),
+                    $a->categoria?->descripcion_kg ?? '', $a->montoACobrar(), $a->saldoPendiente());
+            }
+        }
+
+        foreach ($beneficiario->guias()->withSum('pagos', 'monto_parcial')->get() as $g) {
+            // Una guía anulada no admite cobros, así que ni se ofrece: lo que se
+            // deba de un papel que no vale se resuelve por caja.
+            if ($g->saldoPendiente() > 0 && $g->estado->admitePagos()) {
+                $deudas[] = $this->linea('guia', $g->id, 'Guía '.$g->codigo_guia,
+                    $g->ruta, $g->montoACobrar(), $g->saldoPendiente());
+            }
+        }
+
+        return $deudas;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function linea(string $tipo, int $id, string $titulo, string $detalle, float $monto, float $saldo): array
+    {
+        return [
+            'tipo' => $tipo,
+            'id' => $id,
+            'titulo' => $titulo,
+            'detalle' => $detalle,
+            'monto' => $monto,
+            'saldo' => $saldo,
+            // Lo ya abonado, para que se vea que es una cuota y no el total.
+            'pagado' => round($monto - $saldo, 2),
+        ];
+    }
+
+    /**
+     * Lo cobrado hoy, repartido por método.
+     *
+     * El reparto por método no es decorativo: lo que hay que cuadrar contra el
+     * cajón es el EFECTIVO, y una transferencia no está ahí adentro.
+     *
+     * @return array<string, mixed>
+     */
+    private function arqueoDelDia(): array
+    {
+        $hoy = now()->toDateString();
+
+        $porMetodo = Pago::query()
+            ->whereDate('created_at', $hoy)
+            ->groupBy('metodo_pago')
+            ->selectRaw('metodo_pago, SUM(monto_parcial) as total, COUNT(*) as cantidad')
+            ->get()
+            ->keyBy('metodo_pago');
+
+        return [
+            'fecha' => $hoy,
+            'total' => (float) $porMetodo->sum('total'),
+            'cantidad' => (int) $porMetodo->sum('cantidad'),
+            'por_metodo' => collect(MetodoPago::cases())
+                ->map(fn (MetodoPago $m): array => [
+                    'metodo' => $m->value,
+                    'etiqueta' => $m->etiqueta(),
+                    'color' => $m->color(),
+                    'total' => (float) ($porMetodo[$m->value]->total ?? 0),
+                    'cantidad' => (int) ($porMetodo[$m->value]->cantidad ?? 0),
+                ])
+                ->all(),
+        ];
+    }
+
+    /** De quién es el trámite que este abono paga. */
+    private function titularDe(Pago $pago): ?string
+    {
+        $pagable = $pago->pagable;
+
+        return match (true) {
+            $pagable instanceof Carnet, $pagable instanceof AprovechamientoPesq => $pagable->beneficiario?->nombreCompleto,
+            $pagable instanceof GuiaMovimiento => $pagable->comercializador?->nombreCompleto,
+            default => null,
+        };
+    }
+}

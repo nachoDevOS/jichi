@@ -1,232 +1,224 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { BadgeCheck, Search } from 'lucide-react';
-import { useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { BadgeCheck, Plus, Search } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
 import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
+import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { fecha } from '@/lib/utils';
-import type { OpcionEnum, Paginado } from '@/types';
+import { bs, fecha } from '@/lib/utils';
+import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { CarnetFila } from '@/types/carnets';
 
 /**
- * Los carnets emitidos.
+ * ============================================================================
+ *  LISTADO DE CARNETS
+ * ============================================================================
  *
- * NO HAY BOTÓN DE «NUEVO CARNET», y es a propósito: un carnet nace dentro del
- * trámite, cuando el sistema detecta que la persona no tenía uno de esta
- * gestión. Un alta suelta permitiría emitir documentos sin expediente que los
- * respalde, y sin cobrar.
+ * ----------------------------------------------------------------------------
+ *  EL BUSCADOR ACEPTA EL CÓDIGO CON ESPACIOS
+ * ----------------------------------------------------------------------------
+ *
+ * El código va impreso en grupos de cuatro, así que quien lo copia del plástico
+ * escribe «PES2 6K7R J2M». El servidor lo normaliza antes de comparar; si no,
+ * la búsqueda que hace todo el mundo no devolvería nunca nada.
  */
 export default function IndiceCarnets({
     carnets,
     filtros,
     estados,
-    gestiones,
-    rubros,
+    actores,
     opcionesPorPagina,
 }: {
     carnets: Paginado<CarnetFila>;
-    filtros: {
-        buscar: string | null;
-        estado: string | null;
-        gestion: number | null;
-        /** Con un carnet por actividad, «mostrame los de Pescador» es corriente. */
-        rubro: number | null;
-        por_pagina: number;
-    };
+    filtros: { buscar: string | null; estado: string | null; actor: string | null; por_pagina: number };
     estados: OpcionEnum[];
-    gestiones: number[];
-    /** Todos, incluso los dados de baja: sus carnets emitidos siguen existiendo. */
-    rubros: { id: number; nombre: string }[];
+    actores: OpcionEnum[];
     opcionesPorPagina: number[];
 }) {
+    const { puede } = usePermisos();
+    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
     function filtrar(valores: Record<string, string | number | null>) {
         router.get(
             route('carnets.index'),
-            {
-                buscar,
-                estado: filtros.estado,
-                gestion: filtros.gestion,
-                rubro: filtros.rubro,
-                por_pagina: filtros.por_pagina,
-                ...valores,
-            },
+            { buscar, estado: filtros.estado, actor: filtros.actor, ...valores },
             { preserveState: true, preserveScroll: true, replace: true },
         );
     }
 
     return (
-        <LayoutPanel titulo="Carnets" descripcion="Documentos emitidos, uno por persona, rubro y gestión.">
+        <LayoutPanel
+            titulo="Carnets"
+            descripcion="La credencial anual. De ella cuelgan las faenas y las guías."
+            acciones={
+                puede('carnets.crear') && (
+                    <Button onClick={() => router.visit(route('carnets.create'))}>
+                        <Plus className="size-4" />
+                        Emitir carnet
+                    </Button>
+                )
+            }
+        >
             <Head title="Carnets" />
 
-            <Card>
-                {/* La misma barra de todos los listados: «Mostrar N» a la
-                    izquierda, buscador a la derecha en cuatro columnas. */}
-                <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-12 sm:items-end">
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-3">
-                        Mostrar
-                        <Select
-                            className="w-auto"
-                            value={filtros.por_pagina}
-                            onChange={(e) => filtrar({ por_pagina: e.target.value })}
-                            aria-label="Registros por página"
-                        >
-                            {opcionesPorPagina.map((n) => (
-                                <option key={n} value={n}>
-                                    {n}
-                                </option>
-                            ))}
-                        </Select>
-                        registros
-                    </label>
-
-                    <Select
-                        className="sm:col-span-3"
-                        value={filtros.estado ?? ''}
-                        onChange={(e) => filtrar({ estado: e.target.value || null })}
-                        aria-label="Estado"
-                    >
-                        <option value="">Todos los estados</option>
-                        {estados.map((o) => (
-                            <option key={o.value} value={o.value}>
-                                {o.label}
-                            </option>
-                        ))}
-                    </Select>
-
-                    <Select
-                        className="sm:col-span-2"
-                        value={filtros.gestion ?? ''}
-                        onChange={(e) => filtrar({ gestion: e.target.value || null })}
-                        aria-label="Gestión"
-                    >
-                        <option value="">Todas las gestiones</option>
-                        {gestiones.map((g) => (
-                            <option key={g} value={g}>
-                                {g}
-                            </option>
-                        ))}
-                    </Select>
-
-                    {/*
-                        FILTRO POR ACTIVIDAD. Llegó con el modelo nuevo: antes un
-                        carnet tenía varios rubros y filtrar por uno devolvía
-                        documentos que además habilitaban otras tres cosas. Hoy el
-                        carnet ES la actividad, así que la lista filtrada responde
-                        exactamente «quiénes están habilitados para pescar».
-                    */}
-                    <Select
-                        className="sm:col-span-2"
-                        value={filtros.rubro ?? ''}
-                        onChange={(e) => filtrar({ rubro: e.target.value || null })}
-                        aria-label="Rubro"
-                    >
-                        <option value="">Todos los rubros</option>
-                        {rubros.map((r) => (
-                            <option key={r.id} value={r.id}>
-                                {r.nombre}
-                            </option>
-                        ))}
-                    </Select>
-
+            {/* `min-w-0`: sin él la tarjeta se estira al ancho de la tabla y el
+                que termina con barra de desplazamiento es el documento entero. */}
+            <Card className="min-w-0">
+                <CardContent className="space-y-4 p-0">
                     <form
-                        className="relative sm:col-span-4"
-                        onSubmit={(e) => {
+                        onSubmit={(e: FormEvent) => {
                             e.preventDefault();
                             filtrar({});
                         }}
+                        className="flex flex-wrap gap-2 p-5 pb-0"
                     >
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            className="pl-9"
-                            placeholder="Buscar…"
                             value={buscar}
                             onChange={(e) => setBuscar(e.target.value)}
-                            aria-label="Buscar por número de registro, firma o titular"
+                            placeholder="Buscar por cédula, nombre o código…"
+                            className="min-w-48 flex-1"
                         />
+
+                        <Select
+                            value={filtros.actor ?? ''}
+                            onChange={(e) => filtrar({ actor: e.target.value || null })}
+                            className="w-auto"
+                        >
+                            <option value="">Toda actividad</option>
+                            {actores.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                    {o.label}
+                                </option>
+                            ))}
+                        </Select>
+
+                        <Select
+                            value={filtros.estado ?? ''}
+                            onChange={(e) => filtrar({ estado: e.target.value || null })}
+                            className="w-auto"
+                        >
+                            <option value="">Todos los estados</option>
+                            {estados.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                    {o.label}
+                                </option>
+                            ))}
+                        </Select>
+
+                        <Select
+                            value={filtros.por_pagina}
+                            onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
+                            className="w-auto"
+                        >
+                            {opcionesPorPagina.map((n) => (
+                                <option key={n} value={n}>
+                                    {n} filas
+                                </option>
+                            ))}
+                        </Select>
+
+                        <Button type="submit" variant="outline">
+                            <Search className="size-4" />
+                        </Button>
                     </form>
-                </div>
 
-                {carnets.data.length === 0 ? (
-                    <EstadoVacio
-                        icono={BadgeCheck}
-                        titulo="Sin carnets"
-                        descripcion="Los carnets se emiten al registrar el primer trámite de cada persona en la gestión."
-                    />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                <tr>
-                                    <th className="px-5 py-3 font-medium">Registro</th>
-                                    <th className="px-5 py-3 font-medium">Titular</th>
-                                    <th className="px-5 py-3 font-medium">Gestión</th>
-                                    <th className="px-5 py-3 font-medium">Estado</th>
-                                    <th className="px-5 py-3 font-medium">Rubro</th>
-                                    <th className="px-5 py-3 font-medium">Vence</th>
-                                </tr>
-                            </thead>
+                    {carnets.data.length === 0 ? (
+                        <EstadoVacio
+                            icono={BadgeCheck}
+                            titulo="Sin carnets emitidos"
+                            descripcion={
+                                filtros.buscar || filtros.estado || filtros.actor
+                                    ? 'Ninguno coincide con los filtros.'
+                                    : 'El carnet es el paso 3 del flujo: la persona ya tiene que estar registrada, y si es pescador, con su cupo otorgado.'
+                            }
+                        />
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                        <tr>
+                                            <th className="px-5 py-2.5 font-medium">Titular</th>
+                                            <th className="px-5 py-2.5 font-medium">Actividad</th>
+                                            <th className="px-5 py-2.5 font-medium">Asociación</th>
+                                            <th className="px-5 py-2.5 text-right font-medium">Cupo</th>
+                                            <th className="px-5 py-2.5 font-medium">Estado</th>
+                                            <th className="px-5 py-2.5 text-right font-medium">Cobro</th>
+                                            <th className="px-5 py-2.5 font-medium">Vence</th>
+                                        </tr>
+                                    </thead>
 
-                            <tbody className="divide-y divide-border">
-                                {carnets.data.map((c) => (
-                                    <tr key={c.id} className="hover:bg-secondary/50">
-                                        <td className="px-5 py-3">
-                                            {/* font-mono y tabular-nums: el
-                                                registro se dicta dígito por dígito
-                                                y se compara entre filas, y en
-                                                monoespaciado los ceros de relleno
-                                                quedan alineados en la columna. */}
-                                            <Link
-                                                href={route('carnets.show', c.id)}
-                                                className="font-mono text-sm font-medium tabular-nums text-primary hover:underline"
-                                            >
-                                                {c.registro}
-                                            </Link>
-                                        </td>
-                                        <td className="px-5 py-3">{c.beneficiario ?? '—'}</td>
-                                        <td className="px-5 py-3 tabular-nums">{c.gestion}</td>
-                                        <td className="px-5 py-3">
-                                            {/*
-                                                Se muestra el estado guardado, pero si la fecha ya
-                                                pasó y el comando programado todavía no corrió, se
-                                                avisa: el estado puede estar desfasado hasta un día.
-                                            */}
-                                            <Badge color={c.vigente ? 'emerald' : c.estado_color}>
-                                                {c.vigente ? 'Vigente' : c.estado_etiqueta}
-                                            </Badge>
-                                        </td>
-                                        {/*
-                                            LA ACTIVIDAD, no un contador de rubros.
-                                            Con un carnet por rubro, «cuántos rubros
-                                            tiene» siempre daría uno; lo que hace
-                                            falta saber es CUÁL, porque una misma
-                                            persona aparece varias veces en la lista.
-                                        */}
-                                        <td className="px-5 py-3">
-                                            <span className="font-medium">{c.rubro ?? '—'}</span>
-                                            {c.capacidad && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {c.capacidad}
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="px-5 py-3 text-muted-foreground">
-                                            {fecha(c.fecha_vencimiento)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                    <tbody className="divide-y divide-border">
+                                        {carnets.data.map((c) => (
+                                            <tr key={c.id} className="hover:bg-secondary/50">
+                                                <td className="px-5 py-2.5">
+                                                    <Link
+                                                        href={route('carnets.show', c.id)}
+                                                        className="font-medium text-primary hover:underline"
+                                                    >
+                                                        {c.beneficiario ?? '—'}
+                                                    </Link>
+                                                    <p className="font-mono text-xs text-muted-foreground">
+                                                        {c.codigo}
+                                                    </p>
+                                                </td>
 
-                <Paginacion paginado={carnets} />
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={c.tipo_actor_color}>
+                                                        {c.tipo_actor_etiqueta}
+                                                    </Badge>
+                                                </td>
+
+                                                <td className="px-5 py-2.5">{c.asociacion ?? '—'}</td>
+
+                                                {/*
+                                                    Solo el pescador lleva cupo. El guion no es
+                                                    «falta cargarlo»: la comercialización no se
+                                                    autoriza por volumen.
+                                                */}
+                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    {c.cupo_kg === null ? (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    ) : (
+                                                        `${c.cupo_kg} kg`
+                                                    )}
+                                                </td>
+
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    {c.pagado ? (
+                                                        <span className="text-emerald-700 dark:text-emerald-400">
+                                                            Pagado
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-amber-700 dark:text-amber-400">
+                                                            debe {bs(c.saldo_pendiente, institucion.moneda)}
+                                                        </span>
+                                                    )}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                    {fecha(c.fecha_vencimiento)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Paginacion paginado={carnets} />
+                        </>
+                    )}
+                </CardContent>
             </Card>
         </LayoutPanel>
     );

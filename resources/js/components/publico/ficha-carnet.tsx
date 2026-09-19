@@ -18,22 +18,19 @@ import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
  * ----------------------------------------------------------------------------
  *
  * La escena es un muelle, con sol, y el inspector mira el teléfono dos segundos.
- * Todo lo demás —nombre, gestión, rubros— es la letra chica que se lee si hace
+ * Todo lo demás —nombre, gestión, actividad— es la letra chica que se lee si hace
  * falta; lo que tiene que entenderse de un vistazo es si el carnet vale o no.
  * Por eso el estado va arriba, en un sello grande y con color propio, y no como
  * una etiqueta más en una lista de datos.
  *
  * ----------------------------------------------------------------------------
- *  LOS RUBROS SOLO APARECEN SI EL CARNET ESTÁ VIGENTE
+ *  LA ACTIVIDAD SOLO APARECE SI EL CARNET ESTÁ VIGENTE
  * ----------------------------------------------------------------------------
  *
- * Un carnet vencido, suspendido o anulado no habilita nada, así que mostrar su actividad
- * —aunque fuera en gris— es pedirle al inspector que lea el sello y la lista al
- * mismo tiempo y saque la conclusión correcta. Con un carnet caído, la lista
- * directamente no está.
- *
- * Lo mismo adentro de la lista: los rubros SUSPENDIDOS no vienen desde el
- * servidor. Lo que no habilita, no aparece.
+ * Un carnet vencido o revocado no habilita nada, así que mostrar su actividad
+ * —aunque fuera en gris— es pedirle al inspector que lea el sello y la línea al
+ * mismo tiempo y saque la conclusión correcta. Con un carnet caído, el servidor
+ * manda `actividad` en null y el bloque directamente no está.
  */
 export function FichaCarnet({
     carnet,
@@ -63,12 +60,12 @@ export function FichaCarnet({
 
             <dl className="mt-6 divide-y divide-slate-200 border-y border-slate-200">
                 {/*
-                    El REGISTRO va primero porque es el único dato de esta pantalla
+                    EL CÓDIGO va primero porque es el único dato de esta pantalla
                     que también está impreso en el plástico: es lo que el inspector
                     cruza para confirmar que el acta corresponde a la credencial que
                     tiene en la mano, y no a otra.
                 */}
-                <Renglon etiqueta="Registro" valor={carnet.registro} mono />
+                <Renglon etiqueta="Código" valor={carnet.codigo} mono />
                 <Renglon etiqueta="Titular" valor={carnet.titular ?? '—'} />
                 {/*
                     La cédula llega ENMASCARADA desde PHP: solo los últimos tres
@@ -85,15 +82,15 @@ export function FichaCarnet({
 
             {/*
                 LA ACTIVIDAD QUE EL CARNET AUTORIZA. Es UNA, no una lista: cada
-                carnet habilita un solo rubro, y quien tiene dos actividades
-                tiene dos carnets con dos QR distintos.
+                carnet habilita una sola actividad, y quien hace las dos tiene dos
+                carnets con dos códigos distintos.
 
                 Solo se muestra con el carnet VIGENTE, y el servidor ya manda
-                `rubro` en null cuando no lo está. Es deliberado: enseñar la
-                actividad de un carnet vencido o suspendido —aunque fuera tachada—
+                `actividad` en null cuando no lo está. Es deliberado: enseñar la
+                actividad de un carnet vencido o revocado —aunque fuera tachada—
                 arriesga que el inspector lea la línea y no la advertencia.
             */}
-            {carnet.vigente && carnet.rubro && (
+            {carnet.vigente && carnet.actividad && (
                 <div className="mt-6">
                     <p className="font-serif text-[11px] tracking-[0.14em] text-slate-500 uppercase">
                         Actividad habilitada
@@ -101,7 +98,7 @@ export function FichaCarnet({
 
                     <p className="mt-2 flex items-center gap-2 font-serif text-[13px] text-slate-800">
                         <BadgeCheck className="size-4 shrink-0 text-emerald-700" />
-                        {carnet.rubro}
+                        {carnet.actividad}
                     </p>
 
                     {/*
@@ -109,9 +106,9 @@ export function FichaCarnet({
                         misma línea porque es el dato que un control contrasta
                         contra la guía de transporte: tiene que poder leerse solo.
                     */}
-                    {carnet.capacidad && (
+                    {carnet.cupo_kg !== null && (
                         <p className="mt-1.5 font-serif text-[13px] text-slate-600">
-                            Cupo autorizado: <strong>{carnet.capacidad}</strong>
+                            Cupo autorizado: <strong>{carnet.cupo_kg} kg</strong>
                         </p>
                     )}
                 </div>
@@ -139,34 +136,27 @@ function Sello({ carnet }: { carnet: CarnetPublico }) {
         );
     }
 
-    if (carnet.estado === 'anulado') {
-        return (
-            <Marco
-                clase="border-rose-700/40 bg-rose-50 text-rose-800"
-                icono={<Ban className="size-7" />}
-                texto="Anulado"
-            />
-        );
-    }
-
     /*
-     * SUSPENDIDO TIENE SELLO PROPIO, y no es un detalle estético.
+     * REVOCADO TIENE SELLO PROPIO, y no es un detalle estético.
      *
-     * Sin este caso el sello caía en el genérico de abajo y un carnet suspendido
-     * se anunciaba como VENCIDO, mientras el texto de al lado explicaba una
-     * suspensión. El inspector leía dos cosas distintas en la misma pantalla, y
-     * se resuelven distinto: un vencimiento se arregla tramitando el carnet del
-     * año siguiente, una suspensión la levanta un supervisor.
+     * Sin este caso el sello caería en el genérico de abajo y un carnet
+     * revocado se anunciaría como VENCIDO. El inspector leería dos cosas
+     * distintas en la misma pantalla, y se resuelven distinto: un vencimiento
+     * se arregla emitiendo el carnet del año siguiente, una revocación es una
+     * decisión de la unidad.
      *
      * Va en rojo y no en ámbar porque, a diferencia del vencimiento, es una
      * SANCIÓN vigente: el documento no caducó solo, alguien lo cortó.
+     *
+     * EL CASO `suspendido` SE FUE con el núcleo nuevo: `EstadoCarnet` pasó a
+     * activo/revocado/vencido, y una suspensión temporal ya no existe.
      */
-    if (carnet.estado === 'suspendido') {
+    if (carnet.estado === 'revocado') {
         return (
             <Marco
                 clase="border-rose-700/40 bg-rose-50 text-rose-800"
                 icono={<Ban className="size-7" />}
-                texto="Suspendido"
+                texto="Revocado"
             />
         );
     }

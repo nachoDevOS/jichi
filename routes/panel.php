@@ -1,15 +1,17 @@
 <?php
 
+use App\Http\Controllers\Panel\AprovechamientoController;
+use App\Http\Controllers\Panel\AsociacionController;
 use App\Http\Controllers\Panel\BeneficiarioController;
+use App\Http\Controllers\Panel\CajaController;
 use App\Http\Controllers\Panel\CarnetController;
 use App\Http\Controllers\Panel\CarnetImpresionController;
+use App\Http\Controllers\Panel\CategoriaAprovechamientoController;
 use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\FaenaController;
 use App\Http\Controllers\Panel\GuiaController;
-use App\Http\Controllers\Panel\PagoController;
 use App\Http\Controllers\Panel\ReciboController;
-use App\Http\Controllers\Panel\RubroController;
-use App\Http\Controllers\Panel\TramiteController;
+use App\Http\Controllers\Panel\TipoCarnetController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -43,6 +45,25 @@ use Illuminate\Support\Facades\Route;
 |
 | No hay auto-registro de usuarios: las cuentas las crea el administrador.
 |
+|--------------------------------------------------------------------------
+| EL ORDEN DE LOS BLOQUES ES EL DEL FLUJO DE TRABAJO
+|--------------------------------------------------------------------------
+|
+|     1. Beneficiarios      la persona, una sola vez
+|     2. Aprovechamientos   la bolsa madre: el cupo en kilos
+|     3. Carnets            la credencial anual, y su impresión
+|     4. Faenas / Guías     los permisos operativos que cuelgan del carnet
+|     5. Caja               recibos y pagos
+|
+| Los módulos que todavía no existen NO tienen rutas declaradas, y eso es
+| deliberado: una ruta declarada convierte el renglón del menú en un enlace
+| pinchable (ver barra-lateral.tsx, que pregunta por la ruta antes de enlazar).
+| Sin ella, el renglón se dibuja en gris y se lee como «todavía no» en vez de
+| llevar a un 500.
+|
+| Del modelo anterior no quedó nada: Trámites y Rubros no tienen equivalente y
+| se retiraron enteros. Están en git, en el commit `8d48422`.
+|
 */
 
 Route::middleware('auth')->prefix('panel')->group(function () {
@@ -61,8 +82,12 @@ Route::middleware('auth')->prefix('panel')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Beneficiarios — las personas que sacan el carnet
+    | 1. Beneficiarios — la persona, UNA SOLA VEZ
     |--------------------------------------------------------------------------
+    |
+    | Es el primer paso del flujo, y el único módulo que sobrevivió al cambio de
+    | núcleo casi intacto: la persona no cambió, lo que cambió es lo que le
+    | cuelga.
     |
     | OJO CON EL ORDEN DE LAS RUTAS. Laravel las evalúa de arriba hacia abajo y
     | se queda con la primera que coincide. Por eso 'beneficiarios/crear' tiene
@@ -76,9 +101,10 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         Route::get('/beneficiarios', [BeneficiarioController::class, 'index'])
             ->name('beneficiarios.index');
 
-        // Autocompletado del formulario de trámite. Devuelve JSON, no una
-        // pantalla: se consulta mientras el operador escribe y ahí no se quiere
-        // navegar a ningún lado. Va antes del comodín por lo mismo que 'crear'.
+        /*
+         * El autocompletado del mostrador. Devuelve JSON, no una pantalla de
+         * Inertia, y va ANTES de la ruta con {beneficiario} por lo dicho arriba.
+         */
         Route::get('/beneficiarios/buscar', [BeneficiarioController::class, 'buscar'])
             ->name('beneficiarios.buscar');
     });
@@ -95,9 +121,6 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         Route::get('/beneficiarios/{beneficiario}/editar', [BeneficiarioController::class, 'edit'])
             ->name('beneficiarios.edit');
 
-        // PUT es el verbo para «reemplazar este registro». Como los formularios
-        // HTML solo saben GET y POST, Inertia manda un POST con un campo oculto
-        // _method=PUT y Laravel lo interpreta.
         Route::put('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'update'])
             ->name('beneficiarios.update');
     });
@@ -106,367 +129,163 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:beneficiarios.eliminar')
         ->name('beneficiarios.destroy');
 
-    // La ficha va AL FINAL a propósito: '{beneficiario}' es un comodín y se
-    // comería '/beneficiarios/crear' y '/beneficiarios/buscar' si estuviera
-    // más arriba.
+    // La ficha va ÚLTIMA de su bloque: {beneficiario} coincide con cualquier
+    // palabra, así que puesta antes se tragaría 'crear' y 'buscar'.
     Route::get('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'show'])
         ->middleware('permiso:beneficiarios.ver')
         ->name('beneficiarios.show');
 
     /*
     |--------------------------------------------------------------------------
-    | Rubros — el catálogo de actividades
+    | 2. Aprovechamientos — la BOLSA MADRE del pescador
     |--------------------------------------------------------------------------
     |
-    | No hay DELETE. Un rubro no se borra nunca: los carnets históricos apuntan a
-    | él y desaparecerlo haría que un carnet del año pasado dejara de mostrar una
-    | actividad que en su momento estuvo autorizada. Se pasa a 'inactivo' desde
-    | el formulario de edición.
+    | El cupo anual en kilos. Va ANTES del carnet en el flujo porque el plástico
+    | necesita saber qué cupo imprimir: al revés habría que emitir el carnet y
+    | corregirlo después, y en el medio existiría una credencial impresa sin
+    | cupo.
+    |
+    | `edit`, `update` y `destroy` EXISTEN, PERO SOLO SOBRE EL BORRADOR.
+    |
+    | Un cupo nace PENDIENTE DE PAGO, y mientras nadie pagó nada es eso: un
+    | borrador que el operador acaba de cargar contra el talonario, con el
+    | pescador enfrente. Equivocarse de tramo se arregla corrigiendo la fila, y
+    | uno cargado por error se borra con el motivo escrito.
+    |
+    | En cuanto entra el primer boliviano las tres se cierran solas —lo decide
+    | `EstadoAprovechamiento::permiteEdicion()`, no el middleware—: hay un recibo
+    | numerado con el detalle impreso, y cambiar lo que ese papel dice por detrás
+    | no es una corrección. De ahí en adelante el único camino es AMPLIARLO, que
+    | suma kilos, pide su propio permiso y deja el motivo en `auditorias`.
+    |
+    | Un cupo editable SIEMPRE dejaría de ser un límite: alcanzaría con subirle
+    | el tramo para saltear la escala, sin que quedara constancia de quién lo
+    | decidió.
+    |
+    | Mismo cuidado con el orden que en beneficiarios: 'crear' va ANTES de
+    | '{aprovechamiento}' o Laravel toma esa palabra como si fuera el id.
     |
     */
 
-    Route::get('/rubros', [RubroController::class, 'index'])
-        ->middleware('permiso:rubros.ver')
-        ->name('rubros.index');
+    Route::get('/aprovechamientos', [AprovechamientoController::class, 'index'])
+        ->middleware('permiso:aprovechamientos.ver')
+        ->name('aprovechamientos.index');
 
-    Route::middleware('permiso:rubros.gestionar')->group(function () {
-        Route::get('/rubros/crear', [RubroController::class, 'create'])->name('rubros.create');
-        Route::post('/rubros', [RubroController::class, 'store'])->name('rubros.store');
-        Route::get('/rubros/{rubro}/editar', [RubroController::class, 'edit'])->name('rubros.edit');
-        Route::put('/rubros/{rubro}', [RubroController::class, 'update'])->name('rubros.update');
+    Route::middleware('permiso:aprovechamientos.crear')->group(function () {
+        Route::get('/aprovechamientos/crear', [AprovechamientoController::class, 'create'])
+            ->name('aprovechamientos.create');
+
+        Route::post('/aprovechamientos', [AprovechamientoController::class, 'store'])
+            ->name('aprovechamientos.store');
     });
 
     /*
+     * CORREGIR EL BORRADOR. El permiso es de ventanilla, pero el estado manda:
+     * el servicio rechaza cualquier cupo que ya no esté pendiente, con la fila
+     * bloqueada, porque entre abrir el formulario y guardar alguien pudo
+     * cobrarlo.
+     */
+    Route::middleware('permiso:aprovechamientos.editar')->group(function () {
+        Route::get('/aprovechamientos/{aprovechamiento}/editar', [AprovechamientoController::class, 'edit'])
+            ->name('aprovechamientos.edit');
+
+        Route::put('/aprovechamientos/{aprovechamiento}', [AprovechamientoController::class, 'update'])
+            ->name('aprovechamientos.update');
+    });
+
+    /*
+     * ELIMINAR es de SUPERVISIÓN: borrar la fila la hace desaparecer, y lo único
+     * que queda es la línea de `auditorias` con el motivo. Ver el bloque de
+     * arriba.
+     */
+    Route::delete('/aprovechamientos/{aprovechamiento}', [AprovechamientoController::class, 'destroy'])
+        ->middleware('permiso:aprovechamientos.eliminar')
+        ->name('aprovechamientos.destroy');
+
+    /*
+     * AMPLIAR es de SUPERVISIÓN y no de ventanilla: otorgar es aplicar la
+     * escala que corresponde, ampliar es dar más kilos de los que esa escala
+     * daba — que es justamente lo que el cupo viene a limitar.
+     */
+    Route::patch('/aprovechamientos/{aprovechamiento}/ampliar', [AprovechamientoController::class, 'ampliar'])
+        ->middleware('permiso:aprovechamientos.ampliar')
+        ->name('aprovechamientos.ampliar');
+
+    Route::get('/aprovechamientos/{aprovechamiento}', [AprovechamientoController::class, 'show'])
+        ->middleware('permiso:aprovechamientos.ver')
+        ->name('aprovechamientos.show');
+
+    /*
     |--------------------------------------------------------------------------
-    | Trámites — el circuito del expediente
+    | 3. Carnets — la credencial anual
     |--------------------------------------------------------------------------
     |
-    |     PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
-    |         │              │
-    |         └──────────────┴─────────▶ RECHAZADO
+    | La LLAVE del año. De ella cuelgan los permisos operativos: faenas si es de
+    | pescador, guías si es de comercializador.
+    |
+    | NO HAY `edit` NI `update`. Un carnet emitido no se corrige: el plástico ya
+    | salió de la impresora y está en manos de la persona, así que editarlo
+    | dejaría al documento diciendo una cosa y al sistema otra —y la
+    | verificación pública respondería por el dato nuevo, que el inspector NO
+    | tiene delante—. Lo que hay es REVOCAR, con motivo, y emitir uno nuevo.
+    |
+    | Mismo cuidado con el orden: 'crear' va ANTES de '{carnet}'.
     |
     */
 
-    Route::get('/tramites', [TramiteController::class, 'index'])
-        ->middleware('permiso:tramites.ver')
-        ->name('tramites.index');
+    Route::get('/carnets', [CarnetController::class, 'index'])
+        ->middleware('permiso:carnets.ver')
+        ->name('carnets.index');
 
-    Route::middleware('permiso:tramites.crear')->group(function () {
-        // 'crear' va antes que cualquier '{tramite}', por lo mismo que en
-        // beneficiarios: el comodín se comería la palabra.
-        //
-        // Un solo formulario para los dos tipos de trámite: el operador carga
-        // siempre lo mismo y el sistema decide si es emisión inicial o adición.
-        Route::get('/tramites/crear', [TramiteController::class, 'create'])
-            ->name('tramites.create');
+    Route::middleware('permiso:carnets.crear')->group(function () {
+        Route::get('/carnets/crear', [CarnetController::class, 'create'])
+            ->name('carnets.create');
 
-        Route::post('/tramites', [TramiteController::class, 'store'])
-            ->name('tramites.store');
-    });
-
-    Route::get('/tramites/{tramite}', [TramiteController::class, 'show'])
-        ->middleware('permiso:tramites.ver')
-        ->name('tramites.show');
-
-    /*
-     * Corregir un expediente en curso: se reemplaza el papel que salió ilegible.
-     * Funciona mientras el expediente siga abierto —PENDIENTE o EN REVISIÓN—,
-     * que es el caso más frecuente: el revisor abre el trámite, ve que el
-     * escaneo salió ilegible y el operador lo vuelve a cargar sin que haya que
-     * rechazar y empezar de nuevo. La regla la decide
-     * EstadoTramite::permiteEdicion().
-     */
-    Route::middleware('permiso:tramites.editar')->group(function () {
-        Route::get('/tramites/{tramite}/editar', [TramiteController::class, 'edit'])
-            ->name('tramites.edit');
-
-        Route::put('/tramites/{tramite}', [TramiteController::class, 'update'])
-            ->name('tramites.update');
+        Route::post('/carnets', [CarnetController::class, 'store'])
+            ->name('carnets.store');
     });
 
     /*
-     * BORRAR UN EXPEDIENTE — solo pendiente o en revisión.
-     *
-     * Permiso propio y del grupo de ADMINISTRACIÓN, no del de operación: borrar
-     * no es corregir. El operador de ventanilla que se equivocó al cargar puede
-     * editar los adjuntos con `tramites.editar`; hacer desaparecer el
-     * expediente entero —con sus pagos y sus archivos— es otra cosa.
-     *
-     * El estado no se comprueba acá: lo decide EstadoTramite::permiteEliminacion()
-     * y lo aplica el servicio. El middleware cubre QUIÉN puede; el servicio,
-     * CUÁNDO se puede.
+     * REVOCAR es de SUPERVISIÓN: es una sanción, no se revierte, y la
+     * verificación pública empieza a informarla al instante.
      */
-    Route::delete('/tramites/{tramite}', [TramiteController::class, 'destroy'])
-        ->middleware('permiso:tramites.eliminar')
-        ->name('tramites.destroy');
+    Route::patch('/carnets/{carnet}/revocar', [CarnetController::class, 'revocar'])
+        ->middleware('permiso:carnets.revocar')
+        ->name('carnets.revocar');
 
     /*
-    |--------------------------------------------------------------------------
-    | Los pasos del circuito
-    |--------------------------------------------------------------------------
-    |
-    |     PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
-    |         │              │
-    |         └──────────────┴─────────▶ RECHAZADO
-    |
-    | TODOS SON PATCH. Cambian parcialmente un recurso que ya existe, que es
-    | exactamente lo que significa PATCH.
-    |
-    | Lo que NO pueden ser nunca es GET. Un verbo de lectura que escribe se
-    | dispara solo: alcanza con que el navegador precargue el enlace, que un
-    | antivirus corporativo lo visite o que alguien comparta la URL por chat y la
-    | vista previa la abra. Un trámite aprobado por el prefetch del navegador es
-    | un problema que no se puede explicar después.
-    |
-    | Cada paso tiene SU ruta y SU permiso, en vez de un único «cambiar estado»
-    | con el destino en el cuerpo de la petición. Con eso, quien recepciona
-    | podría aprobarse a sí mismo el trámite que acaba de cargar.
-    |
-    | Qué salto vale desde cada estado lo decide App\Enums\EstadoTramite, no
-    | estas rutas: el permiso dice QUIÉN puede, el enum dice DESDE DÓNDE.
-    |
-    */
-
-    /*
-     * ENVIAR EL EXPEDIENTE A REVISIÓN — el paso OBLIGATORIO del circuito.
+     * EL PLÁSTICO. Va ANTES de '{carnet}' aunque la URL sea más larga: el
+     * orden solo importa entre rutas que puedan coincidir con el mismo camino,
+     * y estas dos no —'/carnets/7/imprimir' no coincide con '/carnets/{carnet}'—
+     * pero se agrupa acá para que el bloque se lea de corrido.
      *
-     * Sin pasar por acá no se puede aprobar: `EstadoTramite::siguientes()` ya no
-     * permite el salto PENDIENTE ──▶ APROBADO. El motivo es de control, no de
-     * comodidad — con ese atajo, quien cargaba la solicitud en ventanilla podía
-     * aprobarla sin que nadie más la tocara.
-     *
-     * Lleva el permiso de ventanilla (`tramites.editar`) y no el de supervisión:
-     * enviar es el último acto de quien ARMA el expediente. Aprobar, que es lo
-     * que sigue, exige `tramites.aprobar`, y así los dos actos quedan en manos
-     * distintas el día que exista el rol de ventanilla.
-     */
-    Route::patch('/tramites/{tramite}/enviar', [TramiteController::class, 'enviar'])
-        ->middleware('permiso:tramites.editar')
-        ->name('tramites.enviar');
-
-    /*
-     * REABRIR UN EXPEDIENTE RECHAZADO — el camino de vuelta.
-     *
-     * Lleva el permiso de VENTANILLA (`tramites.editar`) y no uno de
-     * supervisión, por el mismo motivo que enviar: reabrir es el primer acto de
-     * quien vuelve a ARMAR el expediente, no una decisión sobre él. La decisión
-     * —rechazar— ya la tomó otra persona y queda registrada; esto solo devuelve
-     * los papeles a la mesa donde se corrigen.
-     *
-     * Quién puede lo dice este middleware; CUÁNDO se puede lo dice
-     * `EstadoTramite::siguientes()`, y que el carnet no tenga ya otro
-     * expediente abierto lo comprueba el servicio.
-     */
-    Route::patch('/tramites/{tramite}/reabrir', [TramiteController::class, 'reabrir'])
-        ->middleware('permiso:tramites.editar')
-        ->name('tramites.reabrir');
-
-    Route::patch('/tramites/{tramite}/aprobar', [TramiteController::class, 'aprobar'])
-        ->middleware('permiso:tramites.aprobar')
-        ->name('tramites.aprobar');
-
-    Route::patch('/tramites/{tramite}/rechazar', [TramiteController::class, 'rechazar'])
-        ->middleware('permiso:tramites.rechazar')
-        ->name('tramites.rechazar');
-
-    // Imprimir y entregar son permisos de CARNETS y no de trámites: lo que se
-    // imprime y se entrega es el documento, y quien lo hace no es
-    // necesariamente quien aprobó el expediente.
-    Route::patch('/tramites/{tramite}/generar', [TramiteController::class, 'generar'])
-        ->middleware('permiso:carnets.generar')
-        ->name('tramites.generar');
-
-    Route::patch('/tramites/{tramite}/entregar', [TramiteController::class, 'entregar'])
-        ->middleware('permiso:carnets.entregar')
-        ->name('tramites.entregar');
-
-    /*
-     * EL RECIBO OFICIAL — el talonario verde que se lleva el pescador.
-     *
-     * Es la ÚNICA ruta del circuito que es GET, y no es una excepción a la regla
-     * de arriba: esta no escribe nada. El recibo ya se emitió solo, dentro de la
-     * transacción que pasó el expediente a EN REVISIÓN (ver
-     * SolicitudCarnetService::enviarARevision); acá únicamente se dibuja el
-     * PDF. Que el navegador precargue el enlace no cambia ningún dato ni consume
-     * ningún número de la serie.
-     *
-     * Reimprimir sale siempre con el MISMO número: el papel ya está en manos de
-     * alguien, y un segundo recibo por el mismo pago dejaría a Contabilidad con
-     * dos comprobantes que no puede cuadrar.
-     */
-    Route::get('/tramites/{tramite}/recibo', [ReciboController::class, 'imprimir'])
-        ->middleware('permiso:recibos.imprimir')
-        ->name('tramites.recibo');
-
-    /*
-    |--------------------------------------------------------------------------
-    | Pagos — Regla C
-    |--------------------------------------------------------------------------
-    |
-    | El alta cuelga del trámite porque un pago sin expediente no significa nada:
-    | no habría contra qué compararlo ni a quién acreditárselo.
-    |
-    | El listado general sí es suelto: es el libro de caja, y lo que se quiere
-    | ahí es justamente mirarlos todos juntos para cuadrar contra el banco.
-    |
-    | NO HAY ANULACIÓN DE PAGOS. Una boleta cargada mal se corrige, y el trait
-    | Auditable deja el valor anterior registrado. Un pago «anulado» que sigue en
-    | la lista solo invita a sumarlo por error.
-    |
-    */
-
-    Route::get('/pagos', [PagoController::class, 'index'])
-        ->middleware('permiso:pagos.ver')
-        ->name('pagos.index');
-
-    Route::post('/tramites/{tramite}/pagos', [PagoController::class, 'store'])
-        ->middleware('permiso:pagos.registrar')
-        ->name('pagos.store');
-
-    /*
-     * CORREGIR UN DEPÓSITO — la única salida cuando la boleta se cargó mal.
-     *
-     * Cuelga del PAGO y no del trámite, al revés que el alta: el alta necesita
-     * saber a qué se le carga el depósito, la corrección no, porque el pago ya
-     * sabe de qué es —y desde que `pagos` es polimórfica, ese «de qué» puede ser
-     * también una faena o una guía—.
-     *
-     * VA CON `pagos.registrar` Y NO CON UN PERMISO NUEVO. Corregir lo que se
-     * tipeó mal es el mismo acto de ventanilla que cargarlo: quien puede
-     * escribir la fila puede arreglarla. Lo que NO puede hacer ventanilla es
-     * darla por buena, y eso sigue pidiendo `pagos.validar`.
-     *
-     * Quién puede lo dice este middleware; CUÁNDO se puede lo dice
-     * `Pago::admiteCorreccion()` — un depósito ya validado no se toca, porque
-     * alguien firmó que cuadraba con el extracto.
-     */
-    Route::put('/pagos/{pago}', [PagoController::class, 'update'])
-        ->middleware('permiso:pagos.registrar')
-        ->name('pagos.update');
-
-    /*
-     * QUITAR UN DEPÓSITO — la boleta cargada dos veces, o la de otra persona.
-     *
-     * PERMISO PROPIO Y DE ADMINISTRACIÓN, no el de ventanilla: quitar no es
-     * corregir. Corregir deja la fila y su historial; quitar la hace
-     * desaparecer del expediente y de la suma cobrada, y lo único que queda es
-     * `auditorias`. Es la misma separación que hay entre `tramites.editar` y
-     * `tramites.eliminar`.
-     *
-     * CUÁNDO se puede lo dice `Pago::admiteEliminacion()`, y es más estricto
-     * que corregir: solo mientras el expediente sea un BORRADOR. Una vez
-     * enviado salió el recibo oficial, y hacer desaparecer un depósito dejaría
-     * ese papel cobrando más de lo que el expediente puede mostrar.
-     */
-    Route::delete('/pagos/{pago}', [PagoController::class, 'destroy'])
-        ->middleware('permiso:pagos.eliminar')
-        ->name('pagos.destroy');
-
-    /*
-     * CONTROLAR UN DEPÓSITO — validarlo u observarlo.
-     *
-     * Van por PATCH y no por GET, como todos los pasos que escriben: un verbo de
-     * lectura que escribe se dispara solo con que el navegador precargue el
-     * enlace. Un depósito «validado» por el prefetch es un problema que no se
-     * puede explicar después.
-     *
-     * Permiso de SUPERVISIÓN y no de ventanilla: quien carga la boleta no puede
-     * darla por buena. Eso lo impide además `Pago::puedeValidarlo()`, que
-     * compara contra `registrado_por` — el middleware dice QUIÉN puede, el
-     * servicio dice SOBRE CUÁL.
-     *
-     * Son DOS rutas y no una con el destino en el cuerpo, por lo mismo que los
-     * pasos del trámite: así el día que observar y validar tengan permisos
-     * distintos, ya están separadas.
-     */
-    Route::middleware('permiso:pagos.validar')->group(function () {
-        Route::patch('/pagos/{pago}/validar', [PagoController::class, 'validar'])
-            ->name('pagos.validar');
-
-        Route::patch('/pagos/{pago}/observar', [PagoController::class, 'observar'])
-            ->name('pagos.observar');
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Carnets — consulta y sanciones
-    |--------------------------------------------------------------------------
-    |
-    | NO HAY ALTA. Un carnet nace dentro de SolicitudCarnetService cuando la
-    | Regla A determina que la persona no tenía uno de esta gestión. Un botón de
-    | «crear carnet» suelto permitiría emitir documentos sin expediente que los
-    | respalde, y sin cobrar.
-    |
-    */
-
-    Route::middleware('permiso:carnets.ver')->group(function () {
-        Route::get('/carnets', [CarnetController::class, 'index'])->name('carnets.index');
-
-        /*
-         * Autocompletado de los formularios de faena y de guía. Devuelve JSON,
-         * no una pantalla.
-         *
-         * VA ANTES DEL COMODÍN, por lo mismo que 'beneficiarios/buscar': si
-         * estuviera después, Laravel tomaría la palabra «buscar» como si fuera
-         * el id del carnet y respondera 404.
-         */
-        Route::get('/carnets/buscar', [CarnetController::class, 'buscar'])
-            ->name('carnets.buscar');
-
-        Route::get('/carnets/{carnet}', [CarnetController::class, 'show'])->name('carnets.show');
-    });
-
-    /*
-     * IMPRIMIR EL CARNET — el plástico que se lleva la persona.
-     *
-     * Es GET y NO es una excepción a la regla de que los pasos del circuito van
-     * por PATCH: esta ruta no escribe nada. Dibuja el PDF a partir de la fila
-     * del carnet y lo manda al navegador; que alguien la precargue o comparta el
-     * enlace no cambia ningún dato.
-     *
-     * MARCAR EL TRÁMITE COMO IMPRESO SIGUE SIENDO OTRA COSA
-     * —`PATCH /tramites/{tramite}/generar`—. Son dos actos distintos: abrir la
-     * vista previa no es haber sacado el plástico en la impresora de
-     * credenciales, y si esta ruta marcara, alcanzaría con mirar el documento
-     * para que el expediente declarara un carnet que nunca existió.
-     *
-     * Lleva `carnets.generar` —el permiso de ventanilla, el mismo que marca
-     * impreso— y no `carnets.ver`: consultar un carnet en pantalla y sacar el
-     * documento con validez no son la misma atribución.
+     * Es GET y devuelve bytes, no una pantalla de Inertia: el navegador lo abre
+     * en su visor de PDF, que es desde donde el operador aprieta imprimir.
      */
     Route::get('/carnets/{carnet}/imprimir', [CarnetImpresionController::class, 'imprimir'])
-        ->middleware('permiso:carnets.generar')
+        ->middleware('permiso:carnets.imprimir')
         ->name('carnets.imprimir');
 
-    Route::post('/carnets/{carnet}/anular', [CarnetController::class, 'anular'])
-        ->middleware('permiso:carnets.anular')
-        ->name('carnets.anular');
-
-    // Suspender o rehabilitar un rubro suelto del carnet. La medida es por
-    // actividad y no por documento: a un pescador se le puede cortar el
-    // transporte sin quitarle la pesca.
-    /*
-     * Suspender o levantar un carnet. Reemplaza a la ruta
-     * `habilitaciones.alternar` del modelo anterior: con un carnet por rubro no
-     * hay habilitaciones que suspender, se suspende el carnet de esa actividad.
-     */
-    Route::post('/carnets/{carnet}/suspender', [CarnetController::class, 'suspender'])
-        ->middleware('permiso:carnets.suspender')
-        ->name('carnets.suspender');
+    Route::get('/carnets/{carnet}', [CarnetController::class, 'show'])
+        ->middleware('permiso:carnets.ver')
+        ->name('carnets.show');
 
     /*
     |--------------------------------------------------------------------------
-    | Faenas — el permiso por salida de pesca
+    | 4a. Permisos de faena — una salida de pesca
     |--------------------------------------------------------------------------
     |
-    | Cuelgan de un carnet de Pescador VIGENTE. Se emiten muchas por gestión: una
-    | por cada salida.
+    | Cuelgan del carnet de PESCADOR y descuentan kilos de la bolsa madre. El
+    | carnet es la llave anual; con él solo no se sale a trabajar.
     |
-    | NO HAY EDICIÓN NI BORRADO. El número sale de un talonario de papel que la
-    | persona se lleva en el momento: editarlo dejaría el sistema diciendo una
-    | cosa y el papel otra, y borrarlo dejaría un hueco en la serie —además de
-    | liberar un número que el índice único volvería a aceptar—. Una faena mal
-    | emitida se ANULA, con su motivo escrito.
+    | NO HAY `edit`, NI `update`, NI `destroy`, NI `anular`. El número sale de un
+    | talonario de papel que el pescador se llevó: borrar la fila deja un hueco
+    | en la serie que nadie puede explicar y libera un número que el índice único
+    | volvería a aceptar.
+    |
+    | Y `EstadoFaena` no tiene un estado anulado: una faena emitida de más se
+    | deja VENCER, y al vencer libera su volumen sola. Lo único que se escribe
+    | después de emitir es COMPLETAR, que registra la vuelta.
     |
     */
 
@@ -475,40 +294,43 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->name('faenas.index');
 
     Route::middleware('permiso:faenas.crear')->group(function () {
-        // 'crear' va antes de cualquier '{faena}': el comodín se comería la
-        // palabra y buscaría una faena con id «crear».
-        Route::get('/faenas/crear', [FaenaController::class, 'create'])->name('faenas.create');
-        Route::post('/faenas', [FaenaController::class, 'store'])->name('faenas.store');
+        Route::get('/faenas/crear', [FaenaController::class, 'create'])
+            ->name('faenas.create');
+
+        Route::post('/faenas', [FaenaController::class, 'store'])
+            ->name('faenas.store');
     });
+
+    /*
+     * COMPLETAR es de VENTANILLA y no de supervisión: registrar que el pescador
+     * volvió y descargó es un hecho del mostrador, no una decisión que alguien
+     * firme. Recién ahí los kilos quedan firmes contra el cupo.
+     */
+    Route::patch('/faenas/{faena}/completar', [FaenaController::class, 'completar'])
+        ->middleware('permiso:faenas.completar')
+        ->name('faenas.completar');
 
     Route::get('/faenas/{faena}', [FaenaController::class, 'show'])
         ->middleware('permiso:faenas.ver')
         ->name('faenas.show');
 
     /*
-     * ANULAR — PATCH y no GET.
-     *
-     * Un verbo de lectura que escribe se dispara solo: alcanza con que el
-     * navegador precargue el enlace o que alguien lo comparta por chat y la
-     * vista previa lo abra. Es la misma regla que en los pasos del trámite.
-     *
-     * Permiso de SUPERVISIÓN y no de ventanilla: quema un número del talonario
-     * para siempre.
-     */
-    Route::patch('/faenas/{faena}/anular', [FaenaController::class, 'anular'])
-        ->middleware('permiso:faenas.anular')
-        ->name('faenas.anular');
-
-    /*
     |--------------------------------------------------------------------------
-    | Guías únicas de transporte
+    | 4b. Guías de movimiento — un traslado de producto
     |--------------------------------------------------------------------------
     |
-    | Cuelgan de un carnet de Comercializador VIGENTE, y son muchas por gestión.
+    | La rama del COMERCIALIZADOR. Lo que la faena es para el pescador, la guía
+    | es para él: el carnet habilita el año, la guía habilita el viaje.
     |
-    | Misma regla que las faenas: la CABECERA no se edita. Lo único que se
-    | corrige es el DETALLE de la carga —el peso real sale de la balanza—, y solo
-    | mientras la guía siga valiendo.
+    | TRES DIFERENCIAS CON LAS FAENAS:
+    |
+    |   - No toca ningún cupo: la comercialización no se autoriza por volumen.
+    |   - Lleva descuento: piscicultura paga el 50% del arancel.
+    |   - SÍ SE ANULA. `EstadoGuia` tiene ese estado y `EstadoFaena` no, porque
+    |     una guía emitida mal ampara un camión que puede estar en la ruta.
+    |
+    | Igual que las faenas, NO hay `edit` ni `destroy`: el código sale de un
+    | talonario de papel que viaja dentro del camión.
     |
     */
 
@@ -517,33 +339,160 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->name('guias.index');
 
     Route::middleware('permiso:guias.crear')->group(function () {
-        Route::get('/guias/crear', [GuiaController::class, 'create'])->name('guias.create');
-        Route::post('/guias', [GuiaController::class, 'store'])->name('guias.store');
+        Route::get('/guias/crear', [GuiaController::class, 'create'])
+            ->name('guias.create');
 
-        // Corregir la grilla de carga. Va con el permiso de QUIEN EMITE y no con
-        // el de anular: ajustar los kilos contra la balanza es parte de emitir.
-        Route::put('/guias/{guia}/detalle', [GuiaController::class, 'actualizarDetalle'])
-            ->name('guias.detalle');
+        Route::post('/guias', [GuiaController::class, 'store'])
+            ->name('guias.store');
     });
+
+    // Cerrar es de VENTANILLA: registrar que la carga llegó es un hecho del
+    // mostrador, no una decisión que alguien firme.
+    Route::patch('/guias/{guia}/cerrar', [GuiaController::class, 'cerrar'])
+        ->middleware('permiso:guias.cerrar')
+        ->name('guias.cerrar');
+
+    /*
+     * ANULAR es de SUPERVISIÓN: quema un número del talonario para siempre —no
+     * se desanula— y deja un hueco en la serie que hay que poder explicar. Por
+     * eso no lo tiene quien emite.
+     */
+    Route::patch('/guias/{guia}/anular', [GuiaController::class, 'anular'])
+        ->middleware('permiso:guias.anular')
+        ->name('guias.anular');
 
     Route::get('/guias/{guia}', [GuiaController::class, 'show'])
         ->middleware('permiso:guias.ver')
         ->name('guias.show');
 
-    Route::patch('/guias/{guia}/anular', [GuiaController::class, 'anular'])
-        ->middleware('permiso:guias.anular')
-        ->name('guias.anular');
+    /*
+    |--------------------------------------------------------------------------
+    | 5. Caja — el circuito del dinero
+    |--------------------------------------------------------------------------
+    |
+    | Atraviesa a todos los anteriores: se cobran la credencial, el cupo y la
+    | guía, y los tres se pagan igual. NO es un paso del flujo —es algo que
+    | puede pasar en cualquiera de ellos y varias veces— y por eso va aparte y
+    | no intercalado.
+    |
+    | DOS LISTADOS QUE NO SE REEMPLAZAN:
+    |
+    |   /caja     los ABONOS, uno por entrega de dinero. Es lo que se cuadra
+    |             contra el efectivo del cajón al cerrar el día.
+    |   /recibos  los PAPELES entregados, con su correlativo. Es lo que audita
+    |             Contabilidad.
+    |
+    | Un recibo agrupa varios abonos, así que las dos listas nunca tienen la
+    | misma cantidad de filas.
+    |
+    | LOS RECIBOS NO TIENEN `store`: nacen del cobro, en la misma transacción.
+    | Un endpoint para crear uno suelto permitiría un comprobante numerado sin
+    | ningún pago detrás — un papel oficial que dice que entró plata que no
+    | entró.
+    |
+    */
+
+    Route::middleware('permiso:caja.ver')->group(function () {
+        Route::get('/caja', [CajaController::class, 'index'])->name('caja.index');
+        Route::get('/recibos', [ReciboController::class, 'index'])->name('recibos.index');
+    });
+
+    Route::middleware('permiso:caja.cobrar')->group(function () {
+        // 'cobrar' va ANTES de cualquier ruta con parámetro del mismo prefijo,
+        // por lo de siempre: esa palabra se tomaría como si fuera un id.
+        Route::get('/caja/cobrar', [CajaController::class, 'create'])->name('caja.create');
+        Route::post('/caja', [CajaController::class, 'store'])->name('caja.store');
+    });
+
+    Route::get('/recibos/{recibo}', [ReciboController::class, 'show'])
+        ->middleware('permiso:caja.ver')
+        ->name('recibos.show');
 
     /*
     |--------------------------------------------------------------------------
-    | Módulos pendientes
+    | Catálogos — lo que sale de una resolución y casi no se toca
     |--------------------------------------------------------------------------
     |
-    | Reportes y Configuración todavía no existen. Aparecen en el menú lateral en
-    | gris, porque el layout de React comprueba si la ruta está declarada antes
-    | de convertirla en enlace (ver barra-lateral.tsx).
+    | Son tres listas chicas: los gremios, la escala oficial de kilos y precios,
+    | y los tipos de credencial con su arancel. De ellas dependen los dos pasos
+    | siguientes del flujo —el cupo y el carnet— así que sin cargarlas no se
+    | puede emitir nada.
     |
-    | Para construir cualquiera de ellos: copiar el patrón de Beneficiarios.
+    | CUELGAN DE /panel/catalogos/ Y NO DE LA RAÍZ del panel a propósito: son
+    | mantenimiento, no trabajo de mostrador, y la URL lo dice sin que haga
+    | falta explicarlo.
+    |
+    | LOS TRES TIENEN index + store + update, Y NINGUNO TIENE destroy. No es un
+    | olvido: los carnets, las guías y los aprovechamientos ya emitidos apuntan
+    | a estas filas. Una entrada que se deja de usar se pone inactiva, y así los
+    | documentos históricos la siguen mostrando —que es lo correcto: la persona
+    | pertenecía a esa asociación cuando se le emitió el carnet—.
+    |
+    | Tampoco tienen pantalla de alta ni de edición aparte: el formulario vive
+    | al lado de la tabla, porque son listas de pocas filas que se comparan
+    | entre sí mientras se cargan. Ver AsociacionController.
+    |
+    | VER es de lectura y GESTIONAR es de administración, y por eso son dos
+    | permisos: cualquiera que emita un carnet necesita LEER el catálogo —el
+    | desplegable sale de acá— pero tocar una tarifa es otra cosa.
+    |
+    */
+
+    Route::prefix('catalogos')->group(function () {
+
+        // --- Asociaciones
+        Route::get('/asociaciones', [AsociacionController::class, 'index'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('asociaciones.index');
+
+        Route::middleware('permiso:catalogos.gestionar')->group(function () {
+            Route::post('/asociaciones', [AsociacionController::class, 'store'])
+                ->name('asociaciones.store');
+
+            Route::put('/asociaciones/{asociacion}', [AsociacionController::class, 'update'])
+                ->name('asociaciones.update');
+        });
+
+        // --- Escala de aprovechamiento
+        Route::get('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'index'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('categorias-aprovechamiento.index');
+
+        Route::middleware('permiso:catalogos.gestionar')->group(function () {
+            Route::post('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'store'])
+                ->name('categorias-aprovechamiento.store');
+
+            Route::put('/categorias-aprovechamiento/{categoria}', [CategoriaAprovechamientoController::class, 'update'])
+                ->name('categorias-aprovechamiento.update');
+        });
+
+        // --- Tipos de carnet
+        Route::get('/tipos-carnet', [TipoCarnetController::class, 'index'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('tipos-carnet.index');
+
+        Route::middleware('permiso:catalogos.gestionar')->group(function () {
+            Route::post('/tipos-carnet', [TipoCarnetController::class, 'store'])
+                ->name('tipos-carnet.store');
+
+            Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
+                ->name('tipos-carnet.update');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Módulos por construir
+    |--------------------------------------------------------------------------
+    |
+    | Aprovechamientos, Carnets, Faenas, Guías, Caja, Reportes y Configuración.
+    | Todos aparecen en el menú lateral en gris, porque barra-lateral.tsx
+    | comprueba si la ruta está declarada antes de convertir el renglón en
+    | enlace.
+    |
+    | Para construir cualquiera: copiar el patrón de Beneficiarios —controlador,
+    | Request, tipos de TypeScript y pantallas—, que es la plantilla del sistema
+    | y está comentado paso a paso a propósito.
     |
     */
 });

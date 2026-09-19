@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoAprovechamiento;
+use App\Enums\EstadoCarnet;
+use App\Enums\TipoActor;
 use App\Support\Archivos;
 use App\Support\Sql;
 use App\Traits\Auditable;
@@ -9,16 +12,17 @@ use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /*
+ * LA PERSONA, UNA SOLA VEZ. No hay columna de rol: quien pesca y además
+ * comercializa es UNA ficha con DOS carnets. El rol es del documento.
+ *
  * OJO: `nombreCompleto` NO va en Appends, aunque sea un accesor como los otros
- * dos. La razón es el camelCase.
+ * tres. La razón es el camelCase.
  *
  * Al serializar el modelo a array, Laravel busca el accesor por el nombre del
  * método pasado a snake_case: para `nombreCompleto()` busca la clave
@@ -31,7 +35,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 #[Appends(['documento_identidad', 'foto_url', 'edad'])]
 #[Fillable([
-    'ci_nit',
+    'ci',
     'complemento',
     'expedido',
     'primerNombre',
@@ -51,6 +55,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Beneficiario extends Model
 {
     use Auditable, HasFactory, SoftDeletes;
+
+    /**
+     * `foto` NO está en Fillable a propósito: la ruta la escribe
+     * StorageController después de subir el archivo, y dejarla asignable en
+     * masa permitiría que un formulario mandara una ruta arbitraria.
+     */
+    protected $attributes = [
+        'nacionalidad' => 'Boliviana',
+    ];
 
     protected function casts(): array
     {
@@ -119,13 +132,11 @@ class Beneficiario extends Model
         });
     }
 
-    /**
-     * La cédula tal como se imprime en el carnet: «1234567-1A BN».
-     */
+    /** La cédula tal como se imprime en el carnet: «1234567-1A BN». */
     protected function documentoIdentidad(): Attribute
     {
         return Attribute::get(fn (): string => trim(implode(' ', array_filter([
-            $this->ci_nit.($this->complemento ? '-'.$this->complemento : ''),
+            $this->ci.($this->complemento ? '-'.$this->complemento : ''),
             $this->expedido,
         ]))));
     }
@@ -133,33 +144,19 @@ class Beneficiario extends Model
     /**
      * Los años cumplidos hoy. NULL si la ficha no tiene fecha de nacimiento.
      *
-     * ------------------------------------------------------------------------
-     *  NO HAY COLUMNA `edad`, Y NO PUEDE HABERLA
-     * ------------------------------------------------------------------------
+     * NO HAY COLUMNA `edad`, Y NO PUEDE HABERLA: la edad cambia sola. Guardada,
+     * haría falta un proceso que recorra el padrón todas las noches, y entre
+     * corrida y corrida el dato estaría mal para quien cumplió ese día.
      *
-     * La edad cambia sola: una persona de 39 años pasa a tener 40 el día de su
-     * cumpleaños sin que nadie toque el sistema. Guardada en una columna, haría
-     * falta un proceso que recorra el padrón todas las noches corrigiéndola, y
-     * entre corrida y corrida el dato estaría mal para quien cumplió ese día.
+     * EL floor() NO SE PUEDE QUITAR. Carbon 3 devuelve un FLOAT en
+     * `diffInYears()`: para alguien nacido el 18 de julio de 2006 dice 20.15.
+     * Dejar que PHP lo convierta solo funciona —trunca hacia abajo— pero emite
+     * un «Deprecated: implicit conversion from float loses precision» en cada
+     * lectura, y en un listado de 30 filas eso son 30 líneas de ruido por carga.
      *
-     * Calculada al leer no puede desfasarse nunca, porque no guarda nada: es la
-     * respuesta a «cuántos años tiene ESTA persona HOY».
-     *
-     * ------------------------------------------------------------------------
-     *  EL floor() NO SE PUEDE QUITAR
-     * ------------------------------------------------------------------------
-     *
-     * Carbon 3 devuelve un FLOAT en `diffInYears()`: para alguien nacido el 18 de
-     * julio de 2006 dice 20.15, no 20. Dejar que PHP lo convierta solo al tipo
-     * de retorno funciona —trunca hacia abajo, que es lo que se quiere— pero
-     * emite un «Deprecated: implicit conversion from float loses precision» en
-     * cada lectura, y en un listado de 30 filas eso son 30 líneas de ruido en el
-     * log por cada carga de pantalla.
-     *
-     * Con floor() explícito queda dicho además lo que se quiere de verdad: años
-     * CUMPLIDOS, no redondeados. Es como se lee una edad en cualquier trámite —
-     * quien nació en diciembre de 1990 tiene 34 en noviembre de 2025, no 35—, y
-     * redondear haría que alguien figure con un año de más durante seis meses.
+     * Con floor() explícito queda dicho además lo que se quiere: años CUMPLIDOS,
+     * no redondeados. Redondear haría figurar a alguien con un año de más
+     * durante seis meses.
      */
     protected function edad(): Attribute
     {
@@ -175,7 +172,7 @@ class Beneficiario extends Model
      *
      * Pasa por Archivos::url porque la columna guarda una ruta cuando el disco
      * es local y una dirección completa cuando es s3, y las dos formas pueden
-     * convivir en la misma tabla. Ver App\Support\Archivos.
+     * convivir en la misma tabla.
      */
     protected function fotoUrl(): Attribute
     {
@@ -186,21 +183,28 @@ class Beneficiario extends Model
     //  Relaciones
     // ------------------------------------------------------------------
 
+    /** Sus credenciales: puede tener una de pescador y otra de comercializador. */
     public function carnets(): HasMany
     {
         return $this->hasMany(Carnet::class);
     }
 
-    /**
-     * Todos los trámites de la persona, de cualquier gestión.
-     *
-     * Va por hasManyThrough porque `tramites` no apunta al beneficiario sino a
-     * su carnet: la gestión de cada expediente queda dada por construcción en
-     * vez de tener que deducirse. Ver la migración de `tramites`.
-     */
-    public function tramites(): HasManyThrough
+    /** Sus bolsas madre, de todas las gestiones. */
+    public function aprovechamientos(): HasMany
     {
-        return $this->hasManyThrough(Tramite::class, Carnet::class);
+        return $this->hasMany(AprovechamientoPesq::class);
+    }
+
+    /**
+     * Las guías que emitió COMO COMERCIALIZADOR.
+     *
+     * La clave foránea va explícita porque no sigue la convención: la columna
+     * se llama `beneficiario_com_id` justamente para que nadie la confunda con
+     * el pescador que extrajo la carga, que es otra persona.
+     */
+    public function guias(): HasMany
+    {
+        return $this->hasMany(GuiaMovimiento::class, 'beneficiario_com_id');
     }
 
     // ------------------------------------------------------------------
@@ -209,121 +213,98 @@ class Beneficiario extends Model
 
     /**
      * ========================================================================
-     *  EL CARNET DE ESTA PERSONA PARA ESTE RUBRO Y ESTA GESTIÓN, O NULL
+     *  LA CREDENCIAL VIGENTE DE ESTA PERSONA PARA ESTA ACTIVIDAD, O NULL
      * ========================================================================
      *
-     * ESTE MÉTODO ES LA REGLA A DEL MÓDULO. De lo que devuelva depende todo lo
-     * demás: sin carnet el trámite es EMISIÓN INICIAL y hay que crear el
-     * documento; con carnet es ACTUALIZACIÓN y se reutiliza el que existe.
+     * De lo que devuelva depende el resto: sin carnet hay que emitir uno; con
+     * carnet se reutiliza el que existe y lo que corresponde es renovarlo.
      *
-     * ------------------------------------------------------------------------
-     *  RECIBE EL RUBRO, Y ESO ES LO QUE CAMBIÓ
-     * ------------------------------------------------------------------------
+     * RECIBE EL TIPO DE ACTOR Y ES OBLIGATORIO. Una persona puede tener dos
+     * credenciales al mismo tiempo, así que la pregunta sin el tipo no tiene
+     * una única respuesta: un método que devolviera «la primera» reutilizaría
+     * el carnet de Pescador para un trámite de Comercializador.
      *
-     * Antes se llamaba `carnetDeGestion($gestion)` y respondía «el carnet de
-     * esta persona este año», porque había uno solo. Hoy una persona puede
-     * tener varios en la misma gestión —uno por actividad— así que la pregunta
-     * sin el rubro no tiene una única respuesta, y un método que devolviera
-     * «el primero» sería una fuente de errores silenciosos: el sistema
-     * reutilizaría el carnet de Pescador para un trámite de Comercializador.
+     * Filtra por vigencia REAL —estado más fecha— y no solo por el estado,
+     * porque `estado` puede estar desfasado: `vencido` lo escribe un comando
+     * diario. Ver Carnet::estaVigente().
      *
-     * Por eso el rubro es OBLIGATORIO. Para la otra pregunta —«todos los que
-     * tiene este año»— está `carnetsDeGestion()`.
-     *
-     * Se busca por `gestion` y no por rango de fechas a propósito: un carnet
-     * emitido el 2 de enero para cerrar la gestión anterior existe, y por fecha
-     * de emisión caería en el año equivocado.
-     *
-     * NO filtra por estado: devuelve también el anulado, el suspendido y el
-     * vencido. Quien decide qué hacer con eso es SolicitudCarnetService, porque
-     * la respuesta cambia según el caso —un carnet anulado no admite trámites,
-     * pero tampoco permite emitir otro del mismo rubro en la misma gestión: el
-     * índice único no lo dejaría—.
-     *
-     * ------------------------------------------------------------------------
-     *  SI LA RELACIÓN YA ESTÁ CARGADA, NO SE VUELVE A CONSULTAR
-     * ------------------------------------------------------------------------
-     *
+     * SI LA RELACIÓN YA ESTÁ CARGADA, NO SE VUELVE A CONSULTAR.
      * `$this->carnets()->where(...)` dispara una consulta SIEMPRE, aunque quien
-     * llamó haya hecho `with('carnets')` justamente para evitarlo. Eso convertía
-     * el autocompletado —que arma la situación de diez personas de una vez— en
-     * un N+1 silencioso: el `with()` estaba escrito, se veía correcto, y aun así
-     * salían dieciocho consultas por tecleada.
-     *
-     * `relationLoaded()` distingue los dos casos. Con la relación cargada se
-     * filtra en memoria, sobre las filas que ya están; sin ella se consulta como
-     * siempre. Quien llama no tiene que saber cuál de los dos es.
+     * llamó haya hecho `with('carnets')` justamente para evitarlo: el `with()`
+     * queda escrito, se ve correcto, y el N+1 sigue ahí en silencio.
      */
-    public function carnetDeRubroEnGestion(int $rubroId, ?int $gestion = null): ?Carnet
+    public function carnetVigenteDe(TipoActor $tipo): ?Carnet
     {
-        $gestion ??= (int) now()->format('Y');
-
         if ($this->relationLoaded('carnets')) {
-            return $this->carnets
-                ->first(fn (Carnet $c): bool => $c->rubro_id === $rubroId && $c->gestion === $gestion);
+            return $this->carnets->first(
+                fn (Carnet $c): bool => $c->tipo_actor === $tipo && $c->estaVigente(),
+            );
         }
 
         return $this->carnets()
-            ->where('rubro_id', $rubroId)
-            ->where('gestion', $gestion)
+            ->where('tipo_actor', $tipo)
+            ->where('estado', EstadoCarnet::Activo)
+            ->whereDate('fecha_vencimiento', '>=', now()->toDateString())
+            ->latest('fecha_emision')
             ->first();
     }
 
+    /** ¿Tiene credencial vigente de esta actividad? */
+    public function tieneCarnetVigenteDe(TipoActor $tipo): bool
+    {
+        return $this->carnetVigenteDe($tipo) !== null;
+    }
+
     /**
-     * TODOS los carnets de la persona en una gestión — uno por actividad.
+     * Su bolsa madre utilizable HOY, o null.
      *
-     * Es la vista que necesita la pantalla: el formulario de trámite muestra
-     * qué actividades ya tiene cubiertas este año, y la ficha del beneficiario
-     * las lista. Devuelve una colección, nunca null; vacía si no tiene ninguno.
+     * Es lo que el formulario de faenas necesita: sin ella no hay de dónde
+     * descontar kilos y no se puede emitir el permiso.
      *
      * Mismo cuidado con `relationLoaded()` que arriba, y por el mismo motivo.
-     *
-     * @return Collection<int, Carnet>
      */
-    public function carnetsDeGestion(?int $gestion = null): Collection
+    public function aprovechamientoVigente(): ?AprovechamientoPesq
     {
-        $gestion ??= (int) now()->format('Y');
-
-        if ($this->relationLoaded('carnets')) {
-            return $this->carnets->where('gestion', $gestion)->values();
+        if ($this->relationLoaded('aprovechamientos')) {
+            return $this->aprovechamientos->first(
+                fn (AprovechamientoPesq $a): bool => $a->puedeEmitirFaena(),
+            );
         }
 
-        return $this->carnets()->where('gestion', $gestion)->get();
-    }
-
-    /** ¿Tiene carnet de esta actividad este año? */
-    public function tieneCarnetDeRubro(int $rubroId, ?int $gestion = null): bool
-    {
-        return $this->carnetDeRubroEnGestion($rubroId, $gestion) !== null;
+        return $this->aprovechamientos()
+            ->where('estado', EstadoAprovechamiento::Activo)
+            ->whereDate('fecha_vencimiento', '>=', now()->toDateString())
+            ->latest('fecha_emision')
+            ->get()
+            ->first(fn (AprovechamientoPesq $a): bool => $a->puedeEmitirFaena());
     }
 
     /**
-     * Lo que debe en total, sumando todos sus trámites no rechazados.
+     * Lo que debe en total, sumando lo pendiente de sus tres tipos de trámite.
      *
-     * ------------------------------------------------------------------------
-     *  EL withSum ES LO QUE EVITA UNA CONSULTA POR TRÁMITE
-     * ------------------------------------------------------------------------
-     *
-     * Sin él, `saldoPendiente()` termina llamando a `$this->pagos()->sum(...)` y
-     * eso dispara una consulta agregada POR CADA trámite de la persona. Con él,
-     * lo cobrado de todos viene en la MISMA consulta, y `Tramite::montoPagado()`
-     * lo reusa —por eso ese método pregunta primero por `pagos_sum_monto`—.
-     *
-     * Es el N+1 silencioso que documenta CLAUDE.md: la relación se ve bien
-     * escrita, no falla nada, y las consultas se multiplican sin que nadie lo
-     * note.
+     * EL withSum ES LO QUE EVITA UNA CONSULTA POR TRÁMITE. Sin él, cada
+     * `saldoPendiente()` termina llamando a `$this->pagos()->sum(...)` y eso
+     * dispara una consulta agregada POR CADA carnet, cupo y guía de la persona.
+     * Con él, lo cobrado de todos viene en la MISMA consulta y el trait Pagable
+     * lo reusa —por eso `montoPagado()` pregunta primero por
+     * `pagos_sum_monto_parcial`—.
      *
      * LA RESTA SÍ SE HACE EN PHP, y es correcto: «cuánto falta» no es una resta
-     * a secas, se corta en cero porque pagar de más no genera saldo a favor. Esa
-     * regla vive en `Tramite::saldoPendiente()` y no se duplica acá.
+     * a secas, se corta en cero porque pagar de más no genera saldo a favor.
+     * Esa regla vive en el trait y no se duplica acá.
      */
     public function deudaTotal(): float
     {
-        return (float) $this->tramites()
-            ->noRechazados()
-            ->withSum('pagos', 'monto')
-            ->get()
-            ->sum(fn (Tramite $t): float => $t->saldoPendiente());
+        $pendiente = fn ($coleccion): float => $coleccion->sum(
+            fn ($tramite): float => $tramite->saldoPendiente(),
+        );
+
+        return round(
+            $pendiente($this->carnets()->with('tipoCarnet')->withSum('pagos', 'monto_parcial')->get())
+            + $pendiente($this->aprovechamientos()->with('categoria')->withSum('pagos', 'monto_parcial')->get())
+            + $pendiente($this->guias()->withSum('pagos', 'monto_parcial')->get()),
+            2,
+        );
     }
 
     // ------------------------------------------------------------------
@@ -355,7 +336,7 @@ class Beneficiario extends Model
         $operador = Sql::like($query->getConnection());
 
         return $query->where(function (Builder $q) use ($like, $operador) {
-            $q->where('ci_nit', $operador, $like)
+            $q->where('ci', $operador, $like)
                 ->orWhereRaw('('.self::SQL_NOMBRE.') '.$operador.' ?', [$like])
                 ->orWhere('email', $operador, $like)
                 ->orWhere('telefono', $operador, $like);

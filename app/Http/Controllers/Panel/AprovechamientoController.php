@@ -1,0 +1,505 @@
+<?php
+
+namespace App\Http\Controllers\Panel;
+
+use App\Enums\EstadoAprovechamiento;
+use App\Exceptions\CupoInvalidoException;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Panel\AmpliarCupoRequest;
+use App\Http\Requests\Panel\EliminarCupoRequest;
+use App\Http\Requests\Panel\OtorgarCupoRequest;
+use App\Models\AprovechamientoPesq;
+use App\Models\Beneficiario;
+use App\Models\CategoriaAprovechamiento;
+use App\Models\PermisoFaena;
+use App\Services\OtorgarCupoService;
+use App\Support\Paginacion;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * ============================================================================
+ *  APROVECHAMIENTOS — la BOLSA MADRE del pescador (paso 2 del flujo)
+ * ============================================================================
+ *
+ *     beneficiario ──< aprovechamiento (500 kg, 2026) ──< faena (80 kg)
+ *                                                    ──< faena (120 kg)
+ *
+ * El cupo es el volumen anual que se le autoriza a una persona. Cada faena
+ * descuenta de él, y cuando el saldo llega a cero no se pueden emitir más.
+ *
+ * ----------------------------------------------------------------------------
+ *  EL CONTROLADOR NO DECIDE NADA
+ * ----------------------------------------------------------------------------
+ *
+ * Todas las reglas —una bolsa vigente por persona, el volumen que sale del
+ * techo del tramo, el vencimiento con la gestión— viven en
+ * `OtorgarCupoService`. Acá solo se arman las pantallas y se traduce la
+ * excepción del servicio en un mensaje bajo el campo.
+ *
+ * Es lo que permite que una carga masiva por consola aplique exactamente las
+ * mismas reglas sin copiar una línea.
+ */
+class AprovechamientoController extends Controller
+{
+    public function __construct(private readonly OtorgarCupoService $servicio) {}
+
+    /**
+     * LISTADO — GET /panel/aprovechamientos
+     */
+    public function index(Request $request): Response
+    {
+        $filtros = [
+            'buscar' => $request->string('buscar')->trim()->value() ?: null,
+            'estado' => $request->string('estado')->trim()->value() ?: null,
+            'por_pagina' => Paginacion::filas($request),
+        ];
+
+        $cupos = AprovechamientoPesq::query()
+            /*
+             * OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
+             * partes del nombre porque `nombreCompleto` las lee todas. Una
+             * columna que el modelo consulta y no está en el select vuelve null
+             * y el accesor contesta cualquier cosa, sin ningún error.
+             */
+            ->with([
+                'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                'categoria',
+            ])
+            /*
+             * Los DOS withSum son lo que evita dos consultas agregadas POR FILA:
+             * una para los kilos consumidos y otra para lo cobrado. Con 30 cupos
+             * en pantalla son 61 consultas sin ellos, y el listado se ve igual.
+             */
+            ->withSum('faenasQueConsumen', 'kilos_extraidos')
+            ->withSum('pagos', 'monto_parcial')
+            ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
+                'beneficiario',
+                fn ($b) => $b->buscar($termino),
+            ))
+            ->when($filtros['estado'], fn ($q, $estado) => $q->where(
+                'aprovechamientos_pesq.estado',
+                $estado,
+            ))
+            ->latest('fecha_emision')
+            ->paginate($filtros['por_pagina'])
+            ->withQueryString()
+            ->through($this->resumir(...));
+
+        return Inertia::render('panel/aprovechamientos/index', [
+            'cupos' => $cupos,
+            'filtros' => $filtros,
+            'estados' => EstadoAprovechamiento::opciones(),
+            'opcionesPorPagina' => Paginacion::OPCIONES,
+
+            /*
+             * EL MODO SE MANDA A LA PANTALLA, y no es un detalle informativo.
+             *
+             * En modo flexible las faenas se emiten por encima del cupo, así
+             * que un listado que mostrara los saldos sin decir en qué modo está
+             * el sistema haría leer «0 kg» como un bloqueo que no existe.
+             */
+            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
+        ]);
+    }
+
+    /**
+     * FORMULARIO — GET /panel/aprovechamientos/crear
+     *
+     * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
+     * buscador ya resuelto: quien viene de ahí ya eligió a quién, y volver a
+     * pedírselo es hacerle repetir un paso que acaba de dar.
+     */
+    public function create(Request $request): Response
+    {
+        $beneficiario = $request->integer('beneficiario')
+            ? Beneficiario::query()->find($request->integer('beneficiario'))
+            : null;
+
+        return Inertia::render('panel/aprovechamientos/crear', [
+            'beneficiario' => $beneficiario ? [
+                'id' => $beneficiario->id,
+                'nombreCompleto' => $beneficiario->nombreCompleto,
+                'documento_identidad' => $beneficiario->documento_identidad,
+                'foto_url' => $beneficiario->foto_url,
+            ] : null,
+
+            'escala' => $this->tramosElegibles(),
+        ]);
+    }
+
+    /**
+     * OTORGAR — POST /panel/aprovechamientos
+     */
+    public function store(OtorgarCupoRequest $request): RedirectResponse
+    {
+        $datos = $request->validated();
+
+        try {
+            $cupo = $this->servicio->otorgar(
+                Beneficiario::query()->findOrFail($datos['beneficiario_id']),
+                CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
+                now()->parse($datos['fecha_emision']),
+                $datos['tipo_embarcacion'] ?? null,
+            );
+        } catch (CupoInvalidoException $e) {
+            /*
+             * El mensaje del servicio se devuelve como error DEL CAMPO y no como
+             * un aviso suelto arriba de la pantalla. La regla que falló es sobre
+             * la persona elegida, así que el texto tiene que aparecer al lado de
+             * ese campo: un cartel arriba obliga al operador a adivinar qué
+             * corregir.
+             */
+            return back()
+                ->withInput()
+                ->withErrors(['beneficiario_id' => $e->getMessage()]);
+        }
+
+        /*
+         * ========================================================================
+         *  OTORGAR TERMINA EN LA CAJA, NO EN LA FICHA
+         * ========================================================================
+         *
+         * En ventanilla las dos cosas son UN solo acto: la persona se lleva la
+         * autorización y paga la concesión en el mismo momento —el talonario
+         * tiene el renglón «Valor de la Concesión Pesquera Bs.» en la misma
+         * hoja—. Dejando al operador en la ficha, cobrar exigía acordarse de ir
+         * a Caja y volver a buscar a la persona, y el cupo quedaba impago sin
+         * que nada lo empujara.
+         *
+         * Se manda con `?beneficiario=`, que es lo que el formulario de cobro ya
+         * sabe recibir: llega con TODAS las deudas de esa persona cargadas, no
+         * solo este cupo, así que un mismo recibo cubre el carnet y la
+         * autorización si los dos están pendientes. Eso es exactamente lo que
+         * hace la ventanilla.
+         *
+         * La ficha no queda inalcanzable: el mensaje lleva el número de cupo y
+         * el listado sigue estando a un clic.
+         */
+        return redirect()
+            ->route('caja.create', ['beneficiario' => $cupo->beneficiario_id])
+            ->with('exito', sprintf(
+                'Cupo otorgado: %s kg por %s. Cóbrelo ahora para que quede en regla.',
+                number_format((float) $cupo->volumen_total_kg, 2, ',', '.'),
+                number_format($cupo->montoACobrar(), 2, ',', '.'),
+            ));
+    }
+
+    /**
+     * FICHA — GET /panel/aprovechamientos/{aprovechamiento}
+     */
+    public function show(AprovechamientoPesq $aprovechamiento): Response
+    {
+        $aprovechamiento->load([
+            'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+            'categoria',
+        ]);
+
+        return Inertia::render('panel/aprovechamientos/ver', [
+            'cupo' => [
+                ...$this->resumir($aprovechamiento),
+
+                // La ficha sí muestra el detalle del tramo: es donde alguien va
+                // a mirar bajo qué resolución se otorgó.
+                'escala_descripcion' => $aprovechamiento->categoria?->descripcion_kg,
+                'escala_rango' => $aprovechamiento->categoria
+                    ? [(float) $aprovechamiento->categoria->kilos_min, (float) $aprovechamiento->categoria->kilos_max]
+                    : null,
+
+                /*
+                 * EL VOLUMEN OTORGADO PUEDE NO COINCIDIR CON EL TECHO DEL TRAMO,
+                 * y la pantalla tiene que poder mostrarlo: significa que el cupo
+                 * fue AMPLIADO. Sin los dos números al lado, una ampliación es
+                 * invisible.
+                 */
+                'fue_ampliado' => $aprovechamiento->categoria !== null
+                    && (float) $aprovechamiento->volumen_total_kg > (float) $aprovechamiento->categoria->kilos_max,
+            ],
+
+            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
+
+            /*
+             * Las faenas que colgaron de este cupo, de la más nueva a la más
+             * vieja. Es el detalle que explica el saldo: sin él, «le quedan 20
+             * kg» es un número que hay que creer.
+             */
+            'faenas' => $aprovechamiento->faenas()
+                ->with('carnet:id,codigo_carnet')
+                ->orderByDesc('numero_faena')
+                ->get()
+                ->map(fn (PermisoFaena $f): array => [
+                    'id' => $f->id,
+                    'numero_faena' => $f->numero_faena,
+                    'kilos_extraidos' => (float) $f->kilos_extraidos,
+                    'estado' => $f->estado->value,
+                    'estado_etiqueta' => $f->estado->etiqueta(),
+                    'estado_color' => $f->estado->color(),
+                    // Una faena vencida LIBERA su volumen: la pantalla lo marca
+                    // para que el saldo cuadre a la vista.
+                    'consume_cupo' => $f->consumeCupo(),
+                    'fecha_salida' => $f->fecha_salida?->toDateString(),
+                    'fecha_limite' => $f->fecha_limite?->toDateString(),
+                ])
+                ->all(),
+        ]);
+    }
+
+    /**
+     * AMPLIAR — PATCH /panel/aprovechamientos/{aprovechamiento}/ampliar
+     */
+    /**
+     * FORMULARIO DE CORRECCIÓN — GET /panel/aprovechamientos/{id}/editar
+     *
+     * ------------------------------------------------------------------------
+     *  SE CORTA ACÁ SI EL CUPO YA NO ES BORRADOR
+     * ------------------------------------------------------------------------
+     *
+     * El middleware revisa el PERMISO; esto revisa el ESTADO, que es otra cosa.
+     * Sin este corte, alguien con el permiso puesto podría abrir el formulario
+     * de un cupo ya cobrado, llenarlo y recién descubrir al guardar que no se
+     * podía — con el pescador enfrente y el trabajo tirado.
+     */
+    public function edit(AprovechamientoPesq $aprovechamiento): Response|RedirectResponse
+    {
+        if (! $aprovechamiento->puedeEditarse()) {
+            return redirect()
+                ->route('aprovechamientos.show', $aprovechamiento)
+                ->withErrors(['general' => CupoInvalidoException::noSePuedeEditar(
+                    $aprovechamiento->estado->etiqueta(),
+                )->getMessage()]);
+        }
+
+        $aprovechamiento->load([
+            'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
+            'categoria',
+        ]);
+
+        return Inertia::render('panel/aprovechamientos/editar', [
+            /*
+             * La persona llega con la MISMA forma que usa el autocompletado, y
+             * el formulario la muestra fija: cambiar de titular no es corregir
+             * un cupo, es otorgar otro. Dejarlo elegible abriría la puerta a
+             * mover una autorización de una persona a otra sin ningún rastro.
+             */
+            'cupo' => [
+                'id' => $aprovechamiento->id,
+                'beneficiario_id' => $aprovechamiento->beneficiario_id,
+                'beneficiario' => $aprovechamiento->beneficiario?->nombreCompleto,
+                'documento' => $aprovechamiento->beneficiario?->documento_identidad,
+                'foto_url' => $aprovechamiento->beneficiario?->foto_url,
+                'categoria_aprov_id' => $aprovechamiento->categoria_aprov_id,
+                'tipo_embarcacion' => $aprovechamiento->tipo_embarcacion,
+                'fecha_emision' => $aprovechamiento->fecha_emision?->toDateString(),
+            ],
+
+            'escala' => $this->tramosElegibles(),
+        ]);
+    }
+
+    /**
+     * GUARDAR LA CORRECCIÓN — PUT /panel/aprovechamientos/{id}
+     */
+    public function update(OtorgarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
+    {
+        $datos = $request->validated();
+
+        try {
+            $this->servicio->editar(
+                $aprovechamiento,
+                CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
+                now()->parse($datos['fecha_emision']),
+                $datos['tipo_embarcacion'] ?? null,
+            );
+        } catch (CupoInvalidoException $e) {
+            // Cuelga del tramo y no de la persona: al corregir, el titular no se
+            // toca, así que el único campo con el que el operador puede
+            // reaccionar es la escala.
+            return back()->withInput()->withErrors(['categoria_aprov_id' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('aprovechamientos.show', $aprovechamiento)
+            ->with('exito', 'Aprovechamiento corregido.');
+    }
+
+    /**
+     * ELIMINAR — DELETE /panel/aprovechamientos/{id}
+     *
+     * ------------------------------------------------------------------------
+     *  DESPUÉS DE ESTO NO HAY FICHA A LA QUE VOLVER
+     * ------------------------------------------------------------------------
+     *
+     * La fila se borra de verdad, así que el redirect va al LISTADO. Y el
+     * motivo, que es lo único que sobrevive, ya quedó en `auditorias` — lo
+     * escribe el servicio antes de borrar, cuando el modelo todavía tiene id.
+     */
+    public function destroy(EliminarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
+    {
+        $persona = $aprovechamiento->beneficiario?->nombreCompleto ?? 'el pescador';
+
+        try {
+            $this->servicio->eliminar($aprovechamiento, $request->validated()['motivo']);
+        } catch (CupoInvalidoException $e) {
+            return back()->withErrors(['motivo' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('aprovechamientos.index')
+            ->with('exito', "Aprovechamiento de {$persona} eliminado. El motivo quedó en la auditoría.");
+    }
+
+    public function ampliar(AmpliarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
+    {
+        $datos = $request->validated();
+
+        try {
+            $this->servicio->ampliar(
+                $aprovechamiento,
+                (float) $datos['kilos_adicionales'],
+                $datos['motivo'],
+            );
+        } catch (CupoInvalidoException $e) {
+            return back()->withErrors(['kilos_adicionales' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('aprovechamientos.show', $aprovechamiento)
+            ->with('exito', 'Cupo ampliado. La ampliación quedó registrada con su motivo.');
+    }
+
+    // ------------------------------------------------------------------
+    //  Auxiliares
+    // ------------------------------------------------------------------
+
+    /**
+     * Los tramos que el operador puede elegir, con sus consecuencias.
+     *
+     * ------------------------------------------------------------------------
+     *  LO USAN OTORGAR Y CORREGIR, Y TIENEN QUE VER LO MISMO
+     * ------------------------------------------------------------------------
+     *
+     * Escrito dos veces, agregar un dato al desplegable de alta y olvidarse del
+     * de corrección dejaría a las dos pantallas mostrando cosas distintas para
+     * la misma decisión — y nadie lo notaría hasta que alguien comparara.
+     *
+     * Solo los tramos VIGENTES: uno derogado sigue en la tabla —los cupos ya
+     * otorgados apuntan a él— pero no se puede elegir.
+     *
+     * Se manda el techo del rango porque es el volumen que se va a otorgar, y el
+     * valor porque es lo que se va a cobrar: la pantalla los muestra al elegir,
+     * así el operador ve las dos consecuencias antes de guardar y no después.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function tramosElegibles(): array
+    {
+        return CategoriaAprovechamiento::query()
+            ->vigentes()
+            ->enOrdenDeEscala()
+            ->get()
+            ->map(fn (CategoriaAprovechamiento $c): array => [
+                'id' => $c->id,
+                'nro_escala' => $c->nro_escala,
+                'descripcion_kg' => $c->descripcion_kg,
+                'kilos_min' => (float) $c->kilos_min,
+                'kilos_max' => (float) $c->kilos_max,
+                'valor_bs' => (float) $c->valor_bs,
+                // De la modalidad depende si el cupo se va a poder ampliar
+                // después, así que se muestra ANTES de otorgarlo.
+                'modalidad' => $c->modalidad->value,
+                'modalidad_etiqueta' => $c->modalidad->etiqueta(),
+                'modalidad_descripcion' => $c->modalidad->descripcion(),
+            ])
+            ->all();
+    }
+
+    /**
+     * Los datos de un cupo que pintan el listado y la ficha.
+     *
+     * Todo lo CALCULADO —saldo, porcentaje, vigencia, saldo pendiente— se arma
+     * acá y no en React. No es comodidad: la vigencia mira el estado Y la fecha
+     * —la columna la escribe un comando diario y entre corrida y corrida
+     * miente— y el saldo se corta en cero porque pagar de más no da crédito.
+     * Son reglas, y deducirlas en la pantalla sería una segunda copia.
+     *
+     * @return array<string, mixed>
+     */
+    private function resumir(AprovechamientoPesq $cupo): array
+    {
+        return [
+            'id' => $cupo->id,
+            'beneficiario_id' => $cupo->beneficiario_id,
+            'beneficiario' => $cupo->beneficiario?->nombreCompleto,
+            'documento' => $cupo->beneficiario?->documento_identidad,
+
+            'escala' => $cupo->categoria?->nro_escala,
+            'descripcion' => $cupo->categoria?->descripcion_kg,
+
+            'volumen_total_kg' => (float) $cupo->volumen_total_kg,
+            /*
+             * Lo que el pescador declaró que navega. Va NULL y no una cadena
+             * vacía cuando no se declaró, para que la pantalla pueda decir «no
+             * declarada» en vez de imprimir un renglón en blanco.
+             */
+            'tipo_embarcacion' => $cupo->tipo_embarcacion,
+            'kilos_consumidos' => $cupo->kilosConsumidos(),
+            'saldo_kg' => $cupo->saldoKg(),
+            'porcentaje_usado' => $cupo->porcentajeUsado(),
+
+            'modalidad' => $cupo->modalidad->value,
+            'modalidad_etiqueta' => $cupo->modalidad->etiqueta(),
+            'modalidad_color' => $cupo->modalidad->color(),
+
+            'estado' => $cupo->estado->value,
+            'estado_etiqueta' => $cupo->estado->etiqueta(),
+            'estado_color' => $cupo->estado->color(),
+            'vigente' => $cupo->estaVigente(),
+
+            /*
+             * LOS KILOS QUE SE PASARON DEL CUPO. En modo estricto siempre es
+             * cero —la emisión no deja pasar una faena que no entre— y por eso
+             * el número solo aparece en las pantallas cuando hay algo que
+             * mostrar. `saldoKg()` no puede decirlo: se corta en cero.
+             */
+            'kilos_excedidos' => $cupo->kilosExcedidos(),
+            'excedido' => $cupo->estaExcedido(),
+            // Se puede colgar una faena HOY: vigente, con saldo y sin agotar.
+            'puede_emitir_faena' => $cupo->puedeEmitirFaena(),
+            /*
+             * Distinto de `vigente`, y a propósito: un cupo AGOTADO no está
+             * vigente y sin embargo es el que hay que poder ampliar. Si la
+             * pantalla decidiera con `vigente`, escondería el botón justo
+             * cuando hace falta.
+             *
+             * Sale de `admiteAmpliacion()` y no de `puedeAmpliarse()`: la
+             * primera suma la MODALIDAD a la fecha, porque una especie especial
+             * no se amplía nunca. Con la otra, la pantalla ofrecería el botón
+             * sobre un cupo de paiche y el servidor lo rechazaría.
+             */
+            'puede_ampliarse' => $cupo->admiteAmpliacion(),
+
+            /*
+             * EDITAR Y ELIMINAR LLEGAN RESUELTAS, y no se deducen de `estado`
+             * en React.
+             *
+             * No son «el estado es pendiente»: son eso Y que no haya entrado
+             * plata, y en el caso de eliminar, Y que no tenga faenas. Escritas
+             * en la pantalla serían una segunda copia de las tres reglas, y la
+             * copia se queda vieja sin que nada falle.
+             */
+            'puede_editarse' => $cupo->puedeEditarse(),
+            'puede_eliminarse' => $cupo->puedeEliminarse(),
+
+            'monto' => $cupo->montoACobrar(),
+            'saldo_pendiente' => $cupo->saldoPendiente(),
+            'pagado' => $cupo->estaPagado(),
+
+            // Son DÍAS, no instantes: van con toDateString(). Mandados como
+            // instante, en UTC-4 la pantalla mostraría el día anterior.
+            'fecha_emision' => $cupo->fecha_emision?->toDateString(),
+            'fecha_vencimiento' => $cupo->fecha_vencimiento?->toDateString(),
+        ];
+    }
+}

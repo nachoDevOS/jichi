@@ -2,6 +2,251 @@
 
 ---
 
+## 🔴 ABIERTO Y BLOQUEANTE — el panel no está portado al núcleo nuevo
+
+El **18/09/2026** se rehízo desde cero el núcleo de datos y se migró sobre
+`jichi1`. **La base y los modelos están listos y probados; la capa de
+aplicación no.**
+
+**Estado medido el 18/09/2026**, pidiendo cada ruta contra un servidor limpio.
+**Ninguna ruta declarada da 500:** el código del modelo anterior se retiró en
+vez de dejarlo apuntando a tablas que no existen.
+
+| Ruta | | |
+| --- | :-: | --- |
+| `/panel/dashboard` | ✅ 200 | portado |
+| `/panel/beneficiarios` | ✅ 200 | portado |
+| `/panel/beneficiarios/crear` | ✅ 200 | portado |
+| `/panel/beneficiarios/{id}` | ✅ 200 | ficha nueva: carnets + cupos |
+| `/panel/beneficiarios/{id}/editar` | ✅ 200 | portado |
+| `/panel/beneficiarios/buscar` | ✅ 200 | devuelve `carnets_vigentes` |
+| `/panel/catalogos/asociaciones` | ✅ 200 | CRUD sin borrado |
+| `/panel/catalogos/categorias-aprovechamiento` | ✅ 200 | rechaza solapes, avisa huecos |
+| `/panel/catalogos/tipos-carnet` | ✅ 200 | CRUD sin borrado |
+| `/panel/aprovechamientos` | ✅ 200 | listado con saldo en kilos |
+| `/panel/aprovechamientos/crear` | ✅ 200 | una bolsa vigente por persona |
+| `/panel/aprovechamientos/{id}` | ✅ 200 | ficha con faenas y ampliación |
+| `/panel/carnets` | ✅ 200 | busca también por código |
+| `/panel/carnets/crear` | ✅ 200 | una credencial vigente por actividad |
+| `/panel/carnets/{id}` | ✅ 200 | ficha con qué habilita hoy |
+| `/panel/carnets/{id}/imprimir` | ✅ 200 | PDF CR80, 148 KB |
+| `/panel/faenas` | ✅ 200 | marca las caducadas sin cerrar |
+| `/panel/faenas/crear` | ✅ 200 | descuenta del cupo, con el número propuesto |
+| `/panel/faenas/{id}` | ✅ 200 | ficha con cierre y corrección de kilos |
+| `/panel/guias` | ✅ 200 | busca por código, origen y destino |
+| `/panel/guias/crear` | ✅ 200 | muestra el arancel con el descuento |
+| `/panel/guias/{id}` | ✅ 200 | cierre con peso y anulación con motivo |
+| `/panel/caja` | ✅ 200 | abonos + arqueo del día por método |
+| `/panel/caja/cobrar` | ✅ 200 | un recibo cubre varios trámites |
+| `/panel/recibos` | ✅ 200 | avisa los que dejaron de cuadrar |
+| `/panel/recibos/{id}` | ✅ 200 | detalle del comprobante |
+| `/verificar` y `/verificar/{codigo}` | ✅ 200 | portado a `codigo_carnet` |
+
+Probado además el camino de escritura: alta → 302, alta con cédula repetida →
+422 con el mensaje correcto bajo el campo `ci`.
+
+### Lo que se BORRÓ, y dónde encontrarlo
+
+Todo está en git, en el commit `8d48422`. Se retiraron porque no tienen
+equivalente en el núcleo nuevo o porque hay que rehacerlos:
+
+| Capa | Qué se fue |
+| --- | --- |
+| Modelos | `Rubro`, `Tramite`, `Faena`, `Guia`, `GuiaDetalle` |
+| Enums | `EstadoTramite`, `TipoTramite`, `EstadoRubro`, `EstadoValidacionPago`, `EstadoPermiso`, `ConceptoRecibo`, `CondicionProducto`, `TipoTransporte`, `FormaPago` |
+| Support | `SituacionCarnet`, `ReciboArmado`, `ControlDePago` |
+| Servicios | `SolicitudCarnetService`, `PagoTramiteService`, `ValidacionPagoService`, `ReciboTramiteService`, `FaenaService`, `GuiaService`, `ArchivoTramiteService` |
+| Controladores | `Tramite`, `Rubro`, `Faena`, `Guia`, `Pago`, `Recibo`, `Carnet`, `CarnetImpresion` |
+| Requests | los seis del modelo anterior |
+| React | `pages/panel/{tramites,rubros,carnets,faenas,guias,pagos}`, sus componentes y sus `types/*` |
+| Excepciones | `SolicitudInvalidaException`; `PermisoOperativoException` se reescribió |
+
+> **MIRAR ANTES DE REHACER CARNETS:** `CarnetImpresionController` tenía resuelta
+> la maqueta del plástico en DomPDF —el encogido de texto que achica en vez de
+> cortar, el `cover` a mano de la foto, el texto perfilado de cinco copias, el
+> ancho por carácter medido sobre las DejaVu—. Nada de eso cambia con el modelo
+> nuevo y volver a deducirlo cuesta días. Las plantillas Blade de
+> `views/documentos/` NO se borraron.
+
+Las migraciones del modelo anterior quedaron en `database/migrations-anterior/`
+—Laravel no recorre esa carpeta— por si hace falta consultarlas.
+
+### Cómo quedó el menú, y por qué
+
+`navegacion.ts` se reordenó según el FLUJO y no por abecedario. Los módulos sin
+ruta declarada se dibujan en gris y no se pueden pinchar:
+
+```
+Panel         ✅
+VENTANILLA    Beneficiarios ✅ · Cupos de pesca ✅ · Carnets ✅ · Faenas ✅ · Guías ✅
+CAJA          Cobros ✅ · Recibos ✅
+CATÁLOGOS     Asociaciones ✅ · Escala ✅ · Tipos de carnet ✅
+ADMIN         Reportes · Configuración
+```
+
+Leído de arriba hacia abajo, Ventanilla ES el procedimiento del mostrador.
+
+### Orden para seguir
+
+1. ~~**Catálogos**~~ — ✅ hecho el 18/09/2026. Los tres con `index` + `store` +
+   `update`, sin `destroy`, y con el formulario al lado de la tabla. **Los
+   valores siguen siendo la plantilla**: se pueden corregir desde el panel, pero
+   nadie los corrigió todavía.
+2. ~~**Aprovechamientos**~~ — ✅ hecho el 18/09/2026. `OtorgarCupoService` con
+   la fila del beneficiario bloqueada, ampliación con motivo auditado, y la
+   ficha con las faenas que explican el saldo. **Ampliado el mismo día** con las
+   dos modalidades —escala general y especie especial— y el interruptor
+   `APROVECHAMIENTO_ESTRICTO`; los dos tienen su punto más abajo.
+3. ~~**Carnets**~~ — ✅ hecho el 18/09/2026. `EmitirCarnetService`, revocación
+   con motivo auditado, y la impresión del plástico **recuperada de `8d48422` y
+   adaptada**: se conservó toda la maqueta DomPDF y cambió solo el dominio.
+4. ~~**Faenas y Guías**~~ — ✅ hechos el 18/09/2026. Faenas con el
+   aprovechamiento bloqueado y cierre con corrección contra la balanza; guías
+   con el descuento de piscicultura, cierre con peso y anulación con motivo —y
+   la regla de que una guía CERRADA ya no se anula.
+5. ~~**Caja**~~ — ✅ hecho el 18/09/2026. `CobrarService` con la fila del
+   trámite bloqueada, correlativo reservado dentro de la transacción, cobros
+   fraccionados y un recibo que cubre varios trámites.
+
+**Con esto los tres circuitos del diagrama están completos.** Lo que queda son
+los dos módulos que nunca existieron —Reportes y Configuración— y la impresión
+del recibo en PDF: la plantilla `views/documentos/recibo-oficial.blade.php`
+sobrevivió al cambio de núcleo y espera `$recibo`, `$renglones`, `$total`,
+`$fecha`, `$casillas` y `$esDeposito`; adaptarla es el mismo trabajo que se hizo
+con el carnet.
+
+De adentro hacia afuera en cada uno: servicio → Request → controlador → ruta →
+tipos de TypeScript → pantalla. El patrón a copiar es **Beneficiarios**, que
+está comentado paso a paso a propósito.
+
+### 🟢 El aprovechamiento ya es un borrador corregible — RESUELTO el 18/09/2026
+
+Antes nacía `activo` y no se podía corregir ni eliminar: una carga equivocada
+quedaba ahí para siempre. Ahora:
+
+```
+PENDIENTE ──[se cobra ENTERO]──▶ ACTIVO ──▶ AGOTADO | VENCIDO
+(se edita, se elimina,
+ NO emite faenas)
+```
+
+Quien lo activa es la caja y no hay otro camino. Eliminar borra la fila de
+verdad y deja el motivo en `auditorias`, con casilla de consentimiento en la
+ventana. Ver el Trabajo 14 de
+[docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md).
+
+**Lo que hace falta confirmar con la unidad:** que un cupo sin cobrar NO
+autorice a pescar. Es la consecuencia que más se nota en ventanilla, y es una
+decisión administrativa, no técnica. Si la unidad quiere que autorice igual, es
+una línea en `EstadoAprovechamiento::habilita()`.
+
+### 🔴 Falta IMPRIMIR la autorización de aprovechamiento
+
+El sistema guarda los datos del talonario verde —«AUTORIZACIÓN DE PESCA PARA
+APROVECHAMIENTO PESQUERO»— pero **no emite el papel**. Es el mismo trabajo que
+se hizo con el carnet: una plantilla Blade maquetada para DomPDF.
+
+Mirando el formulario de papel completo, faltan además **dos datos** que no
+tienen dónde guardarse:
+
+1. **El número preimpreso del talonario** («N° 000536»). Es el mismo patrón que
+   `permisos_faena.numero_faena`, donde ese número sí se pide y se guarda. Acá no
+   existe la columna.
+2. **«Tiempo de Cancelación»** — el plazo que se le da al pescador para pagar la
+   concesión.
+
+Lo que sí está cubierto: titular, documento, domicilio, **tipo de embarcación**
+(agregado el 18/09), volumen establecido, vigencia y valor de la concesión.
+
+La tabla de especies con sus tamaños mínimos y las reglas de mallas son texto
+fijo del formulario: van en la plantilla, no en la base.
+
+### 🟠 El control de tope de cupo se puede APAGAR, y hoy está encendido
+
+Desde el **18/09/2026** el sistema tiene un interruptor,
+`APROVECHAMIENTO_ESTRICTO` en el `.env`, que se lee con
+`config('jichi.aprovechamiento.estricto')` y nunca con `env()`:
+
+| Valor | Qué hace al emitir una faena |
+|---|---|
+| `true` (**hoy**) | La faena que no entra en el saldo se RECHAZA. Al llegar a 0 kg el cupo queda `agotado` y no emite más |
+| `false` | La comprobación del tope se OMITE: la faena se emite igual y el exceso queda registrado |
+
+**Existe porque los catálogos siguen siendo plantilla** (ver el punto de
+arriba): frenar a un pescador real contra un tope de ejemplo hace más daño que
+respetarlo. En cuanto la escala oficial esté cargada, esto se deja en `true` y
+no se vuelve a tocar.
+
+**Tres cosas que el interruptor NO apaga**, y conviene tenerlas presentes antes
+de suponer que apagarlo desactiva el módulo:
+
+- **La fecha.** Un cupo vencido no emite faenas en ningún modo.
+- **La modalidad.** Una especie especial no se amplía ni con el control apagado.
+- **El registro.** El saldo, el estado `agotado` y `kilosExcedidos()` se
+  calculan siempre.
+
+**Al cambiarlo hay que reiniciar el servidor ENTERO**, no solo el proceso hijo:
+`php artisan serve` lee el `.env` una vez al arrancar y el recargador reinicia
+únicamente al hijo, que hereda el entorno viejo. Si `composer run dev` está
+corriendo, se mata ese proceso y se vuelve a levantar.
+
+### 🟠 El paiche funciona distinto, y hace falta que la unidad lo confirme
+
+Los siete tramos de la escala ya no son todos iguales: el tramo 7 quedó marcado
+como **especie especial** y los otros seis como **escala general**. La
+diferencia es UNA sola y está en `ModalidadAprovechamiento::admiteAmpliacion()`:
+
+- **Escala general** — cupo acumulativo. Las faenas lo descuentan y se AMPLÍA.
+- **Especie especial** — cuota de la especie, tasación fija. Las faenas lo
+  descuentan igual, pero **NO se amplía**: agotado, hay que tramitar uno nuevo,
+  cobrarlo y emitir otro recibo.
+
+**Lo que hay que confirmar** es esa interpretación de «sin la misma dinámica de
+recarga continua». Si lo que se quería era que las faenas de paiche no
+descuenten, o que su tope sea rígido aunque el resto esté en modo flexible, es
+un cambio de una línea en el enum.
+
+La modalidad la fija el CATÁLOGO —la resolución al definir el tramo— y se COPIA
+al cupo al otorgarlo: reclasificar un tramo no le cambia el régimen a lo ya
+otorgado y cobrado.
+
+### 🟠 Los catálogos están sembrados con valores de PLANTILLA
+
+`CatalogoSeeder` llena `asociaciones` (4), `categorias_aprovechamiento` (los 7
+tramos) y `tipos_carnet` (2), para que el circuito se pueda recorrer en
+desarrollo. **Los números NO son los de la resolución.**
+
+Qué se supuso, para que se sepa qué hay que confirmar:
+
+- De la escala, los únicos textos oficiales que había eran los DOS EXTREMOS:
+  «1 Kg Hasta 100 Kg» y «1001 kg Hasta 2000 Kg PAICHE». Los cinco tramos del
+  medio están repartidos a ojo.
+- Los precios siguen una regla lineal de 55 Bs cada 100 kg, que hace cerrar los
+  dos valores bajos conocidos (55 y 110). **El tercer valor conocido —500 Bs—
+  NO cae en esa recta**, así que la escala real casi seguro no es lineal: es la
+  señal más clara de que esto hay que confirmarlo.
+- Los NOMBRES de los dos tipos de carnet sí son los oficiales; sus precios no.
+- Las asociaciones son nombres verosímiles, no el registro real del SEDAG.
+
+Dos cosas al reemplazarlos:
+
+1. El seeder usa `firstOrCreate` a propósito —para no pisar lo que la unidad
+   ajuste desde el panel—, así que volver a correrlo **no** actualiza los
+   valores. Hay que editarlos en la base o vaciar las tablas primero.
+2. Los tramos de la escala tienen que quedar **contiguos y sin huecos**: el
+   `kilos_min` de cada uno es el `kilos_max` del anterior más 1. Con un hueco,
+   `CategoriaAprovechamiento::paraVolumen()` devuelve null para los volúmenes
+   que caen adentro y el formulario no ofrece ninguna escala, sin ningún error
+   que lo explique.
+
+Mientras sigan siendo plantilla, `CatalogoSeeder` corre **solo fuera de
+producción**. En cuanto sean los de la resolución, sube al bloque de siempre de
+`DatabaseSeeder`.
+
+Ver [docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md).
+
+---
+
 ## El circuito del depósito observado quedó cerrado — y un rechazo ya no es el final
 
 El **17/09/2026**, más tarde, apareció en ventanilla un expediente TRABADO: en

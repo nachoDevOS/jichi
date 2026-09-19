@@ -79,7 +79,7 @@ export function FormularioBeneficiarioComponente({
      * fetch(): `post()` manda un POST normal con el token CSRF.
      */
     const form = useForm<FormularioBeneficiario>({
-        ci_nit: beneficiario?.ci_nit ?? '',
+        ci: beneficiario?.ci ?? '',
         complemento: beneficiario?.complemento ?? '',
         expedido: beneficiario?.expedido ?? '',
         primerNombre: beneficiario?.primerNombre ?? '',
@@ -161,18 +161,18 @@ export function FormularioBeneficiarioComponente({
                         <div className="grid gap-4 sm:grid-cols-4">
                             <Campo
                                 etiqueta="Cédula de identidad"
-                                htmlFor="ci_nit"
+                                htmlFor="ci"
                                 obligatorio
-                                error={form.errors.ci_nit}
+                                error={form.errors.ci}
                                 className="sm:col-span-2"
                             >
                                 <Input
-                                    id="ci_nit"
+                                    id="ci"
                                     inputMode="numeric"
                                     autoFocus={!editando}
-                                    value={form.data.ci_nit}
-                                    onChange={(e) => form.setData('ci_nit', e.target.value)}
-                                    aria-invalid={Boolean(form.errors.ci_nit)}
+                                    value={form.data.ci}
+                                    onChange={(e) => form.setData('ci', e.target.value)}
+                                    aria-invalid={Boolean(form.errors.ci)}
                                 />
                             </Campo>
 
@@ -704,13 +704,13 @@ function componerNombre(datos: FormularioBeneficiario): string {
 }
 
 function componerDocumento(datos: FormularioBeneficiario): string {
-    if (!datos.ci_nit.trim()) {
+    if (!datos.ci.trim()) {
         return '';
     }
 
     const cedula = datos.complemento.trim()
-        ? `${datos.ci_nit.trim()}-${datos.complemento.trim()}`
-        : datos.ci_nit.trim();
+        ? `${datos.ci.trim()}-${datos.complemento.trim()}`
+        : datos.ci.trim();
 
     return [cedula, datos.expedido].filter(Boolean).join(' ');
 }

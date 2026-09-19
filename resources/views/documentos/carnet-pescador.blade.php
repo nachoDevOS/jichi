@@ -97,7 +97,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Carnet {{ $carnet->registro() }}</title>
+    <title>Carnet {{ $carnet->codigo_legible }}</title>
 
     <style>
         * { margin: 0; padding: 0; }
