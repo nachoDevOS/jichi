@@ -245,6 +245,45 @@ class AprovechamientoPesq extends Model
             && $this->faenas()->doesntExist();
     }
 
+    /**
+     * ¿Se le pueden cargar depósitos hoy?
+     *
+     * Solo en pendiente: en revisión el monto ya está cubierto y el expediente
+     * presentado, y después de aprobado la plata que entre de más no es de este
+     * trámite.
+     */
+    public function admitePagos(): bool
+    {
+        return $this->estado->permitePagos();
+    }
+
+    /**
+     * ========================================================================
+     *  ¿SE PUEDE MANDAR A QUE ALGUIEN LO FIRME?
+     * ========================================================================
+     *
+     * DOS condiciones, y la segunda es la que pidió la unidad: el estado tiene
+     * que ser PENDIENTE y los depósitos tienen que CUBRIR el monto.
+     *
+     * No alcanza con el estado porque un cupo a medio pagar sigue siendo
+     * pendiente, y presentarlo así obligaría a quien firma a devolverlo — que es
+     * trabajo de ida y vuelta por algo que la pantalla puede ver antes.
+     *
+     * Se compara con `>= 0` sobre el saldo y no con una igualdad: pagar de más
+     * no deja saldo negativo —`saldoPendiente()` se corta en cero— así que lo
+     * que se pregunta es si quedó algo sin cubrir.
+     */
+    public function puedeEnviarseARevision(): bool
+    {
+        return $this->estado->permiteEnvio() && $this->saldoPendiente() <= 0.0;
+    }
+
+    /** ¿Está presentado y esperando una firma? */
+    public function puedeRevisarse(): bool
+    {
+        return $this->estado->permiteRevision();
+    }
+
     public static function modoEstricto(): bool
     {
         return (bool) config('jichi.aprovechamiento.estricto', true);
@@ -280,11 +319,10 @@ class AprovechamientoPesq extends Model
      * Es la mitad «calendario» de `estaVigente()`, y existe separada porque
      * confundir las dos ya costó dos errores reales:
      *
-     *   - AMPLIAR preguntaba por `estaVigente()` y rechazaba justo el cupo
-     *     AGOTADO, que es el único que hace falta ampliar.
      *   - EMITIR UNA FAENA hacía lo mismo y devolvía «no tiene aprovechamiento
      *     vigente» sobre un cupo que existe y está en fecha, mandando al
-     *     operador a otorgar uno nuevo en vez de pedir una ampliación.
+     *     operador a otorgar uno nuevo, que la regla de una bolsa por
+     *     persona iba a rechazar.
      *
      * La diferencia en una línea: un cupo agotado SÍ está en fecha —lo que se
      * le acabó son los kilos, no el tiempo— así que lo que corresponde decir es
@@ -331,48 +369,10 @@ class AprovechamientoPesq extends Model
         return $kilos === null || $kilos <= $this->saldoKg();
     }
 
-    /**
-     * ¿Se le pueden sumar kilos sin volver a tramitar?
-     *
-     * Dos condiciones, y la segunda es la que distingue las modalidades: una
-     * ESPECIE ESPECIAL no se amplía nunca. Su cuota la autoriza una resolución
-     * sobre esa especie, y estirarla desde una pantalla sería saltearla — lo
-     * que corresponde es el trámite completo, que deja constancia. Ver
-     * ModalidadAprovechamiento::admiteAmpliacion().
-     */
-    public function admiteAmpliacion(): bool
-    {
-        return $this->puedeAmpliarse() && $this->modalidad->admiteAmpliacion();
-    }
-
     /** ¿Se le acabaron los kilos, aunque la fecha no haya llegado? */
     public function estaAgotado(): bool
     {
         return $this->saldoKg() <= 0.0;
-    }
-
-    /**
-     * ========================================================================
-     *  ¿SE LE PUEDEN SUMAR KILOS?
-     * ========================================================================
-     *
-     * MIRA LA FECHA Y NO `estaVigente()`, y la diferencia no es un matiz: es
-     * justamente el caso que la ampliación viene a resolver.
-     *
-     * Un cupo AGOTADO tiene `estaVigente() === false` —el estado `agotado` no
-     * habilita— y es EL que hay que poder ampliar: se le acabaron los kilos, no
-     * el tiempo. Preguntando por la vigencia, la única salida para alguien sin
-     * saldo sería esperar a la gestión siguiente, que es lo contrario de lo que
-     * una ampliación significa.
-     *
-     * Lo que sí bloquea es la FECHA pasada: sumarle kilos a un cupo vencido
-     * daría volumen que las faenas no van a poder usar —`puedeEmitirFaena()`
-     * mira la fecha— así que sería puro ruido en la ficha. Ahí lo que
-     * corresponde es otorgar el cupo de la gestión nueva.
-     */
-    public function puedeAmpliarse(): bool
-    {
-        return $this->estaEnFecha();
     }
 
     /**

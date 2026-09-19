@@ -84,8 +84,7 @@ enum RolSistema: string
              * OTORGAR LA BOLSA MADRE ES DE VENTANILLA.
              *
              * Es el paso 2 del flujo del pescador y va antes del carnet: sin
-             * cupo definido no se sabe qué imprimir en el plástico. Lo que NO
-             * es de ventanilla es AMPLIARLO después, que está abajo.
+             * cupo definido no se sabe qué imprimir en el plástico.
              */
             'aprovechamientos.crear',
 
@@ -135,15 +134,6 @@ enum RolSistema: string
         ];
 
         $supervision = [
-            /*
-             * AMPLIAR UN CUPO YA OTORGADO es distinto de otorgarlo.
-             *
-             * Otorgar es aplicar la escala que corresponde. Ampliar es darle a
-             * alguien más kilos de los que su escala le daba, y eso es
-             * justamente lo que el cupo viene a limitar.
-             */
-            'aprovechamientos.ampliar',
-
             /*
              * REVOCAR un carnet es una medida sancionatoria, y no se revierte:
              * el día que exista el rol de ventanilla, no la tendrá.

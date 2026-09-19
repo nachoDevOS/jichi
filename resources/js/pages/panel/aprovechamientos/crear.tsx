@@ -243,11 +243,10 @@ export default function CrearCupo({
                                 </div>
 
                                 {/*
-                                    EL RÉGIMEN SE VE ANTES DE OTORGAR, y no cuando
-                                    el botón de ampliar no aparezca: de él depende
-                                    si el cupo se va a poder recargar, que es la
-                                    diferencia que el pescador va a venir a
-                                    preguntar seis meses después.
+                                    EL RÉGIMEN SE VE ANTES DE OTORGAR: dice de dónde
+                                    sale el valor —la progresión por kilos o una
+                                    tasación fija por resolución—, que es lo que el
+                                    pescador va a preguntar en el mostrador.
                                 */}
                                 <div>
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">

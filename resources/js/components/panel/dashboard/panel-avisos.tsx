@@ -88,7 +88,7 @@ export function PanelAvisos({ avisos }: { avisos: Avisos }) {
                         icono={PackageX}
                         cantidad={avisos.cupos_agotados}
                         titulo="Cupos agotados"
-                        descripcion="Se acabaron los kilos, no el tiempo. Lo que corresponde es una ampliación."
+                        descripcion="Se acabaron los kilos, no el tiempo. Hay que tramitar otro cupo."
                     />
 
                     <Aviso

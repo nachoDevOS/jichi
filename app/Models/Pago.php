@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use App\Enums\MetodoPago;
+use App\Support\Archivos;
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -37,12 +38,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * estas filas, y lo calcula el trait Pagable al leer. Guardado, quedaría
  * desfasado en cuanto alguien corrija un abono.
  */
+#[Appends(['comprobante_url'])]
 #[Fillable([
     'recibo_id',
     'pagable_type',
     'pagable_id',
     'monto_parcial',
-    'metodo_pago',
+    'nro_transaccion',
+    'fecha_deposito',
+    'comprobante',
 ])]
 class Pago extends Model
 {
@@ -52,7 +56,8 @@ class Pago extends Model
     {
         return [
             'monto_parcial' => 'decimal:2',
-            'metodo_pago' => MetodoPago::class,
+            // Un DÍA, no un instante: es lo que dice la boleta.
+            'fecha_deposito' => 'date',
         ];
     }
 
@@ -88,6 +93,19 @@ class Pago extends Model
     // ------------------------------------------------------------------
     //  Lectura
     // ------------------------------------------------------------------
+
+    /**
+     * La dirección completa de la boleta, o null si no hay.
+     *
+     * La columna guarda una RUTA; quién la convierte en dirección depende del
+     * disco activo, y eso lo sabe App\Support\Archivos —el mismo que la escribe
+     * y la borra—. Armada acá a mano, escribir y leer podrían mirar discos
+     * distintos.
+     */
+    protected function comprobanteUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => Archivos::url($this->comprobante));
+    }
 
     /**
      * Cómo se nombra el trámite pagado en el detalle del recibo.
@@ -133,8 +151,18 @@ class Pago extends Model
         );
     }
 
-    public function scopePorMetodo(Builder $query, MetodoPago $metodo): Builder
+    /**
+     * Los depósitos hechos en una fecha, según lo que dice la BOLETA.
+     *
+     * Es otra pregunta que `delDia()`, que mira `created_at`: un depósito del
+     * viernes cargado el lunes entra en uno y no en el otro. El primero cuadra
+     * el trabajo del día; este se cruza contra el extracto del banco.
+     */
+    public function scopeDepositadosEl(Builder $query, ?string $fecha = null): Builder
     {
-        return $query->where($this->qualifyColumn('metodo_pago'), $metodo);
+        return $query->whereDate(
+            $this->qualifyColumn('fecha_deposito'),
+            $fecha ?? now()->toDateString(),
+        );
     }
 }

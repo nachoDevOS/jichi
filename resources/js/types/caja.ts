@@ -1,5 +1,3 @@
-import type { MetodoPago } from '@/types';
-
 /**
  * Tipos del módulo Caja y Recibos — el circuito del dinero.
  *
@@ -30,9 +28,19 @@ export interface PagoFila {
     /** De quién es el trámite que este abono paga. */
     titular: string | null;
     monto_parcial: number;
-    metodo_pago: MetodoPago;
-    metodo_etiqueta: string;
-    metodo_color: string;
+
+    /**
+     * La boleta del banco. Nunca faltan: TODO pago es un depósito bancario —no
+     * hay efectivo ni QR—, así que cada fila lleva su número, su fecha y su
+     * archivo.
+     *
+     * Cuando un mismo depósito cubre varias líneas, la segunda en adelante
+     * llevan el número con un sufijo («0012345678-2»), porque es único global.
+     */
+    nro_transaccion: string;
+    comprobante_url: string | null;
+    /** Un DÍA —lo que dice la boleta—: se muestra con fecha(). */
+    fecha_deposito: string | null;
     /** Un MOMENTO —cuándo entró la plata—: se muestra con fechaHora(). */
     cobrado_en: string | null;
 }
@@ -51,13 +59,13 @@ export interface ArqueoDelDia {
     fecha: string;
     total: number;
     cantidad: number;
-    por_metodo: {
-        metodo: MetodoPago;
-        etiqueta: string;
-        color: string;
-        total: number;
-        cantidad: number;
-    }[];
+    /**
+     * Lo DEPOSITADO hoy según la boleta, que es otra pregunta que lo cargado:
+     * un depósito del viernes registrado el lunes entra en uno y no en el otro.
+     * El primero cuadra el trabajo del día; este se cruza contra el extracto.
+     */
+    total_depositado: number;
+    cantidad_depositada: number;
 }
 
 /**
@@ -90,8 +98,11 @@ export interface LineaCobro {
 
 /** Lo que el formulario de cobro manda de vuelta. */
 export interface FormularioCobro {
+    /** Siempre obligatorios: todo pago es un depósito bancario. */
+    nro_transaccion: string;
+    fecha_deposito: string;
+    comprobante: File | null;
     lineas: LineaCobro[];
-    metodo_pago: MetodoPago | '';
     nit_ci_factura: string;
     nombre_factura: string;
     concepto: string;
@@ -128,7 +139,9 @@ export interface ReciboFicha extends Omit<ReciboFila, 'pagos_count'> {
         /** El trámite concreto: código, escala o ruta, más el titular. */
         detalle: string | null;
         monto_parcial: number;
-        metodo_etiqueta: string;
-        metodo_color: string;
+        /** La boleta del banco. Ver PagoFila. */
+        nro_transaccion: string;
+        comprobante_url: string | null;
+        fecha_deposito: string | null;
     }[];
 }

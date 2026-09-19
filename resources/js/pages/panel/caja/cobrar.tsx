@@ -7,10 +7,11 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import { Textarea } from '@/components/ui/textarea';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs } from '@/lib/utils';
-import type { MetodoPago, OpcionEnum, PageProps } from '@/types';
+import type { PageProps } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { DeudaCobrable, LineaCobro } from '@/types/caja';
 
@@ -45,18 +46,22 @@ import type { DeudaCobrable, LineaCobro } from '@/types/caja';
 export default function Cobrar({
     beneficiario,
     deudas,
-    metodos,
 }: {
     beneficiario: (BeneficiarioSugerido & { ci: string }) | null;
     deudas: DeudaCobrable[];
-    metodos: OpcionEnum[];
 }) {
     const { institucion } = usePage<PageProps>().props;
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
 
     const form = useForm({
         lineas: [] as LineaCobro[],
-        metodo_pago: '' as MetodoPago | '',
+        /*
+         * LA BOLETA DEL BANCO, siempre: no hay efectivo ni QR, todo pago es un
+         * depósito. La fecha se propone hoy, que es lo normal.
+         */
+        nro_transaccion: '',
+        fecha_deposito: new Date().toISOString().slice(0, 10),
+        comprobante: null as File | null,
         nit_ci_factura: beneficiario?.ci ?? '',
         nombre_factura: beneficiario?.nombreCompleto ?? '',
         concepto: '',
@@ -112,7 +117,13 @@ export default function Cobrar({
 
     function enviar(e: FormEvent) {
         e.preventDefault();
-        form.post(route('caja.store'));
+
+        /*
+         * `forceFormData` es obligatorio: sin él, Inertia manda el cuerpo como
+         * JSON y el archivo se pierde en el camino —llega como un objeto vacío—
+         * sin ningún error que lo explique. Siempre hay boleta, así que siempre.
+         */
+        form.post(route('caja.store'), { forceFormData: true });
     }
 
     return (
@@ -311,28 +322,68 @@ export default function Cobrar({
                                     </p>
                                 </div>
 
+                                {/*
+                                    ================================================
+                                     LA BOLETA DEL DEPÓSITO, SIEMPRE
+                                    ================================================
+
+                                    No hay efectivo ni QR: todo pago es un depósito
+                                    bancario. Sin la boleta, lo único que respalda
+                                    el cobro es que alguien lo tipeó, y eso no se
+                                    puede cruzar contra el extracto del banco.
+                                */}
                                 <Campo
-                                    etiqueta="Método de pago"
-                                    htmlFor="metodo_pago"
-                                    error={form.errors.metodo_pago}
-                                    obligatorio
-                                >
-                                    <Select
-                                        id="metodo_pago"
-                                        value={form.data.metodo_pago}
-                                        onChange={(e) =>
-                                            form.setData('metodo_pago', e.target.value as MetodoPago)
-                                        }
-                                        aria-invalid={Boolean(form.errors.metodo_pago)}
-                                    >
-                                        <option value="">Elija…</option>
-                                        {metodos.map((o) => (
-                                            <option key={o.value} value={o.value}>
-                                                {o.label}
-                                            </option>
-                                        ))}
-                                    </Select>
-                                </Campo>
+                                            etiqueta="Fecha del depósito"
+                                            htmlFor="fecha_deposito"
+                                            error={form.errors.fecha_deposito}
+                                            ayuda="La que dice la boleta, no la de hoy: un depósito del viernes puede cargarse el lunes."
+                                            obligatorio
+                                        >
+                                            <Input
+                                                id="fecha_deposito"
+                                                type="date"
+                                                value={form.data.fecha_deposito}
+                                                onChange={(e) =>
+                                                    form.setData('fecha_deposito', e.target.value)
+                                                }
+                                                aria-invalid={Boolean(form.errors.fecha_deposito)}
+                                            />
+                                        </Campo>
+
+                                        <Campo
+                                            etiqueta="N° de transacción"
+                                            htmlFor="nro_transaccion"
+                                            error={form.errors.nro_transaccion}
+                                            ayuda="El número que figura en la boleta. No se puede repetir: una misma transacción no respalda dos pagos."
+                                            obligatorio
+                                        >
+                                            <Input
+                                                id="nro_transaccion"
+                                                value={form.data.nro_transaccion}
+                                                onChange={(e) =>
+                                                    form.setData('nro_transaccion', e.target.value)
+                                                }
+                                                aria-invalid={Boolean(form.errors.nro_transaccion)}
+                                                placeholder="0012345678"
+                                                className="font-mono"
+                                                maxLength={60}
+                                            />
+                                        </Campo>
+
+                                        <Campo
+                                            etiqueta="Boleta del depósito"
+                                            htmlFor="comprobante"
+                                            error={form.errors.comprobante}
+                                            ayuda="Foto o PDF, hasta 3 MB. Si hizo dos depósitos, cárguelos de a uno: cada cobro sale con su propia boleta y su propio recibo."
+                                            obligatorio
+                                        >
+                                            <SelectorArchivo
+                                                id="comprobante"
+                                                archivo={form.data.comprobante}
+                                                onElegir={(a) => form.setData('comprobante', a)}
+                                                error={form.errors.comprobante}
+                                            />
+                                        </Campo>
                             </>
                         )}
 
@@ -341,7 +392,9 @@ export default function Cobrar({
                             disabled={
                                 form.processing ||
                                 form.data.lineas.length === 0 ||
-                                form.data.metodo_pago === '' ||
+                                form.data.fecha_deposito === '' ||
+                                form.data.comprobante === null ||
+                                form.data.nro_transaccion.trim() === '' ||
                                 total <= 0 ||
                                 excede
                             }

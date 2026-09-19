@@ -3,16 +3,21 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Enums\EstadoAprovechamiento;
+use App\Exceptions\CobroInvalidoException;
 use App\Exceptions\CupoInvalidoException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Panel\AmpliarCupoRequest;
+use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\EliminarCupoRequest;
 use App\Http\Requests\Panel\OtorgarCupoRequest;
+use App\Http\Requests\Panel\RegistrarPagoCupoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\CategoriaAprovechamiento;
+use App\Models\Pago;
 use App\Models\PermisoFaena;
+use App\Services\CobrarService;
 use App\Services\OtorgarCupoService;
+use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,7 +70,7 @@ class AprovechamientoController extends Controller
              * y el accesor contesta cualquier cosa, sin ningún error.
              */
             ->with([
-                'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
                 'categoria',
             ])
             /*
@@ -193,7 +198,7 @@ class AprovechamientoController extends Controller
     public function show(AprovechamientoPesq $aprovechamiento): Response
     {
         $aprovechamiento->load([
-            'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+            'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'categoria',
         ]);
 
@@ -207,18 +212,39 @@ class AprovechamientoController extends Controller
                 'escala_rango' => $aprovechamiento->categoria
                     ? [(float) $aprovechamiento->categoria->kilos_min, (float) $aprovechamiento->categoria->kilos_max]
                     : null,
-
-                /*
-                 * EL VOLUMEN OTORGADO PUEDE NO COINCIDIR CON EL TECHO DEL TRAMO,
-                 * y la pantalla tiene que poder mostrarlo: significa que el cupo
-                 * fue AMPLIADO. Sin los dos números al lado, una ampliación es
-                 * invisible.
-                 */
-                'fue_ampliado' => $aprovechamiento->categoria !== null
-                    && (float) $aprovechamiento->volumen_total_kg > (float) $aprovechamiento->categoria->kilos_max,
             ],
 
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
+
+            /*
+             * ================================================================
+             *  LOS DEPÓSITOS QUE PAGARON ESTE CUPO, CON SU BOLETA
+             * ================================================================
+             *
+             * Un cupo de 412,50 Bs puede haberse pagado con DOS depósitos
+             * bancarios de 200 y 212,50, cada uno con su boleta. Sin esta lista,
+             * la ficha solo dice «debe 212,50» o «pagado» y no hay forma de ver
+             * de dónde salió esa plata sin ir a buscar recibo por recibo.
+             *
+             * Van de la más nueva a la más vieja, que es el orden en que se
+             * pregunta: «¿entró el último depósito?».
+             */
+            'pagos' => $aprovechamiento->pagos()
+                ->with('recibo:id,numero_recibo')
+                ->latest('created_at')
+                ->get()
+                ->map(fn (Pago $p): array => [
+                    'id' => $p->id,
+                    'monto_parcial' => (float) $p->monto_parcial,
+                    'nro_transaccion' => $p->nro_transaccion,
+                    'fecha_deposito' => $p->fecha_deposito?->toDateString(),
+                    'comprobante_url' => $p->comprobante_url,
+                    'numero_recibo' => $p->recibo?->numero_recibo,
+                    'recibo_id' => $p->recibo_id,
+                    // Un MOMENTO: cuándo entró la plata. Va con toIso8601String().
+                    'cobrado_en' => $p->created_at?->toIso8601String(),
+                ])
+                ->all(),
 
             /*
              * Las faenas que colgaron de este cupo, de la más nueva a la más
@@ -246,9 +272,6 @@ class AprovechamientoController extends Controller
         ]);
     }
 
-    /**
-     * AMPLIAR — PATCH /panel/aprovechamientos/{aprovechamiento}/ampliar
-     */
     /**
      * FORMULARIO DE CORRECCIÓN — GET /panel/aprovechamientos/{id}/editar
      *
@@ -350,23 +373,75 @@ class AprovechamientoController extends Controller
             ->with('exito', "Aprovechamiento de {$persona} eliminado. El motivo quedó en la auditoría.");
     }
 
-    public function ampliar(AmpliarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
-    {
+    /**
+     * ========================================================================
+     *  CARGAR UN DEPÓSITO DESDE LA FICHA — POST /panel/aprovechamientos/{id}/pagos
+     * ========================================================================
+     *
+     * Es el MISMO cobro que el de Caja con el trámite ya elegido: termina en
+     * `CobrarService::cobrar()` y sale con su recibo numerado. Existe porque el
+     * caso que se repite es cargar DOS depósitos seguidos por un mismo cupo, y
+     * yendo a Caja hay que volver a buscar a la persona en cada vuelta.
+     *
+     * ------------------------------------------------------------------------
+     *  LA BOLETA SE SUBE ANTES DE ABRIR LA TRANSACCIÓN
+     * ------------------------------------------------------------------------
+     *
+     * Una transacción de base NO deshace escrituras en disco: subiendo adentro,
+     * un cobro que falle —saldo movido por otra ventanilla, boleta repetida—
+     * dejaría el archivo huérfano para siempre. Por eso se sube acá y los
+     * `catch` lo borran.
+     */
+    public function pagar(
+        RegistrarPagoCupoRequest $request,
+        AprovechamientoPesq $aprovechamiento,
+        CobrarService $caja,
+    ): RedirectResponse {
         $datos = $request->validated();
+        $aprovechamiento->loadMissing('beneficiario');
+
+        $comprobante = app(StorageController::class)->file($request->file('comprobante'), 'comprobantes');
 
         try {
-            $this->servicio->ampliar(
-                $aprovechamiento,
-                (float) $datos['kilos_adicionales'],
-                $datos['motivo'],
+            $recibo = $caja->cobrar(
+                [['tipo' => 'cupo', 'id' => $aprovechamiento->id, 'monto' => (float) $datos['monto']]],
+                // Por defecto, los datos del pescador: el recibo se emite a su
+                // nombre salvo que el mostrador diga otra cosa.
+                /*
+                 * `?? null` y no solo `?:`: `validated()` devuelve ÚNICAMENTE
+                 * las claves que vinieron en la petición, así que un campo
+                 * opcional que el formulario no manda no existe en el arreglo y
+                 * leerlo directo revienta con «Undefined array key».
+                 */
+                ($datos['nit_ci_factura'] ?? null) ?: ($aprovechamiento->beneficiario?->ci ?? 'S/N'),
+                ($datos['nombre_factura'] ?? null) ?: ($aprovechamiento->beneficiario?->nombreCompleto ?? 'Sin nombre'),
+                $datos['nro_transaccion'],
+                $datos['fecha_deposito'],
+                $comprobante,
             );
-        } catch (CupoInvalidoException $e) {
-            return back()->withErrors(['kilos_adicionales' => $e->getMessage()]);
+        } catch (CobroInvalidoException $e) {
+            Archivos::borrar($comprobante);
+
+            // Cuelga del MONTO porque es el único campo con el que el operador
+            // puede reaccionar: lo que falla es cuánto se está cobrando.
+            return back()->withInput()->withErrors(['monto' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            Archivos::borrar($comprobante);
+
+            throw $e;
         }
+
+        $cupo = $aprovechamiento->refresh();
 
         return redirect()
             ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', 'Cupo ampliado. La ampliación quedó registrada con su motivo.');
+            ->with('exito', $cupo->estaPagado()
+                ? "Pago registrado con el recibo {$recibo->numero_recibo}. El cupo quedó cubierto y ya autoriza faenas."
+                : sprintf(
+                    'Pago registrado con el recibo %s. Quedan %s Bs por cobrar.',
+                    $recibo->numero_recibo,
+                    number_format($cupo->saldoPendiente(), 2, ',', '.'),
+                ));
     }
 
     // ------------------------------------------------------------------
@@ -406,8 +481,8 @@ class AprovechamientoController extends Controller
                 'kilos_min' => (float) $c->kilos_min,
                 'kilos_max' => (float) $c->kilos_max,
                 'valor_bs' => (float) $c->valor_bs,
-                // De la modalidad depende si el cupo se va a poder ampliar
-                // después, así que se muestra ANTES de otorgarlo.
+                // El régimen del tramo: la escala progresiva o la cuota de una
+                // especie con tasación fija. Se muestra ANTES de otorgarlo.
                 'modalidad' => $c->modalidad->value,
                 'modalidad_etiqueta' => $c->modalidad->etiqueta(),
                 'modalidad_descripcion' => $c->modalidad->descripcion(),
@@ -433,6 +508,10 @@ class AprovechamientoController extends Controller
             'beneficiario_id' => $cupo->beneficiario_id,
             'beneficiario' => $cupo->beneficiario?->nombreCompleto,
             'documento' => $cupo->beneficiario?->documento_identidad,
+            // La foto va con el nombre y la cédula en la misma celda del
+            // listado. Sale de un accesor que lee la columna `foto`, así que esa
+            // columna TIENE que estar en el select de arriba.
+            'foto_url' => $cupo->beneficiario?->foto_url,
 
             'escala' => $cupo->categoria?->nro_escala,
             'descripcion' => $cupo->categoria?->descripcion_kg,
@@ -467,19 +546,6 @@ class AprovechamientoController extends Controller
             'excedido' => $cupo->estaExcedido(),
             // Se puede colgar una faena HOY: vigente, con saldo y sin agotar.
             'puede_emitir_faena' => $cupo->puedeEmitirFaena(),
-            /*
-             * Distinto de `vigente`, y a propósito: un cupo AGOTADO no está
-             * vigente y sin embargo es el que hay que poder ampliar. Si la
-             * pantalla decidiera con `vigente`, escondería el botón justo
-             * cuando hace falta.
-             *
-             * Sale de `admiteAmpliacion()` y no de `puedeAmpliarse()`: la
-             * primera suma la MODALIDAD a la fecha, porque una especie especial
-             * no se amplía nunca. Con la otra, la pantalla ofrecería el botón
-             * sobre un cupo de paiche y el servidor lo rechazaría.
-             */
-            'puede_ampliarse' => $cupo->admiteAmpliacion(),
-
             /*
              * EDITAR Y ELIMINAR LLEGAN RESUELTAS, y no se deducen de `estado`
              * en React.

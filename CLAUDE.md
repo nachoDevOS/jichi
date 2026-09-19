@@ -692,11 +692,26 @@ Los cuatro tienen que pasar.
   todos los scopes y helpers que enumeran estados y decidir uno por uno de qué
   lado cae el nuevo.**
 - **Un método que «revive» un registro puede activar lo que nunca se autorizó.**
-  `ampliar()` escribía `estado = Activo` a secas para revivir un cupo agotado;
-  cuando apareció `pendiente`, ampliar pasó a habilitar para pescar un cupo sin
-  cobrar — la puerta de atrás del cobro. Un `update` de estado a un valor fijo
-  hay que mirarlo de nuevo cada vez que se suma un estado del que ese valor no
-  debería alcanzarse.
+  El viejo `ampliar()` —retirado el 19/09/2026— escribía `estado = Activo` a
+  secas para revivir un cupo agotado; cuando apareció `pendiente`, ampliar pasó a
+  habilitar para pescar un cupo sin cobrar, que era la puerta de atrás del cobro.
+  Un `update` de estado a un valor fijo hay que mirarlo de nuevo cada vez que se
+  suma un estado del que ese valor no debería alcanzarse.
+- **`validated()` devuelve SOLO las claves que vinieron en la petición.** Un
+  campo `nullable` que el formulario no manda no existe en el arreglo, así que
+  `$datos['campo']` revienta con «Undefined array key» y un 500 — no devuelve
+  null. Va `$datos['campo'] ?? null`. Pasó con `nit_ci_factura` al cobrar desde
+  la ficha del cupo, y **ningún ensayo lo detecta**: llamando al servicio
+  directamente se pasan todos los argumentos, y el agujero solo aparece cuando
+  lo llena un formulario de verdad.
+- **Para borrar un método de PHP, NO se usa una expresión regular multilínea.**
+  Las llaves anidadas no se pueden expresar con una regex, así que lo que sobra o
+  falta no se nota hasta que el archivo ya está escrito: al sacar `ampliar()` de
+  `OtorgarCupoService`, una regex «prudente» se llevó también `otorgar()`,
+  `editar()` y `eliminar()` —de 397 líneas a 92—. Va por NÚMERO DE LÍNEA, con un
+  `assert` sobre el contenido de cada borde antes de cortar. Y conviene mirar si
+  el archivo está commiteado antes de empezar: `git checkout HEAD -- <archivo>`
+  fue lo que lo salvó.
 - **Probar una pantalla con `curl` y la cabecera `X-Inertia` devuelve 409, no
   la página.** Inertia compara la versión del manifiesto de assets y responde
   `409 Conflict` con `X-Inertia-Location` cuando no coincide —que es siempre, si
@@ -712,13 +727,12 @@ Los cuatro tienen que pasar.
   el modo como prop. Ver `FaenaController::create()` y `faenas/crear.tsx`.
 - **`estaVigente()` mezcla estado y fecha, y eso esconde botones.** Un cupo
   AGOTADO no está vigente —su estado no habilita— y es exactamente el que hay
-  que poder ampliar. La misma confusión mordió dos veces el mismo día: primero
-  escondiendo «Ampliar cupo», después diciendo «no tiene un aprovechamiento
-  vigente» al emitir una faena, lo que mandaba al operador a otorgar uno nuevo
-  que la regla de una bolsa por persona iba a rechazar. **Antes de usar
-  `estaVigente()` como permiso, preguntarse qué se está preguntando de verdad**:
-  hay `estaEnFecha()`, `puedeAmpliarse()`, `admiteAmpliacion()` y
-  `puedeEmitirFaena()`, y cada una mira cosas distintas.
+  que poder tocar. Mordió diciendo «no tiene un aprovechamiento vigente» al
+  emitir una faena sobre un cupo agotado pero en fecha, lo que mandaba al
+  operador a otorgar uno nuevo que la regla de una bolsa por persona iba a
+  rechazar. **Antes de usar `estaVigente()` como permiso, preguntarse qué se está
+  preguntando de verdad**: hay `estaEnFecha()`, `puedeEditarse()`,
+  `puedeEliminarse()` y `puedeEmitirFaena()`, y cada una mira cosas distintas.
 - **`monto` NO es una columna de `aprovechamientos_pesq`.** Lo que se cobra lo
   calcula `montoACobrar()` leyendo el `valor_bs` de la escala con la que se
   otorgó. Pedirlo como propiedad devuelve vacío en silencio —la misma trampa que

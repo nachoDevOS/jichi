@@ -25,7 +25,7 @@ vez de dejarlo apuntando a tablas que no existen.
 | `/panel/catalogos/tipos-carnet` | ✅ 200 | CRUD sin borrado |
 | `/panel/aprovechamientos` | ✅ 200 | listado con saldo en kilos |
 | `/panel/aprovechamientos/crear` | ✅ 200 | una bolsa vigente por persona |
-| `/panel/aprovechamientos/{id}` | ✅ 200 | ficha con faenas y ampliación |
+| `/panel/aprovechamientos/{id}` | ✅ 200 | ficha con faenas |
 | `/panel/carnets` | ✅ 200 | busca también por código |
 | `/panel/carnets/crear` | ✅ 200 | una credencial vigente por actividad |
 | `/panel/carnets/{id}` | ✅ 200 | ficha con qué habilita hoy |
@@ -93,10 +93,10 @@ Leído de arriba hacia abajo, Ventanilla ES el procedimiento del mostrador.
    valores siguen siendo la plantilla**: se pueden corregir desde el panel, pero
    nadie los corrigió todavía.
 2. ~~**Aprovechamientos**~~ — ✅ hecho el 18/09/2026. `OtorgarCupoService` con
-   la fila del beneficiario bloqueada, ampliación con motivo auditado, y la
-   ficha con las faenas que explican el saldo. **Ampliado el mismo día** con las
-   dos modalidades —escala general y especie especial— y el interruptor
-   `APROVECHAMIENTO_ESTRICTO`; los dos tienen su punto más abajo.
+   la fila del beneficiario bloqueada y la ficha con las faenas que explican el
+   saldo. **Ampliado el mismo día** con las dos modalidades —escala general y
+   especie especial— y el interruptor `APROVECHAMIENTO_ESTRICTO`. El 19/09 se
+   retiró «ampliar cupo» y se sumaron corrección y baja del borrador.
 3. ~~**Carnets**~~ — ✅ hecho el 18/09/2026. `EmitirCarnetService`, revocación
    con motivo auditado, y la impresión del plástico **recuperada de `8d48422` y
    adaptada**: se conservó toda la maqueta DomPDF y cambió solo el dominio.
@@ -194,7 +194,8 @@ corriendo, se mata ese proceso y se vuelve a levantar.
 
 Los siete tramos de la escala ya no son todos iguales: el tramo 7 quedó marcado
 como **especie especial** y los otros seis como **escala general**. La
-diferencia es UNA sola y está en `ModalidadAprovechamiento::admiteAmpliacion()`:
+diferencia era UNA sola —si el cupo se podía ampliar— y **se retiró el
+19/09/2026 junto con la función**. Hoy los dos regímenes se comportan igual:
 
 - **Escala general** — cupo acumulativo. Las faenas lo descuentan y se AMPLÍA.
 - **Especie especial** — cuota de la especie, tasación fija. Las faenas lo

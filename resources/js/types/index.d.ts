@@ -183,25 +183,23 @@ export type TipoActor = 'pescador' | 'comercializador';
  * el cupo se edita y se elimina, y el único en que NO autoriza a pescar — lo
  * que habilita es la concesión pagada.
  *
- * `vencido` y `agotado` son distintos a propósito: al pescador se le dice algo
- * distinto en cada caso —en uno renueva, en el otro pide ampliación de cupo—.
+ * `vencido` y `agotado` son distintos a propósito: se le acabó el tiempo o se
+ * le acabaron los kilos, y al pescador se le explica distinto aunque los dos
+ * terminen en un trámite nuevo.
  */
 export type EstadoAprovechamiento = 'pendiente' | 'activo' | 'vencido' | 'agotado';
 
 /**
  * Espejo de App\Enums\ModalidadAprovechamiento.
  *
- * El RÉGIMEN bajo el que se autoriza el cupo, y lo que cambia entre los dos es
- * una sola cosa: si se puede AMPLIAR sin volver a tramitar.
+ * El RÉGIMEN bajo el que se autoriza el cupo:
  *
- *   - `escala_general`   — cupo acumulativo. Las faenas lo descuentan y se
- *                          recarga ampliándolo.
- *   - `especie_especial` — paiche y lo que la resolución sume. Tasación fija y
- *                          NO se amplía: agotado, hay que tramitar de nuevo.
+ *   - `escala_general`   — tramo de la escala progresiva: a más kilos, más valor.
+ *   - `especie_especial` — paiche y lo que la resolución sume, con tasación fija.
  *
  * Vive en el TRAMO de la escala —la fija la resolución, no el operador— y se
  * COPIA al cupo al otorgarlo, por lo mismo que el volumen: reclasificar el
- * tramo no puede cambiarle el régimen a lo ya otorgado.
+ * tramo no puede cambiarle la clasificación a lo ya otorgado.
  */
 export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 
@@ -210,9 +208,6 @@ export type EstadoFaena = 'activo' | 'completado' | 'vencido';
 
 /** Espejo de App\Enums\EstadoGuia. */
 export type EstadoGuia = 'activa' | 'cerrada' | 'anulada';
-
-/** Espejo de App\Enums\MetodoPago. */
-export type MetodoPago = 'efectivo' | 'transferencia' | 'qr';
 
 /**
  * Espejo de App\Enums\EstadoAsociacion.

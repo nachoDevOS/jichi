@@ -288,7 +288,7 @@ function razonDeBloqueo(carnet: CarnetFicha): string | null {
         }
 
         if (carnet.cupo.saldo_kg <= 0) {
-            return 'El cupo de pesca no tiene kilos disponibles. Corresponde una ampliación.';
+            return 'El cupo de pesca no tiene kilos disponibles. Hay que tramitar otro.';
         }
     }
 

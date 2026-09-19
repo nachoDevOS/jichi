@@ -139,22 +139,16 @@ export default function CatalogoEscala({
                                                     </td>
 
                                                     {/*
-                                                        EL RÉGIMEN VA EN SU PROPIA COLUMNA porque es
-                                                        lo que decide si el cupo se va a poder
-                                                        ampliar, y eso no se lee en ningún número:
-                                                        el tramo del paiche se ve igual que los
-                                                        otros seis.
+                                                        EL RÉGIMEN VA EN SU PROPIA COLUMNA porque no
+                                                        se lee en ningún número: el tramo del paiche
+                                                        se ve igual que los otros seis, y su valor
+                                                        no sale de la progresión por kilos.
                                                     */}
                                                     <td className="px-5 py-2.5">
                                                         <Badge color={t.modalidad_color}>
                                                             {t.modalidad_etiqueta}
                                                         </Badge>
 
-                                                        {t.modalidad === 'especie_especial' && (
-                                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                                No se amplía
-                                                            </p>
-                                                        )}
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-right tabular-nums">
@@ -316,7 +310,7 @@ function FormularioTramo({
                         etiqueta="Régimen"
                         htmlFor="modalidad"
                         error={form.errors.modalidad}
-                        ayuda="La escala general se amplía cuando se agota; la especie especial no: hay que tramitar un cupo nuevo."
+                        ayuda="La escala general es la progresión por kilos; la especie especial lleva tasación fija por resolución."
                         obligatorio
                     >
                         <Select

@@ -122,7 +122,7 @@ export interface Avisos {
     dias_aviso: number;
     carnets_por_vencer: number;
     cupos_por_vencer: number;
-    /** Sin kilos, aunque la fecha no haya llegado: se resuelve con una ampliación. */
+    /** Sin kilos, aunque la fecha no haya llegado: hay que tramitar otro cupo. */
     cupos_agotados: number;
     faenas_vencidas: number;
     guias_vencidas: number;

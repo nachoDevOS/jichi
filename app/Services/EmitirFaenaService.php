@@ -119,7 +119,7 @@ class EmitirFaenaService
              *
              * Un cupo AGOTADO no está «vigente» —su estado no habilita— pero SÍ
              * está en fecha, y lo que corresponde decirle al operador es «quedan
-             * 0 kg, pida una ampliación», no «no tiene aprovechamiento». Con
+             * 0 kg, hay que tramitar otro cupo», no «no tiene aprovechamiento». Con
              * `estaVigente()` el mensaje mandaba a otorgar un cupo nuevo, que es
              * justo lo que la regla de una bolsa por persona iba a rechazar.
              *

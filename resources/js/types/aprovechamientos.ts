@@ -31,6 +31,8 @@ export interface CupoFila {
     beneficiario_id: number;
     beneficiario: string | null;
     documento: string | null;
+    /** Puede faltar: mucha gente del padrón todavía no tiene foto cargada. */
+    foto_url: string | null;
 
     /** El tramo de la escala bajo el que se otorgó: 1 a 7. */
     escala: number | null;
@@ -65,7 +67,7 @@ export interface CupoFila {
      * El régimen, COPIADO del tramo al otorgar.
      *
      * No se lee de la escala en vivo a propósito: reclasificar un tramo en el
-     * catálogo no puede cambiarle las reglas a un cupo ya otorgado y cobrado.
+     * catálogo no puede cambiarle la clasificación a un cupo ya otorgado.
      */
     modalidad: ModalidadAprovechamiento;
     modalidad_etiqueta: string;
@@ -87,17 +89,6 @@ export interface CupoFila {
     excedido: boolean;
     /** Vigente, con saldo y sin agotar: las tres condiciones juntas. */
     puede_emitir_faena: boolean;
-    /**
-     * Si se le pueden SUMAR kilos.
-     *
-     * NO es lo mismo que `vigente`, y confundirlos esconde el botón justo
-     * cuando hace falta: un cupo AGOTADO no está vigente —su estado no
-     * habilita— y es exactamente el que hay que poder ampliar. Lo bloquean dos
-     * cosas: la fecha pasada y la MODALIDAD, porque una especie especial no se
-     * amplía nunca.
-     */
-    puede_ampliarse: boolean;
-
     /**
      * Si todavía se puede corregir, y si se puede borrar la fila entera.
      *
@@ -122,15 +113,26 @@ export interface CupoFicha extends CupoFila {
     escala_descripcion: string | null;
     /** [piso, techo] del tramo, para contrastarlo con lo otorgado. */
     escala_rango: [number, number] | null;
-    /**
-     * El volumen otorgado supera el techo del tramo.
-     *
-     * Es la única forma de ver que un cupo fue AMPLIADO: la ampliación no crea
-     * una fila propia, suma sobre `volumen_total_kg`. Sin este dato la
-     * diferencia entre lo que la escala daba y lo que la persona tiene sería
-     * invisible.
-     */
-    fue_ampliado: boolean;
+}
+
+/**
+ * Un depósito que pagó este cupo, en la ficha.
+ *
+ * Son VARIOS a propósito: un cupo se puede pagar en cuotas, y cada depósito
+ * bancario llega con su propia boleta. No hay efectivo ni QR, así que las tres
+ * columnas de la boleta están siempre.
+ */
+export interface PagoDelCupo {
+    id: number;
+    monto_parcial: number;
+    nro_transaccion: string;
+    comprobante_url: string | null;
+    /** Un DÍA —lo que dice la boleta—: se muestra con fecha(). */
+    fecha_deposito: string | null;
+    numero_recibo: string | null;
+    recibo_id: number;
+    /** Un MOMENTO —cuándo entró la plata—: se muestra con fechaHora(). */
+    cobrado_en: string | null;
 }
 
 /** Una faena colgada del cupo, en la ficha. */
@@ -169,12 +171,7 @@ export interface TramoElegible {
      */
     kilos_max: number;
     valor_bs: number;
-    /**
-     * El régimen del tramo, VISIBLE ANTES DE OTORGAR.
-     *
-     * De él depende si el cupo se va a poder ampliar después, y esa es una
-     * consecuencia que conviene ver al elegir y no cuando el botón no aparece.
-     */
+    /** El régimen del tramo, visible antes de otorgar. */
     modalidad: ModalidadAprovechamiento;
     modalidad_etiqueta: string;
     modalidad_descripcion: string;

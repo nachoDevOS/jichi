@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\EstadoAprovechamiento;
-use App\Enums\MetodoPago;
 use App\Exceptions\CobroInvalidoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
@@ -90,16 +89,18 @@ class CobrarService
      */
     public function cobrar(
         array $lineas,
-        MetodoPago $metodo,
         string $nitCi,
         string $nombreFactura,
+        string $nroTransaccion,
+        string $fechaDeposito,
+        string $comprobante,
         ?string $concepto = null,
     ): Recibo {
         if ($lineas === []) {
             throw CobroInvalidoException::sinLineas();
         }
 
-        return DB::transaction(function () use ($lineas, $metodo, $nitCi, $nombreFactura, $concepto): Recibo {
+        return DB::transaction(function () use ($lineas, $nitCi, $nombreFactura, $concepto, $nroTransaccion, $fechaDeposito, $comprobante): Recibo {
             $resueltas = [];
 
             foreach ($lineas as $linea) {
@@ -123,29 +124,36 @@ class CobrarService
                 'nombre_factura' => $nombreFactura,
             ]);
 
+            $orden = 1;
+
             foreach ($resueltas as ['tramite' => $tramite, 'monto' => $monto]) {
                 Pago::create([
                     'recibo_id' => $recibo->id,
                     'pagable_type' => $tramite->getMorphClass(),
                     'pagable_id' => $tramite->getKey(),
                     'monto_parcial' => $monto,
-                    'metodo_pago' => $metodo,
-                ]);
-            }
+                    'fecha_deposito' => $fechaDeposito,
 
-            /*
-             * ================================================================
-             *  COBRAR UN CUPO ES LO QUE LO ACTIVA
-             * ================================================================
-             *
-             * Un aprovechamiento nace PENDIENTE y la concesión pagada ES la
-             * autorización: hasta acá no emitía faenas. Se hace después de
-             * escribir los pagos —dentro de la misma transacción— porque el
-             * saldo se calcula sumándolos, y antes de escribirlos todavía diría
-             * que debe todo.
-             */
-            foreach ($resueltas as ['tramite' => $tramite]) {
-                $this->activarSiQuedoPagado($tramite);
+                    /*
+                     * LA BOLETA SE REPITE EN CADA LÍNEA DEL MISMO COBRO, y es
+                     * correcto: un solo depósito puede cubrir el carnet y el
+                     * cupo a la vez, y las dos filas están respaldadas por ese
+                     * mismo papel.
+                     *
+                     * EL NÚMERO SE DESAMBIGUA CON UN SUFIJO cuando el mismo
+                     * depósito cubre varias líneas. Es único global —el índice
+                     * lo exige— y la columna ya no admite NULL, así que repetirlo
+                     * tal cual chocaría.
+                     *
+                     * Queda «0012345678» para el caso normal de una sola línea, y
+                     * «0012345678-2», «-3»… cuando un depósito paga el carnet y
+                     * el cupo a la vez. Se sigue leyendo cuál es la boleta.
+                     */
+                    'nro_transaccion' => $orden === 1 ? $nroTransaccion : $nroTransaccion.'-'.$orden,
+                    'comprobante' => $comprobante,
+                ]);
+
+                $orden++;
             }
 
             /*
@@ -221,38 +229,19 @@ class CobrarService
     }
 
     /**
-     * El cupo que se termina de pagar pasa de PENDIENTE a ACTIVO.
+     * ========================================================================
+     *  COBRAR YA NO ACTIVA NADA, Y ES DELIBERADO
+     * ========================================================================
      *
-     * ------------------------------------------------------------------------
-     *  SOLO EL APROVECHAMIENTO, Y SOLO SI QUEDÓ EN CERO
-     * ------------------------------------------------------------------------
+     * Este servicio tuvo un `activarSiQuedoPagado()` que pasaba el cupo a ACTIVO
+     * en cuanto el saldo llegaba a cero. Se retiró el 19/09/2026 al aparecer el
+     * estado EN REVISIÓN: con él, la plata entraba y el pescador quedaba
+     * habilitado en el acto, sin que nadie mirara las boletas contra el extracto.
      *
-     * El carnet y la guía no tienen un estado que dependa del cobro, así que la
-     * comprobación empieza por el tipo. Y se exige el saldo COMPLETO: una cuota
-     * no autoriza a pescar, o el pago fraccionado sería una forma de habilitarse
-     * pagando un boliviano.
-     *
-     * `$tramite` es la copia BLOQUEADA que devolvió `resolver()`, así que nadie
-     * puede meter otro pago en el medio. Se relee el saldo sin caché —la
-     * instancia no trae `withSum`— y por eso ve los abonos recién escritos.
+     * Hoy el cobro solo baja el saldo. El salto PENDIENTE → EN REVISIÓN lo da
+     * una persona desde la ficha, y solo con el monto cubierto; y de ahí a
+     * ACTIVO lo da otra, la que firma. Ver RevisarCupoService.
      */
-    private function activarSiQuedoPagado(Model $tramite): void
-    {
-        if (! $tramite instanceof AprovechamientoPesq) {
-            return;
-        }
-
-        if ($tramite->estado !== EstadoAprovechamiento::Pendiente) {
-            return;
-        }
-
-        if ($tramite->saldoPendiente() > 0.0) {
-            return;
-        }
-
-        $tramite->motivoAuditoria = 'Concesión pagada en su totalidad: el aprovechamiento queda habilitado.';
-        $tramite->update(['estado' => EstadoAprovechamiento::Activo]);
-    }
 
     /**
      * Cómo se nombra un trámite en el recibo y en los mensajes de error.

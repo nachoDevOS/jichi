@@ -131,8 +131,8 @@ class OtorgarCupoService
                  * alguien reclasifica ese tramo en el catálogo, los cupos ya
                  * otorgados no pueden cambiar de régimen retroactivamente.
                  *
-                 * Uno otorgado bajo escala general se sigue pudiendo ampliar
-                 * aunque su tramo pase después a especie especial.
+                 * Uno otorgado bajo escala general sigue siéndolo aunque su
+                 * tramo pase después a especie especial.
                  */
                 'modalidad' => $tramo->modalidad,
 
@@ -151,31 +151,11 @@ class OtorgarCupoService
     }
 
     /**
-     * Suma kilos a un cupo que ya está corriendo.
-     *
-     * ------------------------------------------------------------------------
-     *  AMPLIAR NO ES OTORGAR OTRO, Y POR ESO TOCA `volumen_total_kg`
-     * ------------------------------------------------------------------------
-     *
-     * Podría hacerse creando un segundo aprovechamiento, pero entonces la regla
-     * «una bolsa vigente por persona» dejaría de valer y las faenas tendrían que
-     * elegir de cuál descontar. Sumando sobre el mismo cupo, todo lo demás
-     * —el saldo, el porcentaje usado, el cupo impreso en el carnet— sigue
-     * saliendo de una sola fila.
-     *
-     * EL VOLUMEN CONGELADO SE MUEVE ACÁ, Y ES LA ÚNICA EXCEPCIÓN. Por eso pide
-     * un permiso aparte (`aprovechamientos.ampliar`) y un motivo por escrito:
-     * es dar más kilos de los que la escala otorgaba, que es justamente lo que
-     * el cupo viene a limitar. El motivo viaja al trait Auditable y queda en
-     * `auditorias` con quién lo hizo.
-     */
-    /**
      * ========================================================================
      *  CORREGIR UN CUPO QUE TODAVÍA ES BORRADOR
      * ========================================================================
      *
-     * Cambiar el tramo NO es ampliar, y por eso no pasa por `ampliar()`: acá no
-     * se le está dando más volumen a nadie, se está arreglando una carga
+     * Acá no se le está dando más volumen a nadie: se está arreglando una carga
      * equivocada antes de que exista ningún papel. El volumen y el monto se
      * vuelven a copiar del tramo nuevo, igual que al otorgar.
      *
@@ -280,73 +260,11 @@ class OtorgarCupoService
              * duplicado, una de las dos veces sin explicación.
              *
              * `$motivoAuditoria` es justamente el canal para esto: el trait lo
-             * lee dentro del evento. Mismo patrón que `ampliar()`.
+             * lee dentro del evento.
              */
             $bloqueado->motivoAuditoria = $motivo;
 
             $bloqueado->delete();
-        });
-    }
-
-    public function ampliar(AprovechamientoPesq $cupo, float $kilosAdicionales, string $motivo): AprovechamientoPesq
-    {
-        if ($kilosAdicionales <= 0) {
-            throw CupoInvalidoException::ampliacionSinKilos();
-        }
-
-        /*
-         * `puedeAmpliarse()` y NO `estaVigente()`, y es la diferencia que hace
-         * que esto sirva de algo: un cupo AGOTADO no está «vigente» —su estado
-         * no habilita— y es exactamente el que hay que poder ampliar. Ver el
-         * comentario del método en el modelo.
-         */
-        if (! $cupo->puedeAmpliarse()) {
-            throw CupoInvalidoException::noSePuedeAmpliar();
-        }
-
-        /*
-         * Y la segunda condición, que es la que distingue las modalidades: una
-         * ESPECIE ESPECIAL no se amplía nunca, esté o no en fecha. Ver
-         * ModalidadAprovechamiento::admiteAmpliacion().
-         */
-        if (! $cupo->modalidad->admiteAmpliacion()) {
-            throw CupoInvalidoException::modalidadNoAmpliable(
-                mb_strtolower($cupo->modalidad->etiqueta()),
-            );
-        }
-
-        return DB::transaction(function () use ($cupo, $kilosAdicionales, $motivo): AprovechamientoPesq {
-            $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
-
-            // El motivo se deja en el modelo ANTES de guardar: el trait Auditable
-            // lo lee en el evento `updated` y sin él la fila de auditoría diría
-            // QUÉ cambió pero no POR QUÉ, que acá es lo único que sirve después.
-            $bloqueado->motivoAuditoria = $motivo;
-
-            $bloqueado->update([
-                'volumen_total_kg' => (float) $bloqueado->volumen_total_kg + $kilosAdicionales,
-
-                /*
-                 * Una ampliación REVIVE un cupo agotado, y tiene que hacerlo: si
-                 * quedara en `agotado` con saldo disponible, `puedeEmitirFaena()`
-                 * lo seguiría rechazando y la ampliación no serviría de nada.
-                 *
-                 * PERO NO ACTIVA UN PENDIENTE. Escrito a secas, ampliar un cupo
-                 * sin cobrar lo habilitaba para pescar sin que entrara un
-                 * boliviano: la ampliación se convertía en la puerta de atrás
-                 * del cobro. Un pendiente ampliado sigue pendiente —le suma los
-                 * kilos y espera la caja igual—, y es `CobrarService` el único
-                 * que lo activa.
-                 */
-                'estado' => $bloqueado->estado === EstadoAprovechamiento::Pendiente
-                    ? EstadoAprovechamiento::Pendiente
-                    : EstadoAprovechamiento::Activo,
-            ]);
-
-            // Se devuelve la instancia ORIGINAL refrescada, no la copia
-            // bloqueada: quien llamó tiene esa en la mano, y devolverle otra lo
-            // deja con el estado viejo en memoria. Ver CLAUDE.md.
-            return $cupo->refresh();
         });
     }
 

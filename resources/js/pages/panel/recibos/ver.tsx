@@ -1,5 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { ReceiptText, TriangleAlert } from 'lucide-react';
+import { Paperclip, ReceiptText, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,7 +53,7 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
                                 <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                     <tr>
                                         <th className="px-5 py-2.5 font-medium">Concepto</th>
-                                        <th className="px-5 py-2.5 font-medium">Método</th>
+                                        <th className="px-5 py-2.5 font-medium">Boleta</th>
                                         <th className="px-5 py-2.5 text-right font-medium">Monto</th>
                                     </tr>
                                 </thead>
@@ -69,7 +69,20 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
                                             </td>
 
                                             <td className="px-5 py-2.5">
-                                                <Badge color={p.metodo_color}>{p.metodo_etiqueta}</Badge>
+                                                {/* La boleta del banco. Siempre hay:
+                                                    todo pago es un depósito. */}
+                                                {p.comprobante_url && (
+                                                    <a
+                                                        href={p.comprobante_url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline"
+                                                        title="Abrir la boleta del depósito"
+                                                    >
+                                                        <Paperclip className="size-3" />
+                                                        {p.nro_transaccion ?? 'boleta'}
+                                                    </a>
+                                                )}
                                             </td>
 
                                             <td className="px-5 py-2.5 text-right font-medium tabular-nums">

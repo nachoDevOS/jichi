@@ -420,7 +420,8 @@ class DashboardController extends Controller
 
             /*
              * Cupos SIN KILOS, que es una situación distinta de la anterior y
-             * se resuelve distinto: uno se renueva, el otro pide ampliación.
+             * se le explica distinto al pescador, aunque los dos terminen en un
+             * trámite nuevo.
              * Por eso `EstadoAprovechamiento` los separa en vez de tener un
              * único «inactivo».
              */

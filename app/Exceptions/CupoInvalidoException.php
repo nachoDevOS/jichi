@@ -34,14 +34,16 @@ class CupoInvalidoException extends RuntimeException
      * del beneficiario bloqueada para que dos ventanillas simultáneas no pasen
      * las dos.
      *
-     * Lo que corresponde cuando pasa NO es otorgar otro: es AMPLIAR el que
-     * está, y por eso el mensaje lo dice.
+     * El mensaje dice el saldo y la fecha porque son los dos datos con los que
+     * el operador decide qué hacer: esperar a que venza, o —si el cupo todavía
+     * es un borrador— corregirlo al tramo que corresponde.
      */
     public static function yaTieneCupoVigente(string $persona, float $saldo, string $vence): self
     {
         return new self(sprintf(
             '%s ya tiene un aprovechamiento vigente hasta el %s, con %s kg sin usar. '.
-            'No se otorga un segundo cupo: si necesita más volumen, hay que AMPLIAR el que tiene.',
+            'No se otorga un segundo cupo. Si el que tiene todavía está pendiente de pago, '.
+            'corríjalo al tramo que corresponda; si ya se cobró, hay que esperar a que venza.',
             $persona,
             $vence,
             number_format($saldo, 2, ',', '.'),
@@ -63,31 +65,51 @@ class CupoInvalidoException extends RuntimeException
         );
     }
 
-    /**
-     * ========================================================================
-     *  UNA ESPECIE ESPECIAL NO SE AMPLÍA
-     * ========================================================================
-     *
-     * Es la única diferencia de comportamiento entre las dos modalidades. En la
-     * escala general, ampliar es la forma prevista de seguir pescando cuando el
-     * volumen se acaba — la «recarga continua» de los rangos menores.
-     *
-     * En la especie especial no existe esa recarga: la cuota la autoriza una
-     * resolución sobre esa especie, y estirarla desde una pantalla sería
-     * saltearla. Lo que corresponde es el trámite completo —elegir el tramo,
-     * pagar en caja, recibo nuevo—, que es justamente lo que deja constancia de
-     * que alguien volvió a autorizar.
-     */
-    public static function modalidadNoAmpliable(string $modalidad): self
+    /** Se quiso presentar un cupo que ya no está en el borrador. */
+    public static function noSePuedeEnviar(string $estado): self
     {
-        return new self(
-            "Un aprovechamiento de {$modalidad} no se amplía: su cuota la autoriza una resolución ".
-            'sobre la especie. Lo que corresponde es tramitar uno nuevo — elegir el tramo, cobrarlo '.
-            'y emitir el recibo.',
-        );
+        return new self(sprintf(
+            'Este aprovechamiento está %s y no se puede enviar a revisión. '.
+            'Solo se presenta lo que está pendiente de pago.',
+            mb_strtolower($estado),
+        ));
     }
 
-    /** Ampliar de a cero o en negativo no es ampliar. */
+    /**
+     * Se quiso presentar o aprobar un cupo con saldo sin cubrir.
+     *
+     * Dice CUÁNTO falta y no solo «falta plata», porque es el número con el que
+     * el operador decide qué hacer: cargar otro depósito, o revisar si el que
+     * cargó salió por menos.
+     */
+    public static function faltaCubrirElMonto(float $saldo): self
+    {
+        return new self(sprintf(
+            'Todavía faltan %s Bs por cobrar. Un aprovechamiento se presenta a revisión '.
+            'cuando los depósitos cubren el monto entero.',
+            number_format($saldo, 2, ',', '.'),
+        ));
+    }
+
+    /** Se quiso aprobar o rechazar algo que no está presentado. */
+    public static function noSePuedeRevisar(string $estado): self
+    {
+        return new self(sprintf(
+            'Este aprovechamiento está %s: solo se aprueba o se rechaza lo que está EN REVISIÓN.',
+            mb_strtolower($estado),
+        ));
+    }
+
+    /** Se quiso cargar un depósito contra un cupo que ya no los admite. */
+    public static function noAdmitePagos(string $estado): self
+    {
+        return new self(sprintf(
+            'Este aprovechamiento está %s y ya no admite pagos. '.
+            'Solo se cobra mientras está pendiente; si hay que corregir algo cobrado, se resuelve por caja.',
+            mb_strtolower($estado),
+        ));
+    }
+
     /**
      * Se quiso corregir un cupo que ya salió del borrador.
      *
@@ -133,11 +155,6 @@ class CupoInvalidoException extends RuntimeException
         ));
     }
 
-    public static function ampliacionSinKilos(): self
-    {
-        return new self('La ampliación tiene que sumar kilos: indique un volumen mayor que cero.');
-    }
-
     /**
      * No se amplía un cupo que ya no corre.
      *
@@ -145,11 +162,4 @@ class CupoInvalidoException extends RuntimeException
      * faenas miran la fecha— así que sería puro ruido en la ficha. Lo que
      * corresponde es otorgar el de la gestión nueva.
      */
-    public static function noSePuedeAmpliar(): self
-    {
-        return new self(
-            'Este aprovechamiento no está vigente, así que no se puede ampliar. '.
-            'Lo que corresponde es otorgar el cupo de la gestión en curso.',
-        );
-    }
 }

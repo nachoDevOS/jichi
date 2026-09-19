@@ -99,7 +99,7 @@ class PermisoOperativoException extends RuntimeException
     {
         return new self(sprintf(
             'La faena declara %s kg y en la bolsa madre quedan %s kg. '.
-            'Hay que bajar los kilos o tramitar una ampliación del aprovechamiento.',
+            'Hay que bajar los kilos o tramitar un aprovechamiento nuevo.',
             number_format($pedido, 2, ',', '.'),
             number_format($saldo, 2, ',', '.'),
         ));

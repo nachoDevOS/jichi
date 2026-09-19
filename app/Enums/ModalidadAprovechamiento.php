@@ -40,21 +40,17 @@ enum ModalidadAprovechamiento: string
      * ESCALAS GENERALES — el cupo acumulativo y consumible.
      *
      * Rangos progresivos de peso, de 1 kg en adelante. Cada faena descuenta de
-     * su volumen, y cuando se acaba se puede AMPLIAR: es la «recarga continua»
-     * de los rangos menores.
+     * su volumen, y cuando se acaba el pescador tramita otro cupo.
      */
     case EscalaGeneral = 'escala_general';
 
     /**
      * ESPECIES ESPECIALES — el cupo de gran porte, con tasación fija.
      *
-     * Paiche y lo que la resolución sume después. Tiene volumen y las faenas lo
-     * descuentan igual —sin eso no habría ningún control— pero NO SE AMPLÍA: es
-     * una autorización específica sobre la cuota de la especie, no un saldo que
-     * se recarga.
-     *
-     * Agotado, el pescador tramita uno nuevo: elige el tramo, paga en caja y
-     * sale otro recibo. Esa vuelta completa ES el control normativo.
+     * Paiche y lo que la resolución sume después. Es una autorización específica
+     * sobre la cuota de la especie, con TASACIÓN FIJA: el valor no sale de una
+     * progresión por kilos como en los tramos menores, lo fija la resolución
+     * para esa especie.
      */
     case EspecieEspecial = 'especie_especial';
 
@@ -70,9 +66,8 @@ enum ModalidadAprovechamiento: string
     public function descripcion(): string
     {
         return match ($this) {
-            self::EscalaGeneral => 'Cupo acumulativo: las faenas lo descuentan y se puede ampliar.',
-            self::EspecieEspecial => 'Cuota específica de la especie, con tasación fija. No se amplía: '.
-                'agotada, hay que tramitar una nueva.',
+            self::EscalaGeneral => 'Tramo de la escala progresiva: a más kilos, más valor.',
+            self::EspecieEspecial => 'Cuota específica de la especie, con tasación fija por resolución.',
         };
     }
 
@@ -89,26 +84,6 @@ enum ModalidadAprovechamiento: string
             self::EscalaGeneral => 'sky',
             self::EspecieEspecial => 'violet',
         };
-    }
-
-    /**
-     * ========================================================================
-     *  ¿SE LE PUEDEN SUMAR KILOS SIN VOLVER A TRAMITAR?
-     * ========================================================================
-     *
-     * Es LA diferencia entre las dos modalidades, y la única que cambia el
-     * comportamiento del sistema.
-     *
-     * En la escala general, ampliar es la forma prevista de seguir pescando
-     * cuando el volumen se acaba. En la especie especial no: la cuota la
-     * autoriza una resolución sobre esa especie, y estirarla desde una pantalla
-     * sería saltearla. Lo que corresponde es el trámite completo —elegir el
-     * tramo, pagar en caja, recibo nuevo—, que es justamente lo que deja
-     * constancia.
-     */
-    public function admiteAmpliacion(): bool
-    {
-        return $this === self::EscalaGeneral;
     }
 
     /**

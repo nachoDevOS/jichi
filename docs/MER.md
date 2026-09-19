@@ -110,15 +110,23 @@ tramo por redondeo y el sistema cobraría el siguiente.
 resolución al definir el tramo, no el operador al atender. Puesta allá, dos cupos
 del mismo tramo podrían terminar con reglas distintas.
 
-| Modalidad | Cupo | ¿Se amplía? |
-| --- | --- | --- |
-| `escala_general` | acumulativo y consumible | **Sí** |
-| `especie_especial` | cuota de la especie, tasación fija (paiche) | **No**: agotada, se tramita de nuevo |
+| Modalidad | De dónde sale el valor |
+| --- | --- |
+| `escala_general` | La progresión por kilos: a más volumen, más bolivianos |
+| `especie_especial` | Tasación FIJA que la resolución puso para esa especie (paiche) |
 
 **Por qué es un enum y no una columna `es_paiche`.** Porque el criterio no es la
 especie sino el RÉGIMEN. Mañana la resolución puede sumar otra especie, y con un
 booleano llamado por la especie habría que renombrar la columna —o peor, dejarla
 mintiendo—.
+
+> ⚠️ **Hoy la modalidad NO cambia ningún comportamiento del sistema.** Su única
+> diferencia era que la escala general se podía AMPLIAR, y esa función se retiró
+> el 19/09/2026: ahora los dos regímenes se comportan igual y agotado cualquiera
+> de los dos hay que tramitar un cupo nuevo. Queda como CLASIFICACIÓN —se copia
+> al cupo, se muestra en la ficha y en el catálogo— y como el lugar donde
+> colgar una regla el día que la resolución distinga a las especies por algo
+> más que el precio.
 
 ---
 
@@ -203,13 +211,18 @@ PENDIENTE ──[se cobra ENTERO]──▶ ACTIVO ──▶ AGOTADO | VENCIDO
   editar    ✔                      ✘         ✘         ✘
   eliminar  ✔                      ✘         ✘         ✘
   faenas    ✘                      ✔         ✘         ✘
-  ampliar   ✔ (sigue pendiente)    ✔         ✔         ✘
 ```
 
 **Nace PENDIENTE y solo la caja lo activa.** `CobrarService` lo pasa a `activo`
 cuando el saldo llega a cero, y no hay ningún otro camino: la concesión pagada ES
 la autorización. Se exige el saldo COMPLETO, no una cuota — si media cuota
 alcanzara, habilitarse costaría un boliviano.
+
+**UN CUPO NO SE AMPLÍA.** La función existió y se retiró: el volumen otorgado
+queda congelado desde el otorgamiento, y lo único que lo mueve es corregir el
+borrador —que vuelve a copiarlo del tramo elegido—. Si a un pescador le hacen
+falta más kilos, eso es un trámite nuevo: elegir el tramo, cobrarlo y emitir otro
+recibo. Esa vuelta completa ES el control.
 
 **Eliminar un cupo pendiente es una BAJA LÓGICA.** La fila queda con
 `deleted_at`, el scope global la esconde de todo —incluida la regla de una bolsa
@@ -408,7 +421,9 @@ lo impreso y lo que hay hoy.
 | `recibo_id` | FK **CASCADE** | |
 | `pagable_type` / `pagable_id` | morphs | Carnet, cupo o guía |
 | `monto_parcial` | decimal(12,2) | **Este abono**, no el total |
-| `metodo_pago` | string(20) | `MetodoPago` |
+| `nro_transaccion` | string(60), **único** | El número de la boleta del banco |
+| `fecha_deposito` | date | La que dice la boleta, no la de carga |
+| `comprobante` | string | Ruta de la foto o el PDF de la boleta |
 
 **Por qué es polimórfica.** Se cobran tres cosas distintas y las tres se pagan
 igual. Una tabla por cada una obligaría a repetir el mismo circuito de caja tres
@@ -427,6 +442,39 @@ podría amparar un carnet y una guía sin que nada lo impida.
 **CASCADE y no RESTRICT, al revés que en el resto del sistema**: un pago sin
 recibo no es nada —no se puede imprimir, no entra en ningún arqueo y no se sabe
 quién lo cobró—. Si algún día se anula un recibo entero, su detalle se va con él.
+
+**NO HAY COLUMNA `metodo_pago`, y no es un olvido.** En esta unidad no se cobra
+en efectivo ni por QR: **todo pago es un depósito bancario**. Una columna con un
+solo valor posible no informa nada, y peor, invita a suponer que alguna vez hubo
+otra cosa. Por eso las tres columnas de la boleta son OBLIGATORIAS.
+
+**Y por eso el arqueo del día son DOS números, no un reparto por método:**
+
+| Número | Qué responde |
+| --- | --- |
+| `created_at` de hoy | Lo CARGADO: cuadra el trabajo del día |
+| `fecha_deposito` de hoy | Lo DEPOSITADO: se cruza contra el extracto del banco |
+
+Un depósito hecho el viernes y registrado el lunes entra en el primero y no en el
+segundo, y esa diferencia es justamente la que hay que poder ver.
+
+**LA BOLETA DEL BANCO VIVE EN EL PAGO, no en el recibo.** Si la persona hizo
+dos depósitos, son dos boletas distintas y cada una respalda su monto; guardada
+en el recibo, la segunda pisaría a la primera.
+
+`nro_transaccion` es **único global entre los pagos vivos**, con índice parcial
+`WHERE deleted_at IS NULL`. Es lo que impide
+cargar la misma boleta dos veces —contra el mismo trámite o contra otro—, que es
+la forma más fácil de que algo figure pagado sin que haya entrado la plata. El parcial deja
+fuera las filas dadas de baja, para que un cobro anulado libere su boleta.
+
+**Cuando un mismo depósito cubre varias líneas**, la segunda en adelante llevan
+el número con un sufijo —«0012345678-2»—, porque es único global y la columna ya
+no admite NULL. Se sigue leyendo cuál es la boleta, y el índice no choca.
+
+> El archivo lo sube `StorageController::file()` —regla 11— **antes de abrir la
+> transacción**, porque un rollback no deshace escrituras en disco. Si el cobro
+> falla, el `catch` lo borra con `Archivos::borrar()`.
 
 **Por qué `monto_parcial` y no `monto`.** Porque el nombre dice la regla: un
 trámite se puede pagar en cuotas. Un carnet de 80 Bs admite dos filas de 40, cada

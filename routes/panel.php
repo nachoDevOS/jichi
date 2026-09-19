@@ -155,8 +155,11 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     | En cuanto entra el primer boliviano las tres se cierran solas —lo decide
     | `EstadoAprovechamiento::permiteEdicion()`, no el middleware—: hay un recibo
     | numerado con el detalle impreso, y cambiar lo que ese papel dice por detrás
-    | no es una corrección. De ahí en adelante el único camino es AMPLIARLO, que
-    | suma kilos, pide su propio permiso y deja el motivo en `auditorias`.
+    | no es una corrección.
+    |
+    | NO HAY «AMPLIAR». Un cupo cobrado es lo que dice el recibo, y si al pescador
+    | le hacen falta más kilos, eso es un trámite nuevo: elegir el tramo, cobrarlo
+    | y emitir otro recibo. Esa vuelta completa ES el control.
     |
     | Un cupo editable SIEMPRE dejaría de ser un límite: alcanzaría con subirle
     | el tramo para saltear la escala, sin que quedara constancia de quién lo
@@ -194,6 +197,17 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     });
 
     /*
+     * CARGAR UN DEPÓSITO DESDE LA FICHA DEL CUPO.
+     *
+     * El permiso es el de CAJA y no uno de aprovechamientos, porque esto es un
+     * cobro: sale con recibo numerado y entra al arqueo del día. Que la pantalla
+     * sea otra no cambia quién puede hacerlo.
+     */
+    Route::post('/aprovechamientos/{aprovechamiento}/pagos', [AprovechamientoController::class, 'pagar'])
+        ->middleware('permiso:caja.cobrar')
+        ->name('aprovechamientos.pagar');
+
+    /*
      * ELIMINAR es de SUPERVISIÓN: borrar la fila la hace desaparecer, y lo único
      * que queda es la línea de `auditorias` con el motivo. Ver el bloque de
      * arriba.
@@ -201,15 +215,6 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     Route::delete('/aprovechamientos/{aprovechamiento}', [AprovechamientoController::class, 'destroy'])
         ->middleware('permiso:aprovechamientos.eliminar')
         ->name('aprovechamientos.destroy');
-
-    /*
-     * AMPLIAR es de SUPERVISIÓN y no de ventanilla: otorgar es aplicar la
-     * escala que corresponde, ampliar es dar más kilos de los que esa escala
-     * daba — que es justamente lo que el cupo viene a limitar.
-     */
-    Route::patch('/aprovechamientos/{aprovechamiento}/ampliar', [AprovechamientoController::class, 'ampliar'])
-        ->middleware('permiso:aprovechamientos.ampliar')
-        ->name('aprovechamientos.ampliar');
 
     Route::get('/aprovechamientos/{aprovechamiento}', [AprovechamientoController::class, 'show'])
         ->middleware('permiso:aprovechamientos.ver')

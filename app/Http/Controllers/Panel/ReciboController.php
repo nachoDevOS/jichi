@@ -135,8 +135,11 @@ class ReciboController extends Controller
                         'concepto' => $p->concepto_detalle,
                         'detalle' => $this->detalleDe($p),
                         'monto_parcial' => (float) $p->monto_parcial,
-                        'metodo_etiqueta' => $p->metodo_pago->etiqueta(),
-                        'metodo_color' => $p->metodo_pago->color(),
+                        // La boleta del banco, para poder abrirla desde el
+                        // recibo sin ir a buscarla al archivo físico.
+                        'nro_transaccion' => $p->nro_transaccion,
+                        'comprobante_url' => $p->comprobante_url,
+                        'fecha_deposito' => $p->fecha_deposito?->toDateString(),
                     ])
                     ->values()
                     ->all(),

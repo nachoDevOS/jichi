@@ -257,8 +257,8 @@ export default function CrearFaena({
                                         {excede &&
                                             (modoEstricto ? (
                                                 <p className="mt-1 text-sm text-destructive">
-                                                    No entra en el cupo. Baje los kilos o tramite una
-                                                    ampliación del aprovechamiento.
+                                                    No entra en el cupo. Baje los kilos o tramite
+                                                    otro aprovechamiento.
                                                 </p>
                                             ) : (
                                                 <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">

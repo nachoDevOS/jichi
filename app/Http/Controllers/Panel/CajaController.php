@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Panel;
 
-use App\Enums\MetodoPago;
 use App\Exceptions\CobroInvalidoException;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\CobrarRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
@@ -12,6 +12,7 @@ use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\Pago;
 use App\Services\CobrarService;
+use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +36,7 @@ use Inertia\Response;
  * Son dos vistas distintas del mismo hecho y las dos hacen falta:
  *
  *   - CAJA lista PAGOS: cada entrega de dinero, con su método y su trámite. Es
- *     lo que se mira para cuadrar el efectivo del día contra lo que hay en el
+ *     lo que se mira para cuadrar los depósitos del día contra lo que hay en el
  *     cajón.
  *   - RECIBOS lista los PAPELES entregados, con su número correlativo. Es lo
  *     que audita Contabilidad.
@@ -54,7 +55,7 @@ class CajaController extends Controller
     {
         $filtros = [
             'buscar' => $request->string('buscar')->trim()->value() ?: null,
-            'metodo' => $request->string('metodo')->trim()->value() ?: null,
+
             'desde' => $request->date('desde')?->toDateString(),
             'hasta' => $request->date('hasta')?->toDateString(),
             'por_pagina' => Paginacion::filas($request),
@@ -81,7 +82,6 @@ class CajaController extends Controller
                 fn ($r) => $r->where('numero_recibo', 'like', '%'.mb_strtoupper($termino).'%')
                     ->orWhere('nombre_factura', 'like', '%'.$termino.'%'),
             ))
-            ->when($filtros['metodo'], fn ($q, $metodo) => $q->where('pagos.metodo_pago', $metodo))
             /*
              * EL RANGO SE FILTRA POR `created_at`, que es cuando entró la plata.
              * `pagos` no tiene columna de fecha propia a propósito: una segunda
@@ -101,9 +101,12 @@ class CajaController extends Controller
                 'concepto' => $p->concepto_detalle,
                 'titular' => $this->titularDe($p),
                 'monto_parcial' => (float) $p->monto_parcial,
-                'metodo_pago' => $p->metodo_pago->value,
-                'metodo_etiqueta' => $p->metodo_pago->etiqueta(),
-                'metodo_color' => $p->metodo_pago->color(),
+                // La boleta del banco, para poder abrirla desde el arqueo sin
+                // entrar a cada recibo.
+                'nro_transaccion' => $p->nro_transaccion,
+                'comprobante_url' => $p->comprobante_url,
+                // Un DÍA —lo que dice la boleta—: va con toDateString().
+                'fecha_deposito' => $p->fecha_deposito?->toDateString(),
                 // Es un MOMENTO: cuándo entró el dinero. Va con toIso8601String().
                 'cobrado_en' => $p->created_at?->toIso8601String(),
             ]);
@@ -111,13 +114,12 @@ class CajaController extends Controller
         return Inertia::render('panel/caja/index', [
             'pagos' => $pagos,
             'filtros' => $filtros,
-            'metodos' => MetodoPago::opciones(),
             'opcionesPorPagina' => Paginacion::OPCIONES,
 
             /*
              * EL ARQUEO DEL DÍA, siempre del día de HOY y no del rango filtrado.
              *
-             * Es lo que se compara contra el efectivo del cajón antes de cerrar,
+             * Es lo que se cuadra contra el extracto del banco antes de cerrar,
              * y esa pregunta no cambia porque alguien esté mirando marzo. Un
              * total que siguiera al filtro invitaría a cuadrar la caja contra el
              * número equivocado.
@@ -148,7 +150,6 @@ class CajaController extends Controller
             ] : null,
 
             'deudas' => $beneficiario ? $this->deudasDe($beneficiario) : [],
-            'metodos' => MetodoPago::opciones(),
         ]);
     }
 
@@ -159,18 +160,43 @@ class CajaController extends Controller
     {
         $datos = $request->validated();
 
+        /*
+         * ====================================================================
+         *  LA BOLETA SE SUBE ANTES DE ABRIR LA TRANSACCIÓN
+         * ====================================================================
+         *
+         * Una transacción de base NO deshace escrituras en disco. Subiendo
+         * adentro, un cobro que falle —saldo movido por otra ventanilla, número
+         * de boleta repetido— dejaría el archivo huérfano para siempre, sin
+         * ninguna fila que lo nombre.
+         *
+         * Por eso se sube acá y el `catch` lo borra. Ver la misma maniobra en
+         * ArchivoTramiteService.
+         */
+        $comprobante = app(StorageController::class)->file($request->file('comprobante'), 'comprobantes');
+
         try {
             $recibo = $this->servicio->cobrar(
                 $datos['lineas'],
-                MetodoPago::from($datos['metodo_pago']),
                 $datos['nit_ci_factura'],
                 $datos['nombre_factura'],
+                $datos['nro_transaccion'],
+                $datos['fecha_deposito'],
+                $comprobante,
                 $datos['concepto'] ?? null,
             );
         } catch (CobroInvalidoException $e) {
+            Archivos::borrar($comprobante);
+
             // El mensaje se cuelga de `lineas`: todas las reglas que puede
             // romper son sobre qué se está cobrando y por cuánto.
             return back()->withInput()->withErrors(['lineas' => $e->getMessage()]);
+        } catch (\Throwable $e) {
+            // Cualquier otra cosa —un choque contra el índice de la boleta, por
+            // ejemplo— tampoco puede dejar el archivo tirado.
+            Archivos::borrar($comprobante);
+
+            throw $e;
         }
 
         return redirect()
@@ -247,10 +273,7 @@ class CajaController extends Controller
     }
 
     /**
-     * Lo cobrado hoy, repartido por método.
-     *
-     * El reparto por método no es decorativo: lo que hay que cuadrar contra el
-     * cajón es el EFECTIVO, y una transferencia no está ahí adentro.
+     * El arqueo del día, en DOS números que no son la misma pregunta.
      *
      * @return array<string, mixed>
      */
@@ -258,26 +281,26 @@ class CajaController extends Controller
     {
         $hoy = now()->toDateString();
 
-        $porMetodo = Pago::query()
-            ->whereDate('created_at', $hoy)
-            ->groupBy('metodo_pago')
-            ->selectRaw('metodo_pago, SUM(monto_parcial) as total, COUNT(*) as cantidad')
-            ->get()
-            ->keyBy('metodo_pago');
+        /*
+         * YA NO SE REPARTE POR MÉTODO: todo pago es un depósito bancario, así
+         * que el reparto tenía una sola columna. Lo que sí hace falta son las
+         * DOS fechas, porque no son la misma pregunta:
+         *
+         *   - `created_at`      lo CARGADO hoy: cuadra el trabajo del día.
+         *   - `fecha_deposito`  lo DEPOSITADO hoy: se cruza contra el extracto.
+         *
+         * Un depósito del viernes cargado el lunes entra en el primero y no en
+         * el segundo, y esa diferencia es justamente la que hay que ver.
+         */
+        $cargadoHoy = Pago::query()->whereDate('created_at', $hoy);
+        $depositadoHoy = Pago::query()->whereDate('fecha_deposito', $hoy);
 
         return [
             'fecha' => $hoy,
-            'total' => (float) $porMetodo->sum('total'),
-            'cantidad' => (int) $porMetodo->sum('cantidad'),
-            'por_metodo' => collect(MetodoPago::cases())
-                ->map(fn (MetodoPago $m): array => [
-                    'metodo' => $m->value,
-                    'etiqueta' => $m->etiqueta(),
-                    'color' => $m->color(),
-                    'total' => (float) ($porMetodo[$m->value]->total ?? 0),
-                    'cantidad' => (int) ($porMetodo[$m->value]->cantidad ?? 0),
-                ])
-                ->all(),
+            'total' => (float) (clone $cargadoHoy)->sum('monto_parcial'),
+            'cantidad' => (int) (clone $cargadoHoy)->count(),
+            'total_depositado' => (float) (clone $depositadoHoy)->sum('monto_parcial'),
+            'cantidad_depositada' => (int) (clone $depositadoHoy)->count(),
         ];
     }
 

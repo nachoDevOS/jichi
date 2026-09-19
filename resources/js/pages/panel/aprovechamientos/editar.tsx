@@ -80,7 +80,7 @@ export default function EditarCupo({
     return (
         <LayoutPanel
             titulo="Corregir aprovechamiento"
-            descripcion={`${cupo.beneficiario ?? ''} · pendiente de pago`}
+            descripcion={`${cupo.beneficiario ?? ''} · pendiente`}
         >
             <Head title="Corregir aprovechamiento" />
 

@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Plus, Search, Wallet } from 'lucide-react';
+import { Paperclip, Plus, Search, Wallet } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,7 @@ import type { ArqueoDelDia, PagoFila } from '@/types/caja';
  * ----------------------------------------------------------------------------
  *
  * Un recibo agrupa varios abonos, así que las dos listas nunca tienen la misma
- * cantidad de filas. Acá se mira el DINERO —cada entrega, con su método— que es
+ * cantidad de filas. Acá se mira el DINERO —cada depósito, con su boleta— que es
  * lo que se cuadra contra el cajón. En «Recibos» se miran los PAPELES, con su
  * correlativo, que es lo que audita Contabilidad.
  *
@@ -32,7 +32,7 @@ import type { ArqueoDelDia, PagoFila } from '@/types/caja';
  *  EL ARQUEO ES SIEMPRE DE HOY, AUNQUE SE ESTÉ FILTRANDO OTRO MES
  * ----------------------------------------------------------------------------
  *
- * Es deliberado. Lo que se compara contra el efectivo del cajón antes de cerrar
+ * Es deliberado. Lo que se cuadra contra el extracto del banco antes de cerrar
  * es lo de hoy, y esa pregunta no cambia porque alguien esté mirando marzo. Un
  * total que siguiera al filtro invitaría a cuadrar la caja contra el número
  * equivocado.
@@ -40,7 +40,6 @@ import type { ArqueoDelDia, PagoFila } from '@/types/caja';
 export default function IndiceCaja({
     pagos,
     filtros,
-    metodos,
     arqueo,
     opcionesPorPagina,
 }: {
@@ -52,7 +51,6 @@ export default function IndiceCaja({
         hasta: string | null;
         por_pagina: number;
     };
-    metodos: OpcionEnum[];
     arqueo: ArqueoDelDia;
     opcionesPorPagina: number[];
 }) {
@@ -65,7 +63,6 @@ export default function IndiceCaja({
             route('caja.index'),
             {
                 buscar,
-                metodo: filtros.metodo,
                 desde: filtros.desde,
                 hasta: filtros.hasta,
                 ...valores,
@@ -77,7 +74,7 @@ export default function IndiceCaja({
     return (
         <LayoutPanel
             titulo="Caja"
-            descripcion="Cada entrega de dinero, con su método y el trámite al que se aplicó."
+            descripcion="Cada depósito bancario, con su boleta y el trámite al que se aplicó."
             acciones={
                 puede('caja.cobrar') && (
                     <Button onClick={() => router.visit(route('caja.create'))}>
@@ -110,17 +107,30 @@ export default function IndiceCaja({
                                 </p>
                             </div>
 
-                            {arqueo.por_metodo.map((m) => (
-                                <div key={m.metodo}>
-                                    <Badge color={m.color}>{m.etiqueta}</Badge>
-                                    <p className="mt-1 text-xl font-semibold tabular-nums">
-                                        {bs(m.total, institucion.moneda)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {m.cantidad} abono(s)
-                                    </p>
-                                </div>
-                            ))}
+                            {/*
+                                LAS DOS FECHAS NO SON LA MISMA PREGUNTA, y por eso
+                                van los dos números:
+
+                                  - CARGADO HOY  cuadra el trabajo del día.
+                                  - DEPOSITADO   se cruza contra el extracto.
+
+                                Un depósito del viernes registrado el lunes entra
+                                en el primero y no en el segundo. Antes acá iba el
+                                reparto por método de pago, que desapareció: todo
+                                pago es un depósito bancario.
+                            */}
+                            <div>
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                    Depositado hoy, según la boleta
+                                </p>
+                                <p className="mt-1 text-xl font-semibold tabular-nums">
+                                    {bs(arqueo.total_depositado, institucion.moneda)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {arqueo.cantidad_depositada} depósito(s) — se cruza contra el
+                                    extracto del banco
+                                </p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -161,19 +171,6 @@ export default function IndiceCaja({
                             />
 
                             <Select
-                                value={filtros.metodo ?? ''}
-                                onChange={(e) => filtrar({ metodo: e.target.value || null })}
-                                className="w-auto"
-                            >
-                                <option value="">Todo método</option>
-                                {metodos.map((o) => (
-                                    <option key={o.value} value={o.value}>
-                                        {o.label}
-                                    </option>
-                                ))}
-                            </Select>
-
-                            <Select
                                 value={filtros.por_pagina}
                                 onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
                                 className="w-auto"
@@ -195,7 +192,7 @@ export default function IndiceCaja({
                                 icono={Wallet}
                                 titulo="Sin cobros"
                                 descripcion={
-                                    filtros.buscar || filtros.metodo || filtros.desde || filtros.hasta
+                                    filtros.buscar || filtros.desde || filtros.hasta
                                         ? 'Ninguno coincide con los filtros.'
                                         : 'Acá aparece cada entrega de dinero. Se cobra desde el botón de arriba, y un mismo recibo puede cubrir varios trámites.'
                                 }
@@ -209,7 +206,7 @@ export default function IndiceCaja({
                                                 <th className="px-5 py-2.5 font-medium">Recibo</th>
                                                 <th className="px-5 py-2.5 font-medium">Concepto</th>
                                                 <th className="px-5 py-2.5 font-medium">Titular</th>
-                                                <th className="px-5 py-2.5 font-medium">Método</th>
+                                                <th className="px-5 py-2.5 font-medium">Boleta</th>
                                                 <th className="px-5 py-2.5 text-right font-medium">Monto</th>
                                                 <th className="px-5 py-2.5 font-medium">Cobrado</th>
                                             </tr>
@@ -234,9 +231,26 @@ export default function IndiceCaja({
                                                     <td className="px-5 py-2.5">{p.titular ?? '—'}</td>
 
                                                     <td className="px-5 py-2.5">
-                                                        <Badge color={p.metodo_color}>
-                                                            {p.metodo_etiqueta}
-                                                        </Badge>
+                                                        {/*
+                                                            LA BOLETA SE ABRE DESDE ACÁ, que es
+                                                            donde se cuadra la caja contra el
+                                                            extracto del banco. Sin el enlace habría
+                                                            que entrar a cada recibo para verla, y
+                                                            cuadrar un día son decenas de filas.
+
+                                                        */}
+                                                        {p.comprobante_url && (
+                                                            <a
+                                                                href={p.comprobante_url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="mt-1 flex items-center gap-1 text-xs text-primary hover:underline"
+                                                                title="Abrir la boleta del depósito"
+                                                            >
+                                                                <Paperclip className="size-3" />
+                                                                {p.nro_transaccion ?? 'boleta'}
+                                                            </a>
+                                                        )}
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-right font-medium tabular-nums">
