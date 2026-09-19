@@ -391,7 +391,16 @@ React.**
     alguien lo va a buscar.
 
     **Al editar una migración ya corrida hay que avisar que hay que volver a
-    migrar**, y verificarlo antes: se arma el esquema completo en una base
+    migrar, y el aviso NO alcanza:** el esquema real queda viejo hasta que
+    alguien corra el comando, y el síntoma aparece recién en ventanilla como
+    `column "x" does not exist`. Si la tabla afectada está VACÍA, se puede poner
+    al día sin rearmar todo: `Schema::dropIfExists()` y llamar al `up()` de esa
+    migración —`require database_path('migrations/...')`— deja el esquema
+    **idéntico**, orden de columnas incluido. Un `ALTER TABLE ADD COLUMN` NO
+    sirve para eso: PostgreSQL agrega siempre al final y el orden deja de
+    coincidir con la migración.
+
+    Y verificarlo antes: se arma el esquema completo en una base
     descartable —`DB_CONNECTION=sqlite DB_DATABASE=<archivo> php artisan
     migrate:fresh --seed`— y recién ahí se dice que funciona. Nunca sobre la base
     de trabajo.

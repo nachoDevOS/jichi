@@ -102,7 +102,18 @@ export default function VerCupo({
         comprobante: null as File | null,
     });
 
-    const pago = useForm({ pagos: [] as ReturnType<typeof seccionNueva>[] });
+    const pago = useForm({
+        pagos: [] as ReturnType<typeof seccionNueva>[],
+        /*
+         * LA INTENCIÓN DE ENVIAR, que viaja con los depósitos.
+         *
+         * Se llena al enviar con lo que el botón estaba diciendo, para que el
+         * servidor haga exactamente lo que el operador leyó. Es una intención y
+         * no un permiso: si al guardar el saldo no quedó en cero, el servidor
+         * registra igual y no envía.
+         */
+        enviar: false,
+    });
 
     const cobrando = pago.data.pagos.length > 0;
 
@@ -114,6 +125,15 @@ export default function VerCupo({
      */
     const sumaSecciones = pago.data.pagos.reduce((s, x) => s + Number(x.monto || 0), 0);
     const faltaDespues = Math.round((cupo.saldo_pendiente - sumaSecciones) * 100) / 100;
+
+    /*
+     * ¿CON ESTO ALCANZA? Es lo que decide qué dice el botón y qué hace.
+     *
+     * Con `puede('aprovechamientos.enviar')` adentro: sin ese permiso el botón
+     * solo registra, y ofrecerle enviar a quien no puede sería prometer algo que
+     * el servidor va a ignorar.
+     */
+    const cubre = faltaDespues <= 0 && puede('aprovechamientos.enviar');
 
     function agregarSeccion() {
         // La primera propone el saldo entero —el caso normal es cobrar todo— y
@@ -151,21 +171,6 @@ export default function VerCupo({
                         Ver al pescador
                     </Button>
 
-                    {/*
-                        COBRAR ES LA ACCIÓN QUE SIGUE A OTORGAR, y por eso el
-                        botón aparece mientras quede saldo.
-
-                        Otorgar ya deja al operador en la caja; esto cubre el otro
-                        camino: el cupo que quedó a medio pagar y que alguien abre
-                        días después. Sin el botón habría que ir a Caja y volver a
-                        buscar a la persona a mano.
-
-                        Va con `?beneficiario=` —y no con el id del cupo— porque
-                        el formulario de cobro trae TODAS las deudas de esa
-                        persona: un mismo recibo cubre el carnet y la autorización
-                        si los dos están pendientes, que es lo que hace la
-                        ventanilla.
-                    */}
                     {/*
                         EDITAR Y ELIMINAR SOLO SOBRE EL BORRADOR.
 
@@ -246,18 +251,16 @@ export default function VerCupo({
                         </>
                     )}
 
-                    {puede('caja.cobrar') && !cupo.pagado && (
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                router.visit(route('caja.create', { beneficiario: cupo.beneficiario_id }))
-                            }
-                            className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500/40 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
-                        >
-                            <Banknote className="size-4" />
-                            Cobrar
-                        </Button>
-                    )}
+                    {/*
+                        NO HAY BOTÓN «COBRAR» ACÁ, y es deliberado: los depósitos
+                        se cargan más abajo, en la tarjeta de Pagos, con una
+                        sección por boleta. Mandar al operador a Caja lo sacaba de
+                        la ficha para hacer lo mismo que puede hacer sin moverse,
+                        y perdiendo de vista el saldo.
+
+                        Caja sigue existiendo para lo suyo: cobrar varios trámites
+                        de una persona en un mismo recibo.
+                    */}
                 </div>
             }
         >
@@ -467,6 +470,14 @@ export default function VerCupo({
                                      * archivos se pierden en el camino, sin
                                      * ningún error que lo explique.
                                      */
+                                    /*
+                                     * `transform` y no `setData`: setData es
+                                     * asincrónico y el post saldría con el valor
+                                     * anterior. Transform corre justo antes de
+                                     * armar el cuerpo.
+                                     */
+                                    pago.transform((datos) => ({ ...datos, enviar: cubre }));
+
                                     pago.post(route('aprovechamientos.pagar', cupo.id), {
                                         forceFormData: true,
                                         preserveScroll: true,
@@ -633,8 +644,21 @@ export default function VerCupo({
                                     }
                                 >
                                     <Banknote className="size-4" />
-                                    Registrar {pago.data.pagos.length} depósito(s)
+                                    {cubre
+                                        ? `Registrar ${pago.data.pagos.length} depósito(s) y enviar a revisión`
+                                        : `Registrar ${pago.data.pagos.length} depósito(s)`}
                                 </Button>
+
+                                {/* Se dice qué va a pasar al apretar, porque el
+                                    botón hace DOS cosas y una de ellas cierra la
+                                    puerta: en revisión ya no se edita ni se
+                                    elimina. */}
+                                {cubre && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Al registrarlos, el aprovechamiento pasa a EN REVISIÓN y deja
+                                        de poder editarse o eliminarse.
+                                    </p>
+                                )}
                             </form>
                         )}
 

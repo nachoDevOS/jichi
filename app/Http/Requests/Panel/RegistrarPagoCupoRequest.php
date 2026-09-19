@@ -83,6 +83,17 @@ class RegistrarPagoCupoRequest extends FormRequest
              */
             'nit_ci_factura' => ['nullable', 'string', 'max:30'],
             'nombre_factura' => ['nullable', 'string', 'max:160'],
+
+            /*
+             * ¿EL OPERADOR PIDIÓ ENVIARLO A REVISIÓN EN EL MISMO ACTO?
+             *
+             * Viene del botón, que cambia de texto según si las secciones cubren
+             * el monto: «Registrar depósitos» cuando falta, «Registrar y enviar
+             * a revisión» cuando alcanza. Es una INTENCIÓN, no un permiso: si al
+             * guardar el saldo no quedó en cero —porque otra ventanilla movió
+             * algo— el controlador registra igual y no envía.
+             */
+            'enviar' => ['nullable', 'boolean'],
         ];
     }
 
@@ -126,6 +137,10 @@ class RegistrarPagoCupoRequest extends FormRequest
                 : null;
         }
 
-        $this->merge(['pagos' => $pagos]);
+        $this->merge([
+            'pagos' => $pagos,
+            // Llega como texto desde un FormData: sin esto, «false» sería `true`.
+            'enviar' => $this->boolean('enviar'),
+        ]);
     }
 }

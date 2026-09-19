@@ -166,29 +166,21 @@ class AprovechamientoController extends Controller
 
         /*
          * ========================================================================
-         *  OTORGAR TERMINA EN LA CAJA, NO EN LA FICHA
+         *  OTORGAR TERMINA EN LA FICHA DEL CUPO
          * ========================================================================
          *
-         * En ventanilla las dos cosas son UN solo acto: la persona se lleva la
-         * autorización y paga la concesión en el mismo momento —el talonario
-         * tiene el renglón «Valor de la Concesión Pesquera Bs.» en la misma
-         * hoja—. Dejando al operador en la ficha, cobrar exigía acordarse de ir
-         * a Caja y volver a buscar a la persona, y el cupo quedaba impago sin
-         * que nada lo empujara.
+         * Que es donde se cargan los depósitos: la tarjeta de Pagos tiene una
+         * sección por boleta y el saldo a la vista. Mandarlo a Caja —como hacía
+         * antes— lo sacaba de la ficha para hacer lo mismo desde otra pantalla, y
+         * perdiendo de vista cuánto falta.
          *
-         * Se manda con `?beneficiario=`, que es lo que el formulario de cobro ya
-         * sabe recibir: llega con TODAS las deudas de esa persona cargadas, no
-         * solo este cupo, así que un mismo recibo cubre el carnet y la
-         * autorización si los dos están pendientes. Eso es exactamente lo que
-         * hace la ventanilla.
-         *
-         * La ficha no queda inalcanzable: el mensaje lleva el número de cupo y
-         * el listado sigue estando a un clic.
+         * Caja sigue existiendo para lo suyo: cobrar varios trámites de una misma
+         * persona bajo un solo recibo.
          */
         return redirect()
-            ->route('caja.create', ['beneficiario' => $cupo->beneficiario_id])
+            ->route('aprovechamientos.show', $cupo)
             ->with('exito', sprintf(
-                'Cupo otorgado: %s kg por %s. Cóbrelo ahora para que quede en regla.',
+                'Cupo otorgado: %s kg por %s Bs. Cargue los depósitos para poder enviarlo a revisión.',
                 number_format((float) $cupo->volumen_total_kg, 2, ',', '.'),
                 number_format($cupo->montoACobrar(), 2, ',', '.'),
             ));
@@ -399,6 +391,7 @@ class AprovechamientoController extends Controller
         RegistrarPagoCupoRequest $request,
         AprovechamientoPesq $aprovechamiento,
         CobrarService $caja,
+        RevisarCupoService $revision,
     ): RedirectResponse {
         $datos = $request->validated();
         $aprovechamiento->loadMissing('beneficiario');
@@ -457,18 +450,46 @@ class AprovechamientoController extends Controller
         $cupo = $aprovechamiento->refresh();
         $cuantos = count($datos['pagos']);
 
+        /*
+         * ====================================================================
+         *  REGISTRAR Y ENVIAR SON UN SOLO ACTO CUANDO EL MONTO QUEDA CUBIERTO
+         * ====================================================================
+         *
+         * El botón lo dice: «Registrar depósitos y enviar a revisión». Partirlo
+         * en dos clics obligaba al operador a apretar otro botón para declarar
+         * algo que la pantalla ya le había mostrado —que la suma alcanza—.
+         *
+         * PERO SE VUELVE A MIRAR EL SALDO, y no se confía en la intención: entre
+         * que se abrió el formulario y se guardó, otra ventanilla pudo dar de
+         * baja un pago. Si no quedó cubierto, los depósitos se registran igual
+         * —ya entraron— y el envío simplemente no ocurre. Nunca falla por esto:
+         * el operador ve cuánto falta y sigue.
+         */
+        $enviado = false;
+
+        if (($datos['enviar'] ?? false) && $cupo->puedeEnviarseARevision()) {
+            $revision->enviar($cupo);
+            $cupo->refresh();
+            $enviado = true;
+        }
+
         return redirect()
             ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', $cupo->saldoPendiente() <= 0.0
-                ? sprintf(
+            ->with('exito', match (true) {
+                $enviado => sprintf(
+                    '%d depósito(s) registrado(s) y enviado a revisión. Queda esperando la firma de quien lo aprueba.',
+                    $cuantos,
+                ),
+                $cupo->saldoPendiente() <= 0.0 => sprintf(
                     '%d depósito(s) registrado(s). El monto quedó cubierto: ya se puede enviar a revisión.',
                     $cuantos,
-                )
-                : sprintf(
+                ),
+                default => sprintf(
                     '%d depósito(s) registrado(s). Quedan %s Bs por cobrar.',
                     $cuantos,
                     number_format($cupo->saldoPendiente(), 2, ',', '.'),
-                ));
+                ),
+            });
     }
 
     /**

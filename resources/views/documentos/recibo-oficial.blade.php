@@ -69,7 +69,7 @@
            NO LLEVA `opacity`: el archivo `recibo-sello.png` ya viene atenuado.
            Es a propósito — `opacity` es de lo menos confiable que tiene DomPDF y
            cuando lo ignora el sello sale a pleno color tapando el texto. Ver el
-           comentario de ReciboController::pdf().
+           comentario de ReciboController::imprimir().
 
            CÓMO SE REGENERA, porque no se toca con CSS. El PNG sale de mezclar
            `public/image/sedag.png` contra BLANCO con un factor:
@@ -371,7 +371,7 @@
     {{-- La suma de ... -00/100
          El «-00/100» del talonario es la forma clásica de cerrar un importe
          escrito a mano para que nadie le agregue centavos después. Acá ya viene
-         dentro del texto en letras. Ver ReciboArmado::montoEnLetras(). --}}
+         dentro del texto en letras. Ver ReciboImpreso::montoEnLetras(). --}}
     <div class="bloque" style="top: 154pt; left: 14pt; width: 348pt;">
         <table width="100%" cellspacing="0" cellpadding="0">
             <tr>
@@ -447,8 +447,9 @@
              LA CIFRA NO SE PARTE. Se probaron las dos formas anteriores y las
              dos se leían mal: un dígito por casillero —«1|2|0|00»— parecía
              12000, y separar bolivianos de centavos —«120|00»— obligaba al ojo
-             a juntar dos cifras para entender una. Ver
-             ReciboController::importeFormateado().
+             a juntar dos cifras para entender una. El formato —coma decimal y
+             punto de miles— lo pone ReciboController::imprimir() al armar los
+             renglones.
              ========================================================== --}}
         <table width="100%" cellspacing="0" cellpadding="0" class="importe-caja">
             <tr>
