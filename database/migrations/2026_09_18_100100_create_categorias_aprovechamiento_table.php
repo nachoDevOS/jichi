@@ -3,7 +3,6 @@
 use App\Enums\ModalidadAprovechamiento;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /*
@@ -42,15 +41,10 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // PARCIAL, no `unique()` a secas: en SQL NULL != NULL, así que un unique
-        // con `deleted_at` adentro no bloquearía nada. Y tiene que ser parcial y
-        // no global porque esto es un catálogo: una escala dada de baja libera su
-        // número para que se pueda volver a cargar.
-        DB::statement(<<<'SQL'
-            CREATE UNIQUE INDEX categorias_aprovechamiento_nro_escala_unico
-                ON categorias_aprovechamiento (nro_escala)
-                WHERE deleted_at IS NULL
-        SQL);
+        // SIN INDICE UNICO EN LA BASE, a propósito: era un índice PARCIAL
+        // —`WHERE deleted_at IS NULL`— que solo existe en PostgreSQL. La
+        // unicidad la exige el Request del catálogo, que alcanza: esto se edita
+        // desde el panel una vez cada tanto, sin dos ventanillas a la vez.
     }
 
     public function down(): void

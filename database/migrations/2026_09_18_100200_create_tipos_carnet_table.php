@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /*
@@ -23,15 +22,10 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // Dos tipos con el mismo nombre serían indistinguibles en un desplegable.
-        // PARCIAL por lo mismo que en los otros catálogos: uno dado de baja
-        // libera su nombre, y un unique con `deleted_at` adentro no bloquea nada
-        // porque en SQL NULL != NULL.
-        DB::statement(<<<'SQL'
-            CREATE UNIQUE INDEX tipos_carnet_nombre_unico
-                ON tipos_carnet (nombre)
-                WHERE deleted_at IS NULL
-        SQL);
+        // SIN INDICE UNICO EN LA BASE, a propósito: era un índice PARCIAL
+        // —`WHERE deleted_at IS NULL`— que solo existe en PostgreSQL. La
+        // unicidad la exige el Request del catálogo, que alcanza: esto se edita
+        // desde el panel una vez cada tanto, sin dos ventanillas a la vez.
     }
 
     public function down(): void
