@@ -15,8 +15,24 @@ export function BarraSaldo({
          */
         kilos_excedidos?: number;
         excedido?: boolean;
+        /*
+         * OPCIONAL por lo mismo. En `false` no se dibuja saldo: antes de la
+         * firma el cupo no puede consumirse, así que la barra salía llena y
+         * «disponible 200 de 200» describía un movimiento imposible. Lo que hay
+         * es un volumen PEDIDO. Sin el dato —la ficha de la faena— se dibuja.
+         */
+        ya_fue_aprobado?: boolean;
     };
 }) {
+    if (cupo.ya_fue_aprobado === false) {
+        return (
+            <p className="text-sm tabular-nums">
+                <strong>{cupo.volumen_total_kg}</strong>
+                <span className="text-muted-foreground"> kg solicitados</span>
+            </p>
+        );
+    }
+
     /*
      * Se avisa en ámbar por debajo del 20%.
      */

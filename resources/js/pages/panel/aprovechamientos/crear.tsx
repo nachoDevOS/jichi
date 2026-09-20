@@ -39,7 +39,7 @@ export default function CrearCupo({
         tipo_embarcacion: '',
         // Lo normal es otorgar hoy. El servidor rechaza fechas futuras: el cupo
         // vence con la gestión, así que una del año que viene arrancaría vencida.
-        fecha_emision: new Date().toISOString().slice(0, 10),
+        fecha_solicitud: new Date().toISOString().slice(0, 10),
     });
 
     const tramo = escala.find((t) => String(t.id) === String(form.data.categoria_aprov_id)) ?? null;
@@ -152,19 +152,19 @@ export default function CrearCupo({
                         </Campo>
 
                         <Campo
-                            etiqueta="Fecha de otorgamiento"
-                            htmlFor="fecha_emision"
-                            error={form.errors.fecha_emision}
-                            ayuda="Puede ser pasada, para poner al día lo autorizado en papel. Futura no: el cupo vence con la gestión."
+                            etiqueta="Fecha de solicitud"
+                            htmlFor="fecha_solicitud"
+                            error={form.errors.fecha_solicitud}
+                            ayuda="El día que la persona lo pidió. La fecha de otorgamiento la escribe el sistema al aprobarlo."
                             obligatorio
                             className="max-w-xs"
                         >
                             <Input
-                                id="fecha_emision"
+                                id="fecha_solicitud"
                                 type="date"
-                                value={form.data.fecha_emision}
-                                onChange={(e) => form.setData('fecha_emision', e.target.value)}
-                                aria-invalid={Boolean(form.errors.fecha_emision)}
+                                value={form.data.fecha_solicitud}
+                                onChange={(e) => form.setData('fecha_solicitud', e.target.value)}
+                                aria-invalid={Boolean(form.errors.fecha_solicitud)}
                             />
                         </Campo>
                     </CardContent>

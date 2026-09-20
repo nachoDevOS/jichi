@@ -161,9 +161,9 @@ export default function IndiceRecibos({
                                                     </td>
 
                                                     <td className="px-5 py-2.5">
-                                                        <p className="font-medium">{r.nombre_factura}</p>
+                                                        <p className="font-medium">{r.beneficiario ?? '—'}</p>
                                                         <p className="font-mono text-xs text-muted-foreground">
-                                                            {r.nit_ci_factura}
+                                                            {r.documento ?? '—'}
                                                         </p>
                                                     </td>
 

@@ -48,8 +48,10 @@ readonly class ReciboImpreso
     public function __get(string $nombre): mixed
     {
         return match ($nombre) {
-            'beneficiario_nombre' => $this->recibo->nombre_factura,
-            'beneficiario_ci' => $this->recibo->nit_ci_factura,
+            // Del beneficiario y no copiados en el recibo: uno solo es el
+            // lugar donde se corrige un apellido mal tipeado.
+            'beneficiario_nombre' => $this->recibo->beneficiario?->nombreCompleto ?? 'Sin nombre',
+            'beneficiario_ci' => $this->recibo->beneficiario?->documento_identidad ?: 'S/N',
             'concepto' => $this->recibo->concepto,
 
             /*

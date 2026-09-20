@@ -134,10 +134,20 @@ export function DialogoCorregirPago({
                             ayuda="No se puede repetir: una misma transacción no respalda dos pagos."
                             obligatorio
                         >
+                            {/* Solo dígitos, y de texto: la boleta suele
+                                empezar con ceros. */}
                             <Input
                                 id="corregir-boleta"
+                                inputMode="numeric"
+                                className="font-mono"
+                                maxLength={60}
                                 value={form.data.nro_transaccion}
-                                onChange={(e) => form.setData('nro_transaccion', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'nro_transaccion',
+                                        e.target.value.replace(/\D/g, ''),
+                                    )
+                                }
                             />
                         </Campo>
 

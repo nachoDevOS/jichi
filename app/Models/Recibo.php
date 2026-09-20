@@ -6,6 +6,7 @@ use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -13,11 +14,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * La CABECERA del comprobante oficial de caja.
  */
 #[Fillable([
+    'beneficiario_id',
     'numero_recibo',
     'monto_total',
     'concepto',
-    'nit_ci_factura',
-    'nombre_factura',
 ])]
 class Recibo extends Model
 {
@@ -36,6 +36,19 @@ class Recibo extends Model
     }
 
     //  Relaciones
+
+    /**
+     * A nombre de quién sale el papel.
+     *
+     * Se lee en vivo y no está copiado: corregir un apellido en la ficha
+     * corrige también los comprobantes. El costo es el otro lado de esa
+     * moneda —una reimpresión puede no decir lo mismo que el papel que la
+     * persona se llevó—, y se aceptó a pedido.
+     */
+    public function beneficiario(): BelongsTo
+    {
+        return $this->belongsTo(Beneficiario::class);
+    }
 
     /**
      * El detalle: los abonos que este papel ampara.

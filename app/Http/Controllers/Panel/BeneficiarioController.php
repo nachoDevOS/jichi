@@ -156,7 +156,8 @@ class BeneficiarioController extends Controller
                 ->with('categoria')
                 ->withSum('faenasQueConsumen', 'kilos_extraidos')
                 ->withSum('pagos', 'monto_parcial')
-                ->orderByDesc('fecha_emision')
+                // Por la SOLICITUD: la emisión está en NULL hasta la firma.
+                ->orderByDesc('fecha_solicitud')
                 ->get()
                 ->map(fn (AprovechamientoPesq $a): array => [
                     'id' => $a->id,
@@ -170,7 +171,10 @@ class BeneficiarioController extends Controller
                     'estado_etiqueta' => $a->estado->etiqueta(),
                     'estado_color' => $a->estado->color(),
                     'vigente' => $a->estaVigente(),
+                    // Antes de la firma no hay saldo que mostrar: no se consumió.
+                    'ya_fue_aprobado' => $a->yaFueAprobado(),
                     'saldo_pendiente' => $a->saldoPendiente(),
+                    'fecha_solicitud' => $a->fecha_solicitud?->toDateString(),
                     'fecha_emision' => $a->fecha_emision?->toDateString(),
                     'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
                 ])

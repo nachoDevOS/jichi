@@ -159,8 +159,9 @@ export default function CatalogoAsociaciones({
                                                 <td className="px-5 py-2.5 text-right">
                                                     {puede('catalogos.gestionar') && (
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="editar"
                                                             size="sm"
+                                                            title="Editar"
                                                             onClick={() => setEditando(a)}
                                                         >
                                                             <Pencil className="size-4" />

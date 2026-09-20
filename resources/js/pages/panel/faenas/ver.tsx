@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { BadgeCheck, CalendarX, CheckCheck, Waves } from 'lucide-react';
+import { BadgeCheck, CalendarX, CheckCheck, User, Waves } from 'lucide-react';
 import { useState } from 'react';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
@@ -29,16 +29,17 @@ export default function VerFaena({ faena }: { faena: FaenaFicha }) {
                 <div className="flex flex-wrap gap-2">
                     {faena.beneficiario_id !== null && (
                         <Button
-                            variant="outline"
+                            variant="ver"
                             onClick={() => router.visit(route('beneficiarios.show', faena.beneficiario_id!))}
                         >
+                            <User className="size-4" />
                             Ver al pescador
                         </Button>
                     )}
 
                     {faena.cupo && (
                         <Button
-                            variant="outline"
+                            variant="ver"
                             onClick={() => router.visit(route('aprovechamientos.show', faena.cupo!.id))}
                         >
                             <Waves className="size-4" />

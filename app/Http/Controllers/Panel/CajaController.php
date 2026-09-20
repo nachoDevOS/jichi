@@ -44,17 +44,20 @@ class CajaController extends Controller
              * UNA RELACIÓN POLIMÓRFICA NO SE PRECARGA CON `with('pagable.x')`.
              */
             ->with([
-                'recibo:id,numero_recibo,nombre_factura',
+                'recibo:id,numero_recibo,beneficiario_id',
+                'recibo.beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'pagable' => fn ($m) => $m->morphWith([
                     Carnet::class => ['beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
                     AprovechamientoPesq::class => ['beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado', 'categoria'],
                     GuiaMovimiento::class => ['comercializador:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
                 ]),
             ])
+            // El nombre ya no está copiado en el recibo: se busca sobre su
+            // beneficiario, con el scope del padrón.
             ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
                 'recibo',
                 fn ($r) => $r->where('numero_recibo', 'like', '%'.mb_strtoupper($termino).'%')
-                    ->orWhere('nombre_factura', 'like', '%'.$termino.'%'),
+                    ->orWhereHas('beneficiario', fn ($b) => $b->buscar($termino)),
             ))
             /*
              * EL RANGO SE FILTRA POR `created_at`, que es cuando entró la plata.
@@ -71,7 +74,7 @@ class CajaController extends Controller
                 'id' => $p->id,
                 'recibo_id' => $p->recibo_id,
                 'numero_recibo' => $p->recibo?->numero_recibo,
-                'a_nombre_de' => $p->recibo?->nombre_factura,
+                'a_nombre_de' => $p->recibo?->beneficiario?->nombreCompleto,
                 'concepto' => $p->concepto_detalle,
                 'titular' => $this->titularDe($p),
                 'monto_parcial' => (float) $p->monto_parcial,
@@ -114,7 +117,6 @@ class CajaController extends Controller
                 'nombreCompleto' => $beneficiario->nombreCompleto,
                 'documento_identidad' => $beneficiario->documento_identidad,
                 'foto_url' => $beneficiario->foto_url,
-                'ci' => $beneficiario->ci,
                 'carnets_vigentes' => [],
             ] : null,
 
@@ -137,8 +139,6 @@ class CajaController extends Controller
         try {
             $recibo = $this->servicio->cobrar(
                 $datos['lineas'],
-                $datos['nit_ci_factura'],
-                $datos['nombre_factura'],
                 $datos['nro_transaccion'],
                 $datos['fecha_deposito'],
                 $comprobante,

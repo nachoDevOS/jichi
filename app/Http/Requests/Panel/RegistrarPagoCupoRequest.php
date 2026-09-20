@@ -36,7 +36,9 @@ class RegistrarPagoCupoRequest extends FormRequest
              * el cobro es que alguien lo tipeó.
              */
             'pagos.*.nro_transaccion' => [
-                'required', 'string', 'max:60',
+                // SOLO DÍGITOS, y va `digits_between` y no `numeric`: la boleta
+                // suele empezar con ceros y `numeric` se los comería.
+                'required', 'string', 'digits_between:1,60',
                 // Contra la tabla...
                 Rule::unique('pagos', 'nro_transaccion')->whereNull('deleted_at'),
                 // ...y contra las otras secciones del mismo formulario.
@@ -50,15 +52,6 @@ class RegistrarPagoCupoRequest extends FormRequest
             'pagos.*.comprobante' => [
                 'required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:3072',
             ],
-
-            /*
-             * A nombre de quién sale el recibo. Opcionales: si no vienen, el
-             * controlador usa los datos del pescador. Se mandan igual porque el
-             * comprobante puede ir a nombre de un tercero —la empresa que paga
-             * por él— y eso se decide en el mostrador.
-             */
-            'nit_ci_factura' => ['nullable', 'string', 'max:30'],
-            'nombre_factura' => ['nullable', 'string', 'max:160'],
 
             /*
              * ¿EL OPERADOR PIDIÓ ENVIARLO A REVISIÓN EN EL MISMO ACTO?
@@ -80,6 +73,7 @@ class RegistrarPagoCupoRequest extends FormRequest
             'pagos.*.monto.gt' => 'Cada depósito tiene que ser mayor que cero.',
             'pagos.*.monto.decimal' => 'Los montos llevan como máximo dos decimales.',
             'pagos.*.nro_transaccion.required' => 'Escriba el número de la boleta del banco.',
+            'pagos.*.nro_transaccion.digits_between' => 'El número de la boleta lleva solo dígitos.',
             'pagos.*.nro_transaccion.unique' => 'Esa boleta ya está cargada en otro cobro: '.
                 'una misma transacción no puede respaldar dos pagos.',
             'pagos.*.nro_transaccion.distinct' => 'Repitió el mismo número de boleta en dos depósitos.',

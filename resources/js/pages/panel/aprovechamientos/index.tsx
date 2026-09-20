@@ -1,10 +1,20 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Eye, Pencil, Plus, Search, Trash2, TriangleAlert, Waves } from 'lucide-react';
+import {
+    Eye,
+    Pencil,
+    Plus,
+    Printer,
+    Receipt,
+    Search,
+    Trash2,
+    TriangleAlert,
+    Waves,
+} from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
@@ -13,7 +23,7 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha } from '@/lib/utils';
+import { bs, cn, fecha } from '@/lib/utils';
 import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { CupoFila } from '@/types/aprovechamientos';
 
@@ -78,49 +88,74 @@ export default function IndiceCupos({
                 que termina con barra de desplazamiento es el documento entero. */}
             <Card className="min-w-0">
                 <CardContent className="space-y-4 p-0">
-                    <form
-                        onSubmit={(e: FormEvent) => {
-                            e.preventDefault();
-                            filtrar({});
-                        }}
-                        className="flex flex-wrap gap-2 p-5 pb-0"
-                    >
-                        <Input
-                            value={buscar}
-                            onChange={(e) => setBuscar(e.target.value)}
-                            placeholder="Buscar por cédula o nombre…"
-                            className="min-w-48 flex-1"
-                        />
+                    {/*
+                        LA BARRA DE ARRIBA DE LA TABLA, la misma del padrón de
+                        beneficiarios: «Mostrar N» a la izquierda, el filtro de
+                        estado al medio y el buscador a la derecha, sobre doce
+                        columnas. Ver pages/panel/beneficiarios/index.tsx.
+                    */}
+                    <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-12 sm:items-end">
+                        <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-4">
+                            Mostrar
+                            <Select
+                                className="w-auto"
+                                value={filtros.por_pagina}
+                                onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
+                                aria-label="Registros por página"
+                            >
+                                {opcionesPorPagina.map((n) => (
+                                    <option key={n} value={n}>
+                                        {n}
+                                    </option>
+                                ))}
+                            </Select>
+                            registros
+                        </label>
 
-                        <Select
-                            value={filtros.estado ?? ''}
-                            onChange={(e) => filtrar({ estado: e.target.value || null })}
-                            className="w-auto"
-                        >
-                            <option value="">Todos los estados</option>
-                            {estados.map((o) => (
-                                <option key={o.value} value={o.value}>
-                                    {o.label}
-                                </option>
-                            ))}
-                        </Select>
+                        {/*
+                            EL ESTADO VA PEGADO AL BUSCADOR, en el mismo grupo de
+                            la derecha: los dos filtran lo mismo —qué filas se
+                            ven— y separados por media pantalla se leían como dos
+                            controles sin relación.
+                        */}
+                        <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-8">
+                            <Select
+                                className="w-auto min-w-36"
+                                value={filtros.estado ?? ''}
+                                onChange={(e) => filtrar({ estado: e.target.value || null })}
+                                aria-label="Filtrar por estado"
+                            >
+                                <option value="">Todos los estados</option>
+                                {estados.map((o) => (
+                                    <option key={o.value} value={o.value}>
+                                        {o.label}
+                                    </option>
+                                ))}
+                            </Select>
 
-                        <Select
-                            value={filtros.por_pagina}
-                            onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
-                            className="w-auto"
-                        >
-                            {opcionesPorPagina.map((n) => (
-                                <option key={n} value={n}>
-                                    {n} filas
-                                </option>
-                            ))}
-                        </Select>
-
-                        <Button type="submit" variant="outline">
-                            <Search className="size-4" />
-                        </Button>
-                    </form>
+                            {/*
+                                El buscador es un <form> propio para que el Enter
+                                lo envíe. No busca mientras se teclea: cada tecla
+                                sería una consulta que recorre la tabla entera.
+                            */}
+                            <form
+                                className="relative min-w-48 flex-1 sm:max-w-sm"
+                                onSubmit={(e: FormEvent) => {
+                                    e.preventDefault();
+                                    filtrar({});
+                                }}
+                            >
+                                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    className="pl-9"
+                                    placeholder="Buscar…"
+                                    value={buscar}
+                                    onChange={(e) => setBuscar(e.target.value)}
+                                    aria-label="Buscar por cédula o nombre"
+                                />
+                            </form>
+                        </div>
+                    </div>
 
                     {cupos.data.length === 0 ? (
                         <EstadoVacio
@@ -141,9 +176,16 @@ export default function IndiceCupos({
                                             <th className="px-5 py-2.5 font-medium">Pescador</th>
                                             <th className="px-5 py-2.5 font-medium">Escala</th>
                                             <th className="px-5 py-2.5 font-medium">Saldo</th>
-                                            <th className="px-5 py-2.5 font-medium">Estado</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Cobro</th>
+                                            <th className="px-5 py-2.5 font-medium">Solicitado</th>
+                                            {/* Vacío mientras no lo firmen: ver
+                                                `fecha_emision` en el MER. */}
+                                            <th className="px-5 py-2.5 font-medium">Otorgado</th>
                                             <th className="px-5 py-2.5 font-medium">Vence</th>
+                                            {/* ESTADO AL FINAL, pegado a los botones: es lo que
+                                                decide cuáles aparecen, y leerlo al lado de ellos
+                                                explica por qué falta el de imprimir. */}
+                                            <th className="px-5 py-2.5 font-medium">Estado</th>
                                             {/* Sin rótulo: los iconos se explican
                                                 solos y un encabezado «Acciones»
                                                 solo gasta ancho. */}
@@ -183,21 +225,16 @@ export default function IndiceCupos({
                                                     </div>
                                                 </td>
 
+                                                {/* SOLO EL RANGO, sin el número del tramo: es
+                                                    un dato interno del catálogo y en la columna
+                                                    se leía como un id. «201 Kg Hasta 300 Kg» dice
+                                                    lo mismo y se entiende sin la tabla al lado. */}
                                                 <td className="px-5 py-2.5">
-                                                    <span className="font-semibold tabular-nums">
-                                                        {c.escala ?? '—'}
-                                                    </span>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {c.descripcion ?? '—'}
-                                                    </p>
+                                                    {c.descripcion ?? '—'}
                                                 </td>
 
                                                 <td className="min-w-40 px-5 py-2.5">
                                                     <BarraSaldo cupo={c} />
-                                                </td>
-
-                                                <td className="px-5 py-2.5">
-                                                    <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-right tabular-nums">
@@ -213,7 +250,19 @@ export default function IndiceCupos({
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
+                                                    {fecha(c.fecha_solicitud)}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                    {c.fecha_emision ? fecha(c.fecha_emision) : '—'}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fecha(c.fecha_vencimiento)}
+                                                </td>
+
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
                                                 </td>
 
                                                 {/*
@@ -224,8 +273,59 @@ export default function IndiceCupos({
                                                 */}
                                                 <td className="px-5 py-2.5">
                                                     <div className="flex justify-end gap-1">
+                                                        {/* EL RECIBO, desde que el trámite se
+                                                            presentó: existe a partir del envío, así
+                                                            que sale en revisión y sigue después. */}
+                                                        {puede('recibos.imprimir') &&
+                                                            c.recibo_id !== null && (
+                                                                <a
+                                                                    href={route(
+                                                                        'recibos.imprimir',
+                                                                        c.recibo_id,
+                                                                    )}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    title={`Recibo ${c.recibo_numero ?? ''}`}
+                                                                    aria-label={`Imprimir el recibo de ${c.beneficiario ?? 'la persona'}`}
+                                                                    className={cn(
+                                                                        buttonVariants({
+                                                                            variant: 'outline',
+                                                                            size: 'sm',
+                                                                        }),
+                                                                    )}
+                                                                >
+                                                                    <Receipt className="size-4" />
+                                                                </a>
+                                                            )}
+
+                                                        {/* LA AUTORIZACIÓN EN PDF, sin pasar por la
+                                                            ficha: es el papel que la persona viene
+                                                            a buscar. Sale con el cupo firmado, y
+                                                            abre pestaña porque vuelve un archivo. */}
+                                                        {puede('aprovechamientos.imprimir') &&
+                                                            c.ya_fue_aprobado && (
+                                                                <a
+                                                                    href={route(
+                                                                        'aprovechamientos.autorizacion',
+                                                                        c.id,
+                                                                    )}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    title="Autorización de pesca"
+                                                                    aria-label={`Imprimir la autorización de ${c.beneficiario ?? 'la persona'}`}
+                                                                    className={cn(
+                                                                        buttonVariants({
+                                                                            variant: 'outline',
+                                                                            size: 'sm',
+                                                                        }),
+                                                                    )}
+                                                                >
+                                                                    <Printer className="size-4" />
+                                                                </a>
+                                                            )}
+
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="ver"
                                                             size="sm"
                                                             onClick={() =>
                                                                 router.visit(
@@ -234,7 +334,6 @@ export default function IndiceCupos({
                                                             }
                                                             aria-label={`Ver el cupo de ${c.beneficiario ?? 'la persona'}`}
                                                             title="Ver"
-                                                            className="text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-500/10 dark:hover:text-sky-300"
                                                         >
                                                             <Eye className="size-4" />
                                                         </Button>
@@ -242,7 +341,7 @@ export default function IndiceCupos({
                                                         {puede('aprovechamientos.editar') &&
                                                             c.puede_editarse && (
                                                                 <Button
-                                                                    variant="ghost"
+                                                                    variant="editar"
                                                                     size="sm"
                                                                     onClick={() =>
                                                                         router.visit(
@@ -254,7 +353,6 @@ export default function IndiceCupos({
                                                                     }
                                                                     aria-label={`Editar el cupo de ${c.beneficiario ?? 'la persona'}`}
                                                                     title="Editar"
-                                                                    className="text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-500/10 dark:hover:text-amber-300"
                                                                 >
                                                                     <Pencil className="size-4" />
                                                                 </Button>
@@ -263,12 +361,11 @@ export default function IndiceCupos({
                                                         {puede('aprovechamientos.eliminar') &&
                                                             c.puede_eliminarse && (
                                                                 <Button
-                                                                    variant="ghost"
+                                                                    variant="eliminar"
                                                                     size="sm"
                                                                     onClick={() => setEliminando(c)}
                                                                     aria-label={`Eliminar el cupo de ${c.beneficiario ?? 'la persona'}`}
                                                                     title="Eliminar"
-                                                                    className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
                                                                 >
                                                                     <Trash2 className="size-4" />
                                                                 </Button>

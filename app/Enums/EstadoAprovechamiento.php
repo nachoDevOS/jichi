@@ -15,7 +15,8 @@ enum EstadoAprovechamiento: string
      */
     case EnRevision = 'en_revision';
 
-    case Activo = 'activo';
+    /** Firmado. Recién acá autoriza a pescar. */
+    case Aprobado = 'aprobado';
     case Vencido = 'vencido';
     case Agotado = 'agotado';
 
@@ -24,7 +25,7 @@ enum EstadoAprovechamiento: string
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::EnRevision => 'En revisión',
-            self::Activo => 'Activo',
+            self::Aprobado => 'Aprobado',
             self::Vencido => 'Vencido',
             self::Agotado => 'Agotado',
         };
@@ -35,7 +36,7 @@ enum EstadoAprovechamiento: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::EnRevision => 'indigo',
-            self::Activo => 'emerald',
+            self::Aprobado => 'emerald',
             self::Vencido => 'slate',
             self::Agotado => 'amber',
         };
@@ -46,7 +47,7 @@ enum EstadoAprovechamiento: string
      */
     public function habilita(): bool
     {
-        return $this === self::Activo;
+        return $this === self::Aprobado;
     }
 
     /**

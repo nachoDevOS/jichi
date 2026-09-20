@@ -198,7 +198,7 @@ export default function IndiceBeneficiarios({
                                         <td className="px-5 py-3">
                                             <div className="flex justify-end gap-1">
                                                 <Button
-                                                    variant="ghost"
+                                                    variant="ver"
                                                     size="sm"
                                                     title="Ver ficha"
                                                     onClick={() =>
@@ -218,7 +218,7 @@ export default function IndiceBeneficiarios({
                                                 */}
                                                 {puede('beneficiarios.editar') && (
                                                     <Button
-                                                        variant="ghost"
+                                                        variant="editar"
                                                         size="sm"
                                                         title="Editar ficha"
                                                         onClick={() =>

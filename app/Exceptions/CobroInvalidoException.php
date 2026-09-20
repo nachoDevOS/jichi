@@ -29,6 +29,29 @@ class CobroInvalidoException extends RuntimeException
         ));
     }
 
+    /**
+     *  TAMPOCO SE COBRA DE MENOS: los depósitos entran todos juntos
+     */
+    public static function noCubreElMonto(string $tramite, float $suma, float $saldo): self
+    {
+        return new self(sprintf(
+            'Los depósitos de %s suman %s Bs y se deben %s Bs. Cargue las boletas que falten hasta '.
+            'cubrir el monto: el trámite se registra cobrado entero, no en cuotas.',
+            $tramite,
+            number_format($suma, 2, ',', '.'),
+            number_format($saldo, 2, ',', '.'),
+        ));
+    }
+
+    /** Un recibo es de UNA persona: no se cobran trámites de dos a la vez. */
+    public static function variosTitulares(): self
+    {
+        return new self(
+            'Los trámites elegidos son de personas distintas. Un recibo sale a nombre de una sola: '.
+            'cobre por separado.',
+        );
+    }
+
     /** Ya no se debe nada de ese trámite. */
     public static function yaEstaPagado(string $tramite): self
     {

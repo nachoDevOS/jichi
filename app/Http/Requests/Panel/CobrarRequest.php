@@ -45,7 +45,9 @@ class CobrarRequest extends FormRequest
              *  LA BOLETA ES SIEMPRE OBLIGATORIA
              */
             'nro_transaccion' => [
-                'required', 'string', 'max:60',
+                // SOLO DÍGITOS, y va `digits_between` y no `numeric`: la boleta
+                // suele empezar con ceros y `numeric` se los comería.
+                'required', 'string', 'digits_between:1,60',
                 /*
                  * ÚNICO entre los pagos VIVOS. Es lo que impide cargar la misma
                  * boleta dos veces —contra el mismo trámite o contra otro—, que
@@ -66,15 +68,6 @@ class CobrarRequest extends FormRequest
                 'required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:3072',
             ],
 
-            /*
-             * Los datos del comprobante se COPIAN al recibo y no se leen del
-             * beneficiario cada vez: el papel puede ir a nombre de un tercero
-             * —la empresa que paga por el pescador— y además tiene que seguir
-             * diciendo lo mismo dentro de cinco años aunque la ficha se corrija.
-             */
-            'nit_ci_factura' => ['required', 'string', 'max:30'],
-            'nombre_factura' => ['required', 'string', 'max:160'],
-
             // Opcional: sin él, el servicio arma uno con los trámites cobrados.
             'concepto' => ['nullable', 'string', 'max:1000'],
         ];
@@ -92,6 +85,7 @@ class CobrarRequest extends FormRequest
             'lineas.*.monto.gt' => 'Cada abono tiene que ser mayor que cero.',
             'lineas.*.monto.decimal' => 'Los montos llevan como máximo dos decimales.',
             'nro_transaccion.required' => 'Escriba el número de la boleta del banco.',
+            'nro_transaccion.digits_between' => 'El número de la boleta lleva solo dígitos.',
             'fecha_deposito.required' => 'Indique la fecha que figura en la boleta.',
             'fecha_deposito.before_or_equal' => 'La fecha del depósito no puede ser futura.',
             'nro_transaccion.unique' => 'Esa boleta ya está cargada en otro cobro. Revise el número: '.
@@ -99,8 +93,6 @@ class CobrarRequest extends FormRequest
             'comprobante.required' => 'Adjunte la boleta del depósito.',
             'comprobante.mimes' => 'La boleta tiene que ser una imagen (JPG, PNG, WEBP) o un PDF.',
             'comprobante.max' => 'La boleta no puede pesar más de 3 MB.',
-            'nit_ci_factura.required' => 'Escriba el NIT o CI para el comprobante.',
-            'nombre_factura.required' => 'Escriba a nombre de quién se emite el comprobante.',
         ];
     }
 
@@ -112,8 +104,6 @@ class CobrarRequest extends FormRequest
             'nro_transaccion' => filled($this->input('nro_transaccion'))
                 ? mb_strtoupper(preg_replace('/\s+/', '', (string) $this->input('nro_transaccion')))
                 : null,
-            'nit_ci_factura' => trim((string) $this->input('nit_ci_factura')),
-            'nombre_factura' => trim((string) $this->input('nombre_factura')),
             'concepto' => filled($this->input('concepto')) ? trim((string) $this->input('concepto')) : null,
         ]);
     }

@@ -17,6 +17,15 @@ const buttonVariants = cva(
                 secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
                 ghost: 'hover:bg-secondary hover:text-secondary-foreground',
                 link: 'text-primary underline-offset-4 hover:underline',
+
+                // LAS TRES ACCIONES, iguales en toda pantalla —ficha y tabla—: el
+                // color dice qué hace el botón antes de leerlo —celeste mira,
+                // ámbar cambia, rojo saca— y así no se inventa uno por pantalla.
+                ver: 'border border-sky-300 bg-card text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-500/40 dark:text-sky-300 dark:hover:bg-sky-500/10',
+                editar: 'border border-amber-300 bg-card text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10',
+                // `eliminar` es toda acción que SACA algo de circulación:
+                // eliminar, dar de baja, anular, revocar, rechazar.
+                eliminar: 'border border-rose-300 bg-card text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10',
             },
             size: {
                 default: 'h-8 px-3',

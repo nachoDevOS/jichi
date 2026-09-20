@@ -17,12 +17,9 @@ class RevisarCupoService
     /**
      * PENDIENTE ──▶ EN REVISIÓN.
      */
-    public function enviar(
-        AprovechamientoPesq $cupo,
-        ?string $nitCi = null,
-        ?string $nombreFactura = null,
-    ): AprovechamientoPesq {
-        return DB::transaction(function () use ($cupo, $nitCi, $nombreFactura): AprovechamientoPesq {
+    public function enviar(AprovechamientoPesq $cupo): AprovechamientoPesq
+    {
+        return DB::transaction(function () use ($cupo): AprovechamientoPesq {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
             if (! $bloqueado->estado->permiteEnvio()) {
@@ -36,15 +33,11 @@ class RevisarCupoService
             $bloqueado->motivoAuditoria = 'Depósitos cargados y monto cubierto: se presenta para revisión.';
             $bloqueado->update(['estado' => EstadoAprovechamiento::EnRevision]);
 
-            $bloqueado->loadMissing('beneficiario');
-
             // Devuelve null en un REENVÍO: no hay depósitos sueltos, no se toca
             // el correlativo y el número que la persona tiene sigue valiendo.
-            $this->caja->emitirRecibo(
-                $bloqueado,
-                filled($nitCi) ? $nitCi : ($bloqueado->beneficiario?->ci ?? 'S/N'),
-                filled($nombreFactura) ? $nombreFactura : ($bloqueado->beneficiario?->nombreCompleto ?? 'Sin nombre'),
-            );
+            // El recibo sale a nombre del titular del cupo: no hace falta
+            // pasárselo, lo lee de `beneficiario_id`.
+            $this->caja->emitirRecibo($bloqueado);
 
             // La instancia ORIGINAL refrescada, no la copia bloqueada: quien
             // llamó tiene esa en la mano. Ver CLAUDE.md.
@@ -82,8 +75,21 @@ class RevisarCupoService
                 throw CupoInvalidoException::faltaControlarBoletas($sinControlar);
             }
 
+            /*
+             * ACÁ SE OTORGA, y por eso la fecha de emisión se escribe recién
+             * ahora: hasta la firma lo único que había era una solicitud. El
+             * vencimiento se recalcula sobre ella porque el cupo vale por la
+             * GESTIÓN —un expediente pedido el 28/12 y firmado en enero vence
+             * con el año nuevo, no con el que ya terminó—.
+             */
+            $emision = now();
+
             $bloqueado->motivoAuditoria = 'Depósitos verificados: el aprovechamiento queda habilitado.';
-            $bloqueado->update(['estado' => EstadoAprovechamiento::Activo]);
+            $bloqueado->update([
+                'estado' => EstadoAprovechamiento::Aprobado,
+                'fecha_emision' => $emision->toDateString(),
+                'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
+            ]);
 
             return $cupo->refresh();
         });

@@ -78,7 +78,7 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
                     )}
 
                     <Button
-                        variant="outline"
+                        variant="ver"
                         onClick={() => router.visit(route('beneficiarios.show', carnet.beneficiario_id))}
                     >
                         <User className="size-4" />
@@ -87,7 +87,7 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
 
                     {/* No se revoca dos veces, y la revocación no se revierte. */}
                     {puede('carnets.revocar') && carnet.estado !== 'revocado' && (
-                        <Button variant="destructive" onClick={() => setRevocando(true)}>
+                        <Button variant="eliminar" onClick={() => setRevocando(true)}>
                             <Ban className="size-4" />
                             Revocar
                         </Button>

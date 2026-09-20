@@ -129,7 +129,11 @@ export interface CupoResumen {
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
+    /** Si pasó por la firma. En `false` todavía no hay saldo que mostrar. */
+    ya_fue_aprobado: boolean;
     saldo_pendiente: number;
+    fecha_solicitud: string | null;
+    /** El día que lo firmaron. `null` mientras no esté aprobado. */
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
 }

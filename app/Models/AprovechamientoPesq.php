@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'volumen_total_kg',
     'tipo_embarcacion',
     'estado',
+    'fecha_solicitud',
     'fecha_emision',
     'fecha_vencimiento',
 ])]
@@ -54,6 +55,7 @@ class AprovechamientoPesq extends Model
             'volumen_total_kg' => 'decimal:2',
             'estado' => EstadoAprovechamiento::class,
             'modalidad' => ModalidadAprovechamiento::class,
+            'fecha_solicitud' => 'date',
             'fecha_emision' => 'date',
             'fecha_vencimiento' => 'date',
         ];
@@ -198,7 +200,7 @@ class AprovechamientoPesq extends Model
     public function yaFueAprobado(): bool
     {
         return in_array($this->estado, [
-            EstadoAprovechamiento::Activo,
+            EstadoAprovechamiento::Aprobado,
             EstadoAprovechamiento::Vencido,
             EstadoAprovechamiento::Agotado,
         ], true);
@@ -289,6 +291,30 @@ class AprovechamientoPesq extends Model
         return $kilos === null || $kilos <= $this->saldoKg();
     }
 
+    /**
+     * POR QUÉ no se le puede colgar una faena, o null si sí se puede.
+     *
+     * `puedeEmitirFaena()` contesta sí o no, y la pantalla decía «vencido o sin
+     * saldo» para todos los noes: sobre un cupo recién creado eso era falso y
+     * mandaba al operador a buscar un problema que no existía.
+     */
+    public function motivoSinFaena(): ?string
+    {
+        if ($this->puedeEmitirFaena()) {
+            return null;
+        }
+
+        // El orden importa: el primer motivo que aparece es el que el operador
+        // tiene que resolver antes que los demás.
+        return match (true) {
+            $this->estado === EstadoAprovechamiento::Pendiente => 'Todavía no autoriza faenas: falta cubrir el monto y enviarlo a revisión.',
+            $this->estado === EstadoAprovechamiento::EnRevision => 'Todavía no autoriza faenas: está presentado y esperando la firma.',
+            ! $this->estaEnFecha() => 'No autoriza faenas: el cupo venció.',
+            $this->estaAgotado() => 'No autoriza faenas: el cupo se quedó sin kilos.',
+            default => 'No autoriza faenas.',
+        };
+    }
+
     /** ¿Se le acabaron los kilos, aunque la fecha no haya llegado? */
     public function estaAgotado(): bool
     {
@@ -317,7 +343,7 @@ class AprovechamientoPesq extends Model
     public function scopeVigentes(Builder $query): Builder
     {
         return $query
-            ->where($this->qualifyColumn('estado'), EstadoAprovechamiento::Activo)
+            ->where($this->qualifyColumn('estado'), EstadoAprovechamiento::Aprobado)
             ->whereDate($this->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString());
     }
 
@@ -330,7 +356,7 @@ class AprovechamientoPesq extends Model
             ->whereIn($this->qualifyColumn('estado'), [
                 EstadoAprovechamiento::Pendiente,
                 EstadoAprovechamiento::EnRevision,
-                EstadoAprovechamiento::Activo,
+                EstadoAprovechamiento::Aprobado,
             ])
             ->whereDate($this->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString());
     }

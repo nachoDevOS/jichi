@@ -42,8 +42,6 @@ class CobrarService
      */
     public function cobrar(
         array $lineas,
-        string $nitCi,
-        string $nombreFactura,
         string $nroTransaccion,
         string $fechaDeposito,
         string $comprobante,
@@ -53,7 +51,7 @@ class CobrarService
             throw CobroInvalidoException::sinLineas();
         }
 
-        return DB::transaction(function () use ($lineas, $nitCi, $nombreFactura, $concepto, $nroTransaccion, $fechaDeposito, $comprobante): Recibo {
+        return DB::transaction(function () use ($lineas, $concepto, $nroTransaccion, $fechaDeposito, $comprobante): Recibo {
             $resueltas = [];
 
             foreach ($lineas as $linea) {
@@ -61,13 +59,20 @@ class CobrarService
             }
 
             /*
+             * EL RECIBO SALE A NOMBRE DEL TITULAR DE LO COBRADO, y por eso los
+             * trámites tienen que ser todos de la MISMA persona: un papel a
+             * nombre de dos no existe. Antes el nombre venía tipeado del
+             * formulario y nada lo ataba a lo que se estaba cobrando.
+             */
+            $beneficiarioId = $this->titularDe($resueltas);
+
+            /*
              * EL NÚMERO SE RESERVA DENTRO DE LA MISMA TRANSACCIÓN.
              */
             $recibo = Recibo::create([
+                'beneficiario_id' => $beneficiarioId,
                 'numero_recibo' => $this->correlativos->siguiente(self::SERIE),
                 'concepto' => $concepto ?: $this->conceptoAutomatico($resueltas),
-                'nit_ci_factura' => $nitCi,
-                'nombre_factura' => $nombreFactura,
             ]);
 
             $orden = 1;
@@ -135,16 +140,34 @@ class CobrarService
 
             $saldo = $bloqueado->saldoPendiente();
 
+            if ($saldo <= 0.0) {
+                throw CobroInvalidoException::yaEstaPagado($nombre);
+            }
+
+            /*
+             * LOS DEPÓSITOS TIENEN QUE CUBRIR EL SALDO ENTERO, y se miran como
+             * CONJUNTO: se admiten varias boletas —la persona deposita en dos
+             * veces— pero entran todas juntas y en una sola carga. Un parcial
+             * guardado dejaba el expediente a medio cobrar, sin recibo y sin
+             * poder enviarse, y el saldo solo se descubría abriendo la ficha.
+             *
+             * DE MÁS SÍ SE ADMITE, al revés que en Caja: la boleta del banco
+             * dice lo que dice y el excedente queda a favor de la entidad. Con
+             * el tope puesto, un depósito de 170 por un trámite de 165 no se
+             * podía cargar y el expediente quedaba trabado con la plata ya
+             * depositada.
+             */
+            $suma = round(array_sum(array_map(
+                static fn (array $d): float => round((float) $d['monto'], 2),
+                $depositos,
+            )), 2);
+
+            if ($suma < $saldo) {
+                throw CobroInvalidoException::noCubreElMonto($nombre, $suma, $saldo);
+            }
+
             foreach ($depositos as $deposito) {
                 $monto = round((float) $deposito['monto'], 2);
-
-                if ($saldo <= 0.0) {
-                    throw CobroInvalidoException::excedeElSaldo($nombre, $monto, 0.0);
-                }
-
-                if ($monto > $saldo) {
-                    throw CobroInvalidoException::excedeElSaldo($nombre, $monto, $saldo);
-                }
 
                 Pago::create([
                     // NULL a propósito: el recibo del trámite todavía no existe.
@@ -157,8 +180,6 @@ class CobrarService
                     'fecha_deposito' => $deposito['fecha_deposito'],
                     'comprobante' => $deposito['comprobante'],
                 ]);
-
-                $saldo = round($saldo - $monto, 2);
             }
 
             return count($depositos);
@@ -173,11 +194,9 @@ class CobrarService
      */
     public function emitirRecibo(
         Model $tramite,
-        string $nitCi,
-        string $nombreFactura,
         ?string $concepto = null,
     ): ?Recibo {
-        return DB::transaction(function () use ($tramite, $nitCi, $nombreFactura, $concepto): ?Recibo {
+        return DB::transaction(function () use ($tramite, $concepto): ?Recibo {
             $sueltos = Pago::query()
                 ->where('pagable_type', $tramite->getMorphClass())
                 ->where('pagable_id', $tramite->getKey())
@@ -190,10 +209,10 @@ class CobrarService
             }
 
             $recibo = Recibo::create([
+                // Sale a nombre del titular del trámite, no de quien lo tipeó.
+                'beneficiario_id' => $tramite->beneficiario_id,
                 'numero_recibo' => $this->correlativos->siguiente(self::SERIE),
                 'concepto' => $concepto ?: $this->nombrar($tramite),
-                'nit_ci_factura' => $nitCi,
-                'nombre_factura' => $nombreFactura,
             ]);
 
             // De a uno y no con un update() masivo: el builder no dispara
@@ -209,6 +228,25 @@ class CobrarService
     }
 
     //  Auxiliares
+
+    /**
+     * El titular de todo lo que se está cobrando, o revienta si son varios.
+     *
+     * @param  array<int, array{tramite: Model, monto: float}>  $resueltas
+     */
+    private function titularDe(array $resueltas): int
+    {
+        $titulares = array_unique(array_map(
+            fn (array $r): int => (int) $r['tramite']->beneficiario_id,
+            $resueltas,
+        ));
+
+        if (count($titulares) > 1) {
+            throw CobroInvalidoException::variosTitulares();
+        }
+
+        return (int) reset($titulares);
+    }
 
     /**
      * Convierte una línea del formulario en un trámite real, comprobado.

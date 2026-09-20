@@ -202,21 +202,54 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `volumen_total_kg` | decimal(12,2) | **Copiado** del techo del tramo |
 | `tipo_embarcacion` | string(120) null | El renglón del talonario |
 | `estado` | string(20) | `EstadoAprovechamiento` |
-| `fecha_emision` / `fecha_vencimiento` | date | Vence con la gestión |
+| `fecha_solicitud` | date | El día que la persona lo pidió |
+| `fecha_emision` | date **null** | El día que lo firmaron. NULL hasta aprobar |
+| `fecha_vencimiento` | date | Vence con la gestión |
 
 ```
-PENDIENTE ──[se cobra ENTERO]──▶ ACTIVO ──▶ AGOTADO | VENCIDO
-(borrador)
+PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ AGOTADO | VENCIDO
+(borrador)   ▲               │
+             └──[rechazar]───┘
 
-  editar    ✔                      ✘         ✘         ✘
-  eliminar  ✔                      ✘         ✘         ✘
-  faenas    ✘                      ✔         ✘         ✘
+  editar     ✔               ✘                     ✘          ✘        ✘
+  eliminar   ✔               ✘                     ✘          ✘        ✘
+  pagos      ✔               ✘                     ✘          ✘        ✘
+  faenas     ✘               ✘                     ✔          ✘        ✘
 ```
 
-**Nace PENDIENTE y solo la caja lo activa.** `CobrarService` lo pasa a `activo`
-cuando el saldo llega a cero, y no hay ningún otro camino: la concesión pagada ES
-la autorización. Se exige el saldo COMPLETO, no una cuota — si media cuota
-alcanzara, habilitarse costaría un boliviano.
+**Se llamaba `activo` y pasó a `aprobado` el 20/09/2026**, a pedido: en este
+circuito el estado no dice «está andando» sino que ALGUIEN LO FIRMÓ, y eso es lo
+que el operador busca en la columna.
+
+**Nace PENDIENTE, y de ahí no sale por cobrarse.** Cobrarlo entero habilita el
+ENVÍO; lo que lo aprueba es la firma, con las boletas ya controladas. Ver
+`RevisarCupoService`.
+
+**LOS DEPÓSITOS ENTRAN TODOS JUNTOS Y CUBRIENDO EL MONTO.** Se admiten varias
+boletas —la persona depositó en dos veces— pero se cargan en un solo acto y
+tienen que sumar el saldo: `CobrarService::registrarDepositos()` mira el
+CONJUNTO y rechaza lo que no cubra. Un parcial guardado dejaba el expediente a
+medio cobrar, sin recibo, sin poder enviarse y sin ninguna señal fuera de la
+ficha.
+
+**De MÁS sí se admite, y es la diferencia con Caja.** La boleta del banco dice
+lo que dice: si depositaron 170 por un trámite de 165, el excedente queda a
+favor de la entidad y el trámite se presenta igual. Con el tope puesto —el que
+sigue valiendo en Caja, `excedeElSaldo()`— ese expediente quedaba trabado con la
+plata ya depositada y sin forma de cargarla. Ver
+[docs/modulos/PAGOS.md](modulos/PAGOS.md).
+
+**DOS FECHAS, Y NO UNA.** `fecha_solicitud` es el día que la persona presentó el
+pedido y la escribe el alta; `fecha_emision` es el día que alguien lo firmó y la
+escribe `RevisarCupoService::aprobar()`. Estaban colapsadas en una sola columna,
+escrita al crear: la ficha decía «Otorgado el 20/09» sobre un expediente que
+nadie había aprobado —y que podía terminar rechazado—. Por eso `fecha_emision`
+es **nullable**: en NULL significa «todavía no se otorgó», sin posibilidad de
+contradicción, igual que las fechas de impreso y entregado del carnet.
+
+**Y el vencimiento se recalcula al aprobar**, sobre la emisión: el cupo vale por
+la GESTIÓN, así que un expediente pedido el 28/12 y firmado en enero vence con
+el año nuevo y no con el que ya terminó.
 
 **UN CUPO NO SE AMPLÍA.** La función existió y se retiró: el volumen otorgado
 queda congelado desde el otorgamiento, y lo único que lo mueve es corregir el
@@ -303,7 +336,7 @@ y la tarjeta no se entera.
 **El carnet acepta un cupo PENDIENTE.** Lo único que necesita de él es el volumen
 que va impreso, y eso ya está decidido al otorgarlo; el carnet también nace sin
 pagar y los dos se cobran juntos en el mismo recibo. Por eso `EmitirCarnetService`
-usa el scope `enCurso()` —pendiente o activo, en fecha— y no `vigentes()`.
+usa el scope `enCurso()` —pendiente o aprobado, en fecha— y no `vigentes()`.
 
 ---
 
@@ -383,19 +416,18 @@ quitaría al transportista casi un día.
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
+| `beneficiario_id` | FK RESTRICT | A nombre de quién sale |
 | `numero_recibo` | string(40), único | `REC-2026-0016` |
 | `monto_total` | decimal(12,2) | Suma **congelada** |
 | `concepto` | text | Tal como se imprime |
-| `nit_ci_factura` / `nombre_factura` | string | **Copiados** al emitir |
 
 **Por qué el recibo es una tabla y no se arma al vuelo.** Porque `numero_recibo`
 es un CORRELATIVO DE CAJA, y un correlativo es justamente el dato que no se puede
 derivar de otras tablas: no es el id de ningún trámite ni una cuenta de filas.
 Contabilidad audita esa serie.
 
-Y porque el comprobante tiene que ser **inmutable**. Armado al vuelo, corregir un
-apellido en la ficha cambiaría los comprobantes ya entregados y una reimpresión de
-marzo saldría distinta de la original.
+El **monto** y el **concepto** sí son inmutables: se congelan al emitir, así que
+corregir un abono después no cambia el papel entregado.
 
 **El número va como string y no como entero** aunque el talonario lo escriba
 pelado: la serie lleva prefijo y año, y el año que viene el contador vuelve a 1.
@@ -403,9 +435,16 @@ Como entero, el 1 de 2027 chocaría con el 1 de 2026. Se reserva con
 `CorrelativoService`, que bloquea la fila del contador para que dos ventanillas
 cobrando al mismo tiempo nunca saquen el mismo.
 
-**El nombre y el NIT se copian** porque el comprobante puede emitirse a nombre de
-un tercero —la empresa que paga por el pescador— y tiene que seguir diciendo lo
-mismo dentro de cinco años.
+**EL TITULAR VA POR ID, NO COPIADO** —cambiado el 20/09/2026, a pedido—. El
+recibo guarda `beneficiario_id` y el nombre y la cédula se leen del padrón al
+imprimir, así que un apellido mal tipeado se corrige en UN lugar. Lo que cuesta,
+y hay que tenerlo presente: **el encabezado del comprobante dejó de ser
+inmutable** —una reimpresión puede no decir lo mismo que el papel entregado— y
+**se perdió emitir a nombre de un tercero**, que era lo que habilitaban las dos
+columnas copiadas.
+
+Como el titular sale de lo cobrado y no de un campo tipeado, un recibo no puede
+amparar trámites de dos personas: `CobrarService::titularDe()` lo rechaza.
 
 **`monto_total` también se guarda, y no es redundante**: es la suma de los pagos en
 el momento de emitir. Recalcularla al leer haría que el papel entregado cambiara si
@@ -627,7 +666,7 @@ sin poder recibir otro nunca más.
 | **Índices únicos con borrado lógico: parciales en catálogos, globales en papeles** | Ver la sección 3 |
 | **RESTRICT por defecto**, CASCADE solo en `pagos → recibos` | Borrar no puede llevarse por delante un historial que respalda papeles entregados |
 | **El orden del `Schema::create()` es siempre el mismo**: `id` → claves foráneas → datos → estado → fechas del negocio → índices → `timestamps()` → `softDeletes()` | Las diez tablas terminan iguales. No cambia el esquema: es convención de lectura |
-| **Lo copiado se congela** (`volumen_total_kg`, `modalidad`, `monto_total`, `nombre_factura`) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
+| **Lo copiado se congela** (`volumen_total_kg`, `modalidad`, `monto_total`, `concepto`) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
 | **Lo calculable NO se guarda** (saldo en kg, saldo en Bs) | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
 
 **Tablas de soporte**, fuera del dominio: `users`, `correlativos`,

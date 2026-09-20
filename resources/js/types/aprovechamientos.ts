@@ -55,6 +55,8 @@ export interface CupoFila {
     excedido: boolean;
     /** Vigente, con saldo y sin agotar: las tres condiciones juntas. */
     puede_emitir_faena: boolean;
+    /** Por qué no puede emitir faenas. `null` cuando sí puede. */
+    motivo_sin_faena: string | null;
     /**
      * Si todavía se puede corregir, y si se puede borrar la fila entera.
      */
@@ -70,11 +72,17 @@ export interface CupoFila {
     /** Si pasó por la firma: es lo que habilita la autorización en papel. */
     ya_fue_aprobado: boolean;
 
+    /** El recibo del trámite. Existe desde el ENVÍO; null mientras es borrador. */
+    recibo_id: number | null;
+    recibo_numero: string | null;
+
     monto: number;
     saldo_pendiente: number;
     pagado: boolean;
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
+    fecha_solicitud: string | null;
+    /** El día que lo firmaron. `null` mientras el cupo no esté aprobado. */
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
 }
@@ -177,7 +185,7 @@ export interface TramoElegible {
 export interface FormularioCupo {
     beneficiario_id: number | null;
     categoria_aprov_id: number | string;
-    fecha_emision: string;
+    fecha_solicitud: string;
     /** Opcional: el renglón del talonario tampoco es obligatorio. */
     tipo_embarcacion: string;
 }

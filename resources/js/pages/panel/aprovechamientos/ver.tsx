@@ -2,6 +2,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Banknote,
     Check,
+    Eye,
     Paperclip,
     Pencil,
     Plus,
@@ -19,6 +20,7 @@ import { DialogoCorregirPago } from '@/components/panel/pagos/dialogo-corregir-p
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { usePermisos } from '@/hooks/use-permisos';
@@ -58,6 +60,8 @@ export default function VerCupo({
 
     const [eliminando, setEliminando] = useState(false);
     const [rechazando, setRechazando] = useState(false);
+    const [aprobando, setAprobando] = useState(false);
+    const [confirmandoPago, setConfirmandoPago] = useState(false);
 
     // Guardan el PAGO entero y no su id: las dos ventanas muestran sus datos.
     const [observando, setObservando] = useState<PagoDelCupo | null>(null);
@@ -82,11 +86,13 @@ export default function VerCupo({
     /*
      *  EL FORMULARIO ES UNA LISTA DE SECCIONES, NO UN PAGO
      */
-    const seccionNueva = (monto: number) => ({
+    const seccionNueva = () => ({
         // `key` estable para React: sin ella, quitar la sección del medio
         // remonta las de abajo y les vacía el archivo elegido.
         key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        monto: monto > 0 ? String(monto) : '',
+        // VACÍO, no el saldo propuesto: el monto es el que dice la BOLETA, y un
+        // campo ya lleno se confirma sin leerlo. Lo que falta se ve abajo.
+        monto: '',
         nro_transaccion: '',
         // Se propone hoy, que es lo normal: la boleta suele traerse el mismo día.
         fecha_deposito: new Date().toISOString().slice(0, 10),
@@ -113,14 +119,43 @@ export default function VerCupo({
     const faltaDespues = Math.round((cupo.saldo_pendiente - sumaSecciones) * 100) / 100;
 
     /*
-     * ¿CON ESTO ALCANZA? Es lo que decide qué dice el botón y qué hace.
+     * ¿CON ESTO ALCANZA? Son DOS preguntas y estaban en una sola: cubrir el
+     * monto es lo que habilita REGISTRAR —los depósitos entran todos juntos,
+     * no en cuotas— y enviar pide además el permiso. Mezcladas, a quien no
+     * puede enviar se le apagaba el botón de cargar boletas.
      */
-    const cubre = faltaDespues <= 0 && puede('aprovechamientos.enviar');
+    const cubierto = faltaDespues <= 0;
+    const cubre = cubierto && puede('aprovechamientos.enviar');
 
     function agregarSeccion() {
-        // La primera propone el saldo entero —el caso normal es cobrar todo— y
-        // las siguientes, lo que quede sin cubrir.
-        pago.setData('pagos', [...pago.data.pagos, seccionNueva(faltaDespues)]);
+        pago.setData('pagos', [...pago.data.pagos, seccionNueva()]);
+    }
+
+    /**
+     * Guarda los depósitos, y los ENVÍA si cubren el monto.
+     */
+    function registrarDepositos() {
+        /*
+         * `transform` y no `setData`: setData es asincrónico y el post saldría
+         * con el valor anterior. Transform corre justo antes de armar el cuerpo.
+         */
+        pago.transform((datos) => ({ ...datos, enviar: cubre }));
+
+        /*
+         * `forceFormData` es obligatorio: sin él Inertia manda el cuerpo como
+         * JSON y los archivos se pierden en el camino, sin ningún error.
+         */
+        pago.post(route('aprovechamientos.pagar', cupo.id), {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                pago.reset();
+                setConfirmandoPago(false);
+            },
+            // Se cierra también al fallar: los errores se pintan sobre el
+            // formulario, y con la ventana encima no se ven.
+            onError: () => setConfirmandoPago(false),
+        });
     }
 
     function quitarSeccion(key: string) {
@@ -134,6 +169,9 @@ export default function VerCupo({
         );
     }
 
+    /** El número de boleta es numérico: lo que no sea dígito no entra. */
+    const soloDigitos = (valor: string): string => valor.replace(/\D/g, '');
+
     /** El error que el servidor devolvió para la sección `i`. */
     const errorDe = (i: number, campo: string): string | undefined =>
         (pago.errors as Record<string, string | undefined>)[`pagos.${i}.${campo}`];
@@ -145,11 +183,12 @@ export default function VerCupo({
             acciones={
                 <div className="flex flex-wrap gap-2">
                     <Button
-                        variant="outline"
+                        variant="ver"
                         onClick={() =>
                             router.visit(route('beneficiarios.show', cupo.beneficiario_id))
                         }
                     >
+                        <Eye className="size-4" />
                         Ver al pescador
                     </Button>
 
@@ -173,9 +212,8 @@ export default function VerCupo({
                     */}
                     {puede('aprovechamientos.editar') && cupo.puede_editarse && (
                         <Button
-                            variant="outline"
+                            variant="editar"
                             onClick={() => router.visit(route('aprovechamientos.edit', cupo.id))}
-                            className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
                         >
                             <Pencil className="size-4" />
                             Editar
@@ -184,9 +222,8 @@ export default function VerCupo({
 
                     {puede('aprovechamientos.eliminar') && cupo.puede_eliminarse && (
                         <Button
-                            variant="outline"
+                            variant="eliminar"
                             onClick={() => setEliminando(true)}
-                            className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                         >
                             <Trash2 className="size-4" />
                             Eliminar
@@ -223,11 +260,7 @@ export default function VerCupo({
                                 el title dice cuántas: el servidor lo exige igual,
                                 y un botón que promete y falla es peor. */}
                             <Button
-                                onClick={() =>
-                                    envio.patch(route('aprovechamientos.aprobar', cupo.id), {
-                                        preserveScroll: true,
-                                    })
-                                }
+                                onClick={() => setAprobando(true)}
                                 disabled={envio.processing || !cupo.puede_aprobarse}
                                 title={
                                     cupo.puede_aprobarse
@@ -241,9 +274,8 @@ export default function VerCupo({
                             </Button>
 
                             <Button
-                                variant="outline"
+                                variant="eliminar"
                                 onClick={() => setRechazando(true)}
-                                className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                             >
                                 <Undo2 className="size-4" />
                                 Rechazar
@@ -271,6 +303,7 @@ export default function VerCupo({
                     </CardHeader>
 
                     <CardContent className="space-y-5">
+                        {/* Antes de la firma dice «kg solicitados» y no dibuja saldo. */}
                         <BarraSaldo cupo={cupo} />
 
                         {/*
@@ -288,11 +321,18 @@ export default function VerCupo({
                             </span>
                         </div>
 
+                        {/* «Otorgado» recién después de la firma: antes es lo pedido. */}
                         <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                            <Dato etiqueta="Otorgado" valor={`${cupo.volumen_total_kg} kg`} />
-                            <Dato etiqueta="Consumido" valor={`${cupo.kilos_consumidos} kg`} />
-                            <Dato etiqueta="Disponible" valor={`${cupo.saldo_kg} kg`} />
-                            <Dato etiqueta="Usado" valor={`${cupo.porcentaje_usado}%`} />
+                            {cupo.ya_fue_aprobado ? (
+                                <>
+                                    <Dato etiqueta="Otorgado" valor={`${cupo.volumen_total_kg} kg`} />
+                                    <Dato etiqueta="Consumido" valor={`${cupo.kilos_consumidos} kg`} />
+                                    <Dato etiqueta="Disponible" valor={`${cupo.saldo_kg} kg`} />
+                                    <Dato etiqueta="Usado" valor={`${cupo.porcentaje_usado}%`} />
+                                </>
+                            ) : (
+                                <Dato etiqueta="Solicitado" valor={`${cupo.volumen_total_kg} kg`} />
+                            )}
                         </dl>
 
                         {/*
@@ -375,7 +415,13 @@ export default function VerCupo({
                             valor={cupo.tipo_embarcacion ?? 'No declarada'}
                         />
 
-                        <Dato etiqueta="Otorgado el" valor={fecha(cupo.fecha_emision)} />
+                        {/* Dos fechas distintas: cuándo lo pidió y cuándo se lo
+                            firmaron. La segunda no existe hasta la aprobación. */}
+                        <Dato etiqueta="Solicitado el" valor={fecha(cupo.fecha_solicitud)} />
+
+                        {cupo.fecha_emision !== null && (
+                            <Dato etiqueta="Otorgado el" valor={fecha(cupo.fecha_emision)} />
+                        )}
                         <Dato etiqueta="Vence el" valor={fecha(cupo.fecha_vencimiento)} />
                         <Dato etiqueta="Monto" valor={bs(cupo.monto, institucion.moneda)} />
 
@@ -393,9 +439,9 @@ export default function VerCupo({
                         </div>
 
                         {/*
-                            La conclusión, ya resuelta por el servidor: las tres
-                            condiciones —vigente, con saldo, sin agotar— juntas.
-                            La pantalla no las vuelve a evaluar.
+                            La conclusión y su MOTIVO, los dos resueltos por el
+                            servidor: un cupo pendiente no es uno vencido, y
+                            decirlo mal manda a buscar un problema que no existe.
                         */}
                         <p
                             className={
@@ -408,7 +454,7 @@ export default function VerCupo({
                                 ? modoEstricto
                                     ? 'Habilitado para emitir faenas.'
                                     : 'Habilitado para emitir faenas. El control de saldo está desactivado: se siguen emitiendo aunque el cupo se agote.'
-                                : 'No se le pueden emitir faenas: el cupo está vencido o sin saldo.'}
+                                : cupo.motivo_sin_faena}
                         </p>
                     </CardContent>
                 </Card>
@@ -458,25 +504,8 @@ export default function VerCupo({
                             <form
                                 onSubmit={(e) => {
                                     e.preventDefault();
-                                    /*
-                                     * `forceFormData` es obligatorio: sin él
-                                     * Inertia manda el cuerpo como JSON y los
-                                     * archivos se pierden en el camino, sin
-                                     * ningún error que lo explique.
-                                     */
-                                    /*
-                                     * `transform` y no `setData`: setData es
-                                     * asincrónico y el post saldría con el valor
-                                     * anterior. Transform corre justo antes de
-                                     * armar el cuerpo.
-                                     */
-                                    pago.transform((datos) => ({ ...datos, enviar: cubre }));
-
-                                    pago.post(route('aprovechamientos.pagar', cupo.id), {
-                                        forceFormData: true,
-                                        preserveScroll: true,
-                                        onSuccess: () => pago.reset(),
-                                    });
+                                    // El botón no guarda: abre la confirmación.
+                                    setConfirmandoPago(true);
                                 }}
                                 className="mx-5 space-y-4"
                             >
@@ -500,12 +529,11 @@ export default function VerCupo({
                                                 y se llevan el archivo equivocado. */}
                                             <Button
                                                 type="button"
-                                                variant="ghost"
+                                                variant="eliminar"
                                                 size="sm"
                                                 onClick={() => quitarSeccion(s.key)}
                                                 aria-label={`Quitar el depósito ${i + 1}`}
                                                 title="Quitar este depósito"
-                                                className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-400 dark:hover:bg-rose-500/10"
                                             >
                                                 <Trash2 className="size-4" />
                                             </Button>
@@ -523,6 +551,7 @@ export default function VerCupo({
                                                     type="number"
                                                     step="0.01"
                                                     min={0}
+                                                    placeholder="0.00"
                                                     value={s.monto}
                                                     onChange={(e) =>
                                                         cambiarSeccion(s.key, 'monto', e.target.value)
@@ -560,14 +589,22 @@ export default function VerCupo({
                                                 ayuda="No se puede repetir: una misma boleta no respalda dos pagos."
                                                 obligatorio
                                             >
+                                                {/*
+                                                    SOLO DÍGITOS, y el campo es de
+                                                    TEXTO: un `type="number"` se
+                                                    come los ceros de adelante, y
+                                                    la boleta suele empezar con
+                                                    ellos. Ver `soloDigitos()`.
+                                                */}
                                                 <Input
                                                     id={`nro-${s.key}`}
+                                                    inputMode="numeric"
                                                     value={s.nro_transaccion}
                                                     onChange={(e) =>
                                                         cambiarSeccion(
                                                             s.key,
                                                             'nro_transaccion',
-                                                            e.target.value,
+                                                            soloDigitos(e.target.value),
                                                         )
                                                     }
                                                     aria-invalid={Boolean(errorDe(i, 'nro_transaccion'))}
@@ -600,7 +637,9 @@ export default function VerCupo({
                                 {/*
                                     LA CUENTA A LA VISTA, que es lo que decide si
                                     el cupo se va a poder presentar: las secciones
-                                    tienen que cubrir el saldo entero.
+                                    tienen que cubrir el saldo. De MÁS se admite
+                                    —la boleta dice lo que dice y el excedente
+                                    queda a favor de la entidad—; de menos no.
                                 */}
                                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-secondary/50 p-3 text-sm">
                                     <span>
@@ -620,14 +659,20 @@ export default function VerCupo({
                                     >
                                         {faltaDespues > 0
                                             ? `Faltan ${bs(faltaDespues, institucion.moneda)}`
-                                            : 'Cubre el monto'}
+                                            : faltaDespues < 0
+                                              ? `Cubre el monto · ${bs(-faltaDespues, institucion.moneda)} de más`
+                                              : 'Cubre el monto'}
                                     </span>
                                 </div>
 
+                                {/* APAGADO MIENTRAS NO CUBRA. El servidor lo
+                                    rechaza igual —ver CobrarService— y un botón
+                                    que promete y falla es peor que uno gris. */}
                                 <Button
                                     type="submit"
                                     disabled={
                                         pago.processing ||
+                                        !cubierto ||
                                         pago.data.pagos.some(
                                             (s) =>
                                                 Number(s.monto) <= 0 ||
@@ -647,11 +692,19 @@ export default function VerCupo({
                                     botón hace DOS cosas y una de ellas cierra la
                                     puerta: en revisión ya no se edita ni se
                                     elimina. */}
-                                {cubre && (
-                                    <p className="text-xs text-muted-foreground">
-                                        Al registrarlos, el aprovechamiento pasa a EN REVISIÓN y deja
-                                        de poder editarse o eliminarse.
+                                {!cubierto ? (
+                                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                                        Faltan {bs(faltaDespues, institucion.moneda)} para cubrir el
+                                        monto. El trámite se cobra entero: agregue las boletas que
+                                        falten y regístrelas todas juntas.
                                     </p>
+                                ) : (
+                                    cubre && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Al registrarlos, el aprovechamiento pasa a EN REVISIÓN y
+                                            deja de poder editarse o eliminarse.
+                                        </p>
+                                    )
                                 )}
                             </form>
                         )}
@@ -712,12 +765,17 @@ export default function VerCupo({
                             </div>
                         )}
 
+                        {/* El vacío se calla mientras se está cargando un
+                            depósito: decir «sin pagos» abajo del formulario
+                            abierto se lee como que lo tipeado no entró. */}
                         {pagos.length === 0 ? (
-                            <EstadoVacio
-                                icono={Banknote}
-                                titulo="Sin pagos registrados"
-                                descripcion="El cupo no autoriza faenas hasta que la concesión esté cobrada."
-                            />
+                            !cobrando && (
+                                <EstadoVacio
+                                    icono={Banknote}
+                                    titulo="Sin pagos registrados"
+                                    descripcion="El cupo no autoriza faenas hasta que la concesión esté cobrada."
+                                />
+                            )
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
@@ -845,7 +903,7 @@ export default function VerCupo({
                                                         {puede('pagos.corregir') &&
                                                             p.puede_corregirse && (
                                                                 <Button
-                                                                    variant="outline"
+                                                                    variant="editar"
                                                                     size="sm"
                                                                     onClick={() => setCorrigiendo(p)}
                                                                     title="Corregir el monto, la boleta o la fecha"
@@ -865,80 +923,88 @@ export default function VerCupo({
                     </CardContent>
                 </Card>
 
-                {/* ------------------------------------------------ Las faenas */}
-                <Card className="min-w-0 lg:col-span-3">
-                    <CardHeader>
-                        <CardTitle>Faenas emitidas</CardTitle>
-                    </CardHeader>
+                {/*
+                    LAS FAENAS, solo desde que el cupo pasó por la firma. Antes
+                    no puede haber ninguna —emitirlas lo exige activo— así que la
+                    tarjeta solo decía «sin faenas» sobre un cupo recién creado,
+                    como si faltara hacer algo. Si igual hay filas —un cupo que
+                    venció después de emitir— se muestran.
+                */}
+                {(cupo.ya_fue_aprobado || faenas.length > 0) && (
+                    <Card className="min-w-0 lg:col-span-3">
+                        <CardHeader>
+                            <CardTitle>Faenas emitidas</CardTitle>
+                        </CardHeader>
 
-                    <CardContent className="p-0">
-                        {faenas.length === 0 ? (
-                            <EstadoVacio
-                                icono={Ship}
-                                titulo="Sin faenas"
-                                descripcion="Todavía no se emitió ninguna salida contra este cupo."
-                            />
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                        <tr>
-                                            <th className="px-5 py-2.5 font-medium">N°</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
-                                            <th className="px-5 py-2.5 font-medium">Estado</th>
-                                            <th className="px-5 py-2.5 font-medium">Salida</th>
-                                            <th className="px-5 py-2.5 font-medium">Límite</th>
-                                        </tr>
-                                    </thead>
-
-                                    <tbody className="divide-y divide-border">
-                                        {faenas.map((f) => (
-                                            <tr key={f.id} className="hover:bg-secondary/50">
-                                                <td className="px-5 py-2.5 font-mono tabular-nums">
-                                                    {String(f.numero_faena).padStart(4, '0')}
-                                                </td>
-
-                                                <td className="px-5 py-2.5 text-right tabular-nums">
-                                                    {/*
-                                                        Tachado cuando NO consume cupo: es lo que
-                                                        hace que la suma de la columna cuadre con
-                                                        el saldo de arriba.
-                                                    */}
-                                                    <span
-                                                        className={
-                                                            f.consume_cupo
-                                                                ? undefined
-                                                                : 'text-muted-foreground line-through'
-                                                        }
-                                                    >
-                                                        {f.kilos_extraidos} kg
-                                                    </span>
-                                                    {!f.consume_cupo && (
-                                                        <span className="ml-2 text-xs text-muted-foreground">
-                                                            liberados
-                                                        </span>
-                                                    )}
-                                                </td>
-
-                                                <td className="px-5 py-2.5">
-                                                    <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
-                                                </td>
-
-                                                <td className="px-5 py-2.5 text-muted-foreground">
-                                                    {fecha(f.fecha_salida)}
-                                                </td>
-
-                                                <td className="px-5 py-2.5 text-muted-foreground">
-                                                    {fecha(f.fecha_limite)}
-                                                </td>
+                        <CardContent className="p-0">
+                            {faenas.length === 0 ? (
+                                <EstadoVacio
+                                    icono={Ship}
+                                    titulo="Sin faenas"
+                                    descripcion="Todavía no se emitió ninguna salida contra este cupo."
+                                />
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                            <tr>
+                                                <th className="px-5 py-2.5 font-medium">N°</th>
+                                                <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
+                                                <th className="px-5 py-2.5 font-medium">Estado</th>
+                                                <th className="px-5 py-2.5 font-medium">Salida</th>
+                                                <th className="px-5 py-2.5 font-medium">Límite</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-border">
+                                            {faenas.map((f) => (
+                                                <tr key={f.id} className="hover:bg-secondary/50">
+                                                    <td className="px-5 py-2.5 font-mono tabular-nums">
+                                                        {String(f.numero_faena).padStart(4, '0')}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-right tabular-nums">
+                                                        {/*
+                                                            Tachado cuando NO consume cupo: es lo que
+                                                            hace que la suma de la columna cuadre con
+                                                            el saldo de arriba.
+                                                        */}
+                                                        <span
+                                                            className={
+                                                                f.consume_cupo
+                                                                    ? undefined
+                                                                    : 'text-muted-foreground line-through'
+                                                            }
+                                                        >
+                                                            {f.kilos_extraidos} kg
+                                                        </span>
+                                                        {!f.consume_cupo && (
+                                                            <span className="ml-2 text-xs text-muted-foreground">
+                                                                liberados
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5">
+                                                        <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-muted-foreground">
+                                                        {fecha(f.fecha_salida)}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-muted-foreground">
+                                                        {fecha(f.fecha_limite)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             {/*
@@ -951,10 +1017,91 @@ export default function VerCupo({
                  ELIMINAR PIDE MOTIVO **Y** CASILLA DE CONSENTIMIENTO
             */}
             {/*
-                RECHAZAR PIDE MOTIVO, y no casilla: no es destructivo —el cupo
-                vuelve a pendiente con sus pagos intactos— pero sí es lo único
-                que le dice a ventanilla QUÉ corregir. Sin el texto, el
-                expediente rebota: se vuelve a presentar igual.
+                REGISTRAR LOS DEPÓSITOS TAMBIÉN SE CONFIRMA. Cuando cubren el
+                monto el botón hace DOS cosas —guarda y presenta— y la segunda
+                cierra la puerta: sale el recibo numerado y el cupo deja de
+                poder editarse o eliminarse. La ventana dice cuánto se va a
+                cargar, para contrastarlo con las boletas que están sobre el
+                mostrador antes de que sea tarde.
+            */}
+            <ConfirmarAccion
+                abierto={confirmandoPago}
+                tono="afirmativo"
+                titulo={cubre ? 'Registrar y enviar a revisión' : 'Registrar los depósitos'}
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            Se cargan{' '}
+                            <strong>
+                                {pago.data.pagos.length} depósito(s) por{' '}
+                                {bs(sumaSecciones, institucion.moneda)}
+                            </strong>{' '}
+                            al cupo de <strong>{cupo.beneficiario ?? 'el pescador'}</strong>.
+                        </p>
+
+                        {cubre && (
+                            <p>
+                                El aprovechamiento pasa a <strong>EN REVISIÓN</strong>, se emite el
+                                recibo con el total y deja de poder editarse o eliminarse.
+                            </p>
+                        )}
+                    </div>
+                }
+                confirmacion={
+                    cubre
+                        ? 'Los montos y los números de boleta coinciden con los comprobantes del banco.'
+                        : undefined
+                }
+                textoConfirmar={cubre ? 'Registrar y enviar' : 'Registrar'}
+                procesando={pago.processing}
+                onCancelar={() => setConfirmandoPago(false)}
+                onConfirmar={registrarDepositos}
+            />
+
+            {/*
+                APROBAR PIDE CASILLA. No destruye nada, pero es la FIRMA: desde
+                acá el cupo autoriza a pescar y el expediente ya no vuelve —no
+                hay «des-aprobar»—. La casilla es la declaración de que las
+                boletas se miraron contra el extracto, que es lo que esa firma
+                significa.
+            */}
+            <ConfirmarAccion
+                abierto={aprobando}
+                tono="afirmativo"
+                titulo="Aprobar el aprovechamiento"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            El cupo de <strong>{cupo.beneficiario ?? 'el pescador'}</strong> queda
+                            ACTIVO por{' '}
+                            <strong>
+                                {cupo.volumen_total_kg} kg hasta el {fecha(cupo.fecha_vencimiento)}
+                            </strong>
+                            , y desde ese momento se le pueden emitir faenas.
+                        </p>
+                        <p>
+                            Se registra la fecha de otorgamiento de hoy.{' '}
+                            <strong>No se puede deshacer.</strong>
+                        </p>
+                    </div>
+                }
+                confirmacion="Verifiqué las boletas contra el extracto del banco y el expediente está completo."
+                textoConfirmar="Aprobar"
+                procesando={envio.processing}
+                onCancelar={() => setAprobando(false)}
+                onConfirmar={() =>
+                    envio.patch(route('aprovechamientos.aprobar', cupo.id), {
+                        preserveScroll: true,
+                        onSuccess: () => setAprobando(false),
+                    })
+                }
+            />
+
+            {/*
+                RECHAZAR PIDE MOTIVO **Y** CASILLA. El motivo es lo único que le
+                dice a ventanilla QUÉ corregir —sin él el expediente rebota y se
+                vuelve a presentar igual— y la casilla iguala el peso de las dos
+                mitades de la firma: aprobar y rechazar se confirman igual.
             */}
             <ConfirmarConMotivo
                 abierto={rechazando}
@@ -975,6 +1122,7 @@ export default function VerCupo({
                 etiquetaMotivo="Motivo del rechazo"
                 ayuda="Es lo que va a leer quien tenga que corregirlo. Queda en la auditoría con su nombre."
                 placeholder="La boleta DEP-0002 no figura en el extracto del banco."
+                confirmacion="El expediente vuelve a ventanilla con este motivo escrito, y queda registrado a mi nombre."
                 textoConfirmar="Rechazar"
                 valor={rechazo.data.motivo}
                 onCambiar={(v) => rechazo.setData('motivo', v)}

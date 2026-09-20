@@ -32,7 +32,7 @@ export default function VerGuia({ guia }: { guia: GuiaFicha }) {
             acciones={
                 <div className="flex flex-wrap gap-2">
                     <Button
-                        variant="outline"
+                        variant="ver"
                         onClick={() => router.visit(route('beneficiarios.show', guia.beneficiario_id))}
                     >
                         <User className="size-4" />
@@ -47,7 +47,7 @@ export default function VerGuia({ guia }: { guia: GuiaFicha }) {
                     )}
 
                     {puede('guias.anular') && guia.puede_anularse && (
-                        <Button variant="destructive" onClick={() => setAnulando(true)}>
+                        <Button variant="eliminar" onClick={() => setAnulando(true)}>
                             <Ban className="size-4" />
                             Anular
                         </Button>

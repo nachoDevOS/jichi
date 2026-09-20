@@ -184,7 +184,7 @@ class Beneficiario extends Model
         }
 
         return $this->aprovechamientos()
-            ->where('estado', EstadoAprovechamiento::Activo)
+            ->where('estado', EstadoAprovechamiento::Aprobado)
             ->whereDate('fecha_vencimiento', '>=', now()->toDateString())
             ->latest('fecha_emision')
             ->get()

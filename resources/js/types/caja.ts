@@ -77,8 +77,6 @@ export interface FormularioCobro {
     fecha_deposito: string;
     comprobante: File | null;
     lineas: LineaCobro[];
-    nit_ci_factura: string;
-    nombre_factura: string;
     concepto: string;
 }
 
@@ -87,8 +85,11 @@ export interface ReciboFila {
     id: number;
     /** Correlativo de caja: «REC-2026-0016». Lo audita Contabilidad. */
     numero_recibo: string;
-    nombre_factura: string;
-    nit_ci_factura: string;
+    /** A nombre de quién sale. Se lee del padrón, no está copiado en el recibo. */
+    beneficiario_id: number;
+    beneficiario: string | null;
+    /** Su cédula como se escribe en el papel: «1234567-1A BN». */
+    documento: string | null;
     concepto: string;
     /**
      * Lo que se IMPRIMIÓ, congelado al emitir.

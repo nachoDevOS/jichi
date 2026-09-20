@@ -20,7 +20,7 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
     return (
         <LayoutPanel
             titulo={`Recibo ${recibo.numero_recibo}`}
-            descripcion={`${recibo.nombre_factura} · ${fechaHora(recibo.emitido_en)}`}
+            descripcion={`${recibo.beneficiario ?? '—'} · ${fechaHora(recibo.emitido_en)}`}
             acciones={
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={() => router.visit(route('caja.index'))}>
@@ -125,8 +125,8 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
 
                         <CardContent className="space-y-3 text-sm">
                             <Dato etiqueta="Número" valor={recibo.numero_recibo} mono />
-                            <Dato etiqueta="A nombre de" valor={recibo.nombre_factura} />
-                            <Dato etiqueta="NIT / CI" valor={recibo.nit_ci_factura} mono />
+                            <Dato etiqueta="A nombre de" valor={recibo.beneficiario ?? '—'} />
+                            <Dato etiqueta="C.I." valor={recibo.documento ?? '—'} mono />
                             <Dato etiqueta="Emitido" valor={fechaHora(recibo.emitido_en)} />
 
                             <div>

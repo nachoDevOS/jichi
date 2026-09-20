@@ -22,7 +22,7 @@ export default function Cobrar({
     beneficiario,
     deudas,
 }: {
-    beneficiario: (BeneficiarioSugerido & { ci: string }) | null;
+    beneficiario: BeneficiarioSugerido | null;
     deudas: DeudaCobrable[];
 }) {
     const { institucion } = usePage<PageProps>().props;
@@ -37,8 +37,6 @@ export default function Cobrar({
         nro_transaccion: '',
         fecha_deposito: new Date().toISOString().slice(0, 10),
         comprobante: null as File | null,
-        nit_ci_factura: beneficiario?.ci ?? '',
-        nombre_factura: beneficiario?.nombreCompleto ?? '',
         concepto: '',
     });
 
@@ -221,36 +219,21 @@ export default function Cobrar({
                             </CardHeader>
 
                             <CardContent className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Campo
-                                        etiqueta="NIT o CI"
-                                        htmlFor="nit_ci_factura"
-                                        error={form.errors.nit_ci_factura}
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="nit_ci_factura"
-                                            value={form.data.nit_ci_factura}
-                                            onChange={(e) => form.setData('nit_ci_factura', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.nit_ci_factura)}
-                                            className="font-mono"
-                                        />
-                                    </Campo>
+                                {/* A NOMBRE DE QUIÉN SALE NO SE TIPEA: el recibo
+                                    guarda el id del titular de lo que se cobra,
+                                    y el nombre y la cédula se leen del padrón. */}
+                                <div className="rounded-md bg-secondary/50 p-3 text-sm">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                        El recibo sale a nombre de
+                                    </p>
 
-                                    <Campo
-                                        etiqueta="A nombre de"
-                                        htmlFor="nombre_factura"
-                                        error={form.errors.nombre_factura}
-                                        ayuda="Puede ser un tercero: la empresa que paga por la persona."
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="nombre_factura"
-                                            value={form.data.nombre_factura}
-                                            onChange={(e) => form.setData('nombre_factura', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.nombre_factura)}
-                                        />
-                                    </Campo>
+                                    <p className="font-medium">
+                                        {beneficiario?.nombreCompleto ?? '—'}
+                                    </p>
+
+                                    <p className="font-mono text-xs text-muted-foreground">
+                                        {beneficiario?.documento_identidad ?? '—'}
+                                    </p>
                                 </div>
 
                                 <Campo
@@ -325,11 +308,18 @@ export default function Cobrar({
                                             ayuda="El número que figura en la boleta. No se puede repetir: una misma transacción no respalda dos pagos."
                                             obligatorio
                                         >
+                                            {/* Solo dígitos, y de texto: un campo
+                                                numérico se come los ceros de
+                                                adelante de la boleta. */}
                                             <Input
                                                 id="nro_transaccion"
+                                                inputMode="numeric"
                                                 value={form.data.nro_transaccion}
                                                 onChange={(e) =>
-                                                    form.setData('nro_transaccion', e.target.value)
+                                                    form.setData(
+                                                        'nro_transaccion',
+                                                        e.target.value.replace(/\D/g, ''),
+                                                    )
                                                 }
                                                 aria-invalid={Boolean(form.errors.nro_transaccion)}
                                                 placeholder="0012345678"

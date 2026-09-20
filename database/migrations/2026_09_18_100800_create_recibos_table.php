@@ -15,6 +15,13 @@ return new class extends Migration
             $table->id();
 
             /*
+             * A NOMBRE DE QUIÉN SALE, por id y no copiando el nombre y la
+             * cédula: un solo lugar donde corregir un apellido mal tipeado.
+             * RESTRICT porque el comprobante respalda plata cobrada.
+             */
+            $table->foreignId('beneficiario_id')->constrained('beneficiarios')->restrictOnDelete();
+
+            /*
              * String y no entero: la serie lleva prefijo y año —REC-2026-0016— y
              * el año que viene el contador vuelve a 1. Se reserva con
              * CorrelativoService, que bloquea la fila del contador.
@@ -24,11 +31,6 @@ return new class extends Migration
             $table->decimal('monto_total', 12, 2)->default(0)->comment('Suma congelada de los pagos que ampara');
 
             $table->text('concepto')->comment('Descripción unificada del cobro, tal como se imprime');
-
-            // Se copian: el comprobante puede ir a nombre de un tercero, y tiene
-            // que seguir diciendo lo mismo aunque la ficha se corrija después.
-            $table->string('nit_ci_factura', 30);
-            $table->string('nombre_factura', 160);
 
             /*
              * ÍNDICE, no columna: `created_at` ya la creó timestamps().

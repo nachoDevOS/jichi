@@ -42,6 +42,11 @@ class ReciboController extends Controller
         ];
 
         $recibos = Recibo::query()
+            /*
+             * CON LAS COLUMNAS DEL NOMBRE Y LAS DE LA CÉDULA: los dos accesores
+             * las leen todas, y una que falte vuelve null sin ningún error.
+             */
+            ->with('beneficiario:id,ci,complemento,expedido,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado')
             ->withCount('pagos')
             // El total de lo que HAY, para contrastarlo con lo impreso sin una
             // consulta agregada por fila.
@@ -50,10 +55,11 @@ class ReciboController extends Controller
                 $operador = Sql::like($q->getConnection());
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $termino).'%';
 
+                // El nombre y la cédula ya no están copiados acá: se buscan
+                // sobre el beneficiario, con su propio scope.
                 $q->where(fn ($s) => $s
-                    ->where('numero_recibo', $operador, mb_strtoupper($like))
-                    ->orWhere('nombre_factura', $operador, $like)
-                    ->orWhere('nit_ci_factura', $operador, $like));
+                    ->where('recibos.numero_recibo', $operador, mb_strtoupper($like))
+                    ->orWhereHas('beneficiario', fn ($b) => $b->buscar($termino)));
             })
             ->when($filtros['desde'], fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
             ->when($filtros['hasta'], fn ($q, $h) => $q->whereDate('created_at', '<=', $h))
@@ -63,8 +69,9 @@ class ReciboController extends Controller
             ->through(fn (Recibo $r): array => [
                 'id' => $r->id,
                 'numero_recibo' => $r->numero_recibo,
-                'nombre_factura' => $r->nombre_factura,
-                'nit_ci_factura' => $r->nit_ci_factura,
+                'beneficiario_id' => $r->beneficiario_id,
+                'beneficiario' => $r->beneficiario?->nombreCompleto,
+                'documento' => $r->beneficiario?->documento_identidad,
                 'concepto' => $r->concepto,
                 'monto_total' => (float) $r->monto_total,
                 'pagos_count' => $r->pagos_count,
@@ -96,7 +103,7 @@ class ReciboController extends Controller
          * precarga con `with('pagos.pagable.beneficiario')` — eso se ignora en
          * silencio y el N+1 sigue ahí. Va con morphWith.
          */
-        $recibo->load(['pagos' => fn ($q) => $q->with([
+        $recibo->load(['beneficiario', 'pagos' => fn ($q) => $q->with([
             'pagable' => fn ($m) => $m->morphWith([
                 Carnet::class => ['beneficiario', 'tipoCarnet'],
                 AprovechamientoPesq::class => ['beneficiario', 'categoria'],
@@ -108,8 +115,9 @@ class ReciboController extends Controller
             'recibo' => [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,
-                'nombre_factura' => $recibo->nombre_factura,
-                'nit_ci_factura' => $recibo->nit_ci_factura,
+                'beneficiario_id' => $recibo->beneficiario_id,
+                'beneficiario' => $recibo->beneficiario?->nombreCompleto,
+                'documento' => $recibo->beneficiario?->documento_identidad,
                 'concepto' => $recibo->concepto,
                 'monto_total' => (float) $recibo->monto_total,
                 'monto_actual' => $recibo->montoCalculado(),
@@ -159,7 +167,7 @@ class ReciboController extends Controller
          * Eloquent no sabe qué es `pagable` hasta que lee la fila, así que lo
          * segundo se IGNORA en silencio y cada renglón dispararía su consulta.
          */
-        $recibo->load(['pagos' => fn ($q) => $q->with([
+        $recibo->load(['beneficiario', 'pagos' => fn ($q) => $q->with([
             'pagable' => fn ($m) => $m->morphWith([
                 Carnet::class => ['tipoCarnet'],
                 AprovechamientoPesq::class => ['categoria'],

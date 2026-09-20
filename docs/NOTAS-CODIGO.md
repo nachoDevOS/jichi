@@ -2117,13 +2117,13 @@
    lleva UN papel, aunque adentro esté pagando dos cosas. Por eso el detalle es
    polimórfico y la cabecera no sabe a qué trámite pertenece — no pertenece a
    ninguno en particular.
-   TODO LO IMPRESO SE COPIA, PORQUE UN COMPROBANTE ES INMUTABLE
-   `nombre_factura`, `nit_ci_factura` y `monto_total` se guardan acá en vez de
-   leerse del beneficiario y de la suma de los pagos. Armado al vuelo, corregir
-   un apellido en la ficha cambiaría los comprobantes ya entregados y una
-   reimpresión de marzo saldría distinta de la original.
-   Y además el comprobante puede ir a nombre de un TERCERO —la empresa que paga
-   por el pescador—, que no es ningún dato de la ficha.
+   EL MONTO SE COPIA; EL TITULAR VA POR ID (cambiado el 20/09/2026, a pedido)
+   `monto_total` y `concepto` se congelan al emitir: corregir un abono después no
+   puede cambiar el papel que la persona se llevó.
+   El nombre y la cédula NO: se guarda `beneficiario_id` y se leen del padrón al
+   imprimir, para que un apellido mal tipeado se corrija en un solo lugar. El
+   precio son las dos cosas que las columnas copiadas sostenían — el encabezado
+   dejó de ser inmutable, y ya no se puede emitir a nombre de un TERCERO.
 
 ### El detalle: los abonos que este papel ampara.
 

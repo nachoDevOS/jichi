@@ -26,7 +26,7 @@ export default function EditarCupo({
         foto_url: string | null;
         categoria_aprov_id: number;
         tipo_embarcacion: string | null;
-        fecha_emision: string | null;
+        fecha_solicitud: string | null;
     };
     escala: TramoElegible[];
 }) {
@@ -38,7 +38,7 @@ export default function EditarCupo({
         beneficiario_id: cupo.beneficiario_id,
         categoria_aprov_id: String(cupo.categoria_aprov_id),
         tipo_embarcacion: cupo.tipo_embarcacion ?? '',
-        fecha_emision: cupo.fecha_emision ?? '',
+        fecha_solicitud: cupo.fecha_solicitud ?? '',
     });
 
     const tramo = escala.find((t) => String(t.id) === String(form.data.categoria_aprov_id)) ?? null;
@@ -142,19 +142,19 @@ export default function EditarCupo({
                         </Campo>
 
                         <Campo
-                            etiqueta="Fecha de otorgamiento"
-                            htmlFor="fecha_emision"
-                            error={form.errors.fecha_emision}
+                            etiqueta="Fecha de solicitud"
+                            htmlFor="fecha_solicitud"
+                            error={form.errors.fecha_solicitud}
                             ayuda="Al cambiarla se recalcula el vencimiento, que sale de ella."
                             obligatorio
                             className="max-w-xs"
                         >
                             <Input
-                                id="fecha_emision"
+                                id="fecha_solicitud"
                                 type="date"
-                                value={form.data.fecha_emision}
-                                onChange={(e) => form.setData('fecha_emision', e.target.value)}
-                                aria-invalid={Boolean(form.errors.fecha_emision)}
+                                value={form.data.fecha_solicitud}
+                                onChange={(e) => form.setData('fecha_solicitud', e.target.value)}
+                                aria-invalid={Boolean(form.errors.fecha_solicitud)}
                             />
                         </Campo>
                     </CardContent>

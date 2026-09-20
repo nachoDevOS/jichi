@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Check } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 
@@ -12,6 +12,7 @@ export function ConfirmarAccion({
     descripcion,
     textoConfirmar = 'Confirmar',
     confirmacion,
+    tono = 'peligro',
     procesando = false,
     onConfirmar,
     onCancelar,
@@ -20,6 +21,12 @@ export function ConfirmarAccion({
     titulo: string;
     descripcion?: ReactNode;
     textoConfirmar?: string;
+    /**
+     * `afirmativo` para lo que no destruye nada pero igual no se deshace
+     * —aprobar, firmar—: el triángulo rojo ahí dice «cuidado, vas a romper
+     * algo», que es lo contrario de lo que el operador está haciendo.
+     */
+    tono?: 'peligro' | 'afirmativo';
     /**
      * Frase que hay que MARCAR antes de poder confirmar. Ver la nota de abajo.
      * Sin esta prop no aparece ninguna casilla y la ventana se comporta como
@@ -65,8 +72,18 @@ export function ConfirmarAccion({
         >
             <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg">
                 <div className="flex items-start gap-4">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                        <AlertTriangle className="size-5" />
+                    <div
+                        className={
+                            tono === 'afirmativo'
+                                ? 'flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                                : 'flex size-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive'
+                        }
+                    >
+                        {tono === 'afirmativo' ? (
+                            <Check className="size-5" />
+                        ) : (
+                            <AlertTriangle className="size-5" />
+                        )}
                     </div>
 
                     <div className="min-w-0 space-y-1">
@@ -96,7 +113,7 @@ export function ConfirmarAccion({
                         Cancelar
                     </Button>
                     <Button
-                        variant="destructive"
+                        variant={tono === 'afirmativo' ? 'default' : 'destructive'}
                         onClick={onConfirmar}
                         // Con casilla, el botón espera a que esté marcada.
                         disabled={procesando || (Boolean(confirmacion) && !aceptado)}

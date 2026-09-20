@@ -25,7 +25,9 @@ class CorregirPagoRequest extends FormRequest
             'monto_parcial' => ['required', 'numeric', 'gt:0', 'max:99999999', 'decimal:0,2'],
 
             'nro_transaccion' => [
-                'required', 'string', 'max:60',
+                // SOLO DÍGITOS, y va `digits_between` y no `numeric`: la boleta
+                // suele empezar con ceros y `numeric` se los comería.
+                'required', 'string', 'digits_between:1,60',
                 Rule::unique('pagos', 'nro_transaccion')
                     ->ignore($this->route('pago'))
                     ->whereNull('deleted_at'),
@@ -48,6 +50,7 @@ class CorregirPagoRequest extends FormRequest
             'monto_parcial.gt' => 'El depósito tiene que ser mayor que cero.',
             'monto_parcial.decimal' => 'Los montos llevan como máximo dos decimales.',
             'nro_transaccion.required' => 'Escriba el número de la boleta del banco.',
+            'nro_transaccion.digits_between' => 'El número de la boleta lleva solo dígitos.',
             'nro_transaccion.unique' => 'Esa boleta ya está cargada en otro cobro: '.
                 'una misma transacción no puede respaldar dos pagos.',
             'fecha_deposito.required' => 'Indique la fecha que figura en la boleta.',

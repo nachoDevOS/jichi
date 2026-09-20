@@ -72,7 +72,7 @@ export default function VerBeneficiario({
 
                     {puede('beneficiarios.editar') && (
                         <Button
-                            variant="outline"
+                            variant="editar"
                             onClick={() => router.visit(route('beneficiarios.edit', beneficiario.id))}
                         >
                             <Pencil className="size-4" />
@@ -81,7 +81,7 @@ export default function VerBeneficiario({
                     )}
 
                     {puede('beneficiarios.eliminar') && (
-                        <Button variant="ghost" onClick={() => setConfirmarBaja(true)}>
+                        <Button variant="eliminar" onClick={() => setConfirmarBaja(true)}>
                             <Trash2 className="size-4" />
                             Dar de baja
                         </Button>
@@ -269,14 +269,27 @@ export default function VerBeneficiario({
                                                 {/*
                                                     EL SALDO ES LO ÚNICO ACCIONABLE. «Tiene 500 kg»
                                                     no dice si puede salir a pescar mañana; «le
-                                                    quedan 20» sí.
+                                                    quedan 20» sí. Pero recién desde la firma: antes
+                                                    no se consumió nada porque no se puede pescar.
                                                 */}
                                                 <span className="ml-auto text-sm tabular-nums">
-                                                    <strong>{c.saldo_kg}</strong>
-                                                    <span className="text-muted-foreground">
-                                                        {' '}
-                                                        / {c.volumen_total_kg} kg
-                                                    </span>
+                                                    {c.ya_fue_aprobado ? (
+                                                        <>
+                                                            <strong>{c.saldo_kg}</strong>
+                                                            <span className="text-muted-foreground">
+                                                                {' '}
+                                                                / {c.volumen_total_kg} kg
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <strong>{c.volumen_total_kg}</strong>
+                                                            <span className="text-muted-foreground">
+                                                                {' '}
+                                                                kg solicitados
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </span>
                                             </div>
 
@@ -285,12 +298,14 @@ export default function VerBeneficiario({
                                                 una librería: para un solo valor, traer recharts
                                                 sería cargar 100 KB para dibujar un rectángulo.
                                             */}
-                                            <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                                                <div
-                                                    className="h-full rounded-full bg-primary"
-                                                    style={{ width: `${c.porcentaje_usado}%` }}
-                                                />
-                                            </div>
+                                            {c.ya_fue_aprobado && (
+                                                <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                                                    <div
+                                                        className="h-full rounded-full bg-primary"
+                                                        style={{ width: `${c.porcentaje_usado}%` }}
+                                                    />
+                                                </div>
+                                            )}
                                         </li>
                                     ))}
                                 </ul>

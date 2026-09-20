@@ -16,6 +16,7 @@ use App\Models\Beneficiario;
 use App\Models\CategoriaAprovechamiento;
 use App\Models\Pago;
 use App\Models\PermisoFaena;
+use App\Models\Recibo;
 use App\Services\CobrarService;
 use App\Services\OtorgarCupoService;
 use App\Services\RevisarCupoService;
@@ -62,6 +63,13 @@ class AprovechamientoController extends Controller
              */
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
             ->withSum('pagos', 'monto_parcial')
+            /*
+             * EL RECIBO PARA EL BOTÓN DE IMPRIMIR. `recibos()` del trait NO es
+             * una relación —es una consulta que devuelve colección— así que
+             * llamarla por fila serían treinta consultas. Se precargan los
+             * pagos con el suyo.
+             */
+            ->with(['pagos:id,pagable_type,pagable_id,recibo_id', 'pagos.recibo:id,numero_recibo'])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
                 'beneficiario',
                 fn ($b) => $b->buscar($termino),
@@ -70,7 +78,7 @@ class AprovechamientoController extends Controller
                 'aprovechamientos_pesq.estado',
                 $estado,
             ))
-            ->latest('fecha_emision')
+            ->latest('fecha_solicitud')
             ->paginate($filtros['por_pagina'])
             ->withQueryString()
             ->through($this->resumir(...));
@@ -120,7 +128,7 @@ class AprovechamientoController extends Controller
             $cupo = $this->servicio->otorgar(
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
                 CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
-                now()->parse($datos['fecha_emision']),
+                now()->parse($datos['fecha_solicitud']),
                 $datos['tipo_embarcacion'] ?? null,
             );
         } catch (CupoInvalidoException $e) {
@@ -296,7 +304,7 @@ class AprovechamientoController extends Controller
                 'foto_url' => $aprovechamiento->beneficiario?->foto_url,
                 'categoria_aprov_id' => $aprovechamiento->categoria_aprov_id,
                 'tipo_embarcacion' => $aprovechamiento->tipo_embarcacion,
-                'fecha_emision' => $aprovechamiento->fecha_emision?->toDateString(),
+                'fecha_solicitud' => $aprovechamiento->fecha_solicitud?->toDateString(),
             ],
 
             'escala' => $this->tramosElegibles(),
@@ -314,7 +322,7 @@ class AprovechamientoController extends Controller
             $this->servicio->editar(
                 $aprovechamiento,
                 CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
-                now()->parse($datos['fecha_emision']),
+                now()->parse($datos['fecha_solicitud']),
                 $datos['tipo_embarcacion'] ?? null,
             );
         } catch (CupoInvalidoException $e) {
@@ -372,6 +380,30 @@ class AprovechamientoController extends Controller
             ]);
         }
 
+        /*
+         * Y EL MONTO, TAMBIÉN ANTES DE SUBIR NADA. El servicio lo vuelve a
+         * comprobar con la fila bloqueada —ahí está el control de verdad, y es
+         * el que resiste dos ventanillas a la vez— pero descubrirlo recién
+         * adentro obliga a borrar los archivos ya escritos. El botón apagado de
+         * la pantalla no cuenta: se quita desde el inspector del navegador.
+         */
+        $suma = round(array_sum(array_map(
+            static fn (array $p): float => round((float) $p['monto'], 2),
+            $datos['pagos'],
+        )), 2);
+
+        $saldo = $aprovechamiento->saldoPendiente();
+
+        if ($suma < $saldo) {
+            return back()->withInput()->withErrors([
+                'pagos' => CobroInvalidoException::noCubreElMonto(
+                    'este aprovechamiento',
+                    $suma,
+                    $saldo,
+                )->getMessage(),
+            ]);
+        }
+
         $subidos = [];
 
         try {
@@ -417,13 +449,8 @@ class AprovechamientoController extends Controller
         $enviado = false;
 
         if (($datos['enviar'] ?? false) && $cupo->puedeEnviarseARevision()) {
-            // Viajan hasta acá porque el recibo lo emite el ENVÍO. Pueden ser
-            // los de un tercero: la empresa que paga por el pescador.
-            $revision->enviar(
-                $cupo,
-                $datos['nit_ci_factura'] ?? null,
-                $datos['nombre_factura'] ?? null,
-            );
+            // El recibo lo emite el ENVÍO, y sale a nombre del titular del cupo.
+            $revision->enviar($cupo);
 
             $cupo->refresh();
             $enviado = true;
@@ -533,12 +560,29 @@ class AprovechamientoController extends Controller
     }
 
     /**
+     * El recibo del trámite, sin disparar una consulta por fila.
+     *
+     * `Pagable::recibos()` es una CONSULTA y no una relación, así que en un
+     * listado hay que resolverlo desde los pagos ya precargados.
+     */
+    private function reciboDe(AprovechamientoPesq $cupo): ?Recibo
+    {
+        if ($cupo->relationLoaded('pagos')) {
+            return $cupo->pagos->firstWhere('recibo_id', '!=', null)?->recibo;
+        }
+
+        return $cupo->recibos()->first();
+    }
+
+    /**
      * Los datos de un cupo que pintan el listado y la ficha.
      *
      * @return array<string, mixed>
      */
     private function resumir(AprovechamientoPesq $cupo): array
     {
+        $recibo = $this->reciboDe($cupo);
+
         return [
             'id' => $cupo->id,
             'beneficiario_id' => $cupo->beneficiario_id,
@@ -582,6 +626,8 @@ class AprovechamientoController extends Controller
             'excedido' => $cupo->estaExcedido(),
             // Se puede colgar una faena HOY: vigente, con saldo y sin agotar.
             'puede_emitir_faena' => $cupo->puedeEmitirFaena(),
+            // Y si no se puede, POR QUÉ: un cupo pendiente no es uno vencido.
+            'motivo_sin_faena' => $cupo->motivoSinFaena(),
             /*
              * EDITAR Y ELIMINAR LLEGAN RESUELTAS, y no se deducen de `estado`
              * en React.
@@ -598,12 +644,21 @@ class AprovechamientoController extends Controller
             // La autorización en papel sale recién con el cupo firmado.
             'ya_fue_aprobado' => $cupo->yaFueAprobado(),
 
+            /*
+             * EL RECIBO, para poder imprimirlo sin entrar a la ficha. Existe
+             * desde el ENVÍO, así que aparece en revisión y sigue después.
+             */
+            'recibo_id' => $recibo?->id,
+            'recibo_numero' => $recibo?->numero_recibo,
+
             'monto' => $cupo->montoACobrar(),
             'saldo_pendiente' => $cupo->saldoPendiente(),
             'pagado' => $cupo->estaPagado(),
 
             // Son DÍAS, no instantes: van con toDateString(). Mandados como
             // instante, en UTC-4 la pantalla mostraría el día anterior.
+            'fecha_solicitud' => $cupo->fecha_solicitud?->toDateString(),
+            // NULL hasta la firma: recién ahí hay algo otorgado.
             'fecha_emision' => $cupo->fecha_emision?->toDateString(),
             'fecha_vencimiento' => $cupo->fecha_vencimiento?->toDateString(),
         ];

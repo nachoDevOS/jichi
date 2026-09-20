@@ -21,12 +21,12 @@ class OtorgarCupoService
     public function otorgar(
         Beneficiario $beneficiario,
         CategoriaAprovechamiento $categoria,
-        ?Carbon $emision = null,
+        ?Carbon $solicitud = null,
         ?string $tipoEmbarcacion = null,
     ): AprovechamientoPesq {
-        $emision ??= now();
+        $solicitud ??= now();
 
-        return DB::transaction(function () use ($beneficiario, $categoria, $emision, $tipoEmbarcacion): AprovechamientoPesq {
+        return DB::transaction(function () use ($beneficiario, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
             /*
              * Releer con lockForUpdate() devuelve OTRA instancia del mismo
              * registro. No se escribe sobre ella ni se la devuelve: acá solo
@@ -87,8 +87,15 @@ class OtorgarCupoService
                  * NACE PENDIENTE, y de ahí sale solo al cobrarse.
                  */
                 'estado' => EstadoAprovechamiento::Pendiente,
-                'fecha_emision' => $emision->toDateString(),
-                'fecha_vencimiento' => $this->vencimientoDe($emision),
+
+                /*
+                 * SE GUARDA LA FECHA EN QUE SE PIDIÓ. La de otorgamiento la
+                 * escribe la aprobación: mientras el expediente es un borrador
+                 * no hay nada otorgado. Ver RevisarCupoService::aprobar().
+                 */
+                'fecha_solicitud' => $solicitud->toDateString(),
+                'fecha_emision' => null,
+                'fecha_vencimiento' => $this->vencimientoDe($solicitud),
             ]);
         });
     }
@@ -99,10 +106,10 @@ class OtorgarCupoService
     public function editar(
         AprovechamientoPesq $cupo,
         CategoriaAprovechamiento $categoria,
-        Carbon $emision,
+        Carbon $solicitud,
         ?string $tipoEmbarcacion = null,
     ): AprovechamientoPesq {
-        return DB::transaction(function () use ($cupo, $categoria, $emision, $tipoEmbarcacion): AprovechamientoPesq {
+        return DB::transaction(function () use ($cupo, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
             /*
@@ -123,8 +130,8 @@ class OtorgarCupoService
                 'modalidad' => $tramo->modalidad,
                 'volumen_total_kg' => $tramo->kilos_max,
                 'tipo_embarcacion' => $tipoEmbarcacion,
-                'fecha_emision' => $emision->toDateString(),
-                'fecha_vencimiento' => $this->vencimientoDe($emision),
+                'fecha_solicitud' => $solicitud->toDateString(),
+                'fecha_vencimiento' => $this->vencimientoDe($solicitud),
             ]);
 
             // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
@@ -181,15 +188,15 @@ class OtorgarCupoService
              */
             ->enCurso()
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
-            ->latest('fecha_emision')
+            ->latest('fecha_solicitud')
             ->first();
     }
 
     /**
-     * Hasta cuándo vale un cupo otorgado en esta fecha.
+     * Hasta cuándo vale un cupo de esta fecha: el cupo es de la GESTIÓN.
      */
-    private function vencimientoDe(Carbon $emision): string
+    private function vencimientoDe(Carbon $fecha): string
     {
-        return $emision->copy()->endOfYear()->toDateString();
+        return $fecha->copy()->endOfYear()->toDateString();
     }
 }

@@ -125,7 +125,7 @@ export type TipoActor = 'pescador' | 'comercializador';
 export type EstadoAprovechamiento =
     | 'pendiente'
     | 'en_revision'
-    | 'activo'
+    | 'aprobado'
     | 'vencido'
     | 'agotado';
 

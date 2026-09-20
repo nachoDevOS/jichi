@@ -177,7 +177,7 @@ class EmitirFaenaService
 
         $deberiaEstar = $cupo->saldoKg() <= 0.0
             ? EstadoAprovechamiento::Agotado
-            : EstadoAprovechamiento::Activo;
+            : EstadoAprovechamiento::Aprobado;
 
         if ($cupo->estado !== $deberiaEstar) {
             $cupo->update(['estado' => $deberiaEstar]);

@@ -42,7 +42,11 @@ return new class extends Migration
             // concesión pagada ES la autorización. Ver CobrarService.
             $table->string('estado', 20)->default(EstadoAprovechamiento::Pendiente->value);
 
-            $table->date('fecha_emision');
+            // DOS FECHAS DISTINTAS: el día que la persona lo pidió y el día
+            // que alguien lo firmó. `fecha_emision` queda en NULL hasta la
+            // aprobación —un cupo pendiente no se otorgó todavía—.
+            $table->date('fecha_solicitud');
+            $table->date('fecha_emision')->nullable()->comment('Se llena al aprobar');
             $table->date('fecha_vencimiento');
 
             // «¿Esta persona tiene bolsa?» es la pregunta caliente, y el filtro
