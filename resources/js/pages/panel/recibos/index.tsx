@@ -15,24 +15,7 @@ import type { PageProps, Paginado } from '@/types';
 import type { ReciboFila } from '@/types/caja';
 
 /**
- * ============================================================================
  *  RECIBOS — los comprobantes entregados
- * ============================================================================
- *
- * Es la vista de los PAPELES, con su número correlativo: lo que audita
- * Contabilidad. La otra mitad —cada entrega de dinero— está en «Caja».
- *
- * ----------------------------------------------------------------------------
- *  LA COLUMNA QUE MÁS IMPORTA ES «CUADRA»
- * ----------------------------------------------------------------------------
- *
- * `monto_total` es lo que se IMPRIMIÓ, congelado al emitir. `monto_actual` es
- * lo que HAY hoy en el detalle. Si alguien corrigió un abono después de
- * entregar el papel, los dos números se separan.
- *
- * Eso NO se tapa recalculando al leer: el papel entregado no puede cambiar
- * porque después se corrija algo. Se muestra, que es justamente lo que un
- * arqueo tiene que poder detectar.
  */
 export default function IndiceRecibos({
     recibos,

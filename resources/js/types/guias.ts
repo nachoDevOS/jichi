@@ -2,22 +2,6 @@ import type { EstadoGuia } from '@/types';
 
 /**
  * Tipos del módulo Guías — el amparo de UN traslado de producto.
- *
- * Describen, campo por campo, lo que arma
- * App\Http\Controllers\Panel\GuiaController.
- *
- * ============================================================================
- *  LAS FECHAS SON MOMENTOS, NO DÍAS
- * ============================================================================
- *
- * Llegan en ISO 8601 CON hora, y hay que mostrarlas con `fechaHora()`, no con
- * `fecha()`. Los cinco días de validez se cuentan desde el instante de emisión
- * —una guía de las 18:00 del lunes vence a las 18:00 del sábado— así que la
- * hora ES el dato que decide la vigencia.
- *
- * Es al revés que en carnets, cupos y faenas, donde las columnas guardan un DÍA
- * y viajan con `toDateString()`. Mezclarlos corre la fecha: en UTC-4, un día
- * mandado como instante se muestra con 24 horas menos.
  */
 
 /** Una guía, tal como la pintan el listado y la ficha. */
@@ -41,10 +25,6 @@ export interface GuiaFila {
     es_piscicultura: boolean;
     /**
      * Por cuánto se multiplicó el arancel: 1 o 0.5.
-     *
-     * Viene explícito para que la ficha pueda decir «se cobró al 50%» sin
-     * recalcularlo. La regla vive en `GuiaMovimiento::factorArancel()`, en un
-     * solo lado.
      */
     factor_arancel: number;
 

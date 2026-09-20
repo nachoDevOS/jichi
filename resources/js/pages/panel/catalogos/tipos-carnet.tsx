@@ -14,35 +14,7 @@ import type { PageProps } from '@/types';
 import type { TipoCarnetFila } from '@/types/catalogos';
 
 /**
- * ============================================================================
  *  CATÁLOGO DE TIPOS DE CARNET
- * ============================================================================
- *
- * Cómo se llama cada credencial y cuánto sale.
- *
- * El patrón de la pantalla —tabla a ancho completo, formulario arriba, un solo
- * estado `editando`, sin botón de borrar— está explicado en `asociaciones.tsx`.
- *
- * ----------------------------------------------------------------------------
- *  ES EL CATÁLOGO, NO LA REGLA — y por eso el nombre se puede editar tranquilo
- * ----------------------------------------------------------------------------
- *
- * Qué habilita un carnet —si emite faenas o guías, si lleva cupo en kilos— lo
- * dice `carnets.tipo_actor`, que es un enum del servidor. De este nombre no
- * cuelga ninguna decisión: el mismo documento puede figurar como «Carnet de
- * Pescador» o «Pescador Artesanal» y el sistema se comporta igual.
- *
- * ----------------------------------------------------------------------------
- *  CAMBIAR EL PRECIO NO TOCA LO YA COBRADO, PERO SÍ LO QUE SE DEBE
- * ----------------------------------------------------------------------------
- *
- * Lo cobrado vive en `pagos` y no se recalcula nunca: un carnet emitido a 80 Bs
- * sigue diciendo 80 aunque el arancel suba. Lo que SÍ se mueve es el saldo
- * pendiente de los carnets que todavía no están cubiertos, porque ese saldo se
- * calcula contra esta columna.
- *
- * Es lo correcto —lo que se debe se debe a la tarifa vigente— pero conviene
- * saberlo antes de tocar el número, y por eso está escrito bajo el campo.
  */
 export default function CatalogoTiposCarnet({ tipos }: { tipos: TipoCarnetFila[] }) {
     const { puede } = usePermisos();

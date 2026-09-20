@@ -7,15 +7,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para emitir una guía de movimiento.
- *
- * ----------------------------------------------------------------------------
- *  ACÁ SOLO SE VALIDA LA FORMA. LAS REGLAS VIVEN EN EL SERVICIO
- * ----------------------------------------------------------------------------
- *
- * Que el carnet HABILITE a emitir guías —que sea de comercializador y esté
- * vigente— lo decide `EmitirGuiaService::emitir()`: son dos condiciones que
- * dependen de la fecha de hoy y no se pueden expresar en una regla de
- * validación.
  */
 class EmitirGuiaRequest extends FormRequest
 {
@@ -35,11 +26,6 @@ class EmitirGuiaRequest extends FormRequest
 
             /*
              * EL CÓDIGO DEL TALONARIO, único GLOBAL.
-             *
-             * La regla replica el índice único de la base. Que esté duplicada
-             * acá y en el servicio no es redundancia inútil: esta pinta el
-             * mensaje bajo el campo, la del servicio cubre la carrera entre dos
-             * ventanillas, y el índice es la red que garantiza.
              */
             'codigo_guia' => [
                 'required', 'string', 'max:40',
@@ -52,19 +38,11 @@ class EmitirGuiaRequest extends FormRequest
             /*
              * El peso declarado al salir. `gt:0` porque una guía de cero kilos
              * no ampara nada y solo gastaría una hoja del talonario.
-             *
-             * Al CERRAR se puede corregir contra la balanza del destino, que es
-             * donde el número se vuelve real.
              */
             'peso_total_kg' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
 
             /*
              * LA MARCA QUE VALE PLATA: con ella el arancel se cobra al 50%.
-             *
-             * Va como booleano y no como un catálogo de «tipo de producto»
-             * porque la resolución solo distingue dos casos, y un catálogo
-             * abriría la puerta a que alguien agregue una fila con descuento sin
-             * que haya resolución detrás.
              */
             'es_piscicultura' => ['required', 'boolean'],
 

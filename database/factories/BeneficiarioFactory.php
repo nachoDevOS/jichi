@@ -22,11 +22,6 @@ class BeneficiarioFactory extends Factory
         return [
             /*
              * La cédula se arma con unique() y no con un número al azar.
-             *
-             * La tabla tiene un índice único parcial sobre `ci`: dos números
-             * repetidos en una tanda de cuarenta harían fallar el seeder con un
-             * error de base de datos, y con números al azar de 7 dígitos la
-             * repetición es más probable de lo que parece.
              */
             'ci' => (string) fake()->unique()->numberBetween(1000000, 9999999),
             // En mayúscula, igual que lo guarda el formulario: el complemento se
@@ -59,10 +54,6 @@ class BeneficiarioFactory extends Factory
 
     /**
      * Una mujer casada, con el apellido del esposo.
-     *
-     * Existe como estado propio porque el apellido de casada cambia cómo se arma
-     * `nombreCompleto` —le agrega el «de»— y hay que poder ver esa variante en
-     * las pantallas sin depender de la suerte.
      */
     public function casada(): static
     {
@@ -77,10 +68,6 @@ class BeneficiarioFactory extends Factory
 
     /**
      * Sin segundo nombre ni apellido materno: el caso mínimo.
-     *
-     * Es el que más rompe maquetas —el nombre queda corto y los cálculos de
-     * encogido del carnet no se disparan— así que conviene tenerlo siempre en
-     * los datos de prueba en vez de esperar que salga por azar.
      */
     public function nombreCorto(): static
     {

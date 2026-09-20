@@ -31,14 +31,6 @@ class Asociacion extends Model
 
     /**
      * UN default de la base NO llega al objeto que devuelve create().
-     *
-     * El INSERT lo aplica el motor y el modelo en memoria se queda con la
-     * columna en null hasta que alguien haga refresh(). Eso rompe lo obvio:
-     * crear una asociación y preguntarle el estado en la línea siguiente
-     * contesta null, con la fila ya escrita y correcta en la base.
-     *
-     * Va con `->value` y no con el enum: `$attributes` se llena ANTES de que
-     * corran los casts.
      */
     protected $attributes = [
         'estado' => EstadoAsociacion::Activo->value,
@@ -51,9 +43,7 @@ class Asociacion extends Model
         ];
     }
 
-    // ------------------------------------------------------------------
     //  Relaciones
-    // ------------------------------------------------------------------
 
     public function carnets(): HasMany
     {
@@ -65,9 +55,7 @@ class Asociacion extends Model
         return $this->hasMany(GuiaMovimiento::class);
     }
 
-    // ------------------------------------------------------------------
     //  Lectura
-    // ------------------------------------------------------------------
 
     /**
      * Cómo se muestra en un desplegable: «ASOPESCA — Asociación de Pescadores».
@@ -88,9 +76,7 @@ class Asociacion extends Model
         return $this->estado->seleccionable();
     }
 
-    // ------------------------------------------------------------------
     //  Scopes
-    // ------------------------------------------------------------------
 
     /**
      * Las que se pueden elegir. Se califica la columna porque `carnets`,

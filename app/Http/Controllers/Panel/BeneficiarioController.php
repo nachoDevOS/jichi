@@ -16,35 +16,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  MÓDULO BENEFICIARIOS — controlador de ejemplo
- * ============================================================================
- *
- * Este archivo es la PLANTILLA del sistema: los demás módulos siguen el mismo
- * patrón. Está comentado paso a paso a propósito.
- *
- * ----------------------------------------------------------------------------
- *  CÓMO VIAJA LA INFORMACIÓN DE LARAVEL A REACT
- * ----------------------------------------------------------------------------
- *
- *   1. El navegador pide  GET /panel/beneficiarios
- *   2. routes/panel.php decide que ese pedido lo atiende el método index()
- *   3. index() consulta la base de datos con Eloquent
- *   4. index() devuelve  Inertia::render('panel/beneficiarios/index', [...datos...])
- *   5. Inertia busca  resources/js/pages/panel/beneficiarios/index.tsx
- *   6. Ese componente de React recibe los [...datos...] como PROPS
- *
- * Lo importante: NO hay una API REST de por medio, no se escribe fetch() ni
- * axios en ninguna parte. El array que se pasa como segundo argumento de
- * Inertia::render() ES el objeto de props que llega a React.
- *
- * ----------------------------------------------------------------------------
- *  Y DE REACT DE VUELTA A LARAVEL
- * ----------------------------------------------------------------------------
- *
- * En React se usa router.post() / useForm().post() de Inertia. Eso hace un POST
- * normal, con token CSRF, a una ruta normal. El controlador responde con un
- * redirect() (nunca con JSON), e Inertia pinta la página destino sin recargar.
  */
 class BeneficiarioController extends Controller
 {
@@ -93,15 +65,6 @@ class BeneficiarioController extends Controller
                 /*
                  * La edad se calcula acá y NO se manda la fecha sola para que
                  * React la calcule.
-                 *
-                 * Podría hacerse en el navegador, pero entonces habría dos
-                 * definiciones de «edad» en el sistema —la de PHP y la de
-                 * JavaScript— y tarde o temprano difieren por un día en los
-                 * bordes: el cumpleaños de hoy, los años bisiestos, la zona
-                 * horaria del teléfono del operador. El servidor ya sabe la
-                 * respuesta; que la mande.
-                 *
-                 * Ver Beneficiario::edad(), y por qué no hay columna `edad`.
                  */
                 'edad' => $b->edad,
             ]);
@@ -127,10 +90,6 @@ class BeneficiarioController extends Controller
 
     /**
      * GUARDAR EL ALTA — POST /panel/beneficiarios
-     *
-     * Fíjate en el tipo del parámetro: GuardarBeneficiarioRequest, no Request.
-     * Con eso Laravel valida ANTES de entrar acá; si la validación falla, este
-     * método nunca llega a ejecutarse.
      */
     public function store(GuardarBeneficiarioRequest $request): RedirectResponse
     {
@@ -154,10 +113,6 @@ class BeneficiarioController extends Controller
 
     /**
      * FICHA — GET /panel/beneficiarios/{beneficiario}
-     *
-     * El parámetro se declara como Beneficiario y Laravel busca el registro por
-     * id automáticamente. Si no existe, responde 404 sin ejecutar el método. Eso
-     * se llama «route model binding».
      */
     public function show(Beneficiario $beneficiario): Response
     {
@@ -184,18 +139,7 @@ class BeneficiarioController extends Controller
             'deuda' => $beneficiario->deudaTotal(),
 
             /*
-             * ================================================================
              *  SUS CREDENCIALES — el paso 3 del flujo
-             * ================================================================
-             *
-             * Es una LISTA porque una persona puede tener DOS carnets vigentes
-             * al mismo tiempo: quien pesca y además comercializa. El rol es del
-             * documento (`tipo_actor`), no de la ficha, y por eso acá no hay que
-             * elegir «cuál es el carnet» de nadie.
-             *
-             * OJO CON PEDIR COLUMNAS SUELTAS EN EL with(): `tipoCarnet` va
-             * ENTERO porque `Carnet::montoACobrar()` lee `precio_bs`, y si esa
-             * columna no viene el saldo sale mal sin ningún error.
              */
             'carnets' => $beneficiario->carnets()
                 ->with(['asociacion:id,nombre,sigla', 'tipoCarnet', 'aprovechamiento'])
@@ -206,16 +150,7 @@ class BeneficiarioController extends Controller
                 ->all(),
 
             /*
-             * ================================================================
              *  SUS BOLSAS MADRE — el paso 2, y el que explica las faenas
-             * ================================================================
-             *
-             * Se manda el SALDO en kilos y no solo el volumen otorgado, porque
-             * es lo único accionable: «tiene 500 kg» no dice si puede salir a
-             * pescar mañana, y «le quedan 20» sí.
-             *
-             * `withSum` sobre las faenas que consumen cupo es lo que evita una
-             * consulta agregada por fila al calcular ese saldo.
              */
             'cupos' => $beneficiario->aprovechamientos()
                 ->with('categoria')
@@ -289,18 +224,6 @@ class BeneficiarioController extends Controller
 
     /**
      * BAJA — DELETE /panel/beneficiarios/{beneficiario}
-     *
-     * Es un borrado LÓGICO: el modelo usa SoftDeletes, así que la fila no
-     * desaparece, solo se le pone fecha en `deleted_at`.
-     *
-     * ¿POR QUÉ NO SE BORRA DE VERDAD? Porque los carnets, trámites y pagos
-     * históricos siguen apuntando a esta persona y no pueden quedar huérfanos.
-     * `deleted_at` es el único estado que tiene una ficha: o está en el padrón,
-     * o está dada de baja. No hay una columna `activo` aparte —dos formas de
-     * decir lo mismo terminan contradiciéndose—.
-     *
-     * Que el historial no se rompa depende de `Carnet::beneficiario()`, que
-     * lleva withTrashed() justamente para esto.
      */
     public function destroy(Beneficiario $beneficiario): RedirectResponse
     {
@@ -313,10 +236,6 @@ class BeneficiarioController extends Controller
 
     /**
      * BUSCADOR PARA EL FORMULARIO DE SOLICITUD — GET /panel/beneficiarios/buscar
-     *
-     * Devuelve JSON y no una pantalla de Inertia: lo consume el autocompletado
-     * del formulario de trámite mientras el operador escribe, y ahí no se quiere
-     * navegar a ningún lado.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -335,26 +254,9 @@ class BeneficiarioController extends Controller
             /*
              * Se traen los carnets VIGENTES con su tipo, todo en la misma tanda
              * de consultas.
-             *
-             * Sin esto, armar la situación de diez personas serían veintiuna
-             * consultas —el clásico N+1— y encima disparadas en cada tecleada
-             * del operador. Pasó de verdad: dieciocho consultas por tecla, con
-             * el `with()` escrito pero llamando después a un método del modelo
-             * que consultaba igual. Ver Beneficiario::carnetVigenteDe().
              */
             /*
              * EL CUPO VIAJA CON EL CARNET, y los dos agregados con él.
-             *
-             * `withSum` de las faenas da el saldo en kilos y `withMax` el último
-             * número del talonario. Los dos son subconsultas sobre la relación
-             * YA precargada, así que no agregan una consulta por fila: sin
-             * ellos, pintar diez resultados serían veinte consultas más, y
-             * disparadas en cada tecleada.
-             *
-             * Van acá y no en un endpoint propio del módulo de faenas porque la
-             * pregunta es la misma —«¿qué puede hacer esta persona hoy?»— y
-             * partirla en dos viajes se nota justo cuando el operador acaba de
-             * hacer clic.
              */
             ->with(['carnets' => fn ($q) => $q
                 ->vigentes()
@@ -383,17 +285,6 @@ class BeneficiarioController extends Controller
 
                 /*
                  * QUÉ PUEDE EMITIR ESTA PERSONA HOY, ya resuelto.
-                 *
-                 * Va en el mismo payload que la búsqueda y no en una segunda
-                 * petición al elegir a la persona: son diez filas ya cargadas, y
-                 * un viaje más al servidor justo cuando el operador acaba de
-                 * hacer clic se nota.
-                 *
-                 * La pantalla NO lo deduce: recibe `puede_emitir_faenas` y
-                 * `puede_emitir_guias` calculados por el modelo. Un `if` sobre
-                 * el nombre del tipo de carnet en React sería una segunda copia
-                 * de la regla, y se desincroniza en cuanto alguien renombre una
-                 * fila del catálogo.
                  */
                 'carnets_vigentes' => $b->carnets->map(fn (Carnet $c): array => [
                     'id' => $c->id,
@@ -408,10 +299,6 @@ class BeneficiarioController extends Controller
                      * Lo que el formulario de faena necesita para abrir con los
                      * dos campos difíciles ya resueltos: cuántos kilos quedan y
                      * qué número de talonario propone.
-                     *
-                     * El número es una PROPUESTA, no una imposición: sale de un
-                     * papel que el operador tiene en la mano, y si no coincide
-                     * hay algo que conviene mirar antes de seguir.
                      */
                     'saldo_kg' => $c->aprovechamiento?->saldoKg(),
                     'siguiente_numero_faena' => $c->aprovechamiento
@@ -422,22 +309,10 @@ class BeneficiarioController extends Controller
             ->all();
     }
 
-    // ------------------------------------------------------------------
     //  Auxiliares
-    // ------------------------------------------------------------------
 
     /**
      * Los datos de un carnet que pinta la ficha.
-     *
-     * LA ACTIVIDAD VA PRIMERO. Con dos carnets posibles por persona, sin
-     * `tipo_actor` los dos se ven idénticos en la lista y el operador no sabe
-     * cuál está mirando.
-     *
-     * Se manda `vigente` YA RESUELTO y no el estado a secas: la columna de
-     * estado puede estar desfasada —`vencido` lo escribe un comando diario— así
-     * que la pantalla no puede deducirlo comparando fechas por su cuenta. Es la
-     * misma razón por la que van `codigo` legible y `saldo_pendiente` armados
-     * desde acá.
      *
      * @return array<string, mixed>
      */
@@ -470,10 +345,6 @@ class BeneficiarioController extends Controller
     /**
      * Las listas fijas que necesitan los dos formularios de beneficiario.
      *
-     * Salen de config/jichi.php y no de acá porque las mismas provincias las
-     * pide más de una pantalla: escritas dos veces, tarde o temprano una se
-     * queda sin actualizar.
-     *
      * @return array<string, mixed>
      */
     private function catalogos(): array
@@ -492,11 +363,6 @@ class BeneficiarioController extends Controller
 
     /**
      * Guarda la foto y devuelve su ruta.
-     *
-     * Todo archivo que sube al sistema pasa por StorageController, que es el
-     * único que decide en qué disco se escribe. Para que la imagen sea visible
-     * desde el navegador tiene que existir el enlace simbólico que crea
-     * `php artisan storage:link`.
      */
     private function guardarFoto(GuardarBeneficiarioRequest $request): string
     {

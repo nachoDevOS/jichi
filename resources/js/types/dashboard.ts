@@ -2,15 +2,6 @@ import type { EstadoCarnet, TipoActor } from '@/types';
 
 /**
  * Tipos del panel principal.
- *
- * Cada uno describe, campo por campo, lo que arma
- * App\Http\Controllers\Panel\DashboardController. Si allá se agrega o se
- * renombra una clave, hay que reflejarlo acá: TypeScript avisa en el editor y
- * no hay que esperar a que reviente en el navegador.
- *
- * CONVENCIÓN DEL PROYECTO
- *   - tipos compartidos por todo el sistema  -> types/index.d.ts
- *   - tipos de un módulo concreto            -> types/<modulo>.ts  (este archivo)
  */
 
 /** Los números grandes del encabezado. */
@@ -46,10 +37,6 @@ export interface ResumenDelDia {
 
 /**
  * Una jornada de la serie de los últimos catorce días.
- *
- * Es lo que dibujan las líneas chicas al pie de los indicadores. Cada fila trae
- * los DOS valores del día porque las dos series salen del mismo recorrido en
- * PHP: separarlas obligaría a mandar el calendario dos veces.
  */
 export interface ActividadDia {
     /** Clave ordenable: '2026-09-16'. */
@@ -69,10 +56,6 @@ export interface CarnetsPorTipo {
 
 /**
  * Pescadores contra comercializadores, entre los carnets vigentes.
- *
- * Sale del enum y no de la base para que los dos aparezcan aunque uno esté en
- * cero: un valor que no vuelve en la consulta haría que el bloque mienta por
- * omisión.
  */
 export interface CarnetsPorActor {
     tipo: TipoActor;
@@ -111,10 +94,6 @@ export interface UltimoCarnet {
 
 /**
  * Lo que está por caducar o ya caducó sin cerrarse.
- *
- * Las dos últimas cifras no son avisos de vencimiento sino de TRABAJO SIN
- * CERRAR: una faena o una guía que se pasó de fecha y sigue activa es un papel
- * que alguien se llevó y del que nadie registró la vuelta.
  */
 export interface Avisos {
     gestion: number;

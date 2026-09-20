@@ -2,27 +2,6 @@ import type { EstadoAprovechamiento, EstadoFaena, ModalidadAprovechamiento } fro
 
 /**
  * Tipos del módulo Aprovechamientos — la BOLSA MADRE del pescador.
- *
- * Describen, campo por campo, lo que arma
- * App\Http\Controllers\Panel\AprovechamientoController. Si allá se renombra una
- * clave y acá no, el editor lo marca en rojo al instante en vez de descubrirlo
- * con una pantalla en blanco.
- *
- * ============================================================================
- *  TODO LO CALCULADO LLEGA RESUELTO DEL SERVIDOR
- * ============================================================================
- *
- * `saldo_kg`, `vigente`, `puede_emitir_faena`, `saldo_pendiente`: ninguno se
- * deduce en la pantalla, y no es comodidad. Son REGLAS:
- *
- *   - `vigente` mira el estado Y la fecha, porque la columna de estado la
- *     escribe un comando que corre una vez al día y entre corrida y corrida
- *     miente.
- *   - `saldo_kg` se corta en cero: un cupo excedido no es un saldo negativo.
- *   - `saldo_pendiente` también, porque pagar de más no genera saldo a favor.
- *
- * Deducirlas en React sería una segunda copia de cada una, y las copias se
- * desincronizan sin que nada falle.
  */
 
 /** Un cupo, tal como lo pintan el listado y la ficha. */
@@ -41,20 +20,11 @@ export interface CupoFila {
 
     /**
      * Los kilos OTORGADOS, copiados del techo del tramo al otorgar.
-     *
-     * Están congelados a propósito: la escala cambia por resolución, y un cupo
-     * dado en marzo bajo un tramo de 500 kg no puede pasar a valer 800 porque
-     * alguien editó el catálogo. La única cosa que los mueve es una AMPLIACIÓN.
      */
     volumen_total_kg: number;
 
     /**
      * Lo que el pescador declaró que navega: «canoa», «peque-peque», «bote»…
-     *
-     * Es el renglón «Tipo de Embarcación» del talonario verde, y va en texto
-     * libre porque no hay padrón de embarcaciones ni nomenclatura fija. NULL
-     * cuando no se declaró —que el papel también admite—, y por eso la pantalla
-     * distingue «no declarada» de una cadena vacía.
      */
     tipo_embarcacion: string | null;
 
@@ -80,10 +50,6 @@ export interface CupoFila {
 
     /**
      * Los kilos que se PASARON del volumen otorgado.
-     *
-     * En modo estricto siempre es 0 —la emisión no deja pasar una faena que no
-     * entre—, así que solo aparece en pantalla cuando hay algo que mostrar.
-     * `saldo_kg` no puede decirlo: se corta en cero.
      */
     kilos_excedidos: number;
     excedido: boolean;
@@ -91,24 +57,18 @@ export interface CupoFila {
     puede_emitir_faena: boolean;
     /**
      * Si todavía se puede corregir, y si se puede borrar la fila entera.
-     *
-     * NO son «el estado es pendiente»: son eso Y que no haya entrado plata —y
-     * para eliminar, además, que no tenga faenas emitidas—. Llegan resueltas
-     * del servidor porque deducirlas acá sería una segunda copia de tres reglas.
      */
     puede_editarse: boolean;
     puede_eliminarse: boolean;
 
     /**
      * Las tres del circuito de revisión, resueltas en el servidor.
-     *
-     * `puede_enviarse` NO es «el estado es pendiente»: es eso Y que los
-     * depósitos cubran el monto entero. Deducirlo acá sería una segunda copia
-     * de la regla, y con un saldo que la pantalla puede tener viejo.
      */
     admite_pagos: boolean;
     puede_enviarse: boolean;
     puede_revisarse: boolean;
+    /** Si pasó por la firma: es lo que habilita la autorización en papel. */
+    ya_fue_aprobado: boolean;
 
     monto: number;
     saldo_pendiente: number;
@@ -124,14 +84,16 @@ export interface CupoFicha extends CupoFila {
     escala_descripcion: string | null;
     /** [piso, techo] del tramo, para contrastarlo con lo otorgado. */
     escala_rango: [number, number] | null;
+
+    /**
+     * Cuántas boletas quedan sin dar por buenas —sin validar u observadas—.
+     */
+    pagos_sin_validar: number;
+    puede_aprobarse: boolean;
 }
 
 /**
  * Un depósito que pagó este cupo, en la ficha.
- *
- * Son VARIOS a propósito: un cupo se puede pagar en cuotas, y cada depósito
- * bancario llega con su propia boleta. No hay efectivo ni QR, así que las tres
- * columnas de la boleta están siempre.
  */
 export interface PagoDelCupo {
     id: number;
@@ -140,10 +102,42 @@ export interface PagoDelCupo {
     comprobante_url: string | null;
     /** Un DÍA —lo que dice la boleta—: se muestra con fecha(). */
     fecha_deposito: string | null;
-    numero_recibo: string | null;
-    recibo_id: number;
     /** Un MOMENTO —cuándo entró la plata—: se muestra con fechaHora(). */
     cobrado_en: string | null;
+
+    /**
+     *  EL CONTROL DE LA BOLETA, QUE NO ES EL ESTADO DEL PAGO
+     */
+    estado_validacion: 'pendiente' | 'validado' | 'observado';
+    estado_validacion_etiqueta: string;
+    estado_validacion_color: string;
+    /** Qué se le objetó. Es lo único que le dice a ventanilla qué corregir. */
+    observacion: string | null;
+
+    /** Quién lo cargó y quién lo controló: dos personas, dos columnas. */
+    registrado_por: string | null;
+    validado_por: string | null;
+    /** Un MOMENTO —cuándo se miró la boleta—: se muestra con fechaHora(). */
+    validado_en: string | null;
+
+    /**
+     * Las dos llegan RESUELTAS del servidor, y no se recalculan acá: dependen
+     * del estado del TRÁMITE además del estado del pago —controlar solo corre
+     * en revisión— y una copia de esa regla en la pantalla se queda vieja sola.
+     */
+    puede_validarse: boolean;
+    puede_corregirse: boolean;
+}
+
+/**
+ * EL RECIBO DEL TRÁMITE: uno solo, con todos los depósitos adentro.
+ */
+export interface ReciboDelCupo {
+    id: number;
+    numero_recibo: string;
+    monto_total: number;
+    /** Un MOMENTO —cuándo se emitió—: se muestra con fechaHora(). */
+    emitido_en: string | null;
 }
 
 /** Una faena colgada del cupo, en la ficha. */
@@ -156,10 +150,6 @@ export interface FaenaDelCupo {
     estado_color: string;
     /**
      * Si sus kilos pesan contra el saldo.
-     *
-     * Una faena VENCIDA libera su volumen —la salida no ocurrió— así que la
-     * pantalla la marca aparte: sin eso, la suma de la lista no cuadra con el
-     * saldo y parece un error del sistema.
      */
     consume_cupo: boolean;
     fecha_salida: string | null;
@@ -174,11 +164,6 @@ export interface TramoElegible {
     kilos_min: number;
     /**
      * El techo del rango, que es EL VOLUMEN QUE SE VA A OTORGAR.
-     *
-     * La escala dice «201 kg Hasta 500 Kg»: lo que se autoriza es el máximo, no
-     * un número que el operador elija adentro. Por eso el formulario lo muestra
-     * al elegir el tramo: las dos consecuencias —kilos y precio— se ven antes
-     * de guardar, no después.
      */
     kilos_max: number;
     valor_bs: number;

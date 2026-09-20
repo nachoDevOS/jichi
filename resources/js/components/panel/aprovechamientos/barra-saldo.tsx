@@ -1,24 +1,5 @@
 /**
  * Cuánto queda del cupo, en números y en barra.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ ES UN COMPONENTE Y NO CÓDIGO DE LA PANTALLA
- * ----------------------------------------------------------------------------
- *
- * Lo usan el listado y la ficha, y tiene que decir lo MISMO en los dos: el
- * umbral de «le queda poco» pintado de un color en una pantalla y de otro en la
- * siguiente es peor que no pintarlo, porque enseña a desconfiar del color.
- *
- * ----------------------------------------------------------------------------
- *  EL PORCENTAJE LLEGA CALCULADO DEL SERVIDOR
- * ----------------------------------------------------------------------------
- *
- * No se divide acá. Un cupo de 0 kg no debería existir pero puede —un dato mal
- * cargado— y esa división reventaría la fila entera. `porcentajeUsado()` del
- * modelo devuelve 100 en ese caso y sigue.
- *
- * La barra se dibuja con un div de ancho porcentual y no con una librería: para
- * un solo valor, traer recharts sería cargar 100 KB para pintar un rectángulo.
  */
 export function BarraSaldo({
     cupo,
@@ -38,10 +19,6 @@ export function BarraSaldo({
 }) {
     /*
      * Se avisa en ámbar por debajo del 20%.
-     *
-     * Es el umbral en que conviene que el pescador se entere ANTES de salir:
-     * descubrir que no alcanza cuando vuelve con la bodega llena no sirve de
-     * nada, porque el producto ya se extrajo.
      */
     const escaso = cupo.volumen_total_kg > 0 && cupo.saldo_kg / cupo.volumen_total_kg < 0.2;
 

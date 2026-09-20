@@ -2,21 +2,6 @@ import type { EstadoFaena } from '@/types';
 
 /**
  * Tipos del módulo Faenas — el permiso de UNA salida de pesca.
- *
- * Describen, campo por campo, lo que arma
- * App\Http\Controllers\Panel\FaenaController.
- *
- * ============================================================================
- *  TRES BANDERAS LLEGAN RESUELTAS, Y NINGUNA SE DEDUCE EN LA PANTALLA
- * ============================================================================
- *
- *   - `vigente` mira el estado Y la fecha límite. La columna de estado la
- *     escribe un comando diario y entre corrida y corrida miente.
- *   - `consume_cupo` sale del enum: una faena VENCIDA libera su volumen, porque
- *     la salida no ocurrió.
- *   - `puede_completarse` exige que esté EN CURSO. Sobre una vencida no se
- *     puede: al vencer ya devolvió los kilos, y completarla los volvería a
- *     descontar de un cupo que se repuso.
  */
 
 /** Una faena, tal como la pintan el listado y la ficha. */

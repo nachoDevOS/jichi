@@ -2,30 +2,7 @@ import { usePage } from '@inertiajs/react';
 import type { PageProps } from '@/types';
 
 /**
- * ============================================================================
  *  EL LÍMITE DE LOS ARCHIVOS, UNO SOLO PARA TODO EL SISTEMA
- * ============================================================================
- *
- * ¿POR QUÉ VALIDAR EL PESO EN EL NAVEGADOR SI EL SERVIDOR YA LO VALIDA?
- *
- * Por lo mismo que se esconde un botón por permiso: no es seguridad, es no
- * hacerle perder el tiempo al operador. Sin esto, adjuntar un escaneo de 8 MB
- * significa esperar a que suba entero por la conexión de la Gobernación —que no
- * es rápida— para que recién ahí el servidor lo rechace. Con el control acá, el
- * aviso es instantáneo y no se sube ni un byte.
- *
- * La regla de verdad sigue estando en el servidor. Ver
- * `RegistrarSolicitudRequest` y `GuardarBeneficiarioRequest`.
- *
- * ----------------------------------------------------------------------------
- *  EL NÚMERO NO ESTÁ ESCRITO ACÁ
- * ----------------------------------------------------------------------------
- *
- * Sale de `config/jichi.php` y llega por Inertia, igual que el símbolo de la
- * moneda. Escrito a mano en este archivo, el día que el límite cambie en el
- * servidor esta pantalla seguiría diciendo el número viejo: el operador leería
- * «hasta 4 MB» y el sistema le rechazaría un archivo de 3,5 MB sin que nadie
- * entienda por qué.
  */
 export function useArchivos() {
     const { archivos } = usePage<PageProps>().props;
@@ -43,11 +20,6 @@ export function useArchivos() {
 
     /**
      * Devuelve el mensaje de error, o NULL si el archivo sirve.
-     *
-     * Se comprueban las dos cosas que el servidor va a comprobar: el tipo y el
-     * peso. El tipo también, porque el atributo `accept` del input es una
-     * sugerencia —el usuario puede elegir «Todos los archivos» en el diálogo
-     * del sistema y mandar lo que quiera—.
      */
     function validar(archivo: File, opciones?: { soloImagen?: boolean }): string | null {
         const permitidos = (

@@ -12,34 +12,7 @@ import type { PageProps } from '@/types';
 import type { TramoElegible } from '@/types/aprovechamientos';
 
 /**
- * ============================================================================
  *  CORREGIR UN APROVECHAMIENTO QUE TODAVÍA ES BORRADOR
- * ============================================================================
- *
- * Solo se llega acá con el cupo PENDIENTE DE PAGO y sin ningún abono encima. El
- * servidor lo comprueba dos veces —al abrir la pantalla y al guardar, esta
- * última con la fila bloqueada— porque entre una cosa y la otra otra ventanilla
- * puede cobrarlo.
- *
- * ----------------------------------------------------------------------------
- *  EL TITULAR NO SE CAMBIA, Y NO ES UN OLVIDO
- * ----------------------------------------------------------------------------
- *
- * Corregir es arreglar una carga equivocada; mover la autorización de una
- * persona a otra es otra cosa, y dejarlo hacer desde acá la volvería invisible:
- * la fila quedaría igual, con otro nombre, sin nada que lo delate. Si el cupo se
- * cargó a quien no era, se elimina —con el motivo escrito— y se otorga de nuevo.
- *
- * Por eso la persona se muestra fija arriba, no en el buscador.
- *
- * ----------------------------------------------------------------------------
- *  ES EL MISMO FORMULARIO QUE EL ALTA MENOS ESE CAMPO
- * ----------------------------------------------------------------------------
- *
- * Se mantiene como pantalla aparte —y no como un modo de `crear.tsx`— porque lo
- * que cambia no es un campo sino el significado: el alta elige a quién y esta
- * no, el alta manda a la caja y esta vuelve a la ficha. Un solo componente con
- * dos modos tendría un `if` en cada una de esas decisiones.
  */
 export default function EditarCupo({
     cupo,

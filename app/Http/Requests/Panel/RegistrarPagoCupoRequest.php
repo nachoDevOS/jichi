@@ -7,30 +7,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para cargar UNO O VARIOS depósitos contra un aprovechamiento.
- *
- * ============================================================================
- *  LLEGAN EN UN ARREGLO PORQUE LA PANTALLA ES REPETIBLE
- * ============================================================================
- *
- * El operador agrega tantas secciones como depósitos trajo la persona, y las
- * manda todas juntas. Cada una es un depósito completo: su monto, su número de
- * boleta, su fecha y su archivo.
- *
- * ----------------------------------------------------------------------------
- *  LOS NÚMEROS DE BOLETA SE COMPARAN CONTRA LA BASE **Y ENTRE SÍ**
- * ----------------------------------------------------------------------------
- *
- * `Rule::unique` mira la tabla, no el resto del formulario: dos secciones con el
- * mismo número pasarían las dos y recién chocarían contra el índice, con un
- * error de base en la cara del operador. Por eso va además `distinct`.
- *
- * ----------------------------------------------------------------------------
- *  LO QUE NO SE VALIDA ACÁ
- * ----------------------------------------------------------------------------
- *
- * Que la suma no exceda el saldo. Esa comparación corre DENTRO de la
- * transacción y con la fila del cupo bloqueada: entre que se abre el formulario
- * y se guarda, otra ventanilla puede haber cobrado. Ver CobrarService::resolver().
  */
 class RegistrarPagoCupoRequest extends FormRequest
 {
@@ -86,12 +62,6 @@ class RegistrarPagoCupoRequest extends FormRequest
 
             /*
              * ¿EL OPERADOR PIDIÓ ENVIARLO A REVISIÓN EN EL MISMO ACTO?
-             *
-             * Viene del botón, que cambia de texto según si las secciones cubren
-             * el monto: «Registrar depósitos» cuando falta, «Registrar y enviar
-             * a revisión» cuando alcanza. Es una INTENCIÓN, no un permiso: si al
-             * guardar el saldo no quedó en cero —porque otra ventanilla movió
-             * algo— el controlador registra igual y no envía.
              */
             'enviar' => ['nullable', 'boolean'],
         ];

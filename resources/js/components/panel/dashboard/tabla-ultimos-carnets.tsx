@@ -6,31 +6,12 @@ import type { UltimoCarnet } from '@/types/dashboard';
 
 /**
  * Las últimas diez credenciales emitidas.
- *
- * Se muestra el SALDO y no el precio: lo que le interesa a quien mira el
- * tablero es qué falta cobrar, no cuánto salía el carnet. Uno cubierto se ve de
- * un vistazo porque dice «Pagado» en verde.
  */
 export function TablaUltimosCarnets({ carnets, moneda }: { carnets: UltimoCarnet[]; moneda: string }) {
     return (
         /*
          * `min-w-0` NO ES DECORACIÓN, y sin él el `overflow-x-auto` de abajo no
          * sirve para nada.
-         *
-         * Un elemento dentro de una grilla arranca con `min-width: auto`, que
-         * significa «no te encojas por debajo de tu contenido». El contenido acá
-         * es una tabla de seis columnas que mide unos 675 px, así que la tarjeta
-         * se estira a 675 px aunque la pantalla tenga 375: el que termina con
-         * barra de desplazamiento es el DOCUMENTO ENTERO, y en un celular se
-         * corre de costado la pantalla completa —menú, encabezado y todo— para
-         * leer una columna.
-         *
-         * `min-w-0` devuelve el permiso de encogerse. Recién entonces la
-         * tarjeta se queda en 375, la tabla desborda DENTRO suyo y el
-         * `overflow-x-auto` la hace desplazable sola, que era la intención.
-         *
-         * NO SE NOTA EN EL ESCRITORIO, que es donde se prueba: aparece solo al
-         * angostar la ventana.
          */
         <Card className="min-w-0 lg:col-span-3">
             <CardHeader>

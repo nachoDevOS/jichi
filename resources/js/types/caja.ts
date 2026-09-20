@@ -1,25 +1,14 @@
 /**
  * Tipos del módulo Caja y Recibos — el circuito del dinero.
- *
- * Describen lo que arman `CajaController` y `ReciboController`.
- *
- * ============================================================================
- *  DOS VISTAS DEL MISMO HECHO, Y NINGUNA REEMPLAZA A LA OTRA
- * ============================================================================
- *
- *   - `PagoFila` es un ABONO: cada entrega de dinero, con su método y su
- *     trámite. Es lo que se cuadra contra el efectivo del cajón al cerrar.
- *   - `ReciboFila` es el PAPEL entregado, con su correlativo. Es lo que audita
- *     Contabilidad.
- *
- * Un recibo agrupa varios abonos, así que las dos listas nunca tienen la misma
- * cantidad de filas.
  */
 
 /** Un abono, en el listado de caja. */
 export interface PagoFila {
     id: number;
-    recibo_id: number;
+    /**
+     * NULL mientras el depósito no tiene papel.
+     */
+    recibo_id: number | null;
     numero_recibo: string | null;
     /** A nombre de quién salió el comprobante. Puede ser un tercero. */
     a_nombre_de: string | null;
@@ -33,9 +22,6 @@ export interface PagoFila {
      * La boleta del banco. Nunca faltan: TODO pago es un depósito bancario —no
      * hay efectivo ni QR—, así que cada fila lleva su número, su fecha y su
      * archivo.
-     *
-     * Cuando un mismo depósito cubre varias líneas, la segunda en adelante
-     * llevan el número con un sufijo («0012345678-2»), porque es único global.
      */
     nro_transaccion: string;
     comprobante_url: string | null;
@@ -47,13 +33,6 @@ export interface PagoFila {
 
 /**
  * Lo cobrado hoy, repartido por método.
- *
- * Es SIEMPRE del día de hoy, no del rango filtrado: es lo que se compara contra
- * el efectivo del cajón antes de cerrar, y esa pregunta no cambia porque
- * alguien esté mirando marzo.
- *
- * El reparto por método tampoco es decorativo: lo que hay que cuadrar contra el
- * cajón es el EFECTIVO, y una transferencia no está ahí adentro.
  */
 export interface ArqueoDelDia {
     fecha: string;
@@ -70,11 +49,6 @@ export interface ArqueoDelDia {
 
 /**
  * Una deuda de la persona, lista para cobrar.
- *
- * `tipo` es una palabra corta —`carnet`, `cupo`, `guia`— y no un nombre de
- * clase: el servidor la traduce con una lista blanca. Mandando la clase
- * directo, cualquiera podría escribir otra en el navegador y el sistema crearía
- * pagos apuntando a cualquier tabla.
  */
 export interface DeudaCobrable {
     tipo: 'carnet' | 'cupo' | 'guia';

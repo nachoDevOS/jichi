@@ -13,34 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  CATÁLOGO DE ASOCIACIONES — el gremio que certifica al beneficiario
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  NO HAY `destroy()`, Y NO ES UN OLVIDO
- * ----------------------------------------------------------------------------
- *
- * Los carnets y las guías ya emitidas apuntan acá. Borrar una asociación los
- * dejaría huérfanos —o, con el RESTRICT de la clave foránea, fallaría con un
- * error que el operador no puede interpretar—.
- *
- * Para sacarla de circulación se la pone en `inactivo`: desaparece de los
- * desplegables de alta y los documentos históricos la siguen mostrando. Es lo
- * correcto: la persona pertenecía a ella cuando se le emitió el carnet.
- *
- * ----------------------------------------------------------------------------
- *  UNA SOLA PANTALLA, CON EL FORMULARIO AL LADO DE LA TABLA
- * ----------------------------------------------------------------------------
- *
- * Los tres catálogos tienen `index` + `store` + `update` y ninguna pantalla de
- * alta o edición aparte. El motivo es el tamaño: son listas de pocas filas que
- * se cargan una vez cuando sale la resolución. Navegar a otra pantalla para
- * agregar una fila y volver hace perder de vista la lista, que es justamente
- * contra lo que se compara al cargarla.
- *
- * Es lo contrario de Beneficiarios, que sí tiene pantallas aparte: ahí el
- * formulario tiene veinte campos y una foto, y no entra al costado de nada.
  */
 class AsociacionController extends Controller
 {

@@ -6,11 +6,6 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Reglas para cerrar una guía.
- *
- * El peso es OPCIONAL: lo declarado al salir es lo que dijo la balanza del
- * origen, y al llegar se vuelve a pesar. Casi nunca coincide al kilo, así que
- * el campo permite corregirlo — y a diferencia de la faena, acá no hay tope:
- * no existe ningún cupo que exceder.
  */
 class CerrarGuiaRequest extends FormRequest
 {

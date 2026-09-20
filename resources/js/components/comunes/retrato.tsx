@@ -3,24 +3,6 @@ import { cn } from '@/lib/utils';
 
 /**
  * La foto de una persona en una fila de tabla, o la silueta cuando no tiene.
- *
- * ----------------------------------------------------------------------------
- *  EL HUECO SE DIBUJA IGUAL, Y DEL MISMO TAMAÑO
- * ----------------------------------------------------------------------------
- *
- * Sin él, las filas con y sin fotografía tendrían alturas distintas y la tabla
- * quedaría dentada; peor todavía, la columna del nombre se correría de lugar
- * entre una fila y otra, que es lo que más molesta al recorrer el padrón con la
- * vista.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ ESTÁ EN `comunes/` Y NO DENTRO DE UNA PANTALLA
- * ----------------------------------------------------------------------------
- *
- * Porque lo usan dos listados que no se conocen entre sí —el padrón de
- * beneficiarios y el de trámites— y los dos tienen que verse igual. Copiado en
- * cada uno, alcanza con ajustar el tamaño en uno para que las dos tablas dejen
- * de coincidir.
  */
 export function Retrato({
     url,

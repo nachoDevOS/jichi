@@ -2,22 +2,6 @@ import type { EstadoCarnet, TipoActor } from '@/types';
 
 /**
  * Tipos del módulo Carnets — la credencial anual.
- *
- * Describen, campo por campo, lo que arma
- * App\Http\Controllers\Panel\CarnetController.
- *
- * ============================================================================
- *  LAS TRES BANDERAS LLEGAN RESUELTAS, Y NINGUNA SE DEDUCE EN LA PANTALLA
- * ============================================================================
- *
- *   - `vigente` mira el estado Y la fecha, porque la columna de estado la
- *     escribe un comando diario y entre corrida y corrida miente.
- *   - `cupo_kg` depende del TIPO DE ACTOR, que es un enum del servidor, nunca
- *     del nombre del tipo de carnet — ese nombre es un catálogo editable.
- *   - `puede_emitir_faenas` exige además una bolsa madre con saldo.
- *
- * Un `if` sobre el nombre del tipo en React sería una segunda copia de esas
- * reglas, y se rompería en silencio en cuanto alguien renombre una fila.
  */
 
 /** Un carnet, tal como lo pintan el listado y la ficha. */
@@ -70,10 +54,6 @@ export interface CarnetFicha extends CarnetFila {
 
     /**
      * La bolsa madre que respalda el cupo impreso. Null en un comercializador.
-     *
-     * Trae el SALDO y no solo el volumen porque es lo que decide si hoy se le
-     * puede emitir una faena, que es la pregunta que trae a alguien a esta
-     * ficha.
      */
     cupo: {
         id: number;
@@ -100,10 +80,6 @@ export interface TipoElegible {
 
 /**
  * El cupo vigente de la persona elegida, si lo tiene.
- *
- * La pantalla lo usa para avisar ANTES de guardar que un carnet de pescador sin
- * cupo va a ser rechazado. El servidor lo comprueba igual dentro de la
- * transacción; esto evita el viaje en falso.
  */
 export interface CupoVigente {
     volumen_total_kg: number;

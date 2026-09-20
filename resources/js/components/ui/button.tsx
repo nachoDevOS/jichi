@@ -3,26 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 /**
- * ============================================================================
  *  LA ESCALA DE LOS BOTONES DE TODO EL SISTEMA
- * ============================================================================
- *
- * Cambiar estas clases cambia TODOS los botones, porque no hay ningún botón con
- * tamaño propio: las pantallas usan `<Button>` o, cuando el botón es un enlace,
- * `buttonVariants()` sobre un `<a>`.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ SON CHICOS
- * ----------------------------------------------------------------------------
- *
- * Esto es un panel de trabajo, no una página de inicio: la ficha de un trámite
- * llega a mostrar seis acciones en la misma barra —corregir, aprobar, rechazar,
- * recibo, imprimir, entregar—. Con botones altos esa fila se parte en dos
- * renglones y empuja el contenido hacia abajo.
- *
- * 32 px de alto (`h-8`) es la medida cómoda para un sistema que se usa con mouse
- * todo el día. NO bajar de ahí: más chico empieza a costar acertarle, y el
- * operador de ventanilla hace esto cientos de veces por jornada.
  */
 const buttonVariants = cva(
     "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0",

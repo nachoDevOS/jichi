@@ -8,18 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Aprovechamientos pesqueros — la BOLSA MADRE del pescador.
-|
-| El cupo anual en kilos, con fecha. Cada faena le descuenta; cuando el saldo
-| llega a cero no se emiten más. Esa resta vive en AprovechamientoPesq::saldoKg()
-| y no en ninguna columna.
-|
-|     PENDIENTE ──[se cobra entero]──▶ ACTIVO ──▶ AGOTADO | VENCIDO
-|
-| Cuelga del BENEFICIARIO y no del carnet porque el cupo se define primero: el
-| plástico necesita saber qué volumen imprimir. Por eso la referencia va al
-| revés, en `carnets.aprovechamiento_id`.
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {

@@ -6,19 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Recibos — la CABECERA del comprobante oficial de caja.
-|
-| El papel numerado que la persona se lleva. Agrupa uno o varios `pagos`, que
-| pueden ser de trámites distintos:
-|
-|     recibo 0016 (180 Bs)  ──< pago  80 Bs → carnet
-|                           ──< pago 100 Bs → aprovechamiento
-|
-| Es una tabla y no se arma al vuelo porque `numero_recibo` es un CORRELATIVO DE
-| CAJA —el dato que no se puede derivar de otras tablas— y porque el comprobante
-| tiene que ser INMUTABLE: por eso el nombre, el NIT y el total se COPIAN acá al
-| emitir.
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -31,11 +18,6 @@ return new class extends Migration
              * String y no entero: la serie lleva prefijo y año —REC-2026-0016— y
              * el año que viene el contador vuelve a 1. Se reserva con
              * CorrelativoService, que bloquea la fila del contador.
-             *
-             * Único GLOBAL y NO parcial: es un correlativo que Contabilidad
-             * audita. Un recibo dado de baja deja su número QUEMADO —el papel
-             * salió— y la serie conserva el hueco, que es justamente lo que la
-             * hace auditable.
              */
             $table->string('numero_recibo', 40)->unique();
 
@@ -50,15 +32,6 @@ return new class extends Migration
 
             /*
              * ÍNDICE, no columna: `created_at` ya la creó timestamps().
-             *
-             * Lo gana el ORDEN del listado de recibos, que hace
-             * `latest('created_at')` + paginado en cada carga: sin índice, cada
-             * página ordena la tabla entera para devolver quince filas. Ver
-             * ReciboController::index().
-             *
-             * Ese listado además filtra por rango con `whereDate()`, y eso NO
-             * usa este índice —envuelve la columna en una función—. Se arregla
-             * comparando contra instantes en vez de días; queda anotado.
              */
             $table->index('created_at');
 

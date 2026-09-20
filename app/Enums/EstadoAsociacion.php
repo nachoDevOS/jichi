@@ -4,12 +4,6 @@ namespace App\Enums;
 
 /**
  * Si una asociación se puede elegir hoy en un formulario.
- *
- * Una asociación se da de baja cambiando el estado, NUNCA borrando la fila:
- * los carnets y las guías ya emitidas apuntan a ella y no pueden quedar
- * huérfanos. Una asociación `Inactiva` desaparece de los desplegables, pero
- * los documentos históricos la siguen mostrando — es lo correcto, porque la
- * persona pertenecía a ella cuando se le emitió el carnet.
  */
 enum EstadoAsociacion: string
 {

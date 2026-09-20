@@ -13,19 +13,7 @@ import type { PageProps } from '@/types';
 import type { CarnetFicha } from '@/types/carnets';
 
 /**
- * ============================================================================
  *  LA FICHA DE UN CARNET
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  LO PRIMERO ES QUÉ HABILITA HOY, NO LOS DATOS
- * ----------------------------------------------------------------------------
- *
- * Quien abre esta pantalla casi siempre viene con una pregunta concreta:
- * «¿puedo emitirle una faena a esta persona?». Los datos del titular ya los
- * tiene delante, en el plástico. Por eso el bloque de arriba responde eso, con
- * la respuesta YA RESUELTA por el servidor —`puede_emitir_faenas` exige carnet
- * vigente Y cupo con saldo, dos cosas que la pantalla no puede juntar sola—.
  */
 export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
     const { puede } = usePermisos();
@@ -264,10 +252,6 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
 
 /**
  * Por qué el carnet no habilita, cuando no habilita.
- *
- * Se arma de las banderas que ya llegaron resueltas, en orden de precedencia:
- * primero lo que bloquea el documento entero y después lo que bloquea solo al
- * cupo. Decir «no puede» sin decir por qué manda al operador a adivinar.
  */
 function razonDeBloqueo(carnet: CarnetFicha): string | null {
     if (carnet.estado === 'revocado') {

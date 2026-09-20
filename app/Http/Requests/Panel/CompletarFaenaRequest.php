@@ -6,18 +6,6 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Reglas para cerrar un permiso de faena.
- *
- * ----------------------------------------------------------------------------
- *  LOS KILOS SON OPCIONALES, Y ESE ES EL PUNTO
- * ----------------------------------------------------------------------------
- *
- * Lo declarado al salir es una previsión; lo que se descargó lo dice la
- * balanza. Casi siempre coinciden y el operador no escribe nada: la faena se
- * cierra con lo que decía.
- *
- * Cuando NO coinciden, el campo permite corregirlo. Si la corrección es hacia
- * arriba, el servicio vuelve a comprobar el saldo del cupo — de lo contrario
- * cerrar una faena sería la forma de saltear el límite.
  */
 class CompletarFaenaRequest extends FormRequest
 {

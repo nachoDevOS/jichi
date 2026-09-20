@@ -11,32 +11,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 
 /**
- * ============================================================================
  *  EMITIR UN PERMISO DE FAENA — paso 4 del flujo
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  SE ELIGE UNA PERSONA Y DESPUÉS UN CARNET, NO AL REVÉS
- * ----------------------------------------------------------------------------
- *
- * En el mostrador la persona se identifica con su cédula, no con el código del
- * plástico: llega, lo deja sobre el escritorio y el operador tipea el nombre.
- * Por eso el formulario arranca con el buscador de beneficiarios y recién
- * después muestra qué credenciales tiene.
- *
- * Y las muestra TODAS las vigentes, no solo las que sirven. Un carnet de
- * comercializador aparece deshabilitado y con el motivo al lado, en vez de
- * desaparecer: si no está, el operador cree que la persona no tiene carnet y
- * va a emitirle otro.
- *
- * ----------------------------------------------------------------------------
- *  EL NÚMERO SE PROPONE, NO SE IMPONE
- * ----------------------------------------------------------------------------
- *
- * Sale de un talonario de PAPEL que el pescador se lleva. El sistema sugiere el
- * siguiente para no hacer contar hojas, pero el campo es editable: si la hoja
- * que el operador tiene en la mano dice otro número, hay algo que conviene
- * mirar antes de seguir, no autocorregir en silencio.
  */
 export default function CrearFaena({
     beneficiario,
@@ -49,11 +24,6 @@ export default function CrearFaena({
     /**
      * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor, y ES LO QUE DECIDE
      * SI EL BOTÓN SE BLOQUEA.
-     *
-     * Con la validación apagada el servidor acepta la faena igual, así que
-     * frenar acá sería la pantalla inventando una regla que el sistema no
-     * tiene — y el operador se quedaría sin poder emitir algo perfectamente
-     * válido, sin ningún mensaje que lo explique.
      */
     modoEstricto: boolean;
 }) {
@@ -300,14 +270,6 @@ export default function CrearFaena({
 
 /**
  * Los carnets vigentes de la persona, con el que no sirve deshabilitado.
- *
- * NO SE FILTRAN LOS QUE NO PUEDEN: aparecen en gris y con el motivo al lado. Un
- * carnet que desaparece de la lista le dice al operador «esta persona no tiene
- * carnet», que es falso y lo manda a emitir otro.
- *
- * `puede_emitir_faenas` llega RESUELTO del servidor: exige carnet vigente, de
- * pescador Y con cupo con saldo. Son tres condiciones que la pantalla no puede
- * juntar sola sin copiar la regla.
  */
 function ListaDeCarnets({
     carnets,

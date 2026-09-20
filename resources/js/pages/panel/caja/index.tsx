@@ -15,27 +15,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { ArqueoDelDia, PagoFila } from '@/types/caja';
 
 /**
- * ============================================================================
  *  CAJA — el listado de ABONOS
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  ESTA PANTALLA MUESTRA ABONOS, NO RECIBOS, Y NO ES LO MISMO
- * ----------------------------------------------------------------------------
- *
- * Un recibo agrupa varios abonos, así que las dos listas nunca tienen la misma
- * cantidad de filas. Acá se mira el DINERO —cada depósito, con su boleta— que es
- * lo que se cuadra contra el cajón. En «Recibos» se miran los PAPELES, con su
- * correlativo, que es lo que audita Contabilidad.
- *
- * ----------------------------------------------------------------------------
- *  EL ARQUEO ES SIEMPRE DE HOY, AUNQUE SE ESTÉ FILTRANDO OTRO MES
- * ----------------------------------------------------------------------------
- *
- * Es deliberado. Lo que se cuadra contra el extracto del banco antes de cerrar
- * es lo de hoy, y esa pregunta no cambia porque alguien esté mirando marzo. Un
- * total que siguiera al filtro invitaría a cuadrar la caja contra el número
- * equivocado.
  */
 export default function IndiceCaja({
     pagos,
@@ -110,14 +90,6 @@ export default function IndiceCaja({
                             {/*
                                 LAS DOS FECHAS NO SON LA MISMA PREGUNTA, y por eso
                                 van los dos números:
-
-                                  - CARGADO HOY  cuadra el trabajo del día.
-                                  - DEPOSITADO   se cruza contra el extracto.
-
-                                Un depósito del viernes registrado el lunes entra
-                                en el primero y no en el segundo. Antes acá iba el
-                                reparto por método de pago, que desapareció: todo
-                                pago es un depósito bancario.
                             */}
                             <div>
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -215,13 +187,30 @@ export default function IndiceCaja({
                                         <tbody className="divide-y divide-border">
                                             {pagos.data.map((p) => (
                                                 <tr key={p.id} className="hover:bg-secondary/50">
+                                                    {/* SIN ENLACE CUANDO TODAVÍA NO HAY
+                                                        PAPEL: los depósitos de un
+                                                        aprovechamiento se cargan antes de
+                                                        que el recibo exista —sale uno solo
+                                                        al enviarlo a revisión— y un Link a
+                                                        un id nulo lleva a una pantalla que
+                                                        no existe. */}
                                                     <td className="px-5 py-2.5">
-                                                        <Link
-                                                            href={route('recibos.show', p.recibo_id)}
-                                                            className="font-mono font-medium text-primary hover:underline"
-                                                        >
-                                                            {p.numero_recibo ?? '—'}
-                                                        </Link>
+                                                        {p.recibo_id ? (
+                                                            <Link
+                                                                href={route('recibos.show', p.recibo_id)}
+                                                                className="font-mono font-medium text-primary hover:underline"
+                                                            >
+                                                                {p.numero_recibo ?? '—'}
+                                                            </Link>
+                                                        ) : (
+                                                            <span
+                                                                className="font-mono text-muted-foreground"
+                                                                title="El recibo se emite al enviar el trámite a revisión"
+                                                            >
+                                                                Sin recibo
+                                                            </span>
+                                                        )}
+
                                                         <p className="text-xs text-muted-foreground">
                                                             {p.a_nombre_de ?? '—'}
                                                         </p>

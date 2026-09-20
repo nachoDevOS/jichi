@@ -8,29 +8,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Number;
 
 /**
- * ============================================================================
  *  EL RECIBO, COMO LO NECESITA LA PLANTILLA IMPRESA
- * ============================================================================
- *
- * Es un ADAPTADOR entre el modelo `Recibo` y `views/documentos/recibo-oficial`.
- * La plantilla es una maqueta de coordenadas fijas, medida contra el talonario
- * verde del SEDAG y afinada durante días —los contornos, el sello atenuado, los
- * casilleros de la fecha—. Tocarla para que lea los nombres nuevos de las
- * columnas sería rehacer ese trabajo para no ganar nada.
- *
- * Así que el modelo se adapta a la plantilla, y no al revés: esta clase expone
- * exactamente lo que el Blade pide —`numeroImpreso()`, `montoEnLetras()`,
- * `marca()`, `beneficiario_nombre`…— leyendo del modelo de hoy.
- *
- * ----------------------------------------------------------------------------
- *  A DIFERENCIA DEL ANTERIOR, ACÁ EL NÚMERO SÍ ESTÁ GUARDADO
- * ----------------------------------------------------------------------------
- *
- * El `ReciboArmado` del modelo viejo tenía que usar el id del trámite como
- * número, porque no existía la tabla `recibos` y un correlativo es justamente un
- * dato que no se puede derivar. Hoy la tabla existe y `numero_recibo` es un
- * correlativo de verdad —`REC-2026-0016`, reservado con la fila del contador
- * bloqueada—, así que la serie NO tiene huecos y Contabilidad la puede auditar.
  */
 readonly class ReciboImpreso
 {
@@ -43,14 +21,7 @@ readonly class ReciboImpreso
     ) {}
 
     /**
-     * ========================================================================
      *  ARMA EL RECIBO IMPRESO A PARTIR DEL MODELO
-     * ========================================================================
-     *
-     * Los pagos tienen que venir cargados con su `pagable`, y con `morphWith`:
-     * una relación polimórfica NO se precarga con `with('pagable.beneficiario')`
-     * —eso se ignora en silencio— y acá cada renglón necesita saber qué trámite
-     * pagó.
      */
     public static function desde(Recibo $recibo, string $lugar): self
     {
@@ -72,9 +43,7 @@ readonly class ReciboImpreso
         );
     }
 
-    // ------------------------------------------------------------------
     //  Lo que la plantilla lee como si fueran columnas
-    // ------------------------------------------------------------------
 
     public function __get(string $nombre): mixed
     {
@@ -84,17 +53,32 @@ readonly class ReciboImpreso
             'concepto' => $this->recibo->concepto,
 
             /*
-             * EL NÚMERO DE LA BOLETA DEL BANCO, no el del recibo.
+             * LAS BOLETAS DEL BANCO —TODAS—, no el número del recibo.
              *
-             * Va en el renglón «N° de depósito» del papel. Sale del primer pago:
-             * cuando un mismo depósito cubre varias líneas, las siguientes
-             * llevan el número con sufijo y el que corresponde escribir es el
-             * original.
+             * Va en el renglón «N°» del papel. Ver `boletas()`.
              */
-            'nro_deposito' => $this->recibo->pagos->first()?->nro_transaccion,
+            'nro_deposito' => $this->boletas(),
 
             default => null,
         };
+    }
+
+    /**
+     * Todas las boletas del recibo. El papel es UNO por trámite, así que tiene
+     * que nombrarlas todas: es con lo que Contabilidad lo cruza contra el banco.
+     */
+    public function boletas(int $tope = 6): string
+    {
+        $numeros = $this->recibo->pagos
+            ->pluck('nro_transaccion')
+            ->filter()
+            ->values();
+
+        if ($numeros->count() <= $tope) {
+            return $numeros->implode(' · ');
+        }
+
+        return $numeros->take($tope)->implode(' · ').' y '.($numeros->count() - $tope).' más';
     }
 
     /** El monto total, congelado al emitir. */
@@ -105,10 +89,6 @@ readonly class ReciboImpreso
 
     /**
      * El número que va en el recuadro N° del papel: 0016.
-     *
-     * Se imprime SOLO LA PARTE NUMÉRICA de `REC-2026-0016`, porque el recuadro
-     * del talonario es angosto y porque el prefijo y el año ya están impresos
-     * alrededor. El número completo sigue en la base y en la pantalla.
      */
     public function numeroImpreso(): string
     {
@@ -118,20 +98,7 @@ readonly class ReciboImpreso
     }
 
     /**
-     * ========================================================================
      *  EL MONTO EN LETRAS — el renglón «La suma de:»
-     * ========================================================================
-     *
-     * Sale así: «OCHENTA 00/100 BOLIVIANOS».
-     *
-     * El papel trae preimpreso un «-00/100» al final del renglón, que es la
-     * forma clásica de cerrar un importe escrito a mano para que nadie pueda
-     * agregarle centavos después. Se reproduce igual, con los centavos reales.
-     *
-     * `Number::spell()` usa la extensión intl, que ya es requisito del proyecto.
-     * Escribir a mano un conversor de número a palabras en castellano son
-     * doscientas líneas de casos especiales —«veintiuno», «quinientos», «un
-     * millón»— que ya están resueltas y probadas ahí.
      */
     public function montoEnLetras(): string
     {
@@ -148,9 +115,6 @@ readonly class ReciboImpreso
 
     /**
      * Los tres recuadros DIA | MES | AÑO del encabezado.
-     *
-     * Salen de `created_at` —cuándo se emitió el recibo— y no de hoy: una
-     * reimpresión de marzo tiene que seguir diciendo marzo.
      *
      * @return array{dia: string, mes: string, anio: string}
      */
@@ -178,9 +142,6 @@ readonly class ReciboImpreso
 
     /**
      * Los renglones del cuadro «IMPORTE A PAGAR Bs.».
-     *
-     * Uno por cobro, en el orden en que entraron. Un pescador que pagó en dos
-     * depósitos ve los dos escritos, igual que en el talonario de papel.
      *
      * @return array<int, array{descripcion: string, monto: float}>
      */

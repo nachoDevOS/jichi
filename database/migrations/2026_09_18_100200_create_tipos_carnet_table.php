@@ -7,16 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Tipos de carnet — el catálogo de credenciales y su arancel.
-|
-| `precio_bs` es el precio de HOY, para armar un cobro nuevo. Lo cobrado de
-| verdad queda en `pagos` y no se recalcula: un carnet emitido a 80 Bs sigue
-| diciendo 80 aunque el arancel suba.
-|
-| NO confundir con `carnets.tipo_actor`: eso es la REGLA —qué habilita el
-| documento— y vive en un enum. Esto es el CATÁLOGO —cómo se llama y cuánto
-| sale— y nunca se decide nada con un match sobre este nombre.
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {

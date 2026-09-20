@@ -5,33 +5,7 @@ import { Campo } from '@/components/ui/campo';
 import { Textarea } from '@/components/ui/textarea';
 
 /**
- * ============================================================================
  *  VENTANA DE CONFIRMACIÓN QUE EXIGE ESCRIBIR UN MOTIVO
- * ============================================================================
- *
- * Para las decisiones FINALES que hay que poder explicar después: rechazar un
- * trámite, eliminarlo. En las dos, alguien va a volver a ventanilla a preguntar
- * por qué, y sin el texto guardado nadie puede responderle.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ UNA VENTANA Y NO UN RECUADRO MÁS EN LA PANTALLA
- * ----------------------------------------------------------------------------
- *
- * Porque tapa todo lo demás y obliga a detenerse. Un formulario entre los otros
- * de la página se completa de pasada; estas dos operaciones no se deshacen.
- *
- * Es hermana de `ConfirmarAccion`, que es la versión sin motivo —para lo que
- * solo hay que confirmar—. Se mantienen separadas porque la de acá tiene un
- * campo obligatorio, un mínimo y un contador, y meter todo eso en la otra la
- * volvería un componente con dos modos.
- *
- * ----------------------------------------------------------------------------
- *  NO SE CIERRA AL HACER CLIC EN EL FONDO
- * ----------------------------------------------------------------------------
- *
- * A diferencia de otras ventanas: acá hay texto escrito a mano y un clic al
- * costado lo perdería entero. Se sale con «Cancelar» o con Escape, las dos
- * deliberadas.
  */
 export function ConfirmarConMotivo({
     abierto,
@@ -203,28 +177,5 @@ export function ConfirmarConMotivo({
 }
 
 /**
- * ============================================================================
  *  LA CASILLA DE CONSENTIMIENTO
- * ============================================================================
- *
- * Una frase que hay que MARCAR antes de poder confirmar. El botón queda apagado
- * hasta entonces.
- *
- * ----------------------------------------------------------------------------
- *  PARA QUÉ SIRVE SI YA HAY QUE APRETAR «CONFIRMAR»
- * ----------------------------------------------------------------------------
- *
- * Porque un botón se aprieta de memoria. Después de la décima vez, «¿está
- * seguro?» ya no se lee: la mano va sola al mismo lugar de la pantalla. La
- * casilla rompe eso porque está en OTRO lado y exige un acto distinto.
- *
- * Y sobre todo, DICE QUÉ SE ESTÁ AFIRMANDO. En validar un depósito no es una
- * traba: es la declaración misma —«comparé la boleta con el extracto»— y esa
- * frase es lo que después respalda la firma de quien revisó.
- *
- * Se usa solo donde hace falta: lo irreversible y lo que es una declaración. En
- * todo lo demás estorba, y una casilla que se marca sin leer no protege nada.
- *
- * Se limpia al cerrar la ventana, o la segunda vez aparecería ya marcada y no
- * serviría para nada.
  */

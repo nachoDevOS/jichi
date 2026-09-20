@@ -4,10 +4,6 @@ import { cn } from '@/lib/utils';
 /**
  * Lista desplegable. Es el <select> de HTML de toda la vida, con los estilos
  * del sistema aplicados.
- *
- * No usa librerías externas a propósito: para elegir entre pocas opciones el
- * <select> nativo funciona mejor en celular (abre el selector del sistema
- * operativo) y ya viene accesible con teclado sin escribir nada.
  */
 export const Select = React.forwardRef<
     HTMLSelectElement,

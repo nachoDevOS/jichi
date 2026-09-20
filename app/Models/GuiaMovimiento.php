@@ -15,34 +15,6 @@ use Illuminate\Support\Carbon;
 
 /**
  * El amparo de UN traslado de producto pesquero.
- *
- * Lo que la faena es para el pescador, la guía es para el comercializador: el
- * carnet habilita el año, la guía habilita el viaje. Dice de dónde a dónde, con
- * cuánta carga, y vale COMO MÁXIMO 5 DÍAS.
- *
- * ============================================================================
- *  `es_piscicultura` NO ES UN DATO DESCRIPTIVO: ES PLATA
- * ============================================================================
- *
- * Marcado, el arancel se cobra al 50%. El pescado de criadero no sale del río,
- * así que no consume el recurso que la tasa viene a proteger.
- *
- * El descuento se aplica en UN SOLO lugar —`factorArancel()`— y no se replica
- * en el controlador ni en React. Escrito en tres lados, el día que la
- * resolución cambie el 50% a 40% se corrige en dos y el tercero sigue cobrando
- * mal sin que nadie lo note hasta el arqueo.
- *
- * ============================================================================
- *  LAS FECHAS SON MOMENTOS, NO DÍAS
- * ============================================================================
- *
- * Cinco días se cuentan desde la HORA de emisión: una guía emitida a las 18:00
- * del lunes vence a las 18:00 del sábado, no a la medianoche del viernes.
- *
- * Y por eso, al mandarlas a React van con `toIso8601String()` —son instantes—
- * mientras que las de faenas y carnets van con `toDateString()`. Mandar un día
- * como instante lo corre: en UTC-4, `2026-09-17T00:00:00+00:00` se muestra como
- * 16/09.
  */
 #[Fillable([
     'beneficiario_com_id',
@@ -86,9 +58,7 @@ class GuiaMovimiento extends Model
         ];
     }
 
-    // ------------------------------------------------------------------
     //  Relaciones
-    // ------------------------------------------------------------------
 
     /** Quien comercializa. La clave va explícita: la columna no sigue la convención. */
     public function comercializador(): BelongsTo
@@ -101,9 +71,7 @@ class GuiaMovimiento extends Model
         return $this->belongsTo(Asociacion::class);
     }
 
-    // ------------------------------------------------------------------
     //  Lectura
-    // ------------------------------------------------------------------
 
     /** «Trinidad → Santa Cruz», como se lee de un vistazo en el listado. */
     protected function ruta(): Attribute
@@ -111,16 +79,10 @@ class GuiaMovimiento extends Model
         return Attribute::get(fn (): string => $this->origen.' → '.$this->destino);
     }
 
-    // ------------------------------------------------------------------
     //  Reglas de negocio
-    // ------------------------------------------------------------------
 
     /**
      * El vencimiento que corresponde a una emisión.
-     *
-     * Se calcula y se GUARDA, no se deriva al leer: si la resolución cambia el
-     * plazo, las guías ya emitidas tienen que seguir venciendo cuando dice el
-     * papel que va dentro del camión.
      */
     public static function vencimientoDesde(Carbon|string $emision): Carbon
     {
@@ -128,17 +90,7 @@ class GuiaMovimiento extends Model
     }
 
     /**
-     * ========================================================================
      *  EL ÚNICO LUGAR DONDE VIVE EL DESCUENTO DE PISCICULTURA
-     * ========================================================================
-     *
-     * Devuelve por cuánto se multiplica el arancel: 1.0 para producto de río,
-     * 0.5 para producto de criadero.
-     *
-     * Se expone como factor y no como «monto con descuento» a secas porque el
-     * mismo número lo necesitan tres pantallas distintas —el cobro, la vista
-     * previa y el reporte de recaudación— y cada una parte de una tarifa
-     * distinta.
      */
     public function factorArancel(): float
     {
@@ -153,11 +105,6 @@ class GuiaMovimiento extends Model
 
     /**
      * Lo que se cobra por esta guía. Exigido por el trait Pagable.
-     *
-     * La tarifa base sale de configuración y no de una tabla propia: hoy es un
-     * único valor para todas las guías. El día que se vuelva una escala por
-     * destino o por volumen, esto pasa a leer una tabla y el resto del circuito
-     * de cobro no se entera.
      */
     public function montoACobrar(): float
     {
@@ -193,9 +140,7 @@ class GuiaMovimiento extends Model
             : (int) floor(now()->diffInHours($this->fecha_vencimiento, false));
     }
 
-    // ------------------------------------------------------------------
     //  Scopes
-    // ------------------------------------------------------------------
 
     /**
      * Las que amparan un traslado hoy. Se califica la columna porque

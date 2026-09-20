@@ -6,12 +6,6 @@ use RuntimeException;
 
 /**
  * Una regla de caja dijo que no.
- *
- * Mismo criterio que las otras: es una excepción y no un `return false` porque
- * el cobro entero —el recibo y todos sus abonos— corre dentro de una
- * transacción. Con la excepción, `DB::transaction()` deshace todo solo; con un
- * booleano quedaría un recibo emitido sin la mitad de sus pagos, y su número ya
- * gastado.
  */
 class CobroInvalidoException extends RuntimeException
 {
@@ -22,17 +16,7 @@ class CobroInvalidoException extends RuntimeException
     }
 
     /**
-     * ========================================================================
      *  NO SE COBRA MÁS DE LO QUE SE DEBE
-     * ========================================================================
-     *
-     * Y es una regla, no una comodidad. `Pagable::saldoPendiente()` se corta en
-     * cero: pagar de más NO genera saldo a favor, así que el excedente
-     * DESAPARECE — queda escrito en `pagos`, suma en la recaudación del día, y
-     * no se le acredita a nadie.
-     *
-     * Si entró dinero de más, no es un abono de este trámite y se resuelve por
-     * caja. Por eso acá se rechaza en vez de aceptarlo callado.
      */
     public static function excedeElSaldo(string $tramite, float $monto, float $saldo): self
     {
@@ -66,6 +50,34 @@ class CobroInvalidoException extends RuntimeException
          * corrección que hubo que hacer en PermisoOperativoException.
          */
         return new self("«{$tramite}» no admite cobros: el papel está anulado.");
+    }
+
+    /**
+     * El TRÁMITE no está en un estado que acepte depósitos.
+     */
+    public static function noAdmiteDepositos(string $tramite, string $estado): self
+    {
+        return new self(
+            "«{$tramite}» no admite depósitos: está en «{$estado}». ".
+            'Solo se cargan mientras el trámite está pendiente.',
+        );
+    }
+
+    /**
+     * No se puede validar ni observar este depósito.
+     */
+    public static function noAdmiteControl(string $motivo): self
+    {
+        return new self($motivo);
+    }
+
+    /** Un depósito de un expediente ya firmado no se toca. */
+    public static function noAdmiteCorreccion(string $tramite): self
+    {
+        return new self(
+            "«{$tramite}» ya no admite correcciones en sus depósitos: el expediente está firmado. ".
+            'Lo que haya que arreglar se resuelve por caja.',
+        );
     }
 
     /** El formulario mandó un tipo de trámite que no se cobra. */

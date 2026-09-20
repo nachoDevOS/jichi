@@ -6,38 +6,7 @@ import { Input } from '@/components/ui/input';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 
 /**
- * ============================================================================
  *  AUTOCOMPLETADO DE BENEFICIARIOS
- * ============================================================================
- *
- * Lo usan todos los formularios que arrancan eligiendo a una persona: otorgar
- * un cupo, emitir un carnet, emitir una faena o una guía.
- *
- * Vive en `comunes/` y no dentro de un módulo porque es exactamente el mismo
- * problema en los cuatro. Copiado en cada uno, alcanzaría con que alguien
- * arreglara el retardo en uno para que los otros tres siguieran castigando al
- * servidor.
- *
- * ----------------------------------------------------------------------------
- *  EL RETARDO NO ES UN DETALLE DE PULIDO
- * ----------------------------------------------------------------------------
- *
- * La búsqueda del servidor compara contra las cinco partes del nombre
- * CONCATENADAS, y eso no lo puede resolver ningún índice: recorre la tabla
- * entera. Sin retardo, escribir «antezana» son ocho recorridos completos del
- * padrón, siete de los cuales se descartan antes de dibujarse.
- *
- * 300 ms es el umbral en que una pausa al tipear deja de sentirse como lentitud
- * y empieza a leerse como «está buscando».
- *
- * ----------------------------------------------------------------------------
- *  LA PETICIÓN VIEJA SE CANCELA, Y SIN ESO LA LISTA MIENTE
- * ----------------------------------------------------------------------------
- *
- * Dos búsquedas en vuelo pueden volver en cualquier orden. Si la de «ant»
- * tarda más que la de «antezana», llega después y PISA los resultados buenos:
- * la pantalla termina mostrando coincidencias de un texto que ya no está en la
- * caja. `AbortController` corta la anterior en cada tecleo.
  */
 export function BuscadorBeneficiario({
     seleccionado,

@@ -18,17 +18,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { CupoFila } from '@/types/aprovechamientos';
 
 /**
- * ============================================================================
  *  LISTADO DE CUPOS DE PESCA
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  LA COLUMNA QUE IMPORTA ES EL SALDO, NO EL VOLUMEN OTORGADO
- * ----------------------------------------------------------------------------
- *
- * «Tiene 500 kg» no dice si esa persona puede salir a pescar mañana. «Le quedan
- * 20» sí. Por eso la barra de consumo va en la fila y no escondida en la ficha:
- * quien mira este listado está buscando a quién le queda poco.
  */
 export default function IndiceCupos({
     cupos,
@@ -43,10 +33,6 @@ export default function IndiceCupos({
     opcionesPorPagina: number[];
     /**
      * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor.
-     *
-     * Va en la pantalla porque cambia qué significa un saldo en cero: con la
-     * validación encendida es un bloqueo, y con ella apagada es un dato. Sin
-     * este aviso, el listado se leería mal justo en el caso raro.
      */
     modoEstricto: boolean;
 }) {
@@ -235,27 +221,6 @@ export default function IndiceCupos({
                                                     el suyo: el ojo en azul es CONSULTAR —no cambia
                                                     nada—, el lápiz en ámbar es MODIFICAR y el
                                                     tacho en rojo es DESTRUIR.
-
-                                                    Tres iconos del mismo gris obligan a leer el
-                                                    dibujo antes de cada clic, y con el rojo al lado
-                                                    del ámbar eso se paga caro.
-
-                                                    El fondo va tenue y el color fuerte en el icono:
-                                                    tres botones sólidos en cada fila competirían
-                                                    con el dato de la tabla, que es lo que el
-                                                    operador vino a mirar.
-
-                                                    EDITAR Y ELIMINAR SOLO APARECEN SOBRE UN
-                                                    BORRADOR, y las dos banderas llegan resueltas
-                                                    del servidor.
-
-                                                    Ninguna es «el estado es pendiente»:
-                                                    `puede_editarse` es eso Y que no haya entrado
-                                                    plata; `puede_eliminarse` suma además que no
-                                                    tenga faenas. Van junto con el permiso, porque
-                                                    esconder un botón es comodidad, no seguridad —
-                                                    la ruta lo exige igual, y el servicio lo vuelve
-                                                    a comprobar con la fila bloqueada.
                                                 */}
                                                 <td className="px-5 py-2.5">
                                                     <div className="flex justify-end gap-1">
@@ -325,14 +290,6 @@ export default function IndiceCupos({
             {/*
                 LA MISMA VENTANA QUE EN LA FICHA: motivo obligatorio Y casilla de
                 consentimiento.
-
-                El motivo es lo único que sobrevive —la fila se da de baja y solo
-                queda la línea de auditoría— y la casilla frena el clic
-                automático: escribir un motivo es una tarea, marcar «entiendo que
-                esto no se deshace» es una decisión.
-
-                Se dibuja UNA sola vez fuera de la tabla, no una por fila: con
-                cincuenta cupos habría cincuenta ventanas ocultas en el árbol.
             */}
             <ConfirmarConMotivo
                 abierto={eliminando !== null}
@@ -381,12 +338,6 @@ export default function IndiceCupos({
 
 /**
  * EL AVISO DE MODO FLEXIBLE.
- *
- * Solo aparece con APROVECHAMIENTO_ESTRICTO=false, y tiene que aparecer: con la
- * validación apagada el sistema deja emitir faenas por encima del volumen
- * otorgado, así que un saldo en cero deja de ser un freno. Quien mira este
- * listado buscando a quién le queda poco necesita saber que nadie va a ser
- * frenado por eso.
  */
 function AvisoModoFlexible() {
     return (

@@ -13,27 +13,6 @@ import type { BeneficiarioFicha, CarnetResumen, CupoResumen } from '@/types/bene
 
 /**
  * La ficha del beneficiario.
- *
- * ============================================================================
- *  LA FICHA MUESTRA EL FLUJO DE ESTA PERSONA, EN ORDEN
- * ============================================================================
- *
- * Arriba lo que debe, después sus CREDENCIALES —paso 3— y abajo sus CUPOS DE
- * PESCA —paso 2—. Está al revés del flujo a propósito: el carnet es por lo que
- * pregunta la gente en el mostrador, y el cupo es el detalle que se mira
- * después, cuando alguien viene a sacar una faena.
- *
- * ----------------------------------------------------------------------------
- *  CADA FILA ENLAZA A SU FICHA, Y ESO TIENE UNA CONDICIÓN
- * ----------------------------------------------------------------------------
- *
- * `route()` de Ziggy REVIENTA si se le pide una ruta que no está declarada: no
- * devuelve null ni una cadena vacía, tira una excepción y la pantalla entera
- * queda en blanco. Así que un enlace a un módulo que todavía no existe no es
- * «un enlace roto», es esta pantalla caída.
- *
- * Carnets y Aprovechamientos ya están, así que enlazan. Al agregar el enlace a
- * Faenas o a Guías hay que declarar su ruta PRIMERO.
  */
 export default function VerBeneficiario({
     beneficiario,
@@ -336,19 +315,6 @@ export default function VerBeneficiario({
 
 /**
  * QUÉ PUEDE HACER ESTA PERSONA HOY.
- *
- * ----------------------------------------------------------------------------
- *  EL CARTEL MIRA LA VIGENCIA, NO LA CANTIDAD
- * ----------------------------------------------------------------------------
- *
- * Tener carnets no es lo mismo que estar habilitado: uno vencido o revocado
- * sigue en la lista de abajo —el historial no se borra— pero no autoriza nada.
- * Por eso el cartel cuenta solo los `vigente`, que llegan ya resueltos del
- * servidor contra el estado Y la fecha.
- *
- * Y nombra la ACTIVIDAD y no el tipo de carnet, porque es lo que decide qué
- * puede emitir: un pescador saca faenas, un comercializador saca guías. Quien
- * hace las dos cosas tiene dos carnets, y acá se ven los dos.
  */
 function ResumenDeCredenciales({ carnets, gestion }: { carnets: CarnetResumen[]; gestion: number }) {
     const vigentes = carnets.filter((c) => c.vigente);

@@ -7,17 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Beneficiarios — la persona, UNA SOLA VEZ.
-|
-| Tabla unificada y SIN columna de rol: quien pesca y además comercializa es una
-| persona con dos credenciales, no dos fichas. El rol vive en
-| `carnets.tipo_actor`, que es del documento.
-|
-| De `primerNombre` en adelante van en camelCase, así que en SQL escrito a mano
-| hay que entrecomillar: SELECT "primerNombre". Sin comillas, PostgreSQL pasa el
-| nombre a minúscula y responde «column "primernombre" does not exist». Eloquent
-| entrecomilla solo; el problema aparece con whereRaw / orderByRaw.
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -64,12 +53,6 @@ return new class extends Migration
         /*
          * UNA PERSONA, UNA FICHA. Cargada dos veces, sacaría dos credenciales
          * del mismo tipo — o sea, el doble de cupo de pesca.
-         *
-         * Índice PARCIAL y no `unique()` con `deleted_at` adentro: en SQL
-         * NULL != NULL y ese unique no bloquearía nada.
-         *
-         * Va sobre `ci` SOLO: el complemento es parte del mismo documento, y con
-         * él adentro la misma persona pasaría cargada una vez con y otra sin.
          */
         DB::statement(<<<'SQL'
             CREATE UNIQUE INDEX beneficiarios_ci_unico

@@ -20,29 +20,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  CAJA — el circuito del dinero
- * ============================================================================
- *
- *     carnet | cupo | guía  ──▶  pagos (abonos)  ──▶  recibo numerado
- *
- * Es el tercer circuito del sistema y ATRAVIESA a los otros dos: no es un paso
- * del flujo sino algo que puede pasar en cualquiera de ellos y varias veces.
- *
- * ----------------------------------------------------------------------------
- *  ESTA PANTALLA MUESTRA ABONOS, NO RECIBOS
- * ----------------------------------------------------------------------------
- *
- * Son dos vistas distintas del mismo hecho y las dos hacen falta:
- *
- *   - CAJA lista PAGOS: cada entrega de dinero, con su método y su trámite. Es
- *     lo que se mira para cuadrar los depósitos del día contra lo que hay en el
- *     cajón.
- *   - RECIBOS lista los PAPELES entregados, con su número correlativo. Es lo
- *     que audita Contabilidad.
- *
- * Un recibo agrupa varios pagos, así que las dos listas nunca tienen la misma
- * cantidad de filas y ninguna reemplaza a la otra.
  */
 class CajaController extends Controller
 {
@@ -64,10 +42,6 @@ class CajaController extends Controller
         $pagos = Pago::query()
             /*
              * UNA RELACIÓN POLIMÓRFICA NO SE PRECARGA CON `with('pagable.x')`.
-             *
-             * Eloquent no sabe qué es `pagable` hasta que lee la fila, así que
-             * lo escrito así se IGNORA en silencio y el N+1 sigue ahí. Va con
-             * morphWith, declarando qué traer para cada tipo.
              */
             ->with([
                 'recibo:id,numero_recibo,nombre_factura',
@@ -118,11 +92,6 @@ class CajaController extends Controller
 
             /*
              * EL ARQUEO DEL DÍA, siempre del día de HOY y no del rango filtrado.
-             *
-             * Es lo que se cuadra contra el extracto del banco antes de cerrar,
-             * y esa pregunta no cambia porque alguien esté mirando marzo. Un
-             * total que siguiera al filtro invitaría a cuadrar la caja contra el
-             * número equivocado.
              */
             'arqueo' => $this->arqueoDelDia(),
         ]);
@@ -161,17 +130,7 @@ class CajaController extends Controller
         $datos = $request->validated();
 
         /*
-         * ====================================================================
          *  LA BOLETA SE SUBE ANTES DE ABRIR LA TRANSACCIÓN
-         * ====================================================================
-         *
-         * Una transacción de base NO deshace escrituras en disco. Subiendo
-         * adentro, un cobro que falle —saldo movido por otra ventanilla, número
-         * de boleta repetido— dejaría el archivo huérfano para siempre, sin
-         * ninguna fila que lo nombre.
-         *
-         * Por eso se sube acá y el `catch` lo borra. Ver la misma maniobra en
-         * ArchivoTramiteService.
          */
         $comprobante = app(StorageController::class)->file($request->file('comprobante'), 'comprobantes');
 
@@ -204,24 +163,10 @@ class CajaController extends Controller
             ->with('exito', "Recibo {$recibo->numero_recibo} emitido. Ya se puede imprimir.");
     }
 
-    // ------------------------------------------------------------------
     //  Auxiliares
-    // ------------------------------------------------------------------
 
     /**
      * Todo lo que esta persona debe hoy, listo para cobrar.
-     *
-     * ------------------------------------------------------------------------
-     *  SE JUNTAN LOS TRES TIPOS EN UNA SOLA LISTA
-     * ------------------------------------------------------------------------
-     *
-     * Porque así es como llega la persona al mostrador: con lo que debe, no con
-     * «los carnets por un lado y los cupos por otro». Y porque un mismo recibo
-     * puede cubrir los tres, que es justamente lo que el polimorfismo permite.
-     *
-     * Los `withSum` evitan una consulta agregada por fila al calcular cada
-     * saldo, y los `with` de los catálogos hacen falta porque `montoACobrar()`
-     * lee el precio del tipo de carnet y el valor de la escala.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -285,12 +230,6 @@ class CajaController extends Controller
          * YA NO SE REPARTE POR MÉTODO: todo pago es un depósito bancario, así
          * que el reparto tenía una sola columna. Lo que sí hace falta son las
          * DOS fechas, porque no son la misma pregunta:
-         *
-         *   - `created_at`      lo CARGADO hoy: cuadra el trabajo del día.
-         *   - `fecha_deposito`  lo DEPOSITADO hoy: se cruza contra el extracto.
-         *
-         * Un depósito del viernes cargado el lunes entra en el primero y no en
-         * el segundo, y esa diferencia es justamente la que hay que ver.
          */
         $cargadoHoy = Pago::query()->whereDate('created_at', $hoy);
         $depositadoHoy = Pago::query()->whereDate('fecha_deposito', $hoy);

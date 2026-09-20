@@ -13,52 +13,7 @@ import { edadEnAnios, fecha } from '@/lib/utils';
 import type { BeneficiarioFicha, FormularioBeneficiario } from '@/types/beneficiarios';
 
 /**
- * ============================================================================
  *  EL FORMULARIO DE BENEFICIARIO
- * ============================================================================
- *
- * ES UNO SOLO PARA CREAR Y PARA EDITAR, y no dos archivos casi iguales. Lo único
- * que cambia entre una cosa y la otra es a qué URL se manda y si hay foto
- * previa; los campos, las reglas y el orden son idénticos. Partido en dos, el
- * día que se agregue un campo hay que acordarse de tocar los dos lados.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ DOS COLUMNAS Y NO UNA PILA DE TARJETAS
- * ----------------------------------------------------------------------------
- *
- * Porque cuatro secciones apiladas hacen una pantalla de tres pantallas de alto:
- * la foto queda fuera de la vista, el botón de guardar también, y el operador
- * pierde de vista lo que ya cargó apenas baja.
- *
- * A la izquierda van los campos, agrupados y numerados dentro de UNA SOLA
- * tarjeta. A la derecha, FIJA mientras se hace scroll, la tarjeta de vista
- * previa. Y abajo, también fija, la barra con el botón de guardar: siempre
- * alcanzable, sin llegar al final.
- *
- * ----------------------------------------------------------------------------
- *  UNA TARJETA CON SEPARADORES, NO CUATRO TARJETAS
- * ----------------------------------------------------------------------------
- *
- * Las cuatro secciones son partes de UN formulario, no cuatro formularios. En
- * tarjetas separadas, el espacio entre ellas dice lo contrario —que son cosas
- * independientes— y cada borde y cada sombra suma altura sin agregar
- * información. Con una sola tarjeta y una línea entre secciones, la agrupación
- * se sigue leyendo y la pantalla ocupa bastante menos.
- *
- * ----------------------------------------------------------------------------
- *  LA VISTA PREVIA NO ES DECORACIÓN
- * ----------------------------------------------------------------------------
- *
- * Muestra las CUATRO COSAS QUE EL SISTEMA COMPONE y que el operador no puede
- * ver de otro modo hasta después de guardar:
- *
- *   - el nombre completo, armado a partir de cinco campos sueltos;
- *   - la cédula tal como se imprime, armada de tres;
- *   - la edad, calculada de la fecha de nacimiento;
- *   - la fotografía, recortada en círculo como va a salir en el carnet.
- *
- * Eso convierte errores que hoy se descubren tarde —el nombre quedó al revés, se
- * tecleó 2090 en vez de 1990— en algo que se ve mientras se escribe.
  */
 export function FormularioBeneficiarioComponente({
     beneficiario,
@@ -471,11 +426,6 @@ export function FormularioBeneficiarioComponente({
 
             {/*
                 BARRA DE ACCIONES FIJA AL PIE.
-
-                Con el formulario apilado, el botón de guardar quedaba al final de
-                tres pantallas de alto: había que bajar hasta el fondo para
-                usarlo, y para corregir un campo de arriba había que volver a
-                bajar. Fija, está siempre a un clic.
             */}
             <div className="sticky bottom-0 -mx-4 mt-6 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
                 <div className="flex flex-wrap items-center justify-end gap-2">
@@ -515,15 +465,6 @@ export function FormularioBeneficiarioComponente({
 
 /**
  * Un bloque del formulario: número, icono, título y los campos debajo.
- *
- * NO es una tarjeta: las cuatro secciones viven dentro de la MISMA tarjeta y se
- * separan con una línea. Por eso el borde superior se pinta solo a partir de la
- * segunda —`numero > 1`—: en la primera quedaría una raya pegada al borde de la
- * tarjeta, que se lee como un error de dibujo.
- *
- * El número no es decoración: le dice al operador cuántos pasos le faltan y en
- * qué orden conviene cargarlos, que es lo primero que se pregunta quien abre un
- * formulario largo por primera vez.
  */
 function Seccion({
     numero,
@@ -563,11 +504,6 @@ function Seccion({
 
 /**
  * La fotografía, recortada en círculo como sale en el carnet.
- *
- * Se muestra así y no como un rectángulo porque es como se va a imprimir: una
- * foto que se ve bien cuadrada puede quedar con la cabeza cortada al recortarla,
- * y descubrirlo recién al imprimir el carnet significa volver a llamar a la
- * persona.
  */
 function Retrato({
     url,
@@ -666,21 +602,6 @@ function Compuesto({
 
 /* ==========================================================================
    LAS TRES COMPOSICIONES DE LA VISTA PREVIA
-
-   OJO: estas funciones REPITEN en TypeScript lo que ya hacen
-   Beneficiario::nombreCompleto(), ::documentoIdentidad() y ::edad() en PHP, y
-   eso normalmente sería un error —dos definiciones de la misma regla terminan
-   diciendo cosas distintas—.
-
-   Acá está aceptado, con una condición: lo de acá es SOLO UNA VISTA PREVIA. El
-   valor que se guarda y el que se imprime en el carnet salen siempre del
-   servidor; esto no viaja a ninguna parte. La alternativa sería pedirle al
-   servidor que componga el nombre en cada tecla, que es una petición por letra
-   para mostrar algo que se descarta al guardar.
-
-   Si alguna de las tres reglas cambia en PHP, hay que cambiarla acá también. Por
-   eso están juntas, al final del archivo y con este cartel, en vez de repartidas
-   dentro del componente.
    ========================================================================== */
 
 function componerNombre(datos: FormularioBeneficiario): string {
@@ -717,11 +638,4 @@ function componerDocumento(datos: FormularioBeneficiario): string {
 
 /*
  * La edad NO se calcula acá: vive en `lib/utils.ts`, junto a `fecha()`.
- *
- * El motivo es concreto: las dos tienen que interpretar igual una cadena
- * `AAAA-MM-DD`. `new Date('1986-03-12')` da medianoche UTC, que en Bolivia
- * (UTC-4) es todavía el 11 de marzo —y entonces la fecha se muestra un día
- * antes y la edad se equivoca el día del cumpleaños—. Con las dos funciones en
- * el mismo archivo comparten esa corrección en vez de arrastrar cada una la
- * suya. Ver `aFechaLocal()`.
  */

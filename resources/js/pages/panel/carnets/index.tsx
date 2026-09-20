@@ -15,17 +15,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { CarnetFila } from '@/types/carnets';
 
 /**
- * ============================================================================
  *  LISTADO DE CARNETS
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  EL BUSCADOR ACEPTA EL CÓDIGO CON ESPACIOS
- * ----------------------------------------------------------------------------
- *
- * El código va impreso en grupos de cuatro, así que quien lo copia del plástico
- * escribe «PES2 6K7R J2M». El servidor lo normaliza antes de comparar; si no,
- * la búsqueda que hace todo el mundo no devolvería nunca nada.
  */
 export default function IndiceCarnets({
     carnets,

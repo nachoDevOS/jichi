@@ -6,37 +6,11 @@ use RuntimeException;
 
 /**
  * Una regla del otorgamiento de cupo dijo que no.
- *
- * Mismo criterio que PermisoOperativoException: es una excepción y no un
- * `return false` porque el servicio trabaja dentro de una transacción, y con la
- * excepción `DB::transaction()` hace el rollback solo. Con un booleano, quien
- * llama tiene que acordarse de deshacerla, y si se olvida queda media operación
- * escrita sin que nadie lo note.
- *
- * El mensaje sale tal cual en el aviso rojo de la pantalla, así que se escribe
- * en castellano de mostrador y DICE QUÉ HACER: quien llegó hasta acá tiene a
- * alguien enfrente esperando.
  */
 class CupoInvalidoException extends RuntimeException
 {
     /**
-     * ========================================================================
      *  UNA PERSONA, UNA BOLSA MADRE VIGENTE A LA VEZ
-     * ========================================================================
-     *
-     * Es LA regla del módulo. Dos cupos vigentes al mismo tiempo son el doble
-     * de kilos de los que la escala le otorgó, y no hay forma de notarlo
-     * mirando: cada uno por separado se ve correcto, y `saldoKg()` de cada uno
-     * da un número razonable.
-     *
-     * No la garantiza ningún índice de la base —no se puede, porque «vigente»
-     * depende de la fecha de hoy— así que la sostiene el servicio, con la fila
-     * del beneficiario bloqueada para que dos ventanillas simultáneas no pasen
-     * las dos.
-     *
-     * El mensaje dice el saldo y la fecha porque son los dos datos con los que
-     * el operador decide qué hacer: esperar a que venza, o —si el cupo todavía
-     * es un borrador— corregirlo al tramo que corresponde.
      */
     public static function yaTieneCupoVigente(string $persona, float $saldo, string $vence): self
     {
@@ -52,10 +26,6 @@ class CupoInvalidoException extends RuntimeException
 
     /**
      * Se eligió un tramo de la escala que ya no está vigente.
-     *
-     * Puede pasar entre que el operador abre el formulario y aprieta guardar:
-     * la lista se armó con los tramos de ese momento y en el medio alguien
-     * derogó uno desde el catálogo.
      */
     public static function escalaDerogada(int $nroEscala): self
     {
@@ -77,10 +47,6 @@ class CupoInvalidoException extends RuntimeException
 
     /**
      * Se quiso presentar o aprobar un cupo con saldo sin cubrir.
-     *
-     * Dice CUÁNTO falta y no solo «falta plata», porque es el número con el que
-     * el operador decide qué hacer: cargar otro depósito, o revisar si el que
-     * cargó salió por menos.
      */
     public static function faltaCubrirElMonto(float $saldo): self
     {
@@ -88,6 +54,18 @@ class CupoInvalidoException extends RuntimeException
             'Todavía faltan %s Bs por cobrar. Un aprovechamiento se presenta a revisión '.
             'cuando los depósitos cubren el monto entero.',
             number_format($saldo, 2, ',', '.'),
+        ));
+    }
+
+    /**
+     * Se quiso firmar con boletas sin controlar.
+     */
+    public static function faltaControlarBoletas(int $cuantas): self
+    {
+        return new self(sprintf(
+            'Quedan %d depósito(s) sin validar. Un aprovechamiento se aprueba cuando cada boleta '.
+            'se comparó contra el extracto del banco; un depósito observado se corrige antes de firmar.',
+            $cuantas,
         ));
     }
 
@@ -157,9 +135,5 @@ class CupoInvalidoException extends RuntimeException
 
     /**
      * No se amplía un cupo que ya no corre.
-     *
-     * Sumarle kilos a un cupo vencido daría volumen que no se puede usar —las
-     * faenas miran la fecha— así que sería puro ruido en la ficha. Lo que
-     * corresponde es otorgar el de la gestión nueva.
      */
 }

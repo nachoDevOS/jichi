@@ -2,19 +2,10 @@ import type { EstadoAprovechamiento, EstadoCarnet, TipoActor } from '@/types';
 
 /**
  * Tipos del módulo Beneficiarios.
- *
- * Cada interfaz describe, campo por campo, lo que arma
- * App\Http\Controllers\Panel\BeneficiarioController. Si allá se renombra una
- * clave y acá no, el editor lo marca en rojo al instante en vez de descubrirlo
- * con una pantalla en blanco.
  */
 
 /**
  * Una fila de la tabla del padrón.
- *
- * Los campos están agrupados como los pinta la tabla: identificación, la persona
- * y sus datos. No es casualidad —el controlador los arma en ese mismo orden—
- * para que agregar una columna sea encontrar el grupo al que pertenece.
  */
 export interface BeneficiarioFila {
     id: number;
@@ -31,21 +22,12 @@ export interface BeneficiarioFila {
     fechaNacimiento: string | null;
     /**
      * Años CUMPLIDOS, calculados por el servidor.
-     *
-     * Llega hecha y no se calcula en el navegador a propósito: con dos
-     * definiciones de «edad» —la de PHP y la de JavaScript— tarde o temprano
-     * difieren por un día en los bordes (el cumpleaños de hoy, los bisiestos, la
-     * zona horaria del teléfono del operador). Ver Beneficiario::edad().
      */
     edad: number | null;
 }
 
 /**
  * La ficha completa.
- *
- * `nombreCompleto` va en camelCase porque así llega de PHP: el modelo lo manda
- * con ese nombre explícito. Ver el comentario de App\Models\Beneficiario sobre
- * por qué ese accesor no puede ir en #[Appends].
  */
 export interface BeneficiarioFicha {
     id: number;
@@ -101,18 +83,6 @@ export interface FormularioBeneficiario {
 
 /**
  * El resumen de un carnet que muestra la ficha del beneficiario.
- *
- * ----------------------------------------------------------------------------
- *  LA ACTIVIDAD VA PRIMERO, Y NO ES UN DETALLE DE ORDEN
- * ----------------------------------------------------------------------------
- *
- * Una persona puede tener DOS carnets vigentes a la vez —quien pesca y además
- * comercializa—, así que sin `tipo_actor` las dos filas se ven idénticas y el
- * operador no sabe cuál está mirando.
- *
- * `vigente` llega YA RESUELTO del servidor y la pantalla no lo deduce: la
- * columna `estado` puede estar desfasada, porque «vencido» lo escribe un
- * comando que corre una vez al día. Ver Carnet::estaVigente().
  */
 export interface CarnetResumen {
     id: number;
@@ -128,11 +98,6 @@ export interface CarnetResumen {
     asociacion: string | null;
     /**
      * Los kilos impresos en el plástico, o null si es comercializador.
-     *
-     * Lo decide `TipoActor::requiereAprovechamiento()` en el servidor, NUNCA un
-     * `if` sobre el nombre del tipo de carnet: ese nombre es un catálogo que la
-     * unidad edita, y el mismo documento figura de dos formas distintas según
-     * quién lo cargó.
      */
     cupo_kg: number | null;
     estado: EstadoCarnet;
@@ -148,10 +113,6 @@ export interface CarnetResumen {
 
 /**
  * Una BOLSA MADRE de la persona: el cupo anual en kilos.
- *
- * Se manda el SALDO y no solo el volumen otorgado porque es lo único
- * accionable: «tiene 500 kg» no dice si puede salir a pescar mañana, y «le
- * quedan 20» sí.
  */
 export interface CupoResumen {
     id: number;
@@ -175,11 +136,6 @@ export interface CupoResumen {
 
 /**
  * Un carnet vigente, tal como lo devuelve el autocompletado.
- *
- * LAS DOS BANDERAS LLEGAN CALCULADAS y la pantalla no las deduce. Un `if` sobre
- * el tipo en React sería una segunda copia de la regla, y se desincroniza en
- * cuanto alguien renombre una fila del catálogo o cambie la vigencia del cupo.
- * Ver Carnet::puedeEmitirFaenas() y ::puedeEmitirGuias().
  */
 export interface CarnetVigenteSugerido {
     id: number;
@@ -193,19 +149,11 @@ export interface CarnetVigenteSugerido {
 
     /**
      * Kilos que quedan en la bolsa madre. Null si el carnet no lleva cupo.
-     *
-     * Viene con el resultado de la búsqueda y no en un segundo viaje: el
-     * formulario de faena lo necesita apenas se elige el carnet, y pedirlo
-     * aparte se nota justo cuando el operador acaba de hacer clic.
      */
     saldo_kg: number | null;
 
     /**
      * El número de talonario que el sistema PROPONE. Null si no lleva cupo.
-     *
-     * Es una propuesta y no una imposición: el número sale de la hoja que el
-     * operador tiene en la mano, y si no coincide hay algo que conviene mirar
-     * antes de seguir, no autocorregir en silencio.
      */
     siguiente_numero_faena: number | null;
 }

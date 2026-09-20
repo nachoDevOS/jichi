@@ -66,6 +66,7 @@ PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
 > | [docs/ESTRUCTURA.md](docs/ESTRUCTURA.md) | Dónde va un archivo **nuevo** |
 > | [docs/modulos/](docs/modulos/) | Un módulo en profundidad |
 > | [docs/PENDIENTES.md](docs/PENDIENTES.md) | Qué falta y qué está roto |
+> | [docs/NOTAS-CODIGO.md](docs/NOTAS-CODIGO.md) | El porqué largo de una decisión puntual, por archivo |
 >
 > Recién después abrí código, y abrí **el archivo que vas a cambiar**, no el
 > resto. Si al terminar sabés algo que esos `.md` no decían, agregalo ahí.
@@ -318,11 +319,21 @@ React.**
    `Label`, `Badge`, `Select`, `Textarea`), que conservan el vocabulario
    estándar de React.
 
-2. **Comentar el porqué, no el qué.** Este proyecto lo mantiene alguien que está
-   aprendiendo React. Un comentario que repite lo que dice el código sobra; uno
-   que explica por qué se eligió ese camino vale oro. Ejemplos del estilo
-   esperado: `SolicitudCarnetService`, `ArchivoTramiteService`,
-   `app/Support/Sql.php`, la migración `2026_09_10_100200_create_carnets_table`.
+2. **Comentar el porqué, no el qué — y CORTO: de una a tres líneas.**
+
+   Un comentario que repite lo que dice el código sobra; uno que explica por qué
+   se eligió ese camino vale oro. Pero **el porqué entra en dos renglones**.
+
+   **NADA de bloques con banners de `====`, títulos en mayúscula ni ensayos de
+   treinta líneas.** El código llegó a tener un 38% de comentarios —12.695 líneas
+   sobre 33.383— y dejó de leerse de corrido: había que desplazar media pantalla
+   para ver la línea siguiente. El 20/09/2026 se podaron a la mitad.
+
+   **Lo que no entra en tres líneas va a un `.md`**, que es donde alguien lo va a
+   buscar: el esquema a [docs/MER.md](docs/MER.md), el módulo a
+   [docs/modulos/](docs/modulos/), y el desarrollo largo de una decisión puntual
+   a [docs/NOTAS-CODIGO.md](docs/NOTAS-CODIGO.md) —ahí está lo que se podó, por
+   archivo—. En el código queda el resumen y, si hace falta, «ver X».
 
 3. **Panel y público no se mezclan.** El sistema tiene dos mitades separadas en
    carpetas paralelas, en el backend y en el frontend:
@@ -752,6 +763,50 @@ Los cuatro tienen que pasar.
   otorgó. Pedirlo como propiedad devuelve vacío en silencio —la misma trampa que
   `pluck()` sobre una columna inexistente— y un ensayo que lo compare contra la
   tarifa da en rojo por el lado equivocado.
+- **Llamar a un servicio DENTRO de un `foreach` parte en pedazos lo que ese
+  servicio construye como una unidad, y no falla nada.** `AprovechamientoController::pagar()`
+  cobraba llamando a `CobrarService` una vez por depósito, así que dos boletas
+  del mismo cupo salían como **REC-2026-0001 y REC-2026-0002**: dos papeles donde
+  va uno, dos números gastados de una serie que Contabilidad audita y dos cobros
+  en el arqueo del día donde hubo uno. Lo caro fue lo otro: el control de «no
+  cobrar de más» también corría por llamada —cada una leía el saldo antes de que
+  las anteriores estuvieran escritas— así que tres depósitos por el total cada
+  uno pasaban los tres. **Antes de escribir un servicio adentro de un bucle,
+  preguntarse qué crea de una sola pieza** —un recibo, un correlativo, un
+  expediente— y si sus controles miran el conjunto o solo la llamada.
+- **EL RECIBO DEL APROVECHAMIENTO ES UNO POR TRÁMITE, y se emite AL ENVIAR A
+  REVISIÓN.** No es uno por depósito: la persona entrega sus boletas —una o
+  cinco— y se lleva un papel con el total, igual que el recibo oficial del modelo
+  anterior. Por eso `pagos.recibo_id` es **nullable**: el depósito se carga
+  mientras el trámite está PENDIENTE y todavía no hay papel que ponerle.
+  `CobrarService::registrarDepositos()` lo deja en NULL y
+  `CobrarService::emitirRecibo()` lo llena desde `RevisarCupoService::enviar()`,
+  **dentro de su misma transacción** —un recibo emitido sobre un cupo que se
+  quedó en pendiente sería un papel por un expediente que nadie presentó—. Un
+  reenvío no emite un segundo papel: `emitirRecibo()` solo toma los pagos
+  sueltos. En **Caja** sigue saliendo en el acto, que es lo correcto ahí: se
+  cobra y se entrega en el mismo movimiento.
+- **`method_exists($enum, 'admitePagos')` deja pasar todo cuando el enum llama a
+  ese método de otra forma.** `EstadoGuia` declara `admitePagos()` y
+  `EstadoAprovechamiento` declara `permitePagos()`: la comprobación de
+  `CobrarService::resolver()` contesta «no existe» para el cupo y **no valida
+  ningún estado**, en silencio. Un `method_exists` sobre un nombre que solo
+  algunas clases usan no es una comprobación: es un `if` apagado. Va contra el
+  MODELO, que sí expone `admitePagos()` en los tres. **La forma correcta cuando
+  solo algunas clases contestan que sí**: declarar el método en el trait
+  compartido con un `false` por defecto y sobreescribirlo donde aplique — ver
+  `Pagable::admiteControlDePagos()`.
+- **`pagos.estado_validacion` NO es el estado del pago: es el de su CONTROL.**
+  El dinero entró o no entró, y eso lo dice que la fila exista; esto dice si
+  alguien MIRÓ la boleta contra el extracto del banco. Tres consecuencias que se
+  olvidan: un **OBSERVADO sigue sumando** en `montoPagado()` —sacarlo dejaría al
+  trámite sin cubrir por una observación que puede estar equivocada—; **un
+  observado no se valida, se corrige** —`admiteControl()` solo deja pasar lo que
+  nadie miró, así que el botón «Validar» no existe sobre él—; y al corregir se
+  borra el control ENTERO, `validado_por` y `validado_en` incluidos, porque quien
+  validó lo hizo sobre otros números. El control es parte de la REVISIÓN: solo
+  corre EN REVISIÓN, y `RevisarCupoService::aprobar()` exige que no quede ninguna
+  sin validar — sin eso, validar sería decorativo.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **LAS PRUEBAS NO AVISAN SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Corren

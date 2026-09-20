@@ -10,29 +10,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para crear y editar un tramo de la ESCALA OFICIAL.
- *
- * ============================================================================
- *  LA VALIDACIÓN QUE IMPORTA NO ES LA DE LOS CAMPOS: ES LA DE LOS TRAMOS
- * ============================================================================
- *
- * Cada campo por separado puede estar perfecto y la escala quedar rota igual.
- * Dos formas de romperla, y las dos son silenciosas:
- *
- *   - SOLAPE. Si el tramo 3 llega a 500 y el 4 arranca en 400, un cupo de 450
- *     cae en los dos. `CategoriaAprovechamiento::paraVolumen()` devuelve el de
- *     `nro_escala` más bajo, así que el sistema cobraría siempre el más barato
- *     —y nadie lo notaría hasta un arqueo—.
- *
- *   - HUECO. Si el 3 llega a 500 y el 4 arranca en 502, un cupo de 501 no cae
- *     en ninguno: `paraVolumen()` devuelve null y el formulario no ofrece
- *     ninguna escala, sin ningún error que lo explique.
- *
- * El SOLAPE se RECHAZA acá: es plata mal cobrada y no tiene lectura válida.
- *
- * El HUECO no se rechaza, y es deliberado: cargar la escala de a un tramo por
- * vez deja huecos TRANSITORIOS —al guardar el tramo 1 todavía no existe el 2—
- * y bloquearlos haría imposible cargarla. Se avisa desde la pantalla, que ve
- * la escala entera de una vez. Ver el índice de la escala.
  */
 class GuardarCategoriaAprovechamientoRequest extends FormRequest
 {
@@ -50,10 +27,6 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
         return [
             /*
              * NO lleva `max:7` aunque hoy la escala tenga siete tramos.
-             *
-             * El número de tramos lo fija una resolución y puede cambiar; un
-             * tope escrito en código convertiría ese cambio en un despliegue,
-             * que es exactamente lo que esta tabla vino a evitar.
              */
             'nro_escala' => [
                 'required', 'integer', 'min:1', 'max:99',
@@ -62,10 +35,6 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
 
             /*
              * El TEXTO OFICIAL, y no se deduce de los kilos.
-             *
-             * El tramo más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese
-             * «PAICHE» no está en ningún número. El documento impreso tiene que
-             * decir lo que dice la resolución.
              */
             /*
              * LA MODALIDAD LA FIJA LA RESOLUCIÓN AL DEFINIR EL TRAMO, no el
@@ -90,10 +59,6 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
 
     /**
      * El control que mira la escala ENTERA, no el tramo suelto.
-     *
-     * Corre después de las reglas de campo —si los kilos ni siquiera son
-     * números, no tiene sentido buscar solapes— y por eso va en `after()` y no
-     * dentro de `rules()`.
      */
     public function after(): array
     {

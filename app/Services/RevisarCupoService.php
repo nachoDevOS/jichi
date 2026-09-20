@@ -8,55 +8,21 @@ use App\Models\AprovechamientoPesq;
 use Illuminate\Support\Facades\DB;
 
 /**
- * ============================================================================
  *  EL CIRCUITO DE REVISIÓN DE UN APROVECHAMIENTO
- * ============================================================================
- *
- *     PENDIENTE ──[enviar, con el monto cubierto]──▶ EN REVISIÓN
- *     (borrador)                                         │
- *          ▲                              ┌──────────────┴──────────────┐
- *          └──────────[rechazar]──────────┤                             │
- *                                    [aprobar]                          │
- *                                         │                             │
- *                                      ACTIVO ──▶ recién acá emite faenas
- *
- * ----------------------------------------------------------------------------
- *  ENVIAR NO ES APROBAR, Y SON DOS PERSONAS DISTINTAS
- * ----------------------------------------------------------------------------
- *
- * Ventanilla carga los depósitos y declara que el expediente está completo;
- * quien firma mira las boletas contra el extracto del banco y recién ahí el cupo
- * queda habilitado. Sin el paso del medio, la plata entraba y el pescador salía
- * a pescar sin que nadie hubiera mirado nada — que es exactamente lo que este
- * circuito viene a impedir.
- *
- * Por eso son PERMISOS distintos: `aprovechamientos.enviar` es de ventanilla y
- * `aprovechamientos.aprobar` es de supervisión.
- *
- * ----------------------------------------------------------------------------
- *  RECHAZADO NO ES EL FINAL: VUELVE A PENDIENTE
- * ----------------------------------------------------------------------------
- *
- * Rechazar es devolverle el expediente a ventanilla con el motivo escrito, y lo
- * que sigue es que lo corrijan y lo vuelvan a presentar. Devolverlo a PENDIENTE
- * es lo que permite eso: los pagos ya cargados SIGUEN AHÍ —cuelgan del cupo, no
- * del envío— así que nadie tiene que volver a cargarlos.
- *
- * El rechazo queda en `auditorias` con su motivo; el estado no lo recuerda, y no
- * hace falta que lo recuerde.
  */
 class RevisarCupoService
 {
+    public function __construct(private readonly CobrarService $caja) {}
+
     /**
      * PENDIENTE ──▶ EN REVISIÓN.
-     *
-     * Las dos condiciones se comprueban con la fila BLOQUEADA: entre que el
-     * operador ve el botón encendido y lo aprieta, otra ventanilla pudo anular
-     * un pago y dejar el cupo sin cubrir.
      */
-    public function enviar(AprovechamientoPesq $cupo): AprovechamientoPesq
-    {
-        return DB::transaction(function () use ($cupo): AprovechamientoPesq {
+    public function enviar(
+        AprovechamientoPesq $cupo,
+        ?string $nitCi = null,
+        ?string $nombreFactura = null,
+    ): AprovechamientoPesq {
+        return DB::transaction(function () use ($cupo, $nitCi, $nombreFactura): AprovechamientoPesq {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
             if (! $bloqueado->estado->permiteEnvio()) {
@@ -69,6 +35,16 @@ class RevisarCupoService
 
             $bloqueado->motivoAuditoria = 'Depósitos cargados y monto cubierto: se presenta para revisión.';
             $bloqueado->update(['estado' => EstadoAprovechamiento::EnRevision]);
+
+            $bloqueado->loadMissing('beneficiario');
+
+            // Devuelve null en un REENVÍO: no hay depósitos sueltos, no se toca
+            // el correlativo y el número que la persona tiene sigue valiendo.
+            $this->caja->emitirRecibo(
+                $bloqueado,
+                filled($nitCi) ? $nitCi : ($bloqueado->beneficiario?->ci ?? 'S/N'),
+                filled($nombreFactura) ? $nombreFactura : ($bloqueado->beneficiario?->nombreCompleto ?? 'Sin nombre'),
+            );
 
             // La instancia ORIGINAL refrescada, no la copia bloqueada: quien
             // llamó tiene esa en la mano. Ver CLAUDE.md.
@@ -90,13 +66,20 @@ class RevisarCupoService
 
             /*
              * SE VUELVE A MIRAR EL MONTO, aunque el envío ya lo había mirado.
-             *
-             * No es redundancia: entre el envío y la firma pueden pasar días, y
-             * en el medio alguien pudo dar de baja un pago. Aprobar un cupo que
-             * dejó de estar cubierto lo habilitaría para pescar sin la plata.
              */
             if ($bloqueado->saldoPendiente() > 0.0) {
                 throw CupoInvalidoException::faltaCubrirElMonto($bloqueado->saldoPendiente());
+            }
+
+            /*
+             * TERCERA CONDICIÓN: todas las boletas controladas. El monto cubierto
+             * dice cuánto se DECLARÓ, no que la plata haya entrado. `sinValidar()`
+             * cuenta también los observados: un reparo abierto no se firma.
+             */
+            $sinControlar = $bloqueado->pagos()->sinValidar()->count();
+
+            if ($sinControlar > 0) {
+                throw CupoInvalidoException::faltaControlarBoletas($sinControlar);
             }
 
             $bloqueado->motivoAuditoria = 'Depósitos verificados: el aprovechamiento queda habilitado.';

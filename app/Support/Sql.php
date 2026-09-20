@@ -8,10 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Fragmentos de SQL que cambian entre motores.
- *
- * El sistema corre sobre PostgreSQL en producción, pero en desarrollo puede
- * usarse SQLite. Todo lo que no sea SQL estándar pasa por acá para que no
- * haya consultas que funcionen en un motor y revienten en el otro.
  */
 class Sql
 {
@@ -29,11 +25,6 @@ class Sql
     /**
      * Expresión que reduce una columna de fecha al día 'YYYY-MM-DD', para
      * agrupar por jornada.
-     *
-     * No alcanza con `DATE($columna)`: en PostgreSQL eso devuelve un tipo date
-     * y en SQLite una cadena, así que la clave con la que vuelve el resultado
-     * cambia de forma según el motor y el `pluck` deja de encontrarla. Forzando
-     * el texto 'YYYY-MM-DD' en los dos, la clave es la misma.
      */
     public static function periodoDia(string $columna, ?Connection $conexion = null): Expression
     {

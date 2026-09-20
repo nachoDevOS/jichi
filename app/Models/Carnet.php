@@ -18,18 +18,6 @@ use Illuminate\Support\Str;
 
 /**
  * La credencial física que se entrega en ventanilla.
- *
- * ============================================================================
- *  EL CARNET ES LA LLAVE ANUAL; CON ÉL SOLO NO SE SALE A TRABAJAR
- * ============================================================================
- *
- *     carnet (pescador)        ──< permisos_faena     (una por salida)
- *     carnet (comercializador) ──< guias_movimiento   (una por traslado)
- *
- * Qué puede emitir lo dice `tipo_actor`, NUNCA el nombre del tipo de carnet:
- * `tipos_carnet` es un catálogo que edita la unidad desde el panel, y el mismo
- * documento figura como «Carnet de Pescador» o «Pescador Artesanal» según quién
- * lo cargó. Ver TipoActor::emiteFaenas() y ::emiteGuias().
  */
 #[Appends(['codigo_legible'])]
 #[Fillable([
@@ -67,9 +55,7 @@ class Carnet extends Model
         ];
     }
 
-    // ------------------------------------------------------------------
     //  Relaciones
-    // ------------------------------------------------------------------
 
     public function beneficiario(): BelongsTo
     {
@@ -97,17 +83,10 @@ class Carnet extends Model
         return $this->hasMany(PermisoFaena::class, 'carnet_id');
     }
 
-    // ------------------------------------------------------------------
     //  Lectura
-    // ------------------------------------------------------------------
 
     /**
      * El código en grupos de cuatro: «PES2 6000 0017».
-     *
-     * Se guarda SIN separadores y se muestra con ellos. Un código de catorce
-     * caracteres seguidos es imposible de dictar por teléfono o de tipear de un
-     * plástico gastado, y los separadores guardados romperían la búsqueda de
-     * quien lo escriba sin ellos.
      */
     protected function codigoLegible(): Attribute
     {
@@ -122,16 +101,10 @@ class Carnet extends Model
         return Str::upper(preg_replace('/[^A-Za-z0-9]/', '', $codigo) ?? '');
     }
 
-    // ------------------------------------------------------------------
     //  Reglas de negocio
-    // ------------------------------------------------------------------
 
     /**
      * Lo que sale esta credencial: el precio de su tipo.
-     *
-     * Exigido por el trait Pagable. Si la relación no está cargada la consulta
-     * sale igual —devolver 0 daría saldo 0 y el sistema creería que está
-     * pagado—.
      */
     public function montoACobrar(): float
     {
@@ -140,14 +113,6 @@ class Carnet extends Model
 
     /**
      * ¿Vale HOY?
-     *
-     * ------------------------------------------------------------------------
-     *  EL ESTADO GUARDADO PUEDE MENTIR, Y POR ESO SE MIRA TAMBIÉN LA FECHA
-     * ------------------------------------------------------------------------
-     *
-     * `vencido` lo escribe un comando programado que corre una vez al día.
-     * Entre corrida y corrida, un carnet que venció ayer sigue diciendo
-     * «activo» en la base. Ninguna decisión se toma leyendo la columna sola.
      */
     public function estaVigente(): bool
     {
@@ -158,10 +123,6 @@ class Carnet extends Model
 
     /**
      * ¿Puede emitir permisos de faena?
-     *
-     * Las tres condiciones son necesarias: que sea de pescador, que el carnet
-     * valga hoy, y que tenga una bolsa madre con saldo. Sin la tercera se
-     * emitirían faenas sin cupo del que descontarlas.
      */
     public function puedeEmitirFaenas(): bool
     {
@@ -178,13 +139,6 @@ class Carnet extends Model
 
     /**
      * El cupo que se imprime en el plástico, o null si no corresponde.
-     *
-     * NO SE DECIDE CON UN match SOBRE EL NOMBRE DEL TIPO DE CARNET. La pesca se
-     * autoriza por volumen —tantos kilos, contrastables contra una guía de
-     * transporte—; la comercialización no. De esa distinción cuelgan cuatro
-     * cosas: el formulario muestra u oculta el campo, la validación lo exige o
-     * lo PROHÍBE, la ficha lo muestra o no, y el plástico imprime el renglón
-     * CUPO o le da la tira entera al tipo de actor.
      */
     public function cupoImpreso(): ?float
     {
@@ -205,9 +159,7 @@ class Carnet extends Model
             : (int) floor(now()->startOfDay()->diffInDays($this->fecha_vencimiento->startOfDay(), false));
     }
 
-    // ------------------------------------------------------------------
     //  Scopes
-    // ------------------------------------------------------------------
 
     /**
      * Los que valen hoy. La columna se califica porque `carnets`,

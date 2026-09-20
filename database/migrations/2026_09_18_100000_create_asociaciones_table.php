@@ -8,11 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Asociaciones — el gremio al que pertenece la persona.
-|
-| Catálogo: lo edita la unidad desde el panel y NUNCA se borra una fila. Para
-| sacar una de circulación se pone `estado = inactivo`.
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -36,10 +31,6 @@ return new class extends Migration
 
         /*
          * Dos asociaciones no pueden llamarse igual.
-         *
-         * Índice PARCIAL y no `unique()` con `deleted_at` adentro: en SQL
-         * NULL != NULL, así que ese unique no bloquearía nada. Con el WHERE, el
-         * nombre queda libre recién al dar la fila de baja.
          */
         DB::statement(<<<'SQL'
             CREATE UNIQUE INDEX asociaciones_nombre_unico

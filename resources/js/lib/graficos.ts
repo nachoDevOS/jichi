@@ -1,18 +1,9 @@
 /**
  * Ajustes compartidos por todos los gráficos del sistema.
- *
- * Están acá y no dentro de cada gráfico para que el día que cambie la paleta
- * institucional se toque UN archivo y no seis. Los valores no son colores
- * escritos a mano: son variables CSS definidas en resources/css/app.css, así
- * que los gráficos cambian solos entre el modo claro y el oscuro.
  */
 
 /**
  * Serie de colores para categorías.
- *
- * NO se exporta: quien necesite un color pide `colorSerie(i)`, que además
- * resuelve qué pasa cuando hay más categorías que colores. Exportada, cada
- * gráfico podría indexarla por su cuenta y salirse del arreglo.
  */
 const SERIE_GRAFICOS = [
     'var(--grafico-1)',

@@ -27,27 +27,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  APROVECHAMIENTOS — la BOLSA MADRE del pescador (paso 2 del flujo)
- * ============================================================================
- *
- *     beneficiario ──< aprovechamiento (500 kg, 2026) ──< faena (80 kg)
- *                                                    ──< faena (120 kg)
- *
- * El cupo es el volumen anual que se le autoriza a una persona. Cada faena
- * descuenta de él, y cuando el saldo llega a cero no se pueden emitir más.
- *
- * ----------------------------------------------------------------------------
- *  EL CONTROLADOR NO DECIDE NADA
- * ----------------------------------------------------------------------------
- *
- * Todas las reglas —una bolsa vigente por persona, el volumen que sale del
- * techo del tramo, el vencimiento con la gestión— viven en
- * `OtorgarCupoService`. Acá solo se arman las pantallas y se traduce la
- * excepción del servicio en un mensaje bajo el campo.
- *
- * Es lo que permite que una carga masiva por consola aplique exactamente las
- * mismas reglas sin copiar una línea.
  */
 class AprovechamientoController extends Controller
 {
@@ -103,10 +83,6 @@ class AprovechamientoController extends Controller
 
             /*
              * EL MODO SE MANDA A LA PANTALLA, y no es un detalle informativo.
-             *
-             * En modo flexible las faenas se emiten por encima del cupo, así
-             * que un listado que mostrara los saldos sin decir en qué modo está
-             * el sistema haría leer «0 kg» como un bloqueo que no existe.
              */
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
         ]);
@@ -114,10 +90,6 @@ class AprovechamientoController extends Controller
 
     /**
      * FORMULARIO — GET /panel/aprovechamientos/crear
-     *
-     * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
-     * buscador ya resuelto: quien viene de ahí ya eligió a quién, y volver a
-     * pedírselo es hacerle repetir un paso que acaba de dar.
      */
     public function create(Request $request): Response
     {
@@ -165,17 +137,7 @@ class AprovechamientoController extends Controller
         }
 
         /*
-         * ========================================================================
          *  OTORGAR TERMINA EN LA FICHA DEL CUPO
-         * ========================================================================
-         *
-         * Que es donde se cargan los depósitos: la tarjeta de Pagos tiene una
-         * sección por boleta y el saldo a la vista. Mandarlo a Caja —como hacía
-         * antes— lo sacaba de la ficha para hacer lo mismo desde otra pantalla, y
-         * perdiendo de vista cuánto falta.
-         *
-         * Caja sigue existiendo para lo suyo: cobrar varios trámites de una misma
-         * persona bajo un solo recibo.
          */
         return redirect()
             ->route('aprovechamientos.show', $cupo)
@@ -196,6 +158,19 @@ class AprovechamientoController extends Controller
             'categoria',
         ]);
 
+        /*
+         * El recibo del trámite: uno solo, emitido al enviar a revisión.
+         * `recibos()` devuelve colección porque el trait sirve también al carnet
+         * y a la guía; acá el primero es el único. NULL mientras está pendiente.
+         */
+        $recibo = $aprovechamiento->recibos()->first();
+
+        /*
+         * Cuántas boletas quedan sin dar por buenas, observadas incluidas. Acá y
+         * no en `resumir()`: el listado lo usa para treinta filas.
+         */
+        $sinValidar = $aprovechamiento->pagos()->sinValidar()->count();
+
         return Inertia::render('panel/aprovechamientos/ver', [
             'cupo' => [
                 ...$this->resumir($aprovechamiento),
@@ -206,39 +181,61 @@ class AprovechamientoController extends Controller
                 'escala_rango' => $aprovechamiento->categoria
                     ? [(float) $aprovechamiento->categoria->kilos_min, (float) $aprovechamiento->categoria->kilos_max]
                     : null,
+
+                // Aprobar no es «estar en revisión»: es eso Y que no falte
+                // ninguna boleta por validar. El número va para decir cuántas.
+                'pagos_sin_validar' => $sinValidar,
+                'puede_aprobarse' => $aprovechamiento->puedeRevisarse() && $sinValidar === 0,
             ],
 
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
 
             /*
-             * ================================================================
              *  LOS DEPÓSITOS QUE PAGARON ESTE CUPO, CON SU BOLETA
-             * ================================================================
-             *
-             * Un cupo de 412,50 Bs puede haberse pagado con DOS depósitos
-             * bancarios de 200 y 212,50, cada uno con su boleta. Sin esta lista,
-             * la ficha solo dice «debe 212,50» o «pagado» y no hay forma de ver
-             * de dónde salió esa plata sin ir a buscar recibo por recibo.
-             *
-             * Van de la más nueva a la más vieja, que es el orden en que se
-             * pregunta: «¿entró el último depósito?».
              */
             'pagos' => $aprovechamiento->pagos()
-                ->with('recibo:id,numero_recibo')
+                // Precargados: si no, cinco depósitos son diez consultas.
+                ->with(['registradoPor:id,name', 'validadoPor:id,name'])
                 ->latest('created_at')
                 ->get()
+                /*
+                 * El trámite se le pone a mano: `admiteControl()` le pregunta al
+                 * `pagable`, y sin esto cada fila lo va a buscar a la base — es
+                 * el mismo cupo que ya está en la mano.
+                 */
+                ->each(fn (Pago $p) => $p->setRelation('pagable', $aprovechamiento))
                 ->map(fn (Pago $p): array => [
                     'id' => $p->id,
                     'monto_parcial' => (float) $p->monto_parcial,
                     'nro_transaccion' => $p->nro_transaccion,
                     'fecha_deposito' => $p->fecha_deposito?->toDateString(),
                     'comprobante_url' => $p->comprobante_url,
-                    'numero_recibo' => $p->recibo?->numero_recibo,
-                    'recibo_id' => $p->recibo_id,
                     // Un MOMENTO: cuándo entró la plata. Va con toIso8601String().
                     'cobrado_en' => $p->created_at?->toIso8601String(),
+
+                    // El control de la boleta. `puede_*` llegan resueltas: la
+                    // regla mira el estado del TRÁMITE, no solo el del pago.
+                    'estado_validacion' => $p->estado_validacion->value,
+                    'estado_validacion_etiqueta' => $p->estado_validacion->etiqueta(),
+                    'estado_validacion_color' => $p->estado_validacion->color(),
+                    'observacion' => $p->observacion,
+                    'registrado_por' => $p->registradoPor?->name,
+                    'validado_por' => $p->validadoPor?->name,
+                    // Otro MOMENTO: cuándo se miró la boleta.
+                    'validado_en' => $p->validado_en?->toIso8601String(),
+                    'puede_validarse' => $p->admiteControl(),
+                    'puede_corregirse' => $p->admiteCorreccion(),
                 ])
                 ->all(),
+
+            // Para la cabecera de la tarjeta de Pagos. El número no va repetido
+            // en cada fila: repetirlo hacía leer «un recibo por depósito».
+            'recibo' => $recibo ? [
+                'id' => $recibo->id,
+                'numero_recibo' => $recibo->numero_recibo,
+                'monto_total' => (float) $recibo->monto_total,
+                'emitido_en' => $recibo->created_at?->toIso8601String(),
+            ] : null,
 
             /*
              * Las faenas que colgaron de este cupo, de la más nueva a la más
@@ -268,15 +265,6 @@ class AprovechamientoController extends Controller
 
     /**
      * FORMULARIO DE CORRECCIÓN — GET /panel/aprovechamientos/{id}/editar
-     *
-     * ------------------------------------------------------------------------
-     *  SE CORTA ACÁ SI EL CUPO YA NO ES BORRADOR
-     * ------------------------------------------------------------------------
-     *
-     * El middleware revisa el PERMISO; esto revisa el ESTADO, que es otra cosa.
-     * Sin este corte, alguien con el permiso puesto podría abrir el formulario
-     * de un cupo ya cobrado, llenarlo y recién descubrir al guardar que no se
-     * podía — con el pescador enfrente y el trabajo tirado.
      */
     public function edit(AprovechamientoPesq $aprovechamiento): Response|RedirectResponse
     {
@@ -343,14 +331,6 @@ class AprovechamientoController extends Controller
 
     /**
      * ELIMINAR — DELETE /panel/aprovechamientos/{id}
-     *
-     * ------------------------------------------------------------------------
-     *  DESPUÉS DE ESTO NO HAY FICHA A LA QUE VOLVER
-     * ------------------------------------------------------------------------
-     *
-     * La fila se borra de verdad, así que el redirect va al LISTADO. Y el
-     * motivo, que es lo único que sobrevive, ya quedó en `auditorias` — lo
-     * escribe el servicio antes de borrar, cuando el modelo todavía tiene id.
      */
     public function destroy(EliminarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
     {
@@ -368,24 +348,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * ========================================================================
      *  CARGAR LOS DEPÓSITOS — POST /panel/aprovechamientos/{id}/pagos
-     * ========================================================================
-     *
-     * Acepta VARIOS de una vez, porque la pantalla es repetible: el operador
-     * agrega una sección por cada depósito que trajo la persona y los manda
-     * todos juntos. Cada uno sale con su propio recibo numerado —así lo pide el
-     * correlativo de caja— y entra al arqueo del día.
-     *
-     * ------------------------------------------------------------------------
-     *  LOS ARCHIVOS SE SUBEN ANTES DE ABRIR NINGUNA TRANSACCIÓN
-     * ------------------------------------------------------------------------
-     *
-     * Una transacción de base NO deshace escrituras en disco. Subiendo adentro,
-     * un cobro que falle —saldo movido por otra ventanilla, boleta repetida—
-     * dejaría archivos huérfanos para siempre. Se suben todos acá, y si algo
-     * falla el `catch` los borra TODOS, incluidos los de las líneas que sí
-     * habían pasado.
      */
     public function pagar(
         RegistrarPagoCupoRequest $request,
@@ -417,20 +380,18 @@ class AprovechamientoController extends Controller
                     ->file($request->file("pagos.{$i}.comprobante"), 'comprobantes');
             }
 
-            $nit = ($datos['nit_ci_factura'] ?? null) ?: ($aprovechamiento->beneficiario?->ci ?? 'S/N');
-            $nombre = ($datos['nombre_factura'] ?? null)
-                ?: ($aprovechamiento->beneficiario?->nombreCompleto ?? 'Sin nombre');
+            $depositos = [];
 
             foreach ($datos['pagos'] as $i => $pago) {
-                $caja->cobrar(
-                    [['tipo' => 'cupo', 'id' => $aprovechamiento->id, 'monto' => (float) $pago['monto']]],
-                    $nit,
-                    $nombre,
-                    $pago['nro_transaccion'],
-                    $pago['fecha_deposito'],
-                    $subidos[$i],
-                );
+                $depositos[] = [
+                    'monto' => (float) $pago['monto'],
+                    'nro_transaccion' => $pago['nro_transaccion'],
+                    'fecha_deposito' => $pago['fecha_deposito'],
+                    'comprobante' => $subidos[$i],
+                ];
             }
+
+            $caja->registrarDepositos($aprovechamiento, $depositos);
         } catch (CobroInvalidoException $e) {
             foreach ($subidos as $ruta) {
                 Archivos::borrar($ruta);
@@ -451,24 +412,19 @@ class AprovechamientoController extends Controller
         $cuantos = count($datos['pagos']);
 
         /*
-         * ====================================================================
          *  REGISTRAR Y ENVIAR SON UN SOLO ACTO CUANDO EL MONTO QUEDA CUBIERTO
-         * ====================================================================
-         *
-         * El botón lo dice: «Registrar depósitos y enviar a revisión». Partirlo
-         * en dos clics obligaba al operador a apretar otro botón para declarar
-         * algo que la pantalla ya le había mostrado —que la suma alcanza—.
-         *
-         * PERO SE VUELVE A MIRAR EL SALDO, y no se confía en la intención: entre
-         * que se abrió el formulario y se guardó, otra ventanilla pudo dar de
-         * baja un pago. Si no quedó cubierto, los depósitos se registran igual
-         * —ya entraron— y el envío simplemente no ocurre. Nunca falla por esto:
-         * el operador ve cuánto falta y sigue.
          */
         $enviado = false;
 
         if (($datos['enviar'] ?? false) && $cupo->puedeEnviarseARevision()) {
-            $revision->enviar($cupo);
+            // Viajan hasta acá porque el recibo lo emite el ENVÍO. Pueden ser
+            // los de un tercero: la empresa que paga por el pescador.
+            $revision->enviar(
+                $cupo,
+                $datos['nit_ci_factura'] ?? null,
+                $datos['nombre_factura'] ?? null,
+            );
+
             $cupo->refresh();
             $enviado = true;
         }
@@ -477,7 +433,8 @@ class AprovechamientoController extends Controller
             ->route('aprovechamientos.show', $aprovechamiento)
             ->with('exito', match (true) {
                 $enviado => sprintf(
-                    '%d depósito(s) registrado(s) y enviado a revisión. Queda esperando la firma de quien lo aprueba.',
+                    '%d depósito(s) registrado(s) y enviado a revisión. Se emitió el recibo del trámite '.
+                    'con el total; queda esperando la firma de quien lo aprueba.',
                     $cuantos,
                 ),
                 $cupo->saldoPendiente() <= 0.0 => sprintf(
@@ -494,10 +451,6 @@ class AprovechamientoController extends Controller
 
     /**
      * ENVIAR A REVISIÓN — POST /panel/aprovechamientos/{id}/enviar
-     *
-     * Ventanilla declara que el expediente está completo. Las dos condiciones
-     * —estado y monto cubierto— las vuelve a mirar el servicio con la fila
-     * bloqueada.
      */
     public function enviar(AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
     {
@@ -509,7 +462,8 @@ class AprovechamientoController extends Controller
 
         return redirect()
             ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', 'Enviado a revisión. Queda esperando la firma de quien lo aprueba.');
+            ->with('exito', 'Enviado a revisión. Se emitió el recibo del trámite con el total de los '.
+                'depósitos; queda esperando la firma de quien lo aprueba.');
     }
 
     /**
@@ -549,27 +503,10 @@ class AprovechamientoController extends Controller
             ->with('exito', 'Rechazado y devuelto a ventanilla. El motivo quedó en la auditoría.');
     }
 
-    // ------------------------------------------------------------------
     //  Auxiliares
-    // ------------------------------------------------------------------
 
     /**
      * Los tramos que el operador puede elegir, con sus consecuencias.
-     *
-     * ------------------------------------------------------------------------
-     *  LO USAN OTORGAR Y CORREGIR, Y TIENEN QUE VER LO MISMO
-     * ------------------------------------------------------------------------
-     *
-     * Escrito dos veces, agregar un dato al desplegable de alta y olvidarse del
-     * de corrección dejaría a las dos pantallas mostrando cosas distintas para
-     * la misma decisión — y nadie lo notaría hasta que alguien comparara.
-     *
-     * Solo los tramos VIGENTES: uno derogado sigue en la tabla —los cupos ya
-     * otorgados apuntan a él— pero no se puede elegir.
-     *
-     * Se manda el techo del rango porque es el volumen que se va a otorgar, y el
-     * valor porque es lo que se va a cobrar: la pantalla los muestra al elegir,
-     * así el operador ve las dos consecuencias antes de guardar y no después.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -597,12 +534,6 @@ class AprovechamientoController extends Controller
 
     /**
      * Los datos de un cupo que pintan el listado y la ficha.
-     *
-     * Todo lo CALCULADO —saldo, porcentaje, vigencia, saldo pendiente— se arma
-     * acá y no en React. No es comodidad: la vigencia mira el estado Y la fecha
-     * —la columna la escribe un comando diario y entre corrida y corrida
-     * miente— y el saldo se corta en cero porque pagar de más no da crédito.
-     * Son reglas, y deducirlas en la pantalla sería una segunda copia.
      *
      * @return array<string, mixed>
      */
@@ -654,26 +585,18 @@ class AprovechamientoController extends Controller
             /*
              * EDITAR Y ELIMINAR LLEGAN RESUELTAS, y no se deducen de `estado`
              * en React.
-             *
-             * No son «el estado es pendiente»: son eso Y que no haya entrado
-             * plata, y en el caso de eliminar, Y que no tenga faenas. Escritas
-             * en la pantalla serían una segunda copia de las tres reglas, y la
-             * copia se queda vieja sin que nada falle.
              */
             'puede_editarse' => $cupo->puedeEditarse(),
             'puede_eliminarse' => $cupo->puedeEliminarse(),
 
             /*
              * LAS TRES DEL CIRCUITO DE REVISIÓN, resueltas en el servidor.
-             *
-             * `puede_enviarse` no es «el estado es pendiente»: es eso Y que los
-             * depósitos cubran el monto. Deducirlo en React sería una segunda
-             * copia de la regla, y encima con el saldo que la pantalla conoce,
-             * que puede estar viejo.
              */
             'admite_pagos' => $cupo->admitePagos(),
             'puede_enviarse' => $cupo->puedeEnviarseARevision(),
             'puede_revisarse' => $cupo->puedeRevisarse(),
+            // La autorización en papel sale recién con el cupo firmado.
+            'ya_fue_aprobado' => $cupo->yaFueAprobado(),
 
             'monto' => $cupo->montoACobrar(),
             'saldo_pendiente' => $cupo->saldoPendiente(),

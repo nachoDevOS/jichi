@@ -418,12 +418,17 @@ lo impreso y lo que hay hoy.
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
-| `recibo_id` | FK **CASCADE** | |
+| `recibo_id` | FK **CASCADE**, **nullable** | En NULL hasta que el trámite emite su recibo |
+| `registrado_por` | FK users, nullable | Quién lo cargó en el mostrador |
+| `validado_por` | FK users, nullable | Quién controló la boleta |
 | `pagable_type` / `pagable_id` | morphs | Carnet, cupo o guía |
 | `monto_parcial` | decimal(12,2) | **Este abono**, no el total |
 | `nro_transaccion` | string(60), **único** | El número de la boleta del banco |
 | `fecha_deposito` | date | La que dice la boleta, no la de carga |
 | `comprobante` | string | Ruta de la foto o el PDF de la boleta |
+| `estado_validacion` | string(20) | `pendiente` \| `validado` \| `observado` |
+| `observacion` | string, nullable | Por qué se observó |
+| `validado_en` | timestamp, nullable | Cuándo se miró la boleta |
 
 **Por qué es polimórfica.** Se cobran tres cosas distintas y las tres se pagan
 igual. Una tabla por cada una obligaría a repetir el mismo circuito de caja tres
@@ -439,14 +444,90 @@ podría amparar un carnet y una guía sin que nada lo impida.
 > silencio** y el N+1 sigue ahí. Va con `morphWith`, declarando qué traer para
 > cada tipo. Ver `CajaController::index()`.
 
-**CASCADE y no RESTRICT, al revés que en el resto del sistema**: un pago sin
-recibo no es nada —no se puede imprimir, no entra en ningún arqueo y no se sabe
-quién lo cobró—. Si algún día se anula un recibo entero, su detalle se va con él.
+**CASCADE y no RESTRICT, al revés que en el resto del sistema**: un pago que
+perdió su recibo no se puede imprimir ni entra en ningún arqueo. Si algún día se
+anula un recibo entero, su detalle se va con él.
+
+> ⚠️ **`recibo_id` ES NULLABLE, Y ES LO QUE SOSTIENE «UN RECIBO POR TRÁMITE».**
+>
+> El aprovechamiento es un TRÁMITE, y su comprobante es UNO SOLO con el total de
+> todos los depósitos: la persona entrega sus boletas —una o cinco— y se lleva un
+> papel. Ese papel se emite al pasar a **EN REVISIÓN**, que es cuando el
+> expediente se presenta; hasta entonces los depósitos ya están cargados y
+> todavía no hay recibo que ponerles.
+>
+> ```
+> PENDIENTE   ──< pago 330,00 (boleta 1242134)   recibo_id NULL
+>             ──< pago  82,50 (boleta 42341234)  recibo_id NULL
+>      │
+> [enviar a revisión]  ──▶  REC-2026-0001 (412,50) ──< los dos pagos
+> ```
+>
+> Exigiéndolo desde el INSERT —como estaba— cada depósito tenía que traer su
+> propio recibo para poder escribirse, y eso es exactamente lo que estaba mal:
+> **dos boletas de un mismo cupo salían como REC-2026-0001 y REC-2026-0002**, se
+> gastaban dos números de una serie que Contabilidad audita y el arqueo del día
+> mostraba dos cobros donde hubo uno.
+>
+> **En Caja llega lleno desde el primer momento**: ahí se cobra y se entrega el
+> papel en el mismo acto. Los dos caminos conviven, y por eso la columna admite
+> NULL en vez de haberse movido a otro lado.
+>
+> Lo escriben `CobrarService::registrarDepositos()` (lo deja en NULL) y
+> `CobrarService::emitirRecibo()` (lo llena), que llama
+> `RevisarCupoService::enviar()` dentro de su misma transacción: o el cupo se
+> presenta CON su papel o no se presenta.
+>
+> Consecuencia para quien consulte la tabla: **un pago sin `recibo_id` es plata
+> que entró y todavía no tiene comprobante**, no un dato roto. Suma en el arqueo
+> —`CajaController::arqueoDelDia()` cuenta pagos, no recibos— y el listado de
+> Caja lo muestra como «Sin recibo».
 
 **NO HAY COLUMNA `metodo_pago`, y no es un olvido.** En esta unidad no se cobra
 en efectivo ni por QR: **todo pago es un depósito bancario**. Una columna con un
 solo valor posible no informa nada, y peor, invita a suponer que alguna vez hubo
 otra cosa. Por eso las tres columnas de la boleta son OBLIGATORIAS.
+
+> ⚠️ **`estado_validacion` NO ES EL ESTADO DEL PAGO: ES EL DE SU CONTROL.**
+>
+> ```
+> PENDIENTE ──▶ VALIDADO    la boleta cuadra con el extracto del banco
+>     ▲     └─▶ OBSERVADO   no cuadra, con el motivo escrito
+>     └──[corregir]──┘
+> ```
+>
+> Que el dinero entró ya lo dice que la fila exista. Esto contesta si alguien
+> MIRÓ esa boleta contra el extracto y qué encontró.
+>
+> **Un OBSERVADO sigue sumando en `Pagable::montoPagado()`**: está cargado y la
+> plata está; lo que se puso en duda es si la boleta respalda lo que dice.
+> Sacarlo de la suma dejaría al trámite figurando sin cubrir por una observación
+> que puede estar equivocada.
+>
+> **Un observado no se valida: se corrige.** `EstadoValidacionPago::admiteControl()`
+> solo deja pasar lo que nadie miró, así que el botón «Validar» no existe sobre
+> él. Darlo por bueno sin que el dato cambie es aprobar justo lo que se marcó
+> como malo. Al corregirlo vuelve a PENDIENTE y se le borra el control entero
+> —`validado_por` y `validado_en` incluidos—: quien validó lo hizo sobre otros
+> números.
+>
+> **El control es parte de la REVISIÓN.** Solo corre con el trámite EN REVISIÓN:
+> en pendiente el expediente todavía puede cambiar entero, y aprobado ya no
+> admite reparos. Ver `AprovechamientoPesq::admiteControlDePagos()`.
+>
+> **Y frena la aprobación**: `RevisarCupoService::aprobar()` exige las tres cosas
+> —estado, monto cubierto y **todas las boletas validadas**—. Sin la tercera, la
+> validación sería decorativa.
+
+**QUIÉN CARGÓ Y QUIÉN VALIDÓ VAN EN DOS COLUMNAS DISTINTAS.** No son el mismo
+acto ni la misma responsabilidad: uno tipeó la boleta en el mostrador, el otro la
+comparó contra el extracto y la dio por buena. En una sola, «quién responde por
+esta plata» deja de tener respuesta. Y son dos PERMISOS distintos —
+`pagos.corregir` de ventanilla, `pagos.controlar` de supervisión— porque con uno
+solo la misma persona objetaría y resolvería su propia objeción.
+
+Van en `pagos` y no solo en `auditorias` porque son un DATO del pago: se muestran
+en la ficha y se filtran. La auditoría dice qué pasó; esto dice quién responde.
 
 **Y por eso el arqueo del día son DOS números, no un reparto por método:**
 

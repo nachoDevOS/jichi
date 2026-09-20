@@ -7,18 +7,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para otorgar una bolsa madre.
- *
- * ----------------------------------------------------------------------------
- *  ACÁ SOLO SE VALIDA LA FORMA. LA REGLA VIVE EN EL SERVICIO
- * ----------------------------------------------------------------------------
- *
- * Que la persona no tenga ya un cupo vigente NO se comprueba acá, y no es un
- * olvido: esa comprobación tiene que correr DENTRO de la transacción y con la
- * fila del beneficiario bloqueada, o dos ventanillas simultáneas la pasan las
- * dos. Un Request corre antes de todo eso.
- *
- * Lo que sí se hace acá es lo que un Request puede garantizar solo: que los ids
- * existan y que las fechas tengan sentido. Ver OtorgarCupoService::otorgar().
  */
 class OtorgarCupoRequest extends FormRequest
 {
@@ -47,11 +35,6 @@ class OtorgarCupoRequest extends FormRequest
             /*
              * Solo tramos VIGENTES. Un tramo derogado sigue existiendo en la
              * tabla —los cupos otorgados apuntan a él— pero no se puede elegir.
-             *
-             * El servicio lo vuelve a comprobar dentro de la transacción, y no
-             * es redundancia inútil: entre que el formulario se abre y se
-             * guarda pueden pasar minutos, y esta regla mira el momento del
-             * envío, no el del guardado.
              */
             'categoria_aprov_id' => [
                 'required', 'integer',
@@ -60,15 +43,6 @@ class OtorgarCupoRequest extends FormRequest
 
             /*
              * NO SE PUEDE OTORGAR CON FECHA FUTURA.
-             *
-             * El cupo vence con la gestión, así que una fecha del año que viene
-             * daría un cupo que arranca vencido —o que vale dos años—. Y una
-             * fecha futura dentro del mismo año habilitaría faenas antes de que
-             * el papel exista.
-             *
-             * Sí se acepta una fecha pasada: se carga en el sistema lo que se
-             * autorizó en papel la semana anterior, que es lo normal al poner
-             * al día una unidad.
              */
             'fecha_emision' => ['required', 'date', 'before_or_equal:today'],
 

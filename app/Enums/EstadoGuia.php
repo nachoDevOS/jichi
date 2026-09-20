@@ -4,20 +4,6 @@ namespace App\Enums;
 
 /**
  * En qué situación está una guía de movimiento — el amparo de UN traslado.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ SE ANULA Y NO SE BORRA
- * ----------------------------------------------------------------------------
- *
- * El número sale de un TALONARIO DE PAPEL que el comercializador se llevó.
- * Emitida mal, esa hoja puede estar circulando en un camión. Borrar la fila
- * deja un hueco en la serie que después nadie puede explicar, y peor: libera un
- * `codigo_guia` que el índice único volvería a aceptar, así que dos traslados
- * distintos podrían terminar diciendo ser el mismo papel.
- *
- * `Cerrada` es la que llegó a destino y se descargó; `Anulada` es la que se dio
- * de baja con motivo. La diferencia importa en un control de ruta: una guía
- * cerrada amparó un traslado real, una anulada nunca amparó nada.
  */
 enum EstadoGuia: string
 {

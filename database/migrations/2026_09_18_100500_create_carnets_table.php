@@ -7,16 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Carnets — la credencial física que se entrega en ventanilla.
-|
-| El mismo plástico para las dos actividades; lo que cambia es `tipo_actor`:
-|
-|     carnet (pescador)        ──< permisos_faena     (una por salida)
-|     carnet (comercializador) ──< guias_movimiento   (una por traslado)
-|
-| Se imprime lo que NO cambia después de salir de la impresora. El ESTADO no se
-| imprime: un carnet se revoca después y la tarjeta no se entera.
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -33,9 +23,6 @@ return new class extends Migration
              * NULLABLE PORQUE SOLO EL PESCADOR LLEVA CUPO, y eso lo dice
              * `TipoActor::requiereAprovechamiento()`, NUNCA un match sobre el
              * nombre del tipo de carnet —que es un catálogo que edita la unidad—.
-             *
-             * `nullOnDelete` y no restrict: sin el cupo el carnet sigue siendo un
-             * documento válido, se emitió y se entregó.
              */
             $table->foreignId('aprovechamiento_id')->nullable()
                 ->constrained('aprovechamientos_pesq')->nullOnDelete()
@@ -45,13 +32,6 @@ return new class extends Migration
 
             /*
              * Único GLOBAL, y en los dos sentidos:
-             *
-             *   - No por tipo: un control en ruta lee un código y tiene que
-             *     llegar a UN documento sin preguntar de qué tipo es.
-             *   - No parcial: a diferencia de los catálogos, un carnet dado de
-             *     baja NO libera su código. El plástico ya salió de la impresora
-             *     y está en la calle; reusar ese número haría que el mismo código
-             *     llevara a dos documentos distintos.
              */
             $table->string('codigo_carnet', 40)->unique();
 

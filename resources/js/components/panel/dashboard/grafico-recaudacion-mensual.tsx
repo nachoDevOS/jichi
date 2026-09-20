@@ -5,46 +5,7 @@ import { bs } from '@/lib/utils';
 import type { RecaudacionMes } from '@/types/dashboard';
 
 /**
- * ============================================================================
  *  LA RECAUDACIÓN DE LOS ÚLTIMOS DOCE MESES
- * ============================================================================
- *
- * Los gráficos los dibuja `recharts`, una librería de React. Se arma como si
- * fuera HTML: cada pieza del gráfico es una etiqueta.
- *
- *   <ResponsiveContainer>  se estira al tamaño del contenedor padre
- *     <AreaChart>          el gráfico y sus datos
- *       <CartesianGrid>    la cuadrícula de fondo
- *       <XAxis> <YAxis>    los ejes
- *       <Tooltip>          el cuadrito al pasar el mouse
- *       <Area>             la curva con el relleno debajo
- *
- * OJO: ResponsiveContainer mide a su padre, así que el padre necesita una
- * altura concreta. Por eso el div que lo envuelve lleva `h-64`. Sin esa altura
- * el gráfico se calcula con altura cero y no se ve nada.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ ÁREA Y NO LÍNEA
- * ----------------------------------------------------------------------------
- *
- * Lo que se pregunta de la recaudación no es «cuánto entró en abril» —para eso
- * está el globito— sino «cómo viene el año». Eso es el BULTO bajo la curva, y
- * una línea sola no lo dibuja: hay que reconstruirlo con la vista. El relleno
- * lo muestra directamente.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ EL PANEL VA PINTADO Y NO BLANCO
- * ----------------------------------------------------------------------------
- *
- * Es la pieza más grande del tablero y la que resume el año. Sobre blanco, con
- * el resto de las tarjetas también blancas, queda al mismo nivel que el listado
- * de los últimos trámites. Pintado, hace de ancla: es lo que el ojo agarra
- * después de los cuatro números de arriba.
- *
- * Reusa el tono 1 de los indicadores —no un azul escrito acá— porque ese par de
- * tokens ya tiene medido el contraste del texto encima, en modo claro y en
- * oscuro. Los colores de recharts NO son clases de Tailwind sino atributos SVG,
- * así que van como `var(--widget-1-fg)` y no como `text-widget-1-fg`.
  */
 
 /** Color del texto sobre el panel. Se repite en todos los trazos del gráfico. */

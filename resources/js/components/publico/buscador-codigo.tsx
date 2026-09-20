@@ -6,26 +6,6 @@ import { Input } from '@/components/ui/input';
 
 /**
  * Caja para escribir a mano el código del carnet.
- *
- * Lo normal es llegar acá escaneando el QR, que ya lo trae en la URL. Este
- * formulario es el plan B: cuando el QR está borroso, mojado o el teléfono no
- * tiene cámara.
- *
- * ----------------------------------------------------------------------------
- *  UN SOLO CAMPO, Y ES LA LLAVE ENTERA
- * ----------------------------------------------------------------------------
- *
- * El carnet se identifica por su `codigo_carnet`, que es único global y va
- * impreso en el plástico. Es lo único que hay que saber para consultarlo.
- *
- * Que esté impreso significa que no es un secreto, así que lo que protege del
- * barrido automático NO es el código sino el límite de intentos por minuto de
- * la ruta. Por eso conviene que el código lleve una parte al azar al generarse:
- * uno correlativo se recorre entero probando de 1 en adelante.
- *
- * Al enviar hace POST a /verificar y el controlador redirige a /verificar/{codigo}.
- * Podría haber sido un GET, pero con POST el dato no queda en el historial del
- * navegador de una computadora compartida.
  */
 export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | null }) {
     const { data, setData, post, processing, errors } = useForm({

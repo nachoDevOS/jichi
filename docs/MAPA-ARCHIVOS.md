@@ -99,6 +99,7 @@ decisiones que acá solo se nombran.
 | `Panel/PagoController.php` | 123 | Libro de caja + alta. **Sin anulación** |
 | `Panel/RubroController.php` | 97 | **Sin `destroy()`** |
 | `Panel/ReciboController.php` | 199 | Solo dibuja el PDF. Media carta apaisada. Imágenes embebidas |
+| `Panel/AutorizacionPescaController.php` | 187 | La autorización de pesca en PDF. Carta vertical. Sale recién con el cupo **aprobado**; la tabla de tamaños mínimos y las reglas de redes van como constantes —son texto del reglamento, no de la base— |
 | `Panel/DashboardController.php` | 330 | Cada bloque envuelto en `fn()` para las visitas parciales. `listos_para_aprobar` **cae en N+1**. `actividadDiaria()` arma la serie de 14 días de los indicadores |
 | `Publico/VerificacionController.php` | 232 | Cédula enmascarada. Sin ids internos. **Sin rubros suspendidos** |
 
@@ -128,6 +129,7 @@ decisiones que acá solo se nombran.
 
 | Archivo | Qué es | No obvio |
 | --- | --- | --- |
+| `autorizacion-pesca.blade.php` | Calco de la autorización de pesca | Texto que FLUYE, al revés que el carnet y el recibo: el papel son párrafos, no coordenadas fijas. Carta vertical, 612×792 pt |
 | `recibo-oficial.blade.php` | Calco del talonario del SEDAG | Todo en `position: absolute` sobre una grilla de 592×376 pt. Ver [modulos/RECIBOS.md](modulos/RECIBOS.md) |
 | `carnet-pescador.blade.php` | La credencial impresa | Calco de la cédula de papel, una carilla de 243×153 pt (CR80). **Es el espejo de `vista-previa-carnet.tsx`**: si se toca una, se toca la otra. Ver [modulos/CARNETS.md](modulos/CARNETS.md) |
 | `partes/texto-perfilado.blade.php` | Un texto con contorno | Lo dibuja **cinco veces** —cuatro copias corridas más la cara— porque DomPDF no tiene `-webkit-text-stroke` ni `text-shadow`. Lo usan el título de la cédula y los rótulos. El color, el cuerpo y el corrimiento los pone quien la incluye |

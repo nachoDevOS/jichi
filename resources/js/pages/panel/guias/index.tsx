@@ -15,21 +15,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { GuiaFila } from '@/types/guias';
 
 /**
- * ============================================================================
  *  LISTADO DE GUÍAS DE MOVIMIENTO
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  SE BUSCA POR ORIGEN Y DESTINO, NO SOLO POR PERSONA
- * ----------------------------------------------------------------------------
- *
- * Es la pregunta que trae a alguien a esta pantalla: «¿qué salió para Santa
- * Cruz esta semana?». Un buscador que solo mire el nombre del comercializador
- * obligaría a saber de antemano a quién buscar, que es justo lo que no se sabe.
- *
- * Las fechas se muestran con `fechaHora()` y no con `fecha()`: los cinco días
- * se cuentan desde el instante de emisión, así que la hora es el dato que
- * decide la vigencia.
  */
 export default function IndiceGuias({
     guias,

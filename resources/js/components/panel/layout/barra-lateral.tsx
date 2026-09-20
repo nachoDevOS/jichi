@@ -8,19 +8,6 @@ import type { PageProps } from '@/types';
 
 /**
  * Barra lateral azul institucional: la marca arriba y el menú debajo.
- *
- * ----------------------------------------------------------------------------
- *  TRES ESTADOS, NO DOS
- * ----------------------------------------------------------------------------
- *
- * En pantallas grandes está siempre visible y puede estar ANCHA —icono más
- * texto— o ANGOSTA —solo los iconos—. En celular no existe ninguno de los dos:
- * está fuera de la pantalla y entra deslizándose, y ahí siempre va ancha,
- * porque un menú de iconos sueltos en un teléfono no se entiende.
- *
- * Por eso recibe `abierto` (celular) y `angosto` (escritorio) por separado, y
- * los dos los guarda el layout: el botón que los cambia vive en el encabezado,
- * que es otro componente.
  */
 export function BarraLateral({
     abierto,
@@ -128,10 +115,6 @@ export function BarraLateral({
 
 /**
  * El rótulo de una sección: «Ventanilla», «Registro», «Administración».
- *
- * Angosta la barra, el texto no entra, pero el grupo sigue existiendo: se
- * reemplaza por una línea divisoria para que los iconos no queden como una
- * columna continua sin ninguna agrupación.
  */
 function RotuloGrupo({ titulo, angosto }: { titulo: string; angosto: boolean }) {
     return (
@@ -155,11 +138,6 @@ function RotuloGrupo({ titulo, angosto }: { titulo: string; angosto: boolean }) 
 
 /**
  * Un renglón del menú. Si el módulo todavía no existe se dibuja apagado.
- *
- * LA FILA VA A TODO EL ANCHO y sin esquinas redondeadas, y el ítem activo se
- * marca con una barra dorada pegada al borde izquierdo. Es lo que hace que la
- * columna se lea como una lista y no como una pila de botones sueltos: la marca
- * está siempre en la misma coordenada, así que el ojo la encuentra sin buscar.
  */
 function ItemMenu({
     item,
@@ -221,12 +199,6 @@ function ItemMenu({
 
 /**
  * Pie de la barra: el botón que la angosta, y nada más.
- *
- * QUIÉN ESTÁ CONECTADO NO VA ACÁ, va en el encabezado. Es a propósito: angosta
- * la barra mide 64 px y ahí no entra un nombre, así que el dato desaparecería
- * justo en la configuración en la que el operador ya no ve los rótulos del menú
- * y más necesita saber con qué sesión está trabajando. El encabezado, en
- * cambio, mide siempre lo mismo.
  */
 function PieBarra({
     angosto,

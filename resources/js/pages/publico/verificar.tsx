@@ -9,63 +9,7 @@ import { fechaHora } from '@/lib/utils';
 import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
 
 /**
- * ============================================================================
  *  VERIFICACIÓN PÚBLICA DE CARNETS
- * ============================================================================
- *
- * La ÚNICA pantalla del sistema que se ve sin iniciar sesión, y la más
- * importante de todas: es la que sostiene el valor de cada carnet que emite la
- * Gobernación.
- *
- * Es la dirección codificada dentro del QR impreso. Un inspector escanea el QR
- * de un pescador con su teléfono, en el muelle, y cae acá.
- *
- * ----------------------------------------------------------------------------
- *  UN SOLO DATO: EL CÓDIGO DEL CARNET
- * ----------------------------------------------------------------------------
- *
- * El carnet se identifica por `codigo_carnet`, que es único GLOBAL —no por
- * tipo— justamente para esto: un control en ruta lee un código y tiene que
- * llegar a UN documento, sin preguntar antes de qué tipo es.
- *
- * ESE CÓDIGO VA IMPRESO EN EL PLÁSTICO, así que quien tenga el carnet en la
- * mano puede consultarlo. Se aceptó porque lo que se muestra acá es
- * deliberadamente poco: nada que no esté ya en la tarjeta que esa persona está
- * mirando. Del barrido automático protege el límite de intentos por minuto de
- * la ruta.
- *
- * ----------------------------------------------------------------------------
- *  EL DISEÑO: UN ACTA, NO UNA PANTALLA
- * ----------------------------------------------------------------------------
- *
- * Todo lo que se muestra va sobre una hoja blanca con membrete y guarda. El
- * motivo está explicado largo en `hoja-oficial.tsx`, pero en corto: el ciudadano
- * tiene el papel en la mano y compara. Si la pantalla se parece a una
- * aplicación, no hay nada que comparar; si se parece a otro papel oficial, la
- * comparación la hace cualquiera sin que le expliquen.
- *
- * ----------------------------------------------------------------------------
- *  LOS CUATRO RESULTADOS POSIBLES
- * ----------------------------------------------------------------------------
- *
- *   VIGENTE   verde  — auténtico y habilita las actividades que lista
- *   VENCIDO   ámbar  — auténtico pero cerró la gestión: NO habilita
- *   ANULADO   rojo   — la institución lo dio de baja
- *   NO EXISTE gris   — ningún carnet responde a ese código
- *
- * «Vigente» lo decide `Carnet::estaVigente()` en PHP, que mira el estado Y la
- * fecha: el estado lo escribe un comando programado que corre una vez al día, y
- * entre corrida y corrida un carnet que venció ayer sigue diciendo «vigente» en
- * la columna. Acá eso sería habilitar a alguien con un documento caído.
- *
- * ----------------------------------------------------------------------------
- *  LO QUE ESTA PANTALLA NO MUESTRA
- * ----------------------------------------------------------------------------
- *
- * Cualquiera que levante un carnet del suelo puede abrirla, así que solo aparece
- * lo mínimo para constatar autenticidad: nunca el CI completo (llega enmascarado
- * desde PHP), ni la dirección, ni el teléfono del titular. Ver
- * `VerificacionController::datosPublicos()`.
  */
 interface Props {
     /** El código que venía en la URL, ya normalizado. Null si se entró sin nada. */
@@ -155,17 +99,6 @@ export default function Verificar({ codigo, carnet, encontrado, institucion }: P
 
 /**
  * Acta de carnet no hallado.
- *
- * Sale en la misma hoja que las demás, y no en una pantalla de error. Es
- * deliberado: que no figure un carnet es un RESULTADO de la consulta, tan válido
- * como los otros tres, y merece la misma constancia. Una pantalla de error haría
- * dudar de si el sistema falló o si el documento es falso.
- *
- * EL TEXTO NO ACUSA A NADIE, y eso importa más de lo que parece. Puede ser un
- * carnet falso, pero también un código mal tipeado, un QR borroso o un 0 leído
- * como O. Acusar de falsificación a quien se equivocó en una letra sería un
- * problema real en una ventanilla pública. Se informa el hecho y se dice qué
- * hacer.
  */
 function NoEncontrado({
     codigo,

@@ -2,16 +2,6 @@ import { cn } from '@/lib/utils';
 
 /**
  * Escudo del Gobierno Autónomo Departamental del Beni.
- *
- * Es el emblema institucional oficial, no una marca inventada para el sistema:
- * el mismo que va impreso en la cédula de pescador y en los talonarios.
- *
- * OJO CON EL FONDO. El archivo trae el texto «GOBIERNO AUTÓNOMO DEPARTAMENTAL
- * DEL BENI» en verde oscuro debajo del escudo. Sobre la barra lateral azul ese
- * texto desaparece, por eso MarcaJichi lo apoya sobre un recuadro blanco. Si
- * alguna vez hace falta el escudo suelto —sin la leyenda— conviene recortar una
- * segunda versión del PNG en vez de escalar esta, que a tamaño chico se vuelve
- * una mancha verde.
  */
 export function LogoJichi({ className }: { className?: string }) {
     return (

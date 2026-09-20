@@ -11,21 +11,7 @@ import type { PageProps } from '@/types';
 import type { ReciboFicha } from '@/types/caja';
 
 /**
- * ============================================================================
  *  LA FICHA DE UN RECIBO
- * ============================================================================
- *
- * Es el detalle del papel entregado: qué trámites cubrió y por cuánto cada uno.
- *
- * ----------------------------------------------------------------------------
- *  NO HAY BOTONES DE EDITAR NI DE BORRAR, Y ES LA REGLA
- * ----------------------------------------------------------------------------
- *
- * `numero_recibo` es un correlativo que Contabilidad audita: borrar una fila
- * deja un hueco en la serie que nadie puede explicar. Y el recibo NACE del
- * cobro, en la misma transacción que sus abonos — no existe una forma de
- * crearlo suelto, porque sería un comprobante numerado diciendo que entró plata
- * que no entró.
  */
 export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
     const { puede } = usePermisos();

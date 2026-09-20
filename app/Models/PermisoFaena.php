@@ -14,30 +14,6 @@ use Illuminate\Support\Carbon;
 
 /**
  * La autorización de UNA salida de pesca.
- *
- * ============================================================================
- *  APUNTA A DOS COSAS A LA VEZ, Y LAS DOS HACEN FALTA
- * ============================================================================
- *
- *   - `aprovechamiento` es DE DÓNDE SALEN LOS KILOS: la bolsa madre contra la
- *     que se descuenta.
- *   - `carnet` es QUIÉN LOS EXTRAE: la credencial que un control en el río va
- *     a pedir.
- *
- * Las dos apuntan a la misma persona, pero por caminos distintos y con vidas
- * distintas —el cupo se renueva por resolución y el carnet por gestión, no
- * siempre en la misma fecha—. Guardar solo una obligaría a deducir la otra, y
- * la deducción falla justamente en el caso raro: dos cupos vigentes, o el
- * carnet renovado a mitad de un cupo.
- *
- * ============================================================================
- *  NO SE EDITA NI SE BORRA
- * ============================================================================
- *
- * El número sale de un talonario de papel que el pescador se llevó. Borrar la
- * fila deja un hueco en la serie que nadie puede explicar y libera un número
- * que el índice único volvería a aceptar, así que dos salidas distintas
- * podrían terminar diciendo ser el mismo papel. Se completa o se vence.
  */
 #[Fillable([
     'aprovechamiento_id',
@@ -57,11 +33,6 @@ class PermisoFaena extends Model
 
     /**
      * VIGENCIA MÁXIMA DE UNA FAENA, en días.
-     *
-     * Está acá y no escrito a mano en el controlador porque es una regla de la
-     * resolución, no un detalle del formulario: la usan el alta, la validación
-     * y la vista previa del papel. Escrita en tres lados, cambiarla se hace en
-     * dos y el tercero sigue emitiendo con el plazo viejo.
      */
     public const DIAS_VIGENCIA = 30;
 
@@ -81,9 +52,7 @@ class PermisoFaena extends Model
         ];
     }
 
-    // ------------------------------------------------------------------
     //  Relaciones
-    // ------------------------------------------------------------------
 
     public function aprovechamiento(): BelongsTo
     {
@@ -95,9 +64,7 @@ class PermisoFaena extends Model
         return $this->belongsTo(Carnet::class, 'carnet_id');
     }
 
-    // ------------------------------------------------------------------
     //  Lectura
-    // ------------------------------------------------------------------
 
     /** Cómo se lee en un listado: «Faena N° 0003». */
     protected function etiqueta(): Attribute
@@ -107,17 +74,10 @@ class PermisoFaena extends Model
         );
     }
 
-    // ------------------------------------------------------------------
     //  Reglas de negocio
-    // ------------------------------------------------------------------
 
     /**
      * La fecha límite que corresponde a una salida.
-     *
-     * Se CALCULA acá y se GUARDA en la fila, en vez de derivarse al leer: si
-     * mañana la resolución baja el plazo a quince días, los permisos ya
-     * emitidos tienen que seguir venciendo cuando dice el papel que el pescador
-     * tiene en la mano.
      */
     public static function limiteDesde(Carbon|string $salida): Carbon
     {
@@ -151,9 +111,7 @@ class PermisoFaena extends Model
         return $this->estado->consumeCupo();
     }
 
-    // ------------------------------------------------------------------
     //  Scopes
-    // ------------------------------------------------------------------
 
     /**
      * Las que autorizan hoy. Se califica la columna porque `permisos_faena`,

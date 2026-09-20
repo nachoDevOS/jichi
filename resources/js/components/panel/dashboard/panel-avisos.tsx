@@ -5,21 +5,6 @@ import type { Avisos } from '@/types/dashboard';
 
 /**
  * Lo que está por caducar y lo que ya caducó sin cerrarse.
- *
- * ----------------------------------------------------------------------------
- *  SON DOS COSAS DISTINTAS Y VAN SEPARADAS A PROPÓSITO
- * ----------------------------------------------------------------------------
- *
- * Arriba, lo que VA A VENCER: carnets y cupos dentro del plazo de aviso. Es
- * trabajo que se puede anticipar —avisarle a la gente que renueve— y no hay
- * nada mal todavía.
- *
- * Abajo, lo que YA SE PASÓ DE FECHA y sigue abierto: una faena o una guía
- * vencida sin cerrar es un papel que alguien se llevó y del que nadie registró
- * la vuelta. Eso no es una previsión, es algo que hay que ir a buscar.
- *
- * Mezclados en una sola lista, lo segundo se pierde entre lo primero, que
- * siempre es más numeroso.
  */
 export function PanelAvisos({ avisos }: { avisos: Avisos }) {
     const sinCerrar = avisos.faenas_vencidas + avisos.guias_vencidas;

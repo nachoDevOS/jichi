@@ -10,43 +10,6 @@ use Illuminate\Database\Seeder;
 
 /**
  * Los tres CATÁLOGOS sin los que no se puede emitir nada.
- *
- * ============================================================================
- *  ⚠️  LOS NÚMEROS DE ACÁ SON UNA PLANTILLA, NO LA RESOLUCIÓN
- * ============================================================================
- *
- * Los tramos de la escala, los precios y los nombres de las asociaciones salen
- * de una resolución administrativa que no está cargada en el sistema. Lo que
- * hay abajo se armó para que el circuito se pueda recorrer de punta a punta en
- * desarrollo, y está marcado con `REVISAR` renglón por renglón.
- *
- * **Antes de usar esto en la base real hay que reemplazar los valores.** Un
- * carnet emitido con una tarifa inventada es plata mal cobrada, y el error no
- * aparece hasta el arqueo.
- *
- * De dónde salen los números de la plantilla, para que se sepa qué se supuso:
- *
- *   - Los DOS EXTREMOS de la escala son los únicos textos oficiales que había:
- *     «1 Kg Hasta 100 Kg» y «1001 kg Hasta 2000 Kg PAICHE».
- *   - Los cinco tramos del medio se repartieron a ojo entre esos dos extremos.
- *   - Los precios siguen una regla lineal de 55 Bs por cada 100 kg, que hace
- *     cerrar los dos valores conocidos de los tramos bajos (55 y 110). OJO: el
- *     tercer valor conocido —500 Bs— NO cae en esa recta, así que la escala
- *     real casi seguro NO es lineal. Es la señal más clara de que esto hay que
- *     confirmarlo.
- *
- * ============================================================================
- *  POR QUÉ firstOrCreate Y NO updateOrCreate
- * ============================================================================
- *
- * Un catálogo lo edita la unidad desde el panel. Con `updateOrCreate`, volver a
- * correr el seeder —cosa que pasa sola al rearmar un entorno— PISARÍA la
- * tarifa que alguien ajustó, y nadie se enteraría hasta que un carnet saliera
- * cobrando el número viejo.
- *
- * Con `firstOrCreate`, el seeder solo llena lo que falta. Para forzar la
- * recarga de un valor hay que decidirlo a mano, que es lo correcto para un dato
- * que sale de una resolución.
  */
 class CatalogoSeeder extends Seeder
 {
@@ -64,12 +27,6 @@ class CatalogoSeeder extends Seeder
 
     /**
      * La escala de aprovechamiento. REVISAR TODO: kilos, textos y precios.
-     *
-     * Los tramos tienen que ser CONTIGUOS y SIN HUECOS: el `kilos_min` de cada
-     * uno es el `kilos_max` del anterior más 1. Si queda un hueco,
-     * `CategoriaAprovechamiento::paraVolumen()` devuelve null para los
-     * volúmenes que caen adentro y el formulario no ofrece ninguna escala, sin
-     * ningún error que lo explique.
      *
      * @var list<array{nro_escala: int, descripcion_kg: string, kilos_min: float, kilos_max: float, valor_bs: float, modalidad?: string}>
      */

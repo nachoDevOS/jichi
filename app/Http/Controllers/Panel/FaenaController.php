@@ -19,27 +19,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  PERMISOS DE FAENA — una salida de pesca (paso 4 del flujo)
- * ============================================================================
- *
- *     carnet (pescador) ──▶ faena ──▶ descuenta kilos de la bolsa madre
- *
- * ----------------------------------------------------------------------------
- *  NO HAY `edit`, NI `update`, NI `destroy`
- * ----------------------------------------------------------------------------
- *
- * El número sale de un TALONARIO DE PAPEL que el pescador se llevó. Borrar la
- * fila deja un hueco en la serie que nadie puede explicar y libera un número
- * que el índice único volvería a aceptar, así que dos salidas distintas podrían
- * terminar diciendo ser la misma hoja.
- *
- * Y TAMPOCO SE ANULA: `EstadoFaena` no tiene ese estado. Una faena emitida de
- * más se deja VENCER, y al vencer libera su volumen sola. El número queda
- * ocupado igual, que es lo correcto — la hoja se gastó.
- *
- * Lo único que se escribe después de emitir es COMPLETAR, que registra la
- * vuelta y admite corregir los kilos contra la balanza.
  */
 class FaenaController extends Controller
 {
@@ -193,10 +173,6 @@ class FaenaController extends Controller
 
                 /*
                  * EL CUPO DEL QUE SALIERON LOS KILOS.
-                 *
-                 * Va en la ficha porque es la pregunta que sigue: «¿le queda
-                 * para otra salida?». Sin esto habría que ir al módulo de cupos
-                 * a buscarlo.
                  */
                 'cupo' => $faena->aprovechamiento ? [
                     'id' => $faena->aprovechamiento->id,
@@ -227,16 +203,10 @@ class FaenaController extends Controller
             ->with('exito', 'Faena completada. El volumen quedó firme contra el cupo.');
     }
 
-    // ------------------------------------------------------------------
     //  Auxiliares
-    // ------------------------------------------------------------------
 
     /**
      * Un carnet como lo necesita el formulario de emisión.
-     *
-     * Es la MISMA forma que devuelve `BeneficiarioController::buscar()`, a
-     * propósito: la pantalla trata igual a la persona preseleccionada y a la que
-     * se busca a mano, así que hay un solo camino en el componente.
      *
      * @return array<string, mixed>
      */
@@ -259,11 +229,6 @@ class FaenaController extends Controller
 
     /**
      * Los datos de una faena que pintan el listado y la ficha.
-     *
-     * `vigente`, `consume_cupo` y `puede_completarse` llegan RESUELTOS: las tres
-     * son reglas —la primera mira el estado Y la fecha, la segunda sale del
-     * enum, la tercera exige que esté en curso— y deducirlas en la pantalla
-     * sería una segunda copia de cada una.
      *
      * @return array<string, mixed>
      */

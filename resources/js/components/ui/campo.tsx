@@ -4,28 +4,6 @@ import { cn } from '@/lib/utils';
 
 /**
  * Envoltorio de un campo de formulario: etiqueta + control + error + ayuda.
- *
- * ¿PARA QUÉ SIRVE?
- *
- * Sin esto, cada campo de cada formulario del sistema hay que escribirlo así:
- *
- *   <div className="space-y-2">
- *     <Label htmlFor="telefono">Teléfono</Label>
- *     <Input id="telefono" value={...} onChange={...} aria-invalid={...} />
- *     {errors.telefono && <p className="text-sm text-destructive">{errors.telefono}</p>}
- *   </div>
- *
- * Son cinco líneas repetidas veinte veces por formulario, y basta olvidarse
- * una para que un error de validación no se muestre y el usuario no entienda
- * por qué no puede guardar. Con <Campo> queda:
- *
- *   <Campo etiqueta="Teléfono" htmlFor="telefono" error={errors.telefono}>
- *     <Input id="telefono" ... />
- *   </Campo>
- *
- * `children` es el hueco donde va el control (Input, Select, Textarea...).
- * Es una idea central de React: un componente puede recibir otros componentes
- * como contenido, igual que una etiqueta HTML envuelve a otras.
  */
 export function Campo({
     etiqueta,

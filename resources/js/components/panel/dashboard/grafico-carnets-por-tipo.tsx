@@ -5,19 +5,6 @@ import type { CarnetsPorTipo } from '@/types/dashboard';
 
 /**
  * Cuántos carnets vigentes hay de cada tipo del catálogo.
- *
- * Se cuentan solo los VIGENTES y no todos los emitidos, porque la pregunta del
- * tablero es «cuánta gente está habilitada hoy», y un carnet revocado o vencido
- * no habilita a nadie.
- *
- * LAS BARRAS VAN HORIZONTALES (`layout="vertical"`) porque los nombres del
- * catálogo son largos —«Carnet Comercializador»— y en barras verticales
- * quedarían inclinados o cortados. Horizontal, el nombre entra entero sobre el
- * eje.
- *
- * OJO: ResponsiveContainer mide a su padre, así que el padre necesita una
- * altura concreta. Por eso el CardContent lleva `h-72`. Sin esa altura el
- * gráfico se calcula con altura cero y no se ve nada.
  */
 export function GraficoCarnetsPorTipo({ datos, gestion }: { datos: CarnetsPorTipo[]; gestion: number }) {
     return (

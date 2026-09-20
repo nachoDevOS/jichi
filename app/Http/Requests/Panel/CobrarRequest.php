@@ -8,15 +8,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para emitir un cobro.
- *
- * ----------------------------------------------------------------------------
- *  ACÁ SOLO SE VALIDA LA FORMA. LOS SALDOS SE COMPRUEBAN EN EL SERVICIO
- * ----------------------------------------------------------------------------
- *
- * Que el monto no exceda lo que se debe NO se comprueba acá, y no es un olvido:
- * el saldo puede moverlo otra ventanilla en el mismo segundo, así que esa
- * comparación tiene que correr DENTRO de la transacción y con la fila del
- * trámite bloqueada. Ver CobrarService::resolver().
  */
 class CobrarRequest extends FormRequest
 {
@@ -51,14 +42,7 @@ class CobrarRequest extends FormRequest
             'lineas.*.monto' => ['required', 'numeric', 'gt:0', 'max:99999999', 'decimal:0,2'],
 
             /*
-             * ================================================================
              *  LA BOLETA ES SIEMPRE OBLIGATORIA
-             * ================================================================
-             *
-             * En esta unidad no se cobra en efectivo ni por QR: todo pago es un
-             * depósito bancario, y sin la boleta lo único que respalda el cobro
-             * es que alguien lo tipeó — eso no se puede cruzar contra el
-             * extracto del banco.
              */
             'nro_transaccion' => [
                 'required', 'string', 'max:60',
@@ -66,9 +50,6 @@ class CobrarRequest extends FormRequest
                  * ÚNICO entre los pagos VIVOS. Es lo que impide cargar la misma
                  * boleta dos veces —contra el mismo trámite o contra otro—, que
                  * es la forma más fácil de dar por pagado algo que no se pagó.
-                 *
-                 * El índice de la base lo vuelve a exigir: dos ventanillas
-                 * simultáneas pasarían esta comprobación las dos.
                  */
                 Rule::unique('pagos', 'nro_transaccion')->whereNull('deleted_at'),
             ],

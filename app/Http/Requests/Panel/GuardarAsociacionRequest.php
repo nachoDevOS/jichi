@@ -9,10 +9,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para crear y editar una asociación.
- *
- * Mismo criterio que GuardarBeneficiarioRequest: crear y editar comparten las
- * reglas, así que se escriben una sola vez y el día que cambien no hay dos
- * lados que sincronizar.
  */
 class GuardarAsociacionRequest extends FormRequest
 {
@@ -33,12 +29,6 @@ class GuardarAsociacionRequest extends FormRequest
         return [
             /*
              * DOS ASOCIACIONES NO PUEDEN LLAMARSE IGUAL.
-             *
-             * La regla replica el índice único PARCIAL de la base
-             * (`asociaciones_nombre_unico`), que solo mira las filas vivas. El
-             * `whereNull('deleted_at')` es lo que reproduce esa parcialidad:
-             * sin él, un nombre liberado por una baja seguiría bloqueado acá y
-             * la pantalla diría «ya existe» sobre algo que la base aceptaría.
              */
             'nombre' => [
                 'required', 'string', 'max:160',

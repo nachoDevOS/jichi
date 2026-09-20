@@ -15,48 +15,41 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
+import { DialogoCorregirPago } from '@/components/panel/pagos/dialogo-corregir-pago';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha, fechaHora } from '@/lib/utils';
+import { bs, cn, fecha, fechaHora } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import { Campo } from '@/components/ui/campo';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
-import type { CupoFicha, FaenaDelCupo, PagoDelCupo } from '@/types/aprovechamientos';
+import type { CupoFicha, FaenaDelCupo, PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
 
 /**
- * ============================================================================
  *  LA FICHA DE UN CUPO
- * ============================================================================
- *
- * Arriba el saldo, abajo las faenas que lo explican. Ese orden es el punto:
- * «le quedan 20 kg» es un número que hay que creer hasta que se ve de dónde
- * sale.
- *
- * ----------------------------------------------------------------------------
- *  LAS FAENAS VENCIDAS SE MARCAN APARTE
- * ----------------------------------------------------------------------------
- *
- * Una faena vencida LIBERA su volumen: la salida no ocurrió. Sin marcarlas, la
- * suma de la lista no cuadra con el saldo de arriba y parece un error del
- * sistema. Por eso van tachadas y con la aclaración al lado.
  */
 export default function VerCupo({
     cupo,
     faenas,
     pagos,
+    recibo,
     modoEstricto,
 }: {
     cupo: CupoFicha;
     faenas: FaenaDelCupo[];
     /** Los depósitos que pagaron este cupo, del más nuevo al más viejo. */
     pagos: PagoDelCupo[];
+    /**
+     * EL RECIBO DEL TRÁMITE, uno solo. Llega en null mientras el cupo está
+     * pendiente: recién se emite al enviarlo a revisión.
+     */
+    recibo: ReciboDelCupo | null;
     /** Lo que dice APROVECHAMIENTO_ESTRICTO: cambia qué significa un saldo en cero. */
     modoEstricto: boolean;
 }) {
@@ -65,6 +58,14 @@ export default function VerCupo({
 
     const [eliminando, setEliminando] = useState(false);
     const [rechazando, setRechazando] = useState(false);
+
+    // Guardan el PAGO entero y no su id: las dos ventanas muestran sus datos.
+    const [observando, setObservando] = useState<PagoDelCupo | null>(null);
+    const [corrigiendo, setCorrigiendo] = useState<PagoDelCupo | null>(null);
+
+    /* Validar no manda ningún dato: es un PATCH y el servidor sabe quién es. */
+    const control = useForm({});
+    const observacion = useForm({ motivo: '' });
 
     /*
      * FORMULARIO PROPIO PARA EL RECHAZO, separado del borrado. Los dos tienen un
@@ -79,17 +80,7 @@ export default function VerCupo({
     const borrado = useForm({ motivo: '' });
 
     /*
-     * ========================================================================
      *  EL FORMULARIO ES UNA LISTA DE SECCIONES, NO UN PAGO
-     * ========================================================================
-     *
-     * Cada clic en «Agregar pago» suma una sección, y cada una es un depósito
-     * completo: monto, número de boleta, fecha y archivo. Se mandan todas
-     * juntas, y cada una sale con su propio recibo numerado.
-     *
-     * Por qué una lista y no un pago por vez: la persona llega al mostrador con
-     * las dos boletas en la mano. Cargarlas de a una obligaba a guardar, esperar
-     * la recarga y volver a abrir el formulario.
      */
     const seccionNueva = (monto: number) => ({
         // `key` estable para React: sin ella, quitar la sección del medio
@@ -106,11 +97,6 @@ export default function VerCupo({
         pagos: [] as ReturnType<typeof seccionNueva>[],
         /*
          * LA INTENCIÓN DE ENVIAR, que viaja con los depósitos.
-         *
-         * Se llena al enviar con lo que el botón estaba diciendo, para que el
-         * servidor haga exactamente lo que el operador leyó. Es una intención y
-         * no un permiso: si al guardar el saldo no quedó en cero, el servidor
-         * registra igual y no envía.
          */
         enviar: false,
     });
@@ -128,10 +114,6 @@ export default function VerCupo({
 
     /*
      * ¿CON ESTO ALCANZA? Es lo que decide qué dice el botón y qué hace.
-     *
-     * Con `puede('aprovechamientos.enviar')` adentro: sin ese permiso el botón
-     * solo registra, y ofrecerle enviar a quien no puede sería prometer algo que
-     * el servidor va a ignorar.
      */
     const cubre = faltaDespues <= 0 && puede('aprovechamientos.enviar');
 
@@ -171,13 +153,23 @@ export default function VerCupo({
                         Ver al pescador
                     </Button>
 
+                    {/* LA AUTORIZACIÓN DE PESCA, en PDF. Sale recién con el cupo
+                        firmado, y abre una pestaña porque lo que vuelve es un
+                        archivo: el visor del navegador es desde donde se imprime. */}
+                    {puede('aprovechamientos.imprimir') && cupo.ya_fue_aprobado && (
+                        <a
+                            href={route('aprovechamientos.autorizacion', cupo.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={cn(buttonVariants({ variant: 'outline' }))}
+                        >
+                            <Printer className="size-4" />
+                            Autorización de pesca
+                        </a>
+                    )}
+
                     {/*
                         EDITAR Y ELIMINAR SOLO SOBRE EL BORRADOR.
-
-                        Las dos banderas llegan resueltas del servidor: no son
-                        «el estado es pendiente» sino eso Y que no haya entrado
-                        plata —y para eliminar, además, que no tenga faenas—.
-                        Deducirlas acá sería una segunda copia de tres reglas.
                     */}
                     {puede('aprovechamientos.editar') && cupo.puede_editarse && (
                         <Button
@@ -227,13 +219,21 @@ export default function VerCupo({
                     */}
                     {puede('aprovechamientos.aprobar') && cupo.puede_revisarse && (
                         <>
+                            {/* Se apaga mientras falte validar alguna boleta, y
+                                el title dice cuántas: el servidor lo exige igual,
+                                y un botón que promete y falla es peor. */}
                             <Button
                                 onClick={() =>
                                     envio.patch(route('aprovechamientos.aprobar', cupo.id), {
                                         preserveScroll: true,
                                     })
                                 }
-                                disabled={envio.processing}
+                                disabled={envio.processing || !cupo.puede_aprobarse}
+                                title={
+                                    cupo.puede_aprobarse
+                                        ? undefined
+                                        : `Faltan ${cupo.pagos_sin_validar} depósito(s) por validar`
+                                }
                                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                             >
                                 <Check className="size-4" />
@@ -257,9 +257,6 @@ export default function VerCupo({
                         sección por boleta. Mandar al operador a Caja lo sacaba de
                         la ficha para hacer lo mismo que puede hacer sin moverse,
                         y perdiendo de vista el saldo.
-
-                        Caja sigue existiendo para lo suyo: cobrar varios trámites
-                        de una persona en un mismo recibo.
                     */}
                 </div>
             }
@@ -426,9 +423,6 @@ export default function VerCupo({
                             caso que se repite es cargar DOS depósitos seguidos
                             por el mismo cupo: yendo a Caja hay que volver a
                             buscar a la persona en cada vuelta.
-
-                            Es el mismo cobro —sale con su recibo numerado y entra
-                            al arqueo—, así que pide el permiso de caja.
                         */}
                         {/*
                             SOLO MIENTRAS ADMITE PAGOS. En revisión el monto ya
@@ -662,6 +656,62 @@ export default function VerCupo({
                             </form>
                         )}
 
+                        {/* El recibo va UNA vez, arriba del detalle que ampara.
+                            Era una columna de la tabla, y el número repetido en
+                            cada fila se leía como «un recibo por depósito». */}
+                        {pagos.length > 0 && (
+                            <div className="mx-5 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-secondary/40 px-4 py-3">
+                                {recibo ? (
+                                    <>
+                                        <div className="min-w-0">
+                                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                                Recibo del trámite
+                                            </p>
+
+                                            <Link
+                                                href={route('recibos.show', recibo.id)}
+                                                className="font-mono font-medium text-primary hover:underline"
+                                            >
+                                                {recibo.numero_recibo}
+                                            </Link>
+
+                                            <span className="ml-2 text-xs text-muted-foreground">
+                                                {pagos.length} depósito(s) · emitido el{' '}
+                                                {fechaHora(recibo.emitido_en)}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-medium tabular-nums">
+                                                {bs(recibo.monto_total, institucion.moneda)}
+                                            </span>
+
+                                            {/* Abre una pestaña y no navega con
+                                                Inertia: lo que vuelve es un PDF,
+                                                y el visor del navegador es desde
+                                                donde se imprime. */}
+                                            {puede('recibos.imprimir') && (
+                                                <a
+                                                    href={route('recibos.imprimir', recibo.id)}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className={cn(buttonVariants({ variant: 'outline' }))}
+                                                >
+                                                    <Printer className="size-4" />
+                                                    Imprimir
+                                                </a>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                        Todavía no se emitió el recibo. Sale uno solo, con el total de
+                                        todos los depósitos, al enviar el aprovechamiento a revisión.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         {pagos.length === 0 ? (
                             <EstadoVacio
                                 icono={Banknote}
@@ -673,11 +723,11 @@ export default function VerCupo({
                                 <table className="w-full text-sm">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">Recibo</th>
                                             <th className="px-5 py-2.5 font-medium">Boleta</th>
                                             <th className="px-5 py-2.5 font-medium">Depositado</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Monto</th>
                                             <th className="px-5 py-2.5 font-medium">Cargado</th>
+                                            <th className="px-5 py-2.5 font-medium">Validación</th>
                                             <th className="px-5 py-2.5" />
                                         </tr>
                                     </thead>
@@ -685,15 +735,6 @@ export default function VerCupo({
                                     <tbody className="divide-y divide-border">
                                         {pagos.map((p) => (
                                             <tr key={p.id} className="hover:bg-secondary/50">
-                                                <td className="px-5 py-2.5">
-                                                    <Link
-                                                        href={route('recibos.show', p.recibo_id)}
-                                                        className="font-mono font-medium text-primary hover:underline"
-                                                    >
-                                                        {p.numero_recibo ?? '—'}
-                                                    </Link>
-                                                </td>
-
                                                 <td className="px-5 py-2.5">
                                                     {p.comprobante_url ? (
                                                         <a
@@ -728,26 +769,92 @@ export default function VerCupo({
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fechaHora(p.cobrado_en)}
+                                                    {p.registrado_por && (
+                                                        <span className="block text-xs">
+                                                            por {p.registrado_por}
+                                                        </span>
+                                                    )}
                                                 </td>
 
-                                                {/* EL RECIBO DEL TALONARIO, en
-                                                    PDF. Abre una pestaña porque
-                                                    lo que vuelve es un archivo y
-                                                    el visor del navegador es
-                                                    desde donde se imprime. */}
-                                                <td className="px-5 py-2.5 text-right">
-                                                    {puede('recibos.imprimir') && (
-                                                        <a
-                                                            href={route('recibos.imprimir', p.recibo_id)}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            title="Imprimir el recibo"
-                                                            aria-label={`Imprimir el recibo ${p.numero_recibo ?? ''}`}
-                                                            className="inline-flex text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
-                                                        >
-                                                            <Printer className="size-4" />
-                                                        </a>
+                                                {/* El control de la boleta: quién la
+                                                    miró y cuándo. El motivo va DEBAJO
+                                                    y no en un title — es lo que dice
+                                                    qué corregir. */}
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={p.estado_validacion_color}>
+                                                        {p.estado_validacion_etiqueta}
+                                                    </Badge>
+
+                                                    {p.validado_por && (
+                                                        <span className="mt-1 block text-xs text-muted-foreground">
+                                                            {p.validado_por} · {fechaHora(p.validado_en)}
+                                                        </span>
                                                     )}
+
+                                                    {p.observacion && (
+                                                        <span className="mt-1 block max-w-60 text-xs text-rose-700 dark:text-rose-300">
+                                                            {p.observacion}
+                                                        </span>
+                                                    )}
+                                                </td>
+
+                                                {/* Validar y observar son de
+                                                    SUPERVISIÓN; corregir, de
+                                                    ventanilla. Sobre un observado no
+                                                    aparece «Validar»: se corrige. */}
+                                                <td className="px-5 py-2.5">
+                                                    <div className="flex justify-end gap-1">
+                                                        {puede('pagos.controlar') &&
+                                                            p.puede_validarse && (
+                                                                <>
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            control.patch(
+                                                                                route(
+                                                                                    'pagos.validar',
+                                                                                    p.id,
+                                                                                ),
+                                                                                { preserveScroll: true },
+                                                                            )
+                                                                        }
+                                                                        disabled={control.processing}
+                                                                        title="La boleta cuadra con el extracto del banco"
+                                                                        className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500/40 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                                                                    >
+                                                                        <Check className="size-4" />
+                                                                        Validar
+                                                                    </Button>
+
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            setObservando(p)
+                                                                        }
+                                                                        title="No cuadra: hay que escribir por qué"
+                                                                        className="border-rose-300 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                                                    >
+                                                                        <TriangleAlert className="size-4" />
+                                                                        Observar
+                                                                    </Button>
+                                                                </>
+                                                            )}
+
+                                                        {puede('pagos.corregir') &&
+                                                            p.puede_corregirse && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => setCorrigiendo(p)}
+                                                                    title="Corregir el monto, la boleta o la fecha"
+                                                                >
+                                                                    <Pencil className="size-4" />
+                                                                    Corregir
+                                                                </Button>
+                                                            )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -841,24 +948,7 @@ export default function VerCupo({
                 persona tuvo 800 kg cuando su tramo daba 500.
             */}
             {/*
-                ================================================================
                  ELIMINAR PIDE MOTIVO **Y** CASILLA DE CONSENTIMIENTO
-                ================================================================
-
-                Las dos cosas, y cada una tapa algo distinto:
-
-                  - EL MOTIVO es lo único que sobrevive. La fila se borra de
-                    verdad, así que dentro de seis meses la única respuesta
-                    posible a «¿y el cupo de Fulano?» es la línea de auditoría.
-                    Sin texto ahí, esa respuesta es «alguien lo borró».
-
-                  - LA CASILLA frena el clic automático. Escribir un motivo es
-                    una tarea; marcar «entiendo que esto no se deshace» es una
-                    decisión, y son dos actos distintos a propósito.
-
-                El mínimo de 10 caracteres es el mismo que exige
-                EliminarCupoRequest: si acá fuera menor, el botón se habilitaría
-                y el servidor rechazaría igual.
             */}
             {/*
                 RECHAZAR PIDE MOTIVO, y no casilla: no es destructivo —el cupo
@@ -944,7 +1034,55 @@ export default function VerCupo({
                 }
             />
 
-            
+            {/* OBSERVAR — misma ventana que rechazar: quien corrige es otra
+                persona y sin el texto no sabe qué arreglar. */}
+            <ConfirmarConMotivo
+                abierto={observando !== null}
+                titulo="Observar este depósito"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            Boleta{' '}
+                            <strong className="font-mono">{observando?.nro_transaccion}</strong> por{' '}
+                            <strong>{bs(observando?.monto_parcial ?? 0, institucion.moneda)}</strong>.
+                        </p>
+                        <p>
+                            El depósito <strong>sigue sumando</strong> en el saldo: lo que queda en
+                            duda es si la boleta respalda lo que dice, no que la plata esté.
+                        </p>
+                        <p>
+                            Un observado <strong>no se valida: se corrige</strong>. Hasta que
+                            ventanilla lo arregle, el aprovechamiento no se puede aprobar.
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Qué no cuadra"
+                ayuda="Es lo que va a leer quien tenga que corregirlo. Queda en la auditoría con su nombre."
+                placeholder="El monto de la boleta dice 82,50 y en el extracto figuran 80,00."
+                textoConfirmar="Observar"
+                valor={observacion.data.motivo}
+                onCambiar={(v) => observacion.setData('motivo', v)}
+                error={observacion.errors.motivo}
+                procesando={observacion.processing}
+                onCancelar={() => {
+                    setObservando(null);
+                    observacion.reset();
+                }}
+                onConfirmar={() => {
+                    if (!observando) return;
+
+                    observacion.patch(route('pagos.observar', observando.id), {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            setObservando(null);
+                            observacion.reset();
+                        },
+                    });
+                }}
+            />
+
+            {/* CORREGIR — la única salida de una observación. */}
+            <DialogoCorregirPago pago={corrigiendo} onCerrar={() => setCorrigiendo(null)} />
         </LayoutPanel>
     );
 }

@@ -20,23 +20,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  GUÍAS DE MOVIMIENTO — un traslado de producto (paso 4, rama comercializador)
- * ============================================================================
- *
- *     carnet (comercializador) ──▶ guía ──▶ ampara UN traslado, 5 días
- *
- * ----------------------------------------------------------------------------
- *  NO HAY `edit` NI `destroy`
- * ----------------------------------------------------------------------------
- *
- * El código sale de un talonario de papel que viaja dentro del camión. Borrar
- * la fila deja un hueco en la serie y libera un código que el índice único
- * volvería a aceptar: dos traslados podrían terminar diciendo ser el mismo
- * papel.
- *
- * Lo que se escribe después de emitir son dos cosas: CERRAR —la carga llegó, y
- * ahí se corrige el peso contra la balanza del destino— y ANULAR, con motivo.
  */
 class GuiaController extends Controller
 {
@@ -135,12 +119,6 @@ class GuiaController extends Controller
 
             /*
              * LA TARIFA Y EL DESCUENTO SALEN DEL SERVIDOR, no escritos en React.
-             *
-             * El formulario muestra cuánto va a costar apenas se marca la casilla
-             * de piscicultura, y ese número tiene que ser EL MISMO que cobra
-             * `GuiaMovimiento::montoACobrar()`. Escrito en los dos lados, el día
-             * que la resolución cambie el 50% a 40% la pantalla seguiría
-             * prometiendo un precio que la caja no cobra.
              */
             'tarifaBase' => (float) config('jichi.guias.tarifa_base'),
             'descuentoPiscicultura' => GuiaMovimiento::DESCUENTO_PISCICULTURA,
@@ -230,17 +208,10 @@ class GuiaController extends Controller
             ->with('exito', 'Guía anulada. El código queda ocupado: la hoja del talonario se gastó.');
     }
 
-    // ------------------------------------------------------------------
     //  Auxiliares
-    // ------------------------------------------------------------------
 
     /**
      * Los datos de una guía que pintan el listado y la ficha.
-     *
-     * `vigente`, `caducada`, `puede_cerrarse` y `puede_anularse` llegan
-     * RESUELTOS. Las cuatro son reglas —la primera mira el estado Y la hora, y
-     * la última además prohíbe anular una guía CERRADA, porque el traslado ya
-     * ocurrió— y deducirlas en la pantalla sería una segunda copia.
      *
      * @return array<string, mixed>
      */
@@ -280,10 +251,6 @@ class GuiaController extends Controller
 
             /*
              * Son MOMENTOS, no días: van con toIso8601String().
-             *
-             * Los cinco días se cuentan desde la HORA de emisión —una guía de
-             * las 18:00 del lunes vence a las 18:00 del sábado— así que mandarlas
-             * como día perdería justamente el dato que decide la vigencia.
              */
             'fecha_emision' => $guia->fecha_emision?->toIso8601String(),
             'fecha_vencimiento' => $guia->fecha_vencimiento?->toIso8601String(),

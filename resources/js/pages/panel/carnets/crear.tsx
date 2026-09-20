@@ -14,36 +14,7 @@ import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { AsociacionElegible, CupoVigente, TipoElegible } from '@/types/carnets';
 
 /**
- * ============================================================================
  *  EMITIR UNA CREDENCIAL — paso 3 del flujo
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  LA ACTIVIDAD Y EL TIPO DE CARNET SON DOS COSAS DISTINTAS
- * ----------------------------------------------------------------------------
- *
- * Es el punto que más confunde, y por eso están separados en el formulario con
- * una explicación al lado:
- *
- *   - LA ACTIVIDAD (`tipo_actor`) es la REGLA. Decide qué puede emitir la
- *     credencial —faenas o guías— y si lleva cupo en kilos. Es un enum del
- *     servidor y no se puede inventar.
- *
- *   - EL TIPO DE CARNET es el CATÁLOGO: cómo se llama el documento y cuánto
- *     sale. La unidad lo edita, y el mismo documento puede figurar como «Carnet
- *     de Pescador» o «Pescador Artesanal» sin que cambie nada de lo anterior.
- *
- * Juntarlos en un solo campo parecería más simple y sería una trampa: bastaría
- * con renombrar una fila del catálogo para cambiar lo que un carnet habilita.
- *
- * ----------------------------------------------------------------------------
- *  EL AVISO DEL CUPO EVITA EL VIAJE EN FALSO
- * ----------------------------------------------------------------------------
- *
- * Un carnet de pescador sin bolsa madre lo rechaza el servidor, porque el
- * plástico imprime el cupo. La pantalla lo avisa apenas se eligen la persona y
- * la actividad, para que el operador vaya a otorgar el cupo antes de llenar el
- * resto del formulario y perderlo.
  */
 export default function CrearCarnet({
     beneficiario,

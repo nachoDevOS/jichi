@@ -12,22 +12,7 @@ import type { PageProps } from '@/types';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 
 /**
- * ============================================================================
  *  EMITIR UNA GUÍA DE MOVIMIENTO — paso 4, rama comercializador
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  EL PRECIO SE MUESTRA ANTES DE GUARDAR, Y SALE DEL SERVIDOR
- * ----------------------------------------------------------------------------
- *
- * La casilla de piscicultura no es un dato descriptivo: marcarla cobra la
- * MITAD. Por eso el monto aparece al costado y cambia al instante — el operador
- * ve la consecuencia mientras decide, no después en la caja.
- *
- * La tarifa y el descuento llegan como props y no escritos acá: tienen que ser
- * los MISMOS que cobra `GuiaMovimiento::montoACobrar()`. Escritos en los dos
- * lados, el día que la resolución cambie el 50% a 40% la pantalla seguiría
- * prometiendo un precio que la caja no cobra.
  */
 export default function CrearGuia({
     beneficiario,
@@ -281,10 +266,6 @@ export default function CrearGuia({
 
 /**
  * Los carnets vigentes, con el que no sirve deshabilitado.
- *
- * NO SE FILTRAN los que no pueden: aparecen en gris con el motivo al lado. Un
- * carnet que desaparece le dice al operador «esta persona no tiene carnet», que
- * es falso y lo manda a emitir otro.
  */
 function ListaDeCarnets({
     carnets,

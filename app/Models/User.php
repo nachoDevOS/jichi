@@ -19,14 +19,6 @@ class User extends Authenticatable
 {
     /*
      * NO LLEVA HasFactory, y su UserFactory se borró.
-     *
-     * Las cuentas del sistema no se generan al azar: las crea el administrador
-     * desde el panel, y la única que se siembra —admin@admin.com— la escribe
-     * UsuarioSeeder con `updateOrCreate`. El único que usaba `User::factory()`
-     * era el juego de pruebas, que se eliminó el 14/09/2026.
-     *
-     * `Beneficiario` sí conserva la suya: DemoSeeder la usa para poblar el
-     * padrón de prueba.
      */
     use Auditable, HasRoles, Notifiable, SoftDeletes;
 
@@ -52,11 +44,6 @@ class User extends Authenticatable
 
     /**
      * Los depósitos que esta persona cargó en ventanilla.
-     *
-     * OJO: apuntaba a `user_id`, UNA COLUMNA QUE NUNCA EXISTIÓ en `pagos`. La
-     * relación estaba rota desde el primer día y no se notaba porque nadie la
-     * llamaba —Eloquent no valida el nombre de la columna hasta que se ejecuta
-     * la consulta—. Se arregló al agregar `registrado_por`.
      */
     public function pagosRegistrados(): HasMany
     {

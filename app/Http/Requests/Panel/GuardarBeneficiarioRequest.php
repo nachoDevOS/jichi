@@ -8,16 +8,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas de validación para crear y editar un beneficiario.
- *
- * ¿POR QUÉ UN FORM REQUEST Y NO VALIDAR EN EL CONTROLADOR?
- *
- * Porque crear y editar comparten exactamente las mismas reglas. Validando
- * dentro del controlador habría que escribirlas dos veces, y el día que cambie
- * una hay que acordarse de tocar los dos lados. Acá se escriben una sola vez.
- *
- * Laravel lo ejecuta ANTES de entrar al método del controlador. Si algo falla,
- * el controlador nunca se ejecuta: Laravel redirige de vuelta al formulario con
- * los errores, e Inertia los deja disponibles en React dentro de `errors`.
  */
 class GuardarBeneficiarioRequest extends FormRequest
 {
@@ -44,22 +34,6 @@ class GuardarBeneficiarioRequest extends FormRequest
         return [
             /*
              * Unicidad de la cédula.
-             *
-             * La regla replica el índice único PARCIAL de la base
-             * (`beneficiarios_ci_unico`): `ci` no puede repetirse entre
-             * registros VIVOS.
-             *
-             * VA SOBRE `ci` SOLA, sin el complemento, igual que el índice. El
-             * complemento es parte del MISMO documento, no de otro: metiéndolo
-             * en la comparación, cargar a la misma persona una vez con
-             * complemento y otra sin él pasaría los dos controles.
-             *
-             * whereNull('deleted_at') es lo que deja fuera a los dados de baja,
-             * y ->ignore() excluye al registro que se está editando.
-             *
-             * Que esté duplicada acá y en la base no es redundancia inútil: el
-             * índice garantiza, pero su error es ilegible; esta regla es la que
-             * pinta el mensaje bajo el campo.
              */
             'ci' => [
                 'required', 'string', 'max:30',
@@ -75,10 +49,6 @@ class GuardarBeneficiarioRequest extends FormRequest
 
             /*
              * El nombre, partido como viene en la cédula.
-             *
-             * El segundo nombre y el apellido materno no son obligatorios porque
-             * mucha gente no los tiene, y exigirlos dejaría a esa gente fuera del
-             * sistema. El apellido paterno sí: es NOT NULL en la base.
              */
             'primerNombre' => ['required', 'string', 'max:60'],
             'segundoNombre' => ['nullable', 'string', 'max:60'],
@@ -137,11 +107,6 @@ class GuardarBeneficiarioRequest extends FormRequest
 
     /**
      * Normaliza los datos ANTES de validar.
-     *
-     * Ventanilla escribe con espacios de más y en minúsculas; acá se limpia una
-     * sola vez para que la base guarde siempre el mismo formato. Un espacio al
-     * final no se ve en pantalla pero viaja a `nombreCompleto` y ensucia el
-     * nombre impreso en el carnet.
      */
     protected function prepareForValidation(): void
     {

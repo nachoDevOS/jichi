@@ -15,22 +15,7 @@ import type { OpcionEnum, Paginado } from '@/types';
 import type { FaenaFila } from '@/types/faenas';
 
 /**
- * ============================================================================
  *  LISTADO DE PERMISOS DE FAENA
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  LAS CADUCADAS SE MARCAN, Y ES LO MÁS ÚTIL DE ESTA PANTALLA
- * ----------------------------------------------------------------------------
- *
- * Una faena que se pasó de fecha y sigue ACTIVA es un papel que alguien se
- * llevó y del que nadie registró la vuelta. El comando diario la marca como
- * vencida, pero entre corrida y corrida queda acá a la vista — y el dato es
- * accionable: hay que ir a buscarla, no esperar.
- *
- * El aviso sale de `caducada`, que llega resuelto del servidor: la pantalla no
- * compara fechas, porque `new Date('2026-12-31')` en JavaScript se interpreta
- * como medianoche UTC y en UTC-4 devuelve el día anterior.
  */
 export default function IndiceFaenas({
     faenas,

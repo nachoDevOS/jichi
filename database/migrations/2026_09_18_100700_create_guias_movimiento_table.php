@@ -7,15 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Guías de movimiento — el amparo de UN traslado de producto.
-|
-| Lo que la faena es para el pescador, la guía es para el comercializador: el
-| carnet habilita el año, la guía habilita el viaje. Vale como máximo 5 días.
-|
-| `es_piscicultura` NO es descriptivo: es plata. Marcado, el arancel se cobra al
-| 50% —el pescado de criadero no sale del río—. El descuento se aplica en UN
-| solo lugar: GuiaMovimiento::factorArancel().
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {

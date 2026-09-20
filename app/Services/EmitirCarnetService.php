@@ -14,49 +14,12 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * ============================================================================
  *  PASO 3 DEL FLUJO — emitir la CREDENCIAL
- * ============================================================================
- *
- *     beneficiario + asociación + tipo (+ cupo si es pescador) ──▶ carnet
- *
- * El carnet es la llave ANUAL. Con él solo no se sale a trabajar: de él cuelgan
- * los permisos operativos —faenas y guías— que autorizan cada día.
- *
- * ----------------------------------------------------------------------------
- *  LAS TRES REGLAS QUE VIVEN ACÁ
- * ----------------------------------------------------------------------------
- *
- *   1. Una credencial vigente POR ACTIVIDAD y por persona. Quien pesca y
- *      además comercializa tiene dos; lo que no puede tener son dos iguales.
- *
- *   2. Un carnet de PESCADOR exige una bolsa madre vigente. El plástico
- *      imprime el cupo, y sin cupo tampoco se pueden emitir faenas — que es
- *      para lo único que sirve ese carnet.
- *
- *   3. Un carnet de COMERCIALIZADOR no lleva cupo, y la columna queda en NULL.
- *      No es que «no se cargó»: la comercialización no se autoriza por volumen.
- *
- * Ninguna la puede garantizar la base: la primera depende de la fecha de hoy y
- * las otras dos son condicionales. Por eso van acá, con la fila del
- * beneficiario bloqueada.
  */
 class EmitirCarnetService
 {
     /**
      * El alfabeto del código impreso.
-     *
-     * ------------------------------------------------------------------------
-     *  FALTAN 0, O, 1, I, L, 5 Y S A PROPÓSITO
-     * ------------------------------------------------------------------------
-     *
-     * El código se lee de un plástico gastado, a veces se dicta por teléfono y
-     * se tipea a mano en la verificación pública. Esos siete caracteres son los
-     * que se confunden entre sí en cualquier tipografía, y una sola letra mal
-     * leída devuelve «no existe» — que en el muelle se lee como «carnet falso».
-     *
-     * Sacarlos cuesta poco: quedan 29 símbolos, y con siete posiciones al azar
-     * son 17 billones de combinaciones.
      */
     private const ALFABETO = 'ABCDEFGHJKMNPQRTUVWXYZ2346789';
 
@@ -65,15 +28,6 @@ class EmitirCarnetService
 
     /**
      * Emite la credencial.
-     *
-     * ------------------------------------------------------------------------
-     *  SE BLOQUEA AL BENEFICIARIO, IGUAL QUE AL OTORGAR EL CUPO
-     * ------------------------------------------------------------------------
-     *
-     * Sin el candado, dos ventanillas atendiendo a la misma persona pasan las
-     * dos comprobaciones —ninguna ve el carnet de la otra, que todavía no está
-     * escrito— y la persona se va con dos plásticos de la misma actividad, cada
-     * uno con su código válido. Después no hay forma de saber cuál vale.
      */
     public function emitir(
         Beneficiario $beneficiario,
@@ -136,19 +90,6 @@ class EmitirCarnetService
 
     /**
      * Da de baja una credencial, con motivo.
-     *
-     * ------------------------------------------------------------------------
-     *  NO SE BORRA NI SE REVIERTE
-     * ------------------------------------------------------------------------
-     *
-     * El plástico está en la calle. Borrar la fila liberaría un código que el
-     * índice único volvería a aceptar, así que dos credenciales distintas
-     * podrían terminar diciendo ser la misma — y la verificación pública
-     * respondería por la nueva mostrando el nombre de otra persona.
-     *
-     * Tampoco se «desrevoca»: si la persona vuelve a estar en regla, lo que
-     * corresponde es emitirle una nueva, con su propio código. La vieja pudo
-     * haber quedado en manos de cualquiera.
      */
     public function revocar(Carnet $carnet, string $motivo): Carnet
     {
@@ -175,17 +116,10 @@ class EmitirCarnetService
         });
     }
 
-    // ------------------------------------------------------------------
     //  Auxiliares
-    // ------------------------------------------------------------------
 
     /**
      * Los catálogos se releen DENTRO de la transacción.
-     *
-     * No es redundancia con el Request: entre que el operador abrió el
-     * formulario y apretó guardar pueden pasar minutos, y en el medio alguien
-     * pudo desactivar la asociación o el tipo desde el catálogo. El Request
-     * mira el momento del envío; esto, el del guardado.
      */
     private function comprobarCatalogos(Asociacion $asociacion, TipoCarnet $tipo): void
     {
@@ -200,10 +134,6 @@ class EmitirCarnetService
 
     /**
      * Su credencial vigente de ESTA actividad, o null.
-     *
-     * Se consulta siempre contra la base y no se reutiliza ninguna relación
-     * cargada: corre dentro del candado, y todo el punto es ver lo último
-     * escrito, incluido lo que otra ventanilla acaba de crear.
      */
     private function carnetVigenteDe(Beneficiario $beneficiario, TipoActor $actor): ?Carnet
     {
@@ -217,19 +147,6 @@ class EmitirCarnetService
 
     /**
      * Su bolsa madre de esta gestión, o null.
-     *
-     * ------------------------------------------------------------------------
-     *  ACEPTA UN CUPO PENDIENTE DE PAGO, Y TIENE QUE ACEPTARLO
-     * ------------------------------------------------------------------------
-     *
-     * Lo único que el carnet necesita del cupo es el VOLUMEN que va impreso en
-     * el plástico, y eso ya está decidido desde que se otorgó. El carnet también
-     * nace sin pagar, y los dos se cobran juntos en el mismo recibo — así llega
-     * la persona al mostrador—.
-     *
-     * Con `vigentes()`, que exige el cupo ya cobrado, el circuito quedaba
-     * trabado: no se podía emitir la credencial hasta cobrar el cupo, y entonces
-     * la caja nunca podía cobrar las dos cosas de una.
      */
     private function cupoVigenteDe(Beneficiario $beneficiario): ?AprovechamientoPesq
     {
@@ -241,34 +158,7 @@ class EmitirCarnetService
     }
 
     /**
-     * ========================================================================
      *  EL CÓDIGO IMPRESO EN EL PLÁSTICO
-     * ========================================================================
-     *
-     * Forma: PES + 26 + siete al azar  ->  «PES26K7RJ2M», que se muestra como
-     * «PES2 6K7R J2M».
-     *
-     * ------------------------------------------------------------------------
-     *  LLEVA UNA PARTE AL AZAR, Y NO ES ADORNO
-     * ------------------------------------------------------------------------
-     *
-     * El código es la llave de la verificación pública, que es una pantalla SIN
-     * SESIÓN. Un código correlativo —PES26-0001, 0002…— se recorre entero
-     * probando de 1 en adelante, y cualquiera podría listar el padrón de
-     * pescadores del año con un script.
-     *
-     * El prefijo y el año SÍ son predecibles, y está bien: sirven para que una
-     * persona sepa de un vistazo qué credencial tiene en la mano. Lo que
-     * protege son las siete posiciones al azar.
-     *
-     * ------------------------------------------------------------------------
-     *  EL REINTENTO NO SOBRA
-     * ------------------------------------------------------------------------
-     *
-     * La probabilidad de repetir es ínfima, pero «ínfima» no es «cero», y la
-     * columna tiene un índice único: sin reintentar, esa colisión sería un error
-     * de base de datos en la cara del operador, con alguien esperando el carnet.
-     * Se prueba varias veces y recién ahí se rinde.
      */
     private function codigoUnico(TipoActor $actor, Carbon $emision): string
     {

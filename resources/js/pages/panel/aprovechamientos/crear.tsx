@@ -16,42 +16,11 @@ import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 
 /**
  * Sugerencias del campo de embarcación, NO una lista cerrada.
- *
- * Es lo que más se escribe en ventanilla, puesto ahí para ahorrar tecleo y para
- * que el dato salga escrito igual la mayoría de las veces. El operador puede
- * escribir cualquier otra cosa: un `datalist` sugiere, no restringe.
  */
 const TIPOS_DE_EMBARCACION = ['Canoa', 'Peque-peque', 'Bote', 'Chalana', 'Deslizador', 'Balsa'];
 
 /**
- * ============================================================================
  *  OTORGAR UNA BOLSA MADRE — paso 2 del flujo del pescador
- * ============================================================================
- *
- * Son tres datos: a quién, qué tramo de la escala y desde cuándo. De ahí salen
- * solos el volumen en kilos y lo que hay que cobrar.
- *
- * ----------------------------------------------------------------------------
- *  EL VOLUMEN NO SE ESCRIBE: SALE DEL TRAMO
- * ----------------------------------------------------------------------------
- *
- * La escala dice «201 kg Hasta 500 Kg», y lo que se autoriza es el TECHO. No
- * hay campo de kilos porque dejarlo elegir convertiría la escala en una
- * sugerencia: se podría cobrar el tramo 3 otorgando el volumen del 5, y nada lo
- * marcaría como raro.
- *
- * Lo que sí hace la pantalla es MOSTRAR las dos consecuencias —cuántos kilos y
- * cuánto se cobra— apenas se elige el tramo, para que se vean antes de guardar
- * y no después.
- *
- * ----------------------------------------------------------------------------
- *  LO QUE ESTA PANTALLA NO COMPRUEBA
- * ----------------------------------------------------------------------------
- *
- * Que la persona no tenga ya un cupo vigente. Esa regla necesita la fila del
- * beneficiario bloqueada dentro de una transacción —dos ventanillas
- * simultáneas la pasarían las dos— así que vive en OtorgarCupoService y su
- * mensaje vuelve como error del campo de la persona.
  */
 export default function CrearCupo({
     beneficiario,
@@ -157,12 +126,6 @@ export default function CrearCupo({
                             Embarcación: ___», y el sistema no lo guardaba: la
                             autorización impresa desde el panel decía MENOS que
                             la que se llena a mano.
-
-                            Va con sugerencias en un `datalist` y no en un
-                            desplegable cerrado: en el Beni se escribe «canoa»,
-                            «peque-peque», «bote», «chalana» y variantes, y un
-                            catálogo obligaría a dar de alta un tipo nuevo con el
-                            pescador esperando enfrente.
                         */}
                         <Campo
                             etiqueta="Tipo de embarcación"

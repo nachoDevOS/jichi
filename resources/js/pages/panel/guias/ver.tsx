@@ -14,23 +14,7 @@ import type { PageProps } from '@/types';
 import type { GuiaFicha } from '@/types/guias';
 
 /**
- * ============================================================================
  *  LA FICHA DE UNA GUÍA
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  CERRAR Y ANULAR NO SON LO MISMO, Y LA PANTALLA LO DICE
- * ----------------------------------------------------------------------------
- *
- * CERRAR es registrar que la carga llegó: el traslado ocurrió y esta guía lo
- * amparó. ANULAR es decir que el papel nunca valió.
- *
- * Por eso una guía CERRADA ya no se puede anular —lo dice `puede_anularse`, que
- * llega resuelto del servidor—: anularla declararía que nunca amparó nada y
- * dejaría un viaje real sin ningún respaldo.
- *
- * Las fechas van con `fechaHora()`: los cinco días se cuentan desde el instante
- * de emisión, así que la hora es el dato que decide la vigencia.
  */
 export default function VerGuia({ guia }: { guia: GuiaFicha }) {
     const { puede } = usePermisos();
@@ -235,10 +219,6 @@ export default function VerGuia({ guia }: { guia: GuiaFicha }) {
 
 /**
  * En qué situación está el traslado, en una frase.
- *
- * El caso que importa es el del medio: una guía que se pasó de hora y sigue
- * activa es un camión en la ruta con un papel que ya no vale. No es una
- * previsión — es algo que hay que resolver ahora.
  */
 function Situacion({ guia }: { guia: GuiaFicha }) {
     if (guia.estado === 'anulada') {

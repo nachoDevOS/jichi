@@ -20,27 +20,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  CARNETS — la credencial anual (paso 3 del flujo)
- * ============================================================================
- *
- *     carnet (pescador)        ──< permisos_faena     (una por salida)
- *     carnet (comercializador) ──< guias_movimiento   (una por traslado)
- *
- * El carnet es la LLAVE ANUAL; con él solo no se sale a trabajar. De él cuelgan
- * los permisos operativos que autorizan cada día.
- *
- * ----------------------------------------------------------------------------
- *  NO HAY `edit` NI `update`, Y ES LA REGLA
- * ----------------------------------------------------------------------------
- *
- * Un carnet emitido no se corrige: el plástico ya salió de la impresora y está
- * en manos de la persona. Editarlo dejaría al documento impreso diciendo una
- * cosa y al sistema otra, sin que nada lo delate — y la verificación pública
- * respondería por el dato nuevo mostrando lo que el inspector NO tiene delante.
- *
- * Lo que sí hay es REVOCAR, con motivo escrito, y emitir uno nuevo con su
- * propio código.
  */
 class CarnetController extends Controller
 {
@@ -119,10 +99,6 @@ class CarnetController extends Controller
 
             /*
              * EL CUPO VIGENTE DE ESA PERSONA, si la hay.
-             *
-             * La pantalla lo necesita para avisar ANTES de guardar que un carnet
-             * de pescador sin cupo va a ser rechazado. El servidor lo comprueba
-             * igual dentro de la transacción; esto evita el viaje en falso.
              */
             'cupoVigente' => $beneficiario?->aprovechamientoVigente() !== null ? [
                 'volumen_total_kg' => (float) $beneficiario->aprovechamientoVigente()->volumen_total_kg,
@@ -242,18 +218,10 @@ class CarnetController extends Controller
             ->with('exito', 'Carnet revocado. La verificación pública ya lo informa como revocado.');
     }
 
-    // ------------------------------------------------------------------
     //  Auxiliares
-    // ------------------------------------------------------------------
 
     /**
      * Los datos de un carnet que pintan el listado y la ficha.
-     *
-     * Todo lo CALCULADO se arma acá y no en React. `vigente` mira el estado Y la
-     * fecha —la columna la escribe un comando diario y entre corrida y corrida
-     * miente—, `cupo_kg` depende del tipo de actor y no del nombre del tipo de
-     * carnet, y `saldo_pendiente` se corta en cero. Son reglas, y deducirlas en
-     * la pantalla sería una segunda copia de cada una.
      *
      * @return array<string, mixed>
      */

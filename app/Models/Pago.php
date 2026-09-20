@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoValidacionPago;
 use App\Support\Archivos;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Appends;
@@ -15,42 +16,33 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Un abono: una entrega de dinero, contra un trámite y bajo un recibo.
- *
- * ============================================================================
- *  ES POLIMÓRFICA PORQUE EL NÚMERO DE RECIBO ES ÚNICO GLOBAL
- * ============================================================================
- *
- * Se cobran tres cosas —la credencial, el cupo de pesca y la guía de traslado—
- * y las tres se pagan igual. Una tabla de pagos por cada una obligaría a
- * repetir el circuito de caja tres veces, y peor: el mismo papel podría amparar
- * un carnet y una guía sin que nada lo impida.
- *
- * EL COSTO, Y HAY QUE TENERLO PRESENTE: SE PIERDE LA CLAVE FORÁNEA. El motor no
- * puede exigir que `pagable_id` exista, porque no sabe en qué tabla buscarlo.
- * La integridad la sostienen los RESTRICT de las otras tablas y la aplicación.
- *
- * ============================================================================
- *  `monto_parcial` SE LLAMA ASÍ PORQUE LA REGLA ES QUE PUEDE SER PARCIAL
- * ============================================================================
- *
- * Un carnet de 80 Bs admite dos filas de 40, cada una con su recibo y su fecha.
- * Lo que se DEBE no se guarda en ninguna columna: es el precio menos la suma de
- * estas filas, y lo calcula el trait Pagable al leer. Guardado, quedaría
- * desfasado en cuanto alguien corrija un abono.
  */
 #[Appends(['comprobante_url'])]
 #[Fillable([
     'recibo_id',
+    'registrado_por',
+    'validado_por',
     'pagable_type',
     'pagable_id',
     'monto_parcial',
     'nro_transaccion',
     'fecha_deposito',
     'comprobante',
+    'estado_validacion',
+    'observacion',
+    'validado_en',
 ])]
 class Pago extends Model
 {
     use Auditable, SoftDeletes;
+
+    /**
+     * El default de la BASE no llega al objeto que devuelve `create()`. Va con
+     * `->value` porque `$attributes` se llena antes de los casts.
+     */
+    protected $attributes = [
+        'estado_validacion' => EstadoValidacionPago::Pendiente->value,
+    ];
 
     protected function casts(): array
     {
@@ -58,49 +50,44 @@ class Pago extends Model
             'monto_parcial' => 'decimal:2',
             // Un DÍA, no un instante: es lo que dice la boleta.
             'fecha_deposito' => 'date',
+            'estado_validacion' => EstadoValidacionPago::class,
+            // Un MOMENTO: cuándo alguien lo miró. Va a React con toIso8601String().
+            'validado_en' => 'datetime',
         ];
     }
 
-    // ------------------------------------------------------------------
     //  Relaciones
-    // ------------------------------------------------------------------
 
     public function recibo(): BelongsTo
     {
         return $this->belongsTo(Recibo::class);
     }
 
+    /** Quién cargó el depósito en el mostrador. */
+    public function registradoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'registrado_por');
+    }
+
+    /** Quién comparó la boleta contra el extracto del banco. */
+    public function validadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'validado_por');
+    }
+
     /**
      * El trámite que este abono paga: un Carnet, un AprovechamientoPesq o una
      * GuiaMovimiento.
-     *
-     * NO SE PRECARGA CON `with('pagable.beneficiario')`. Eloquent no sabe qué
-     * es `pagable` hasta que lee la fila, así que no puede resolver lo que
-     * cuelga de él: lo escrito así se IGNORA y el N+1 sigue ahí, sin ningún
-     * error. Va con morphWith, declarando qué traer para cada tipo:
-     *
-     *     Pago::with(['pagable' => fn ($m) => $m->morphWith([
-     *         Carnet::class              => ['beneficiario', 'tipoCarnet'],
-     *         AprovechamientoPesq::class => ['beneficiario', 'categoria'],
-     *         GuiaMovimiento::class      => ['comercializador'],
-     *     ])])
      */
     public function pagable(): MorphTo
     {
         return $this->morphTo();
     }
 
-    // ------------------------------------------------------------------
     //  Lectura
-    // ------------------------------------------------------------------
 
     /**
      * La dirección completa de la boleta, o null si no hay.
-     *
-     * La columna guarda una RUTA; quién la convierte en dirección depende del
-     * disco activo, y eso lo sabe App\Support\Archivos —el mismo que la escribe
-     * y la borra—. Armada acá a mano, escribir y leer podrían mirar discos
-     * distintos.
      */
     protected function comprobanteUrl(): Attribute
     {
@@ -109,10 +96,6 @@ class Pago extends Model
 
     /**
      * Cómo se nombra el trámite pagado en el detalle del recibo.
-     *
-     * El `match` va sobre la CLASE y no sobre el texto de `pagable_type`, que
-     * es el mismo dato pero sin que el analizador pueda avisar cuando se agrega
-     * un tipo nuevo y este método se olvida.
      */
     protected function conceptoDetalle(): Attribute
     {
@@ -124,16 +107,47 @@ class Pago extends Model
         });
     }
 
-    // ------------------------------------------------------------------
+    //  El control de la boleta
+
+    /**
+     * ¿Se puede validar u observar? Que nadie lo haya mirado Y que el trámite
+     * esté en revisión: el control es parte de la revisión.
+     */
+    public function admiteControl(): bool
+    {
+        return $this->estado_validacion->admiteControl()
+            && ($this->pagable?->admiteControlDePagos() ?? false);
+    }
+
+    /**
+     * ¿Se puede corregir? Lo decide el trámite: lo que cierra la puerta es que
+     * el expediente ya esté firmado.
+     */
+    public function admiteCorreccion(): bool
+    {
+        return $this->pagable?->admiteCorreccionDePagos() ?? false;
+    }
+
+    /** Lo que muestra la ficha: quién lo controló y cuándo, en una frase. */
+    public function estaControlado(): bool
+    {
+        return $this->estado_validacion->estaControlado();
+    }
+
     //  Scopes
-    // ------------------------------------------------------------------
+
+    /** Los que no están dados por buenos. Frena la aprobación. */
+    public function scopeSinValidar(Builder $query): Builder
+    {
+        return $query->where(
+            $this->qualifyColumn('estado_validacion'),
+            '!=',
+            EstadoValidacionPago::Validado->value,
+        );
+    }
 
     /**
      * Los abonos de un trámite concreto.
-     *
-     * Recibe el modelo y no el par (tipo, id) a mano: escrito a mano, el tipo
-     * se copia como texto y el día que una clase se renombre o se mueva de
-     * namespace la consulta deja de encontrar nada, en silencio.
      */
     public function scopeDe(Builder $query, Model $tramite): Builder
     {
@@ -153,10 +167,6 @@ class Pago extends Model
 
     /**
      * Los depósitos hechos en una fecha, según lo que dice la BOLETA.
-     *
-     * Es otra pregunta que `delDia()`, que mira `created_at`: un depósito del
-     * viernes cargado el lunes entra en uno y no en el otro. El primero cuadra
-     * el trabajo del día; este se cruza contra el extracto del banco.
      */
     public function scopeDepositadosEl(Builder $query, ?string $fecha = null): Builder
     {

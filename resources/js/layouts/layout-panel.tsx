@@ -10,11 +10,6 @@ const CLAVE_ANGOSTO = 'panel-menu-angosto';
 
 /**
  * Lee la preferencia guardada del menú.
- *
- * Va envuelto en try/catch porque `localStorage` LANZA —no devuelve null— en
- * una ventana de incógnito o con las cookies bloqueadas por política del
- * equipo, que es un escenario real en una oficina pública. Sin el catch, el
- * panel entero queda en blanco por recordar el ancho de una barra.
  */
 function leerAngosto(): boolean {
     try {
@@ -25,31 +20,7 @@ function leerAngosto(): boolean {
 }
 
 /**
- * ============================================================================
  *  EL MARCO DE TODAS LAS PANTALLAS DEL PANEL
- * ============================================================================
- *
- * Un "layout" es el envoltorio que se repite en cada página: la barra lateral,
- * el encabezado y el aviso de mensajes. Cada pantalla se escribe pensando solo
- * en su contenido y se mete acá adentro:
- *
- *   export default function Beneficiarios() {
- *       return (
- *           <LayoutPanel titulo="Beneficiarios">
- *               ...aquí va SOLO el contenido de la pantalla...
- *           </LayoutPanel>
- *       );
- *   }
- *
- * `children` es justamente ese contenido. React lo pasa automáticamente:
- * es todo lo que está escrito entre <LayoutPanel> y </LayoutPanel>.
- *
- * Este archivo quedó a propósito muy corto. Las tres partes que lo componen
- * viven en components/panel/layout/ y se pueden leer una por una:
- *
- *   barra-lateral.tsx   el menú azul de la izquierda
- *   barra-superior.tsx  el encabezado: sesión arriba, título y migas abajo
- *   navegacion.ts       la lista de módulos del menú
  */
 export default function LayoutPanel({
     children,
@@ -72,19 +43,6 @@ export default function LayoutPanel({
 
     /*
      * useState guarda un dato que, al cambiar, hace que React vuelva a pintar.
-     *
-     *   menuAbierto  -> en CELULAR: si la barra está desplegada encima
-     *   menuAngosto  -> en ESCRITORIO: si la barra quedó reducida a iconos
-     *
-     * Son dos y no uno porque responden a cosas distintas: el primero se apaga
-     * solo al navegar, el segundo es una preferencia que tiene que sobrevivir a
-     * la recarga.
-     *
-     * Viven en el layout, y no dentro de la barra lateral, porque DOS
-     * componentes distintos los necesitan: la barra (para dibujarse) y el
-     * encabezado (para los botones que los cambian). Cuando dos componentes
-     * comparten un dato, este sube al padre común. En React eso se llama
-     * "levantar el estado".
      */
     const [menuAbierto, setMenuAbierto] = useState(false);
 

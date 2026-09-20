@@ -4,44 +4,7 @@ import { useArchivos } from '@/hooks/use-archivos';
 import { cn } from '@/lib/utils';
 
 /**
- * ============================================================================
  *  EL CAMPO PARA ADJUNTAR UN ARCHIVO
- * ============================================================================
- *
- * Reemplaza al `<input type="file">` pelado, que en Chrome se dibuja como un
- * botón gris con la leyenda «Sin archivos seleccionados» al lado.
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ HACÍA FALTA
- * ----------------------------------------------------------------------------
- *
- * El control del navegador no sirve para este formulario por dos motivos:
- *
- *   1. NO SE VE SI QUEDÓ CARGADO. El nombre del archivo sale en gris chico, al
- *      lado del botón, con el mismo peso visual que tenía el «Sin archivos
- *      seleccionados». El operador carga tres adjuntos seguidos y no puede decir
- *      de un vistazo cuál le falta — y si manda el formulario incompleto, se
- *      entera después de que el servidor lo rechace.
- *
- *   2. NO SE PUEDE QUITAR LO ELEGIDO. Una vez seleccionado un archivo, el
- *      control no ofrece forma de volver atrás sin recargar la pantalla.
- *
- * Acá, apenas se elige, el recuadro pasa a VERDE con una tilde, el nombre del
- * archivo y cuánto pesa. Si es una imagen, además muestra la miniatura: es la
- * única forma de darse cuenta en el momento de que se adjuntó el escaneo
- * equivocado.
- *
- * ----------------------------------------------------------------------------
- *  VALIDA ANTES DE ACEPTAR
- * ----------------------------------------------------------------------------
- *
- * Tipo y peso, con las mismas reglas que el servidor —salen de
- * `useArchivos()`, que las recibe de config/jichi.php—. Un archivo que no pasa
- * no se guarda en el formulario: se muestra el motivo y el campo queda vacío,
- * para que no se pueda enviar algo que va a rebotar.
- *
- * Eso NO reemplaza la validación del servidor, que sigue siendo la que manda.
- * Ver `RegistrarSolicitudRequest` y `StorageController::verificarPeso()`.
  */
 export function SelectorArchivo({
     id,
@@ -69,10 +32,6 @@ export function SelectorArchivo({
 
     /*
      * LA MINIATURA HAY QUE LIBERARLA A MANO.
-     *
-     * `URL.createObjectURL()` deja el archivo retenido en memoria hasta que
-     * alguien llame a `revokeObjectURL`. Sin esto, cargar y cambiar adjuntos
-     * varias veces en la misma pantalla va dejando copias sin liberar.
      */
     useEffect(() => {
         if (!archivo || !archivo.type.startsWith('image/')) {

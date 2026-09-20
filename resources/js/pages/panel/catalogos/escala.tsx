@@ -15,32 +15,7 @@ import type { ModalidadAprovechamiento, OpcionEnum, PageProps } from '@/types';
 import type { EscalaFila, HuecoEscala } from '@/types/catalogos';
 
 /**
- * ============================================================================
  *  LA ESCALA OFICIAL DE APROVECHAMIENTO
- * ============================================================================
- *
- * De esta tabla salen los dos números con los que trabaja el módulo de pesca:
- * cuántos kilos se autorizan y cuánto se cobra por ellos.
- *
- * El patrón de la pantalla —tabla a ancho completo, formulario arriba, un solo
- * estado `editando`, sin botón de borrar— está explicado en `asociaciones.tsx`.
- *
- * ----------------------------------------------------------------------------
- *  LO PROPIO DE ESTA PANTALLA: EL AVISO DE HUECOS
- * ----------------------------------------------------------------------------
- *
- * Un hueco entre dos tramos no rompe nada visible. Simplemente hay volúmenes
- * que no caen en ninguna escala: el servidor devuelve null al buscar el tramo y
- * el formulario de cupo no ofrece nada, sin ningún error que lo explique. Es el
- * tipo de falla que se descubre en ventanilla, con alguien enfrente.
- *
- * El SOLAPE, en cambio, lo rechaza el servidor al guardar: es plata mal cobrada
- * —un cupo que cae en dos tramos se cobra con el más barato— y no tiene lectura
- * válida.
- *
- * Los huecos los calcula el SERVIDOR y llegan en `huecos`. La pantalla no los
- * deduce recorriendo la tabla: ordenar por kilos y comparar extremos es la misma
- * regla, y escrita en los dos lados se desincroniza.
  */
 export default function CatalogoEscala({
     escala,
@@ -186,10 +161,6 @@ export default function CatalogoEscala({
 
 /**
  * El aviso de rangos sin cubrir.
- *
- * Va ARRIBA DE TODO y en ámbar porque es lo único de esta pantalla que puede
- * romper el trabajo de mañana, y porque no se deduce mirando la tabla: los
- * tramos se ven correctos uno por uno.
  */
 function AvisoHuecos({ huecos }: { huecos: HuecoEscala[] }) {
     return (

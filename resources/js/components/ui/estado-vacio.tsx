@@ -3,10 +3,6 @@ import type { ReactNode } from 'react';
 
 /**
  * Lo que se muestra cuando una lista no tiene nada que mostrar.
- *
- * Una tabla vacía sin explicación parece un error del sistema. Este bloque
- * aclara si no hay datos todavía o si el filtro no encontró nada, y ofrece la
- * acción que corresponda.
  */
 export function EstadoVacio({
     icono: Icono,

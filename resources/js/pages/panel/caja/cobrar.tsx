@@ -16,32 +16,7 @@ import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { DeudaCobrable, LineaCobro } from '@/types/caja';
 
 /**
- * ============================================================================
  *  COBRAR — el formulario de caja
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  UN RECIBO PUEDE CUBRIR VARIOS TRÁMITES, Y POR ESO SON CASILLAS
- * ----------------------------------------------------------------------------
- *
- * La persona llega con lo que debe —el carnet, el cupo, una guía— y entrega la
- * plata UNA vez. Un formulario que cobrara de a un trámite obligaría a emitir
- * tres papeles por una sola entrega, y a la persona a guardar tres.
- *
- * Por eso las deudas vienen juntas en una lista con casillas: se tilda lo que
- * se cobra y sale un solo comprobante numerado.
- *
- * ----------------------------------------------------------------------------
- *  CADA LÍNEA ARRANCA CON EL SALDO COMPLETO, PERO ES EDITABLE
- * ----------------------------------------------------------------------------
- *
- * Lo normal es pagar todo, así que ese es el valor por defecto. Bajarlo es lo
- * que hace un pago en cuotas: 40 hoy y 40 la semana que viene, cada uno con su
- * recibo.
- *
- * Lo que NO se puede es subirlo por encima del saldo. El servidor lo rechaza, y
- * la pantalla lo avisa antes: pagar de más no genera saldo a favor —el saldo se
- * corta en cero— así que el excedente se perdería.
  */
 export default function Cobrar({
     beneficiario,
@@ -323,14 +298,7 @@ export default function Cobrar({
                                 </div>
 
                                 {/*
-                                    ================================================
                                      LA BOLETA DEL DEPÓSITO, SIEMPRE
-                                    ================================================
-
-                                    No hay efectivo ni QR: todo pago es un depósito
-                                    bancario. Sin la boleta, lo único que respalda
-                                    el cobro es que alguien lo tipeó, y eso no se
-                                    puede cruzar contra el extracto del banco.
                                 */}
                                 <Campo
                                             etiqueta="Fecha del depósito"

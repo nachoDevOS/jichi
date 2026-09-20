@@ -21,31 +21,7 @@ import type {
 } from '@/types/dashboard';
 
 /**
- * ============================================================================
  *  LOS DOS GRÁFICOS GRANDES SE CARGAN APARTE, Y DESPUÉS
- * ============================================================================
- *
- * `lazy()` le dice a Vite que ponga cada uno en su propio archivo y que lo baje
- * recién cuando haga falta dibujarlo, en vez de meterlo dentro del archivo del
- * tablero.
- *
- * El motivo es concreto y se medía: los dos gráficos usan `recharts`, y por
- * arrastrarla el tablero pesaba **373 kB** —más que React entero—. Es la
- * pantalla a la que cae TODO el mundo apenas entra, así que ese peso lo pagaba
- * cada persona en cada ingreso, antes de ver un solo número.
- *
- * Y los números son lo accionable: «cuánta gente está habilitada», «cuánto se
- * recaudó hoy». Los gráficos son contexto. Separándolos, lo importante aparece
- * de inmediato y lo demás llega un instante después, solo.
- *
- * LAS LÍNEAS CHICAS DE LOS CUATRO INDICADORES NO PASAN POR ACÁ: están dibujadas
- * a mano en SVG justamente para no volver a meter recharts arriba de todo y
- * desarmar esta decisión. Ver components/panel/dashboard/mini-grafico.tsx.
- *
- * `Suspense` es lo que React necesita para saber qué dibujar mientras tanto:
- * sin él, un componente `lazy()` que todavía no llegó revienta la pantalla.
- * El `fallback` es un recuadro de la MISMA altura —ver GraficoCargando—, así
- * la página no salta cuando el gráfico aparece.
  */
 const GraficoCarnetsPorTipo = lazy(() =>
     import('@/components/panel/dashboard/grafico-carnets-por-tipo').then((m) => ({
@@ -64,10 +40,6 @@ const GraficoRecaudacionMensual = lazy(() =>
 
 /**
  * El tablero de la gestión en curso.
- *
- * Los siete bloques llegan como props desde DashboardController, cada uno
- * calculado en su propia consulta. Todo lo que se muestra acá es de solo
- * lectura: el tablero informa, no permite hacer nada.
  */
 export default function Dashboard({
     gestion,
@@ -214,14 +186,6 @@ export default function Dashboard({
 
 /**
  * El hueco del gráfico mientras se está bajando.
- *
- * Ocupa lo mismo que el gráfico terminado, y por eso el alto es una prop y no
- * un número fijo: los dos gráficos miden distinto. Si el hueco midiera otra
- * cosa, al llegar el gráfico la página daría un salto y lo que el operador
- * estaba por tocar se le correría de lugar.
- *
- * `animate-pulse` es de Tailwind y hace el latido gris de «esto está por
- * llegar».
  */
 function GraficoCargando({
     titulo,
@@ -248,11 +212,6 @@ function GraficoCargando({
 
 /**
  * Pescadores contra comercializadores, entre los carnets vigentes.
- *
- * Va como dos cifras y no como gráfico porque son dos valores: una torta con
- * dos porciones no agrega nada que el número no diga, y costaría traer
- * recharts a la parte de arriba de la pantalla —que es justo lo que la carga
- * diferida vino a evitar—.
  */
 function RepartoPorActividad({ datos, gestion }: { datos: CarnetsPorActor[]; gestion: number }) {
     const total = datos.reduce((suma, d) => suma + d.cantidad, 0);

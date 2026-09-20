@@ -6,18 +6,6 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Reglas para anular una guía.
- *
- * ----------------------------------------------------------------------------
- *  UN SOLO CAMPO, Y ES EL MOTIVO
- * ----------------------------------------------------------------------------
- *
- * El código sale de un talonario de papel que puede estar circulando dentro de
- * un camión. Anular quema ese número para siempre —no se desanula— y deja un
- * hueco en la serie que alguien va a tener que explicar dentro de seis meses.
- *
- * El mínimo de 10 caracteres está para que no se resuelva con «ok». No
- * garantiza que el motivo sirva, pero sí que alguien haya tenido que escribir
- * una frase.
  */
 class AnularGuiaRequest extends FormRequest
 {

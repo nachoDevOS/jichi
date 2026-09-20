@@ -8,17 +8,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para emitir una credencial.
- *
- * ----------------------------------------------------------------------------
- *  ACÁ SOLO SE VALIDA LA FORMA. LAS REGLAS VIVEN EN EL SERVICIO
- * ----------------------------------------------------------------------------
- *
- * Que la persona no tenga ya un carnet vigente de esa actividad, y que un
- * pescador tenga cupo, NO se comprueban acá. Las dos necesitan correr DENTRO de
- * la transacción y con la fila del beneficiario bloqueada, o dos ventanillas
- * simultáneas las pasan las dos. Un Request corre antes de todo eso.
- *
- * Ver EmitirCarnetService::emitir().
  */
 class EmitirCarnetRequest extends FormRequest
 {
@@ -61,10 +50,6 @@ class EmitirCarnetRequest extends FormRequest
             /*
              * LA ACTIVIDAD ES UN ENUM Y NO UN CATÁLOGO, y por eso se valida
              * contra la clase de PHP.
-             *
-             * De ella cuelga lógica —qué puede emitir la credencial, si lleva
-             * cupo— así que no puede ser una fila editable: cambiarle el nombre
-             * a un tipo de carnet no debe cambiar lo que ese carnet habilita.
              */
             'tipo_actor' => ['required', Rule::enum(TipoActor::class)],
 

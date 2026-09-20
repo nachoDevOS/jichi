@@ -6,28 +6,6 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Reglas para ELIMINAR un aprovechamiento cargado por error.
- *
- * ============================================================================
- *  EL MOTIVO ES OBLIGATORIO, Y NO ES BUROCRACIA
- * ============================================================================
- *
- * La fila se borra: después de esto no queda nada que mirar salvo la línea de
- * `auditorias`. Si ahí no dice POR QUÉ, dentro de seis meses la única respuesta
- * posible a «¿y el cupo de Fulano?» es «alguien lo borró».
- *
- * El mínimo de 10 caracteres es lo que separa una explicación de un «error».
- * Coincide con el `minimo` que usa la ventana de confirmación del panel, y los
- * dos tienen que moverse juntos o el botón se habilitaría antes de que el
- * servidor acepte el texto.
- *
- * ----------------------------------------------------------------------------
- *  LO QUE NO SE VALIDA ACÁ
- * ----------------------------------------------------------------------------
- *
- * Que el cupo esté pendiente, sin pagos y sin faenas. Esas tres corren DENTRO
- * de la transacción y con la fila bloqueada: entre que el operador abre la
- * ventana y confirma, otra ventanilla puede cobrarlo o emitirle una faena. Ver
- * OtorgarCupoService::eliminar().
  */
 class EliminarCupoRequest extends FormRequest
 {

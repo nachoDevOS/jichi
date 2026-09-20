@@ -3,25 +3,6 @@ import type { PageProps } from '@/types';
 
 /**
  * Saber qué puede hacer el usuario conectado.
- *
- * Los permisos los calcula spatie/laravel-permission en PHP y los manda en
- * cada página el middleware HandleInertiaRequests, dentro de
- * auth.user.permisos. Este hook solo los envuelve para no repetir
- * `usePage().props.auth.user?.permisos?.includes(...)` en cada archivo.
- *
- * CÓMO SE USA
- *
- *   const { puede } = usePermisos();
- *
- *   {puede('beneficiarios.crear') && <Button>Nuevo beneficiario</Button>}
- *
- * ADVERTENCIA IMPORTANTE
- *
- * Esto sirve para NO MOSTRAR botones que el usuario no puede usar. No es
- * seguridad: el navegador es del usuario y cualquiera puede escribir la URL a
- * mano o modificar el JavaScript. Quien realmente bloquea el acceso es el
- * middleware 'permiso:...' declarado en routes/panel.php. Los dos tienen que
- * estar: el de React por comodidad, el de Laravel por seguridad.
  */
 export function usePermisos() {
     const { auth } = usePage<PageProps>().props;

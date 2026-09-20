@@ -16,10 +16,6 @@ import type { BeneficiarioFila } from '@/types/beneficiarios';
 
 /**
  * El padrón de beneficiarios.
- *
- * Los datos llegan como PROPS desde BeneficiarioController::index(). No hay
- * fetch() ni axios: el array que ese método pasa a Inertia::render() es
- * exactamente este objeto.
  */
 export default function IndiceBeneficiarios({
     beneficiarios,
@@ -68,13 +64,6 @@ export default function IndiceBeneficiarios({
                     LA BARRA DE ARRIBA DE LA TABLA: «Mostrar N» a la izquierda y
                     el buscador a la derecha, ocupando cuatro de las doce
                     columnas.
-
-                    Las dos cosas van al SERVIDOR, no se resuelven en el
-                    navegador. Es la diferencia que importa: filtrar en React
-                    exigiría traer el padrón entero en cada carga, y con miles de
-                    personas eso es un JSON enorme por pantalla. Acá cada cambio
-                    dispara una petición y Laravel devuelve solo la página pedida
-                    (ver Beneficiario::scopeBuscar y App\Support\Paginacion).
                 */}
                 <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-12 sm:items-end">
                     <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-4">

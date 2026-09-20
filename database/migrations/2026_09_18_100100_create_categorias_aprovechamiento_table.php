@@ -8,12 +8,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Categorías de aprovechamiento — la ESCALA OFICIAL del SEDAG.
-|
-| Los tramos con los que se cobra el cupo de pesca: a tantos kilos autorizados,
-| tantos bolivianos. Es una tabla y no un match() en código porque la fija una
-| resolución: así actualizarla es una pantalla y no un despliegue.
-|
-| Ver docs/MER.md.
 */
 return new class extends Migration
 {

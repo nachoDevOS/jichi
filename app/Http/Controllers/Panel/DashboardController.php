@@ -23,41 +23,11 @@ use Inertia\Response;
 
 /**
  * El tablero de la gestión en curso.
- *
- * ----------------------------------------------------------------------------
- *  QUÉ MIRA ESTE TABLERO, Y POR QUÉ CAMBIÓ
- * ----------------------------------------------------------------------------
- *
- * La versión anterior contaba EXPEDIENTES: cuántos entraron, cuántos esperan
- * firma, cuántos están listos para aprobar. Ese circuito ya no existe — hoy el
- * documento se emite y se cobra, sin trámite en el medio.
- *
- * Lo que queda para mirar son las tres cosas que sí pueden salir mal en
- * ventanilla, y por eso son los tres bloques del tablero:
- *
- *   1. CUÁNTA GENTE ESTÁ HABILITADA HOY  → carnets vigentes
- *   2. QUÉ ESTÁ POR CADUCAR              → carnets, cupos, faenas y guías
- *   3. CUÁNTO ENTRÓ Y CUÁNTO FALTA COBRAR → recaudación y saldo pendiente
- *
- * ----------------------------------------------------------------------------
- *  POR QUÉ CADA BLOQUE VA ENVUELTO EN UN fn()
- * ----------------------------------------------------------------------------
- *
- * Inertia evalúa las closures solo cuando la prop se va a enviar de verdad. En
- * una visita parcial —cuando la pantalla pide refrescar únicamente el gráfico
- * de recaudación, por ejemplo— las demás no se ejecutan, y esas consultas
- * agregadas no se corren al pedo. Pasadas como valores sueltos se calcularían
- * todas en cada refresco.
  */
 class DashboardController extends Controller
 {
     /**
      * Con cuántos días de anticipación se avisa que algo está por caducar.
-     *
-     * Vive acá y no repartido por los métodos porque el número tiene que decir
-     * lo MISMO en el conteo y en el texto que lo explica: con dos constantes,
-     * alcanza con cambiar una para que el tablero diga «12 por vencer en los
-     * próximos 30 días» contando en realidad 45.
      */
     private const DIAS_AVISO = 30;
 
@@ -91,11 +61,6 @@ class DashboardController extends Controller
 
             /*
              * CUÁNTA GENTE ESTÁ HABILITADA HOY.
-             *
-             * `vigentes()` mira el estado Y la fecha, y esa segunda mitad no es
-             * de más: `vencido` lo escribe un comando que corre una vez al día,
-             * así que contar solo por estado mostraría como habilitada a gente
-             * cuyo carnet venció anoche.
              */
             'carnets_vigentes' => Carnet::vigentes()->count(),
 
@@ -116,11 +81,6 @@ class DashboardController extends Controller
 
             /*
              * LA RECAUDACIÓN SALE DE `created_at`, NO DE UNA COLUMNA DE FECHA.
-             *
-             * `pagos` no tiene `fecha_pago`: un abono se registra cuando entra
-             * la plata, así que el momento de la fila ES el momento del cobro.
-             * Una columna aparte solo agregaría la posibilidad de que las dos
-             * se contradigan.
              */
             'recaudado_hoy' => (float) Pago::whereDate('created_at', $hoy)->sum('monto_parcial'),
             'recaudado_mes' => (float) Pago::whereBetween(
@@ -134,24 +94,6 @@ class DashboardController extends Controller
 
     /**
      * Lo que falta cobrar, sumando los tres trámites que se cobran.
-     *
-     * ------------------------------------------------------------------------
-     *  LA RESTA SE HACE EN PHP A PROPÓSITO
-     * ------------------------------------------------------------------------
-     *
-     * «Cuánto falta» no es `precio - pagado` a secas: se corta en cero, porque
-     * pagar de más no genera saldo a favor. Esa regla vive en
-     * `Pagable::saldoPendiente()` y no se duplica acá — escrita en SQL con un
-     * GREATEST habría dos versiones de la misma decisión, y además GREATEST se
-     * escribe distinto en PostgreSQL que en SQLite.
-     *
-     * EL withSum NO ES OPCIONAL. Sin él, cada `saldoPendiente()` cae en
-     * `$this->pagos()->sum(...)` y dispara UNA CONSULTA POR FILA, en la pantalla
-     * a la que cae todo el mundo al entrar. Con él, lo cobrado de todos viene en
-     * la misma consulta y el trait lo reusa.
-     *
-     * Los `with()` de los catálogos son por lo mismo: `montoACobrar()` lee el
-     * precio del tipo de carnet y el valor de la escala.
      */
     private function porCobrar(): float
     {
@@ -170,19 +112,6 @@ class DashboardController extends Controller
     /**
      * Los últimos catorce días, jornada por jornada: cuántos documentos se
      * emitieron y cuánto se cobró.
-     *
-     * ------------------------------------------------------------------------
-     *  PARA QUÉ, SI LOS NÚMEROS YA ESTÁN ARRIBA
-     * ------------------------------------------------------------------------
-     *
-     * Alimenta las líneas chicas que van al pie de los indicadores. No son
-     * adorno: un número solo —«0 documentos hoy»— no dice si eso es lo normal
-     * de un martes o si la ventanilla se paró. La línea de atrás lo pone en
-     * contexto sin gastar una tarjeta entera en un gráfico aparte.
-     *
-     * CATORCE DÍAS, no treinta: el dibujo mide unos 60 px de alto y ahí adentro
-     * treinta puntos se pisan entre sí y quedan como una mancha. Dos semanas
-     * alcanzan para ver el ritmo y para que se distinga un lunes de un sábado.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -219,10 +148,6 @@ class DashboardController extends Controller
      * Agrupa una tabla por jornada. Cuenta filas, o suma una columna si se le
      * pasa una.
      *
-     * Existe para no repetir cuatro veces el mismo group by: reducir un
-     * timestamp al día se escribe distinto en cada motor, y esa expresión vive
-     * en App\Support\Sql justamente para que no se copie por ahí.
-     *
      * @return Collection<string, mixed>
      */
     private function porDia(
@@ -247,10 +172,6 @@ class DashboardController extends Controller
     /**
      * Cuántos carnets vigentes hay de cada tipo del catálogo.
      *
-     * Se recorre el catálogo ENTERO y no solo lo que devolvió la consulta: un
-     * tipo con cero carnets también es información —dice que nadie lo pide— y
-     * si no aparece, el gráfico miente por omisión.
-     *
      * @return array<int, array<string, mixed>>
      */
     private function carnetsPorTipo(): array
@@ -273,10 +194,6 @@ class DashboardController extends Controller
 
     /**
      * Pescadores contra comercializadores, entre los carnets vigentes.
-     *
-     * Es el número que dice cómo se reparte el padrón habilitado entre las dos
-     * actividades. Sale del enum y no de la base para que los dos aparezcan
-     * aunque uno esté en cero.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -348,13 +265,6 @@ class DashboardController extends Controller
             /*
              * with() para no caer en N+1: sin esto, diez filas serían 31
              * consultas.
-             *
-             * OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
-             * partes del nombre porque `nombreCompleto` las lee todas, y
-             * `tipoCarnet` va ENTERO —sin `:id,nombre`— porque
-             * `Carnet::montoACobrar()` lee `precio_bs`. Una columna que un
-             * método consulta y no está en el select vuelve null, y el método
-             * contesta cualquier cosa sin ningún error.
              */
             ->with([
                 'beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
@@ -387,16 +297,6 @@ class DashboardController extends Controller
 
     /**
      * Lo que está por caducar o ya caducó sin cerrarse.
-     *
-     * ------------------------------------------------------------------------
-     *  ES EL BLOQUE ACCIONABLE DEL TABLERO
-     * ------------------------------------------------------------------------
-     *
-     * Las dos últimas cifras no son avisos de vencimiento sino de TRABAJO SIN
-     * CERRAR: una faena o una guía que se pasó de fecha y sigue en `activa` es
-     * un papel que alguien se llevó y del que nadie registró la vuelta. El
-     * comando diario las marca, pero entre corrida y corrida quedan acá a la
-     * vista.
      *
      * @return array<string, mixed>
      */

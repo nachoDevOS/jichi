@@ -5,28 +5,6 @@ import type { Paginado } from '@/types';
 
 /**
  * Barra de paginación para cualquier listado del panel.
- *
- * DE DÓNDE SALEN ESTOS DATOS
- *
- * En el controlador se escribió `->paginate(15)`. Laravel no devuelve un array
- * pelado, sino un objeto con las filas MÁS la información de navegación:
- *
- *   {
- *     data:         [ ...las 15 filas de esta página... ],
- *     current_page: 2,
- *     last_page:    4,
- *     from: 16, to: 30, total: 48,
- *     links: [ { url, label, active }, ... ]   <- los botones ya calculados
- *   }
- *
- * Ese objeto llega tal cual a React. Acá solo hay que pintarlo.
- *
- * POR QUÉ <Link> Y NO <a>
- *
- * <Link> es de Inertia. Hace la petición por detrás y reemplaza solo el
- * contenido de la página, sin recargar el navegador: no parpadea, no se
- * vuelven a descargar los estilos ni el JavaScript. Un <a> normal recargaría
- * todo. Regla simple: dentro del sistema, siempre <Link>.
  */
 export function Paginacion<T>({ paginado }: { paginado: Paginado<T> }) {
     // Con una sola página no hay nada que navegar.

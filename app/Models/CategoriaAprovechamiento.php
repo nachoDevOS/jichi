@@ -13,14 +13,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Un tramo de la ESCALA OFICIAL de aprovechamiento pesquero.
- *
- * Convierte una decisión administrativa —«a esta persona le corresponde la
- * escala 3»— en los dos números con los que trabaja el sistema: el volumen en
- * kilos y lo que se cobra por él.
- *
- * NO SE BORRA UNA ESCALA. Los aprovechamientos otorgados apuntan acá para
- * dejar constancia de bajo qué tramo se autorizaron; una escala derogada se
- * pone en `estado = false` y desaparece del formulario sin tocar lo histórico.
  */
 #[Fillable([
     'nro_escala',
@@ -60,25 +52,17 @@ class CategoriaAprovechamiento extends Model
         ];
     }
 
-    // ------------------------------------------------------------------
     //  Relaciones
-    // ------------------------------------------------------------------
 
     public function aprovechamientos(): HasMany
     {
         return $this->hasMany(AprovechamientoPesq::class, 'categoria_aprov_id');
     }
 
-    // ------------------------------------------------------------------
     //  Lectura
-    // ------------------------------------------------------------------
 
     /**
      * Cómo se lee en un desplegable: «3 · 201 kg Hasta 500 Kg — 110,00 Bs».
-     *
-     * Se usa `descripcion_kg` y no los dos decimales, porque el texto oficial
-     * no siempre es la lectura literal del rango: el tramo más alto dice
-     * «PAICHE» y eso no está en ningún número.
      */
     protected function etiqueta(): Attribute
     {
@@ -92,10 +76,6 @@ class CategoriaAprovechamiento extends Model
 
     /**
      * ¿Este volumen cae dentro del tramo?
-     *
-     * Los dos extremos entran. Es lo que dice el texto oficial —«1 Kg Hasta 100
-     * Kg»— y además, con uno de los dos abierto, un cupo de exactamente 100 kg
-     * no caería en ninguna escala.
      */
     public function contiene(float $kilos): bool
     {
@@ -104,10 +84,6 @@ class CategoriaAprovechamiento extends Model
 
     /**
      * El tramo que corresponde a este volumen, o null si se pasa de la escala.
-     *
-     * Devuelve null en vez de caer al tramo más alto a propósito: un pedido de
-     * 5000 kg cuando la escala llega a 2000 no es «el tramo 7», es un pedido
-     * que necesita resolución aparte. Silenciarlo cobraría de menos.
      */
     public static function paraVolumen(float $kilos): ?self
     {
@@ -119,9 +95,7 @@ class CategoriaAprovechamiento extends Model
             ->first();
     }
 
-    // ------------------------------------------------------------------
     //  Scopes
-    // ------------------------------------------------------------------
 
     public function scopeVigentes(Builder $query): Builder
     {

@@ -5,14 +5,6 @@ import type { BeneficiarioFicha } from '@/types/beneficiarios';
 
 /**
  * Edición de un beneficiario.
- *
- * Usa el MISMO componente de formulario que el alta. La diferencia la marca
- * `beneficiario`: cuando llega con id, el formulario manda a la ruta de
- * actualización y agrega el campo oculto `_method=put`.
- *
- * ¿POR QUÉ EL CAMPO OCULTO Y NO router.put()? Porque el formulario lleva una
- * foto, y los formularios HTML solo saben mandar archivos por POST. Laravel
- * interpreta `_method` y trata la petición como PUT.
  */
 export default function EditarBeneficiario({
     beneficiario,

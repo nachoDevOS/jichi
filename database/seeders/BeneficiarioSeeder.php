@@ -7,29 +7,6 @@ use Illuminate\Database\Seeder;
 
 /**
  * DATOS DE PRUEBA DEL PADRÓN — y son los ÚNICOS del sistema.
- *
- * ============================================================================
- *  POR QUÉ NO SE SIEMBRA NADA MÁS
- * ============================================================================
- *
- * Los carnets, los cupos, las faenas y las guías se cargan a mano desde el
- * panel, que es justamente lo que hay que probar. Sembrados, las pantallas se
- * ven llenas sin que nadie haya recorrido el circuito, y el primer error real
- * aparece en ventanilla.
- *
- * Lo que sí hace falta para que ese circuito arranque son los CATÁLOGOS
- * —asociaciones, escala de aprovechamiento y tipos de carnet—, y no se siembran
- * acá a propósito: no son datos de prueba sino datos oficiales, salen de una
- * resolución y los carga la unidad desde el panel.
- *
- * ============================================================================
- *  LAS TRES PRIMERAS FICHAS SON FIJAS, NO ALEATORIAS
- * ============================================================================
- *
- * Con todo al azar no se puede escribir un paso a paso —«abrí la ficha de
- * 1234567»— ni volver a la misma pantalla después de recargar la base. Estas
- * tres tienen cédula conocida y cubren los tres casos que cambian cómo se arma
- * y cómo se imprime el nombre.
  */
 class BeneficiarioSeeder extends Seeder
 {
@@ -97,19 +74,7 @@ class BeneficiarioSeeder extends Seeder
         ]);
 
         /*
-         * ====================================================================
          *  EL RESTO SE COMPLETA HASTA EL OBJETIVO, NO SE CREA DE NUEVO
-         * ====================================================================
-         *
-         * Las tres de arriba son idempotentes por el `updateOrCreate`, pero la
-         * factory NO: cada `create()` inserta filas nuevas. Escrito como
-         * `factory()->count(37)->create()` a secas, volver a correr el seeder
-         * —cosa que pasa sola al rearmar un entorno o al agregar un seeder
-         * nuevo— sumaba otras treinta y siete, y el padrón crecía de 40 a 77 a
-         * 114 sin que nadie lo pidiera ni lo notara.
-         *
-         * Por eso se mira cuántas hay y se completa la diferencia. Corrido dos
-         * veces seguidas, la segunda no inserta nada.
          */
         $objetivo = 40;
         $faltan = max(0, $objetivo - Beneficiario::count());

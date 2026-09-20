@@ -13,29 +13,7 @@ import { fecha } from '@/lib/utils';
 import type { FaenaFicha } from '@/types/faenas';
 
 /**
- * ============================================================================
  *  LA FICHA DE UNA FAENA
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  CERRAR LA FAENA ES LA ACCIÓN, Y ESTÁ ARRIBA DE TODO
- * ----------------------------------------------------------------------------
- *
- * Quien abre esta pantalla casi siempre viene porque el pescador volvió. Por
- * eso el formulario de cierre es lo primero, con los kilos declarados ya
- * puestos: en la mayoría de los casos coinciden con la balanza y alcanza con
- * confirmar.
- *
- * ----------------------------------------------------------------------------
- *  COMPLETAR NO CAMBIA EL SALDO, Y ESO SORPRENDE
- * ----------------------------------------------------------------------------
- *
- * Los kilos ya estaban descontados desde que la faena se emitió: una faena
- * ACTIVA consume cupo aunque no se haya descargado nada. Si solo contaran las
- * completadas, un pescador podría tener diez faenas abiertas por el volumen
- * entero cada una.
- *
- * Lo que sí mueve el saldo es CORREGIR los kilos al cerrar.
  */
 export default function VerFaena({ faena }: { faena: FaenaFicha }) {
     const { puede } = usePermisos();
@@ -193,11 +171,6 @@ export default function VerFaena({ faena }: { faena: FaenaFicha }) {
 
 /**
  * En qué situación está la salida, en una frase.
- *
- * Los tres casos se resuelven con banderas que ya llegaron del servidor. El que
- * importa es el del medio: una faena que se pasó de fecha y sigue activa es un
- * papel que alguien se llevó y del que nadie registró la vuelta — no es una
- * previsión, es algo que hay que ir a buscar.
  */
 function Situacion({ faena }: { faena: FaenaFicha }) {
     if (faena.caducada) {

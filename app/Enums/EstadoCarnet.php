@@ -4,23 +4,6 @@ namespace App\Enums;
 
 /**
  * En qué situación está una credencial.
- *
- * ----------------------------------------------------------------------------
- *  ESTA COLUMNA PUEDE MENTIR, Y ESTÁ BIEN QUE PUEDA
- * ----------------------------------------------------------------------------
- *
- * `Vencido` no se escribe solo el día que corresponde: lo pone un comando
- * programado que corre una vez por día. Entre corrida y corrida, un carnet que
- * venció ayer sigue diciendo «activo» en la base.
- *
- * Por eso NINGUNA decisión se toma leyendo esta columna sola: para saber si un
- * carnet vale HOY se mira además `fecha_vencimiento`, que no puede quedar
- * desfasada. Ver Carnet::estaVigente().
- *
- * ¿Y entonces para qué está la columna? Para dos cosas que la fecha no puede
- * dar: distinguir «venció» de «se revocó» —un carnet revocado en marzo tiene la
- * fecha de vencimiento de diciembre y la fecha no lo delata— y filtrar o
- * agrupar en los listados sin calcular una comparación por fila.
  */
 enum EstadoCarnet: string
 {
@@ -29,10 +12,6 @@ enum EstadoCarnet: string
 
     /**
      * Dado de baja por decisión de la unidad, antes de su vencimiento.
-     *
-     * El documento sigue existiendo y su historial queda legible —un inspector
-     * necesita saber que la persona estuvo autorizada hasta tal fecha— pero hoy
-     * no habilita a trabajar ni a emitir faenas o guías.
      */
     case Revocado = 'revocado';
 

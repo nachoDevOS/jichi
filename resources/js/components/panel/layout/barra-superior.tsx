@@ -8,25 +8,7 @@ import { iniciales } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
 /**
- * ============================================================================
  *  EL ENCABEZADO DEL PANEL, EN DOS FRANJAS
- * ============================================================================
- *
- * Arriba la BARRA DE SESIÓN: el botón del menú, quién está conectado, el
- * selector de tema y la salida. Es lo que no cambia nunca, esté donde esté el
- * usuario.
- *
- * Abajo la BANDA DE PÁGINA: las migas de pan, el título, su línea de apoyo y
- * los botones de la pantalla («Nuevo beneficiario», «Exportar»).
- *
- * ESTÁN SEPARADAS PORQUE SE MIRAN EN MOMENTOS DISTINTOS. La de sesión se mira
- * una vez al entrar y después se ignora; la de página se lee en cada pantalla.
- * Mezcladas en una sola fila, el título compite por el ojo con un botón de
- * salir que nadie estaba buscando, y los botones de acción —que son lo que el
- * operador vino a apretar— quedan a la misma altura que el cambio de tema.
- *
- * `sticky top-0` deja las dos pegadas arriba al desplazar la página, para que
- * el título y los botones sigan a mano en los listados largos.
  */
 export function BarraSuperior({
     titulo,
@@ -145,20 +127,6 @@ export function BarraSuperior({
 
 /**
  * Las migas de pan: «Inicio / Trámites / Nuevo trámite».
- *
- * El módulo del medio NO se escribe en cada pantalla: sale de la URL, con el
- * mismo cálculo que usa la barra lateral para saber qué renglón resaltar (ver
- * `moduloActual`). Escrito a mano, cada página tendría que acordarse de pasarlo
- * y las trece se irían desincronizando de a una.
- *
- * El último tramo es el `titulo` que ya recibe el layout, así que tampoco hay
- * un dato nuevo que mantener. Cuando el título ES el del módulo —el listado de
- * trámites de carnet se llama «Trámites de carnet»— el tramo del medio se
- * saltea, o la miga diría «Inicio / Trámites de carnet / Trámites de carnet».
- *
- * SE USA `tituloCompleto` Y NO `titulo`: en la barra lateral los ítems de un
- * grupo van con el nombre corto —«De faena», porque el grupo ya dice
- * «Trámites»— y acá esa palabra suelta no se entiende.
  */
 function Migas({ titulo }: { titulo: string }) {
     const { ziggy } = usePage<PageProps>().props;

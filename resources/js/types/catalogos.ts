@@ -3,20 +3,6 @@ import type { EstadoAsociacion, ModalidadAprovechamiento } from '@/types';
 /**
  * Tipos de los tres CATÁLOGOS: asociaciones, escala de aprovechamiento y tipos
  * de carnet.
- *
- * Cada interfaz describe, campo por campo, lo que arman
- * App\Http\Controllers\Panel\{Asociacion,CategoriaAprovechamiento,TipoCarnet}Controller.
- * Si allá se renombra una clave y acá no, el editor lo marca en rojo al
- * instante en vez de descubrirlo con una pantalla en blanco.
- *
- * ============================================================================
- *  LOS TRES TRAEN UN CONTADOR DE USO, Y NO ES DECORACIÓN
- * ============================================================================
- *
- * `carnets_count`, `guias_count`, `aprovechamientos_count`: es lo que explica
- * por qué una fila no se puede borrar. Sin el número, «solo se puede desactivar»
- * suena a capricho del sistema; con él se entiende que hay documentos emitidos
- * colgando de esa fila.
  */
 
 /** Una fila del catálogo de gremios. */
@@ -48,20 +34,12 @@ export interface EscalaFila {
     nro_escala: number;
     /**
      * El RÉGIMEN del tramo, y de él depende si el cupo se va a poder ampliar.
-     *
-     * Se declara acá, en el catálogo, y no al otorgar: la fija la resolución al
-     * definir el tramo. Puesta en el otorgamiento, dos cupos del mismo tramo
-     * podrían terminar con reglas distintas.
      */
     modalidad: ModalidadAprovechamiento;
     modalidad_etiqueta: string;
     modalidad_color: string;
     /**
      * El texto literal de la resolución.
-     *
-     * Se guarda aparte de los kilos porque no siempre es su lectura: el tramo
-     * más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese «PAICHE» no está en
-     * ningún número.
      */
     descripcion_kg: string;
     kilos_min: number;
@@ -76,14 +54,6 @@ export interface EscalaFila {
 
 /**
  * Un rango de kilos que no cae en ningún tramo.
- *
- * Lo calcula el servidor mirando la escala ENTERA y ordenando por KILOS, no por
- * número de escala: nada impide cargar la escala 7 con el rango más bajo, y
- * recorriendo por número un catálogo así daría huecos inventados.
- *
- * El hueco no rompe nada visible —simplemente hay volúmenes que no caen en
- * ninguna escala y el formulario de cupo no ofrece nada— así que sin este aviso
- * se descubre en ventanilla, con alguien enfrente.
  */
 export interface HuecoEscala {
     desde: number;
@@ -107,11 +77,6 @@ export interface TipoCarnetFila {
     nombre: string;
     /**
      * El arancel de HOY, para armar un cobro nuevo.
-     *
-     * NO sirve para leer lo que salió un carnet ya emitido: lo cobrado de
-     * verdad está en `pagos` y no se recalcula. Lo que SÍ cambia al subir este
-     * número es el saldo pendiente de los carnets que todavía no están
-     * cubiertos.
      */
     precio_bs: number;
     estado: boolean;

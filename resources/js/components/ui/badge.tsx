@@ -4,13 +4,6 @@ import { cn } from '@/lib/utils';
  * Los colores llegan desde los enums de PHP (EstadoTramite::color(),
  * TipoTramite::color(), EstadoCarnet::color()...), por eso el mapa está escrito
  * con clases COMPLETAS.
- *
- * Es la trampa clásica de Tailwind: un `bg-${color}-100` armado juntando textos
- * nunca llega a la hoja de estilos, porque Tailwind solo incluye las clases que
- * puede leer literalmente en el código. El badge saldría sin fondo y sin ningún
- * error que lo explique.
- *
- * Si se agrega un color a un enum de PHP, hay que agregarlo también acá.
  */
 const COLORES: Record<string, string> = {
     slate: 'bg-slate-100 text-slate-700 ring-slate-600/20 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-400/30',

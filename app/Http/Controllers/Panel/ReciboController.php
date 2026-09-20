@@ -20,39 +20,12 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as RespuestaHttp;
 
 /**
- * ============================================================================
  *  RECIBOS — los comprobantes entregados
- * ============================================================================
- *
- * ----------------------------------------------------------------------------
- *  NO HAY `store`, NI `update`, NI `destroy`
- * ----------------------------------------------------------------------------
- *
- * Un recibo NACE de un cobro: lo emite `CobrarService` junto con sus abonos, en
- * la misma transacción. Un endpoint para crear uno suelto permitiría un
- * comprobante numerado sin ningún pago detrás — un papel oficial que dice que
- * entró plata que no entró.
- *
- * Y no se borra: `numero_recibo` es un correlativo que Contabilidad audita.
- * Borrar una fila deja un hueco en la serie que nadie puede explicar.
- *
- * ----------------------------------------------------------------------------
- *  `monto_total` ESTÁ CONGELADO, Y LA PANTALLA MUESTRA SI DEJÓ DE CUADRAR
- * ----------------------------------------------------------------------------
- *
- * La columna es lo que se IMPRIMIÓ; `Recibo::montoCalculado()` es lo que HAY
- * hoy en el detalle. Si alguien corrigió un abono después de entregar el papel,
- * los dos números se separan — y eso es justamente lo que un arqueo tiene que
- * poder detectar, no algo que convenga tapar recalculando al leer.
  */
 class ReciboController extends Controller
 {
     /**
      * Cuántos renglones tiene el cuadro de importes como mínimo.
-     *
-     * El talonario de papel trae tres rayas impresas: con un solo cobro, el
-     * cuadro quedaría alto y vacío, y con menos de tres el recibo dejaría de
-     * parecerse al papel que la gente conoce.
      */
     private const RENGLONES_MINIMOS = 3;
 
@@ -163,10 +136,6 @@ class ReciboController extends Controller
 
     /**
      * Qué trámite concreto pagó este abono.
-     *
-     * El `match` va sobre la CLASE y no sobre el texto de `pagable_type`: es el
-     * mismo dato, pero así el analizador avisa cuando se agrega un cobrable y
-     * este método se olvida.
      */
     private function detalleDe(Pago $pago): ?string
     {
@@ -181,14 +150,7 @@ class ReciboController extends Controller
     }
 
     /**
-     * ========================================================================
      *  IMPRIMIR — GET /panel/recibos/{recibo}/imprimir
-     * ========================================================================
-     *
-     * Dibuja el talonario verde del SEDAG en media carta apaisada. La maqueta
-     * está en `views/documentos/recibo-oficial.blade.php` y se adapta con
-     * App\Support\ReciboImpreso, que expone lo que ese Blade pide sin obligar a
-     * reescribirlo: es una maqueta de coordenadas fijas, medida contra el papel.
      */
     public function imprimir(Recibo $recibo): RespuestaHttp
     {
@@ -217,12 +179,8 @@ class ReciboController extends Controller
             'fecha' => $impreso->fechaEnCasilleros(),
 
             /*
-             * SIEMPRE MARCA «DEPÓSITO». En esta unidad no se cobra en efectivo
-             * ni por QR: todo pago es un depósito bancario, así que la casilla
-             * de efectivo del papel queda vacía por construcción.
+             * YA NO SE MANDA `esDeposito`, y no es un olvido.
              */
-            'esDeposito' => true,
-
             'renglones' => array_map(
                 fn (array $linea): array => [
                     'descripcion' => $linea['descripcion'],
@@ -242,16 +200,6 @@ class ReciboController extends Controller
 
             /*
              * LAS IMÁGENES SON COPIAS A MEDIDA Y VAN EMBEBIDAS EN BASE64.
-             *
-             * No son `icon.png` ni `sedag.png`: esos miden más de 2000 px de
-             * lado y embebidos hacían un PDF de 5,4 MB por recibo. Las copias de
-             * `recibo-*` están al tamaño en que se dibujan y pesan 59 KB juntas,
-             * con el sello ya PRE-ATENUADO en el archivo —`opacity` es de lo
-             * menos confiable que tiene DomPDF—.
-             *
-             * Y en base64 porque DomPDF no es un navegador: una ruta se resuelve
-             * contra el disco con las restricciones de `chroot` y en producción
-             * termina en un recuadro vacío.
              */
             'escudo' => $this->imagenEmbebida('image/recibo-escudo.png'),
             'selloSedag' => $this->imagenEmbebida('image/recibo-sello.png'),
@@ -263,10 +211,6 @@ class ReciboController extends Controller
              * PDF —unas 380 KB cada una— aunque el recibo use ochenta caracteres
              * contados. Medido en su momento: 930 KB, de los cuales 734 eran las
              * fuentes.
-             *
-             * Se activa acá y no en `config/dompdf.php` a propósito: ese archivo
-             * lo publica el paquete y conviene dejarlo tal cual para poder
-             * compararlo cuando se actualice.
              */
             ->setOption('enable_font_subsetting', true);
 

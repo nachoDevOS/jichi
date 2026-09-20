@@ -7,28 +7,11 @@ use RuntimeException;
 
 /**
  * Una regla de emisión de credenciales dijo que no.
- *
- * Mismo criterio que CupoInvalidoException: es una excepción y no un
- * `return false` porque el servicio trabaja dentro de una transacción, y así
- * `DB::transaction()` deshace todo solo.
- *
- * El mensaje sale tal cual en el aviso rojo de la pantalla, así que va en
- * castellano de mostrador y DICE QUÉ HACER.
  */
 class CarnetInvalidoException extends RuntimeException
 {
     /**
-     * ========================================================================
      *  UNA CREDENCIAL VIGENTE POR ACTIVIDAD Y POR PERSONA
-     * ========================================================================
-     *
-     * La regla es POR ACTIVIDAD, no por persona: quien pesca y además
-     * comercializa tiene DOS carnets vigentes al mismo tiempo, y eso es lo
-     * normal. Lo que no puede tener son dos de pescador.
-     *
-     * No la garantiza ningún índice de la base —«vigente» depende de la fecha
-     * de hoy— así que la sostiene el servicio con la fila del beneficiario
-     * bloqueada.
      */
     public static function yaTieneCarnetVigente(string $persona, TipoActor $actor, string $codigo, string $vence): self
     {
@@ -45,13 +28,6 @@ class CarnetInvalidoException extends RuntimeException
 
     /**
      * Un carnet de pescador sin bolsa madre detrás.
-     *
-     * El plástico imprime el cupo en kilos, así que emitirlo sin cupo daría una
-     * credencial con un renglón vacío en el lugar donde un control espera un
-     * número. Y sin cupo tampoco se pueden emitir faenas, que es para lo único
-     * que sirve ese carnet.
-     *
-     * POR ESO EL CUPO ES EL PASO 2 Y EL CARNET EL 3, y no al revés.
      */
     public static function pescadorSinCupo(string $persona): self
     {
@@ -63,10 +39,6 @@ class CarnetInvalidoException extends RuntimeException
 
     /**
      * Se eligió una asociación o un tipo que ya no se puede usar.
-     *
-     * Puede pasar entre que el operador abre el formulario y aprieta guardar:
-     * la lista se armó con lo vigente en ese momento y en el medio alguien lo
-     * desactivó desde el catálogo.
      */
     public static function catalogoInactivo(string $que, string $nombre): self
     {
@@ -84,10 +56,6 @@ class CarnetInvalidoException extends RuntimeException
 
     /**
      * No se revoca dos veces.
-     *
-     * Y tampoco se «desrevoca»: la revocación es definitiva. Si la persona
-     * vuelve a estar en regla, lo que corresponde es emitirle un carnet nuevo,
-     * con su propio código — el plástico viejo puede estar circulando.
      */
     public static function yaRevocado(): self
     {

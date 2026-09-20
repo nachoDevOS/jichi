@@ -3,48 +3,16 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * ============================================================================
  *  UNO DE LOS CUATRO NÚMEROS DE ARRIBA DEL TABLERO
- * ============================================================================
- *
- * Es el mismo componente repetido cuatro veces con datos distintos. Ese es el
- * sentido de un componente: se escribe el diseño UNA vez y se reutiliza
- * cambiándole las props.
- *
- * VA PINTADO DE COLOR ENTERO y no como tarjeta blanca con un icono de color. La
- * diferencia no es estética: estos cuatro son el resumen del día y compiten por
- * la atención con dos gráficos, una tabla y un aviso de vencimiento. Siendo
- * blancos, pesan lo mismo que todo lo demás y hay que buscarlos; pintados, el
- * ojo cae ahí primero y recién después recorre el resto.
- *
- * El pie es una franja translúcida que se apoya en el borde de abajo, y ahí va
- * el contexto: la línea de los últimos catorce días, o el desglose del número.
- * Puede no haber ninguno —no todo número tiene una serie detrás— y entonces la
- * tarjeta termina en la cifra.
  */
 
 /**
  * Qué color de los cuatro usa la tarjeta.
- *
- * Es un número y no un nombre de color a propósito: los tonos están definidos
- * en app.css como una escala institucional, y nombrarlos «azul» o «dorado» acá
- * ataría el tablero a un color concreto. El día que la paleta cambie se toca el
- * CSS y este archivo no se entera.
  */
 export type TonoWidget = 1 | 2 | 3 | 4;
 
 /**
  * Las clases van ESCRITAS ENTERAS, no armadas con `bg-widget-${tono}`.
- *
- * Es la trampa clásica de Tailwind, la misma que está documentada en
- * components/ui/badge.tsx: solo llegan a la hoja de estilos final las clases
- * que Tailwind puede leer literalmente en el código. Armada juntando textos, la
- * clase no existe, la tarjeta sale transparente y no hay ningún error que lo
- * explique.
- *
- * Fondo y color de texto van SIEMPRE juntos: el dorado necesita texto oscuro y
- * los tres azules texto claro (ver el comentario de los tokens en app.css), así
- * que separarlos permitiría combinar un par ilegible.
  */
 const TONOS: Record<TonoWidget, string> = {
     1: 'bg-widget-1 text-widget-1-fg',
@@ -111,14 +79,6 @@ export function WidgetEstadistica({
 
 /**
  * La franja de abajo cuando el número se puede PARTIR en pedazos.
- *
- * «12 trámites sin resolver» no dice si son doce recién llegados o doce trabados
- * en revisión desde hace una semana, y esas dos situaciones piden cosas
- * distintas. La barra parte el número en sus pedazos reales y los rotula.
- *
- * LOS PEDAZOS TIENEN QUE SER EXCLUYENTES entre sí: la barra los dibuja uno al
- * lado del otro sumando el total, así que dos categorías que se pisan —un mismo
- * expediente contado en las dos— dibujan una barra que miente sobre el total.
  */
 export function DesglosePie({ partes }: { partes: { etiqueta: string; cantidad: number }[] }) {
     const total = partes.reduce((suma, p) => suma + p.cantidad, 0);

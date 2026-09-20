@@ -4,17 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 
 /*
-|--------------------------------------------------------------------------
 | Inicio y cierre de sesión
-|--------------------------------------------------------------------------
-|
-| No hay registro público ni verificación por correo: las cuentas del sistema
-| las crea el administrador desde el panel. Por eso este archivo solo tiene
-| login y logout, y no las rutas de "recuperar contraseña" que trae Laravel.
-|
-| Cada intento (exitoso, fallido o bloqueado) queda registrado en la tabla
-| `accesos`. Ver App\Http\Requests\Auth\LoginRequest.
-|
 */
 
 /*

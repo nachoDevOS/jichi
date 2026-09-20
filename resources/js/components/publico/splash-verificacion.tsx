@@ -1,28 +1,7 @@
 import { useEffect, useState } from 'react';
 
 /**
- * ============================================================================
  *  LA PANTALLA DE "VERIFICANDO..."
- * ============================================================================
- *
- * Aparece un segundo y medio al abrir un código escaneado, y después se
- * desvanece dejando ver el resultado.
- *
- * ¿PARA QUÉ, SI EL DATO YA VINO CON LA PÁGINA?
- *
- * No es para disimular una espera: cuando esto se muestra, la respuesta ya
- * está. Es para que la verificación se SIENTA como un acto, y no como abrir
- * una página web cualquiera.
- *
- * El caso de uso real: el inspector escanea el QR delante del pescador y le
- * gira el teléfono para mostrárselo. Que aparezca el escudo con una línea de
- * escaneo y la palabra «Verificando» hace que los dos entiendan que el sistema
- * consultó algo. Si el resultado apareciera de golpe, parecería una imagen
- * guardada en el teléfono —justo lo que un documento falsificado querría
- * simular—.
- *
- * SE RESPETA `prefers-reduced-motion`: quien pidió menos animaciones en su
- * dispositivo va directo al resultado, sin splash y sin transición.
  */
 export function SplashVerificacion() {
     const [oculto, setOculto] = useState(false);

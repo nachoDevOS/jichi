@@ -7,15 +7,6 @@ use Illuminate\Validation\Rule;
 
 /**
  * Reglas para emitir un permiso de faena.
- *
- * ----------------------------------------------------------------------------
- *  ACÁ SOLO SE VALIDA LA FORMA. EL CUPO SE COMPRUEBA EN EL SERVICIO
- * ----------------------------------------------------------------------------
- *
- * Que los kilos entren en el saldo NO se comprueba acá, y no es un olvido: el
- * saldo puede moverlo otra ventanilla en el mismo segundo, así que esa
- * comparación tiene que correr DENTRO de la transacción y con la fila del
- * aprovechamiento bloqueada. Ver EmitirFaenaService::emitir().
  */
 class EmitirFaenaRequest extends FormRequest
 {

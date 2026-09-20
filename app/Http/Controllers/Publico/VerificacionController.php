@@ -12,48 +12,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * ============================================================================
  *  VERIFICACIÓN PÚBLICA DE CARNETS — la única pantalla sin sesión
- * ============================================================================
- *
- * Un pescador muestra su carnet, el inspector lee el código con el teléfono y
- * cae en esta pantalla, que le dice si el documento es real, si está vigente y
- * qué actividad autoriza. Por eso NO puede pedir login.
- *
- * ----------------------------------------------------------------------------
- *  HACE FALTA UN SOLO DATO: EL CÓDIGO DEL CARNET
- * ----------------------------------------------------------------------------
- *
- * `carnets.codigo_carnet` es único GLOBAL —no por tipo— justamente para esto:
- * un control en ruta lee un código y tiene que llegar a UN documento, sin
- * preguntar antes de qué tipo es.
- *
- * LO QUE ESTO CUESTA, Y HAY QUE TENERLO PRESENTE: el código va IMPRESO en el
- * plástico, así que quien tenga el carnet en la mano —o una foto— puede
- * consultarlo. Se aceptó porque lo que se muestra acá es deliberadamente poco:
- * nombre, cédula enmascarada, actividad y vigencia. Nada que no esté ya en la
- * tarjeta que esa persona está mirando.
- *
- * Lo que sí protege del barrido automático es el `throttle` de la ruta. Un
- * código corto y predecible sería adivinable, así que al generarlo conviene que
- * lleve una parte al azar; eso es responsabilidad del módulo de carnets.
- *
- * ----------------------------------------------------------------------------
- *  REGLA DE ORO DE ESTA PARTE DEL SISTEMA
- * ----------------------------------------------------------------------------
- *
- * Acá solo puede aparecer lo mínimo para constatar que un carnet es auténtico.
- * Nunca la cédula completa, ni la dirección, ni el teléfono. Cada campo que se
- * agregue queda expuesto a cualquiera. Ver datosPublicos().
  */
 class VerificacionController extends Controller
 {
     /**
      * Largo mínimo aceptado antes de ir a la base.
-     *
-     * No es una regla de negocio sino un filtro barato: un código de dos letras
-     * no puede existir, y cortando acá una URL manipulada ni siquiera llega a
-     * consultar.
      */
     private const LARGO_MINIMO = 6;
 
@@ -82,11 +46,6 @@ class VerificacionController extends Controller
 
     /**
      * El código escrito a mano, cuando el QR no se deja escanear.
-     *
-     * Se normaliza ANTES de validar, y eso no es un detalle: el código se
-     * imprime en grupos de cuatro y la gente lo copia con los espacios. Sin
-     * normalizar primero, la validación rechazaría lo que el operador ve
-     * escrito en la tarjeta.
      */
     public function buscar(Request $request): RedirectResponse
     {
@@ -107,11 +66,6 @@ class VerificacionController extends Controller
 
     /**
      * Busca el carnet por su código.
-     *
-     * La comparación la hace el ÍNDICE ÚNICO de la base, que responde en el
-     * mismo tiempo encuentre o no. Comparar en PHP obligaría a traer filas y a
-     * cuidarse del ataque por tiempo —una comparación normal corta en el primer
-     * carácter distinto—; acá no hay nada que filtrar.
      */
     private function buscarCarnet(string $codigo): ?Carnet
     {
@@ -156,10 +110,6 @@ class VerificacionController extends Controller
 
             /*
              * La cédula va ENMASCARADA: solo los últimos tres dígitos.
-             *
-             * Alcanza para que el inspector confirme contra el documento que la
-             * persona le está mostrando, y no alcanza para que alguien que
-             * encuentre un carnet tirado se haga con el número completo.
              */
             'documento_titular' => $this->enmascarar((string) $beneficiario?->ci),
 
@@ -177,12 +127,6 @@ class VerificacionController extends Controller
 
             /*
              * `vigente` NO es lo mismo que estado === 'activo'.
-             *
-             * Carnet::estaVigente() mira además la fecha, porque el estado lo
-             * escribe un comando programado y entre corrida y corrida un carnet
-             * vencido ayer sigue diciendo «activo» en la columna. Acá eso
-             * importaría de verdad: sería habilitar a alguien con un documento
-             * caído.
              */
             'vigente' => $vigente,
 
@@ -190,13 +134,6 @@ class VerificacionController extends Controller
 
             /*
              * LA ACTIVIDAD QUE ESTE CARNET AUTORIZA, Y SU CUPO.
-             *
-             * Es UNA, no una lista: cada actividad es un carnet propio.
-             *
-             * SE MANDA NULL Y NO EL NOMBRE cuando el carnet no está vigente, y
-             * no es un olvido: mostrar la actividad —aunque fuera marcada en
-             * rojo— arriesga que el inspector lea la fila y no el color. Lo que
-             * no habilita, no aparece.
              */
             'actividad' => $vigente ? $carnet->tipo_actor->etiqueta() : null,
             'tipo_carnet' => $vigente ? $carnet->tipoCarnet?->nombre : null,

@@ -6,21 +6,6 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Reglas para RECHAZAR un aprovechamiento presentado a revisión.
- *
- * ============================================================================
- *  EL MOTIVO ES LO ÚNICO QUE EXPLICA LA DEVOLUCIÓN
- * ============================================================================
- *
- * Rechazar es devolverle el expediente a ventanilla, y lo que sigue es que lo
- * corrijan. Sin el texto escrito, quien lo recibe no sabe QUÉ corregir y el
- * expediente rebota: se vuelve a presentar igual y se vuelve a rechazar.
- *
- * El estado no recuerda el rechazo —vuelve a PENDIENTE, a secas— así que la
- * línea de `auditorias` es todo el rastro que queda.
- *
- * El mínimo de 10 caracteres coincide con el de la ventana de confirmación del
- * panel: si acá fuera menor, el botón se habilitaría antes de que el servidor
- * acepte el texto.
  */
 class RechazarCupoRequest extends FormRequest
 {
