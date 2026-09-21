@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -74,9 +75,23 @@ class AprovechamientoPesq extends Model
         return $this->belongsTo(CategoriaAprovechamiento::class, 'categoria_aprov_id');
     }
 
-    public function faenas(): HasMany
+    /**
+     * Las salidas que descuentan de esta bolsa, A TRAVÉS de los carnets.
+     *
+     * `permisos_faena` no guarda `aprovechamiento_id`: la faena cuelga del
+     * carnet y el carnet sabe de qué cupo se apoya. Es `hasManyThrough`, así
+     * que `withSum` y `withMax` siguen funcionando igual.
+     */
+    public function faenas(): HasManyThrough
     {
-        return $this->hasMany(PermisoFaena::class, 'aprovechamiento_id');
+        return $this->hasManyThrough(
+            PermisoFaena::class,
+            Carnet::class,
+            'aprovechamiento_id',  // FK en carnets
+            'carnet_id',           // FK en permisos_faena
+            'id',
+            'id',
+        );
     }
 
     /**
@@ -119,9 +134,10 @@ class AprovechamientoPesq extends Model
     }
 
     /** Las faenas cuyo volumen pesa contra el cupo: todas menos las vencidas. */
-    public function faenasQueConsumen(): HasMany
+    public function faenasQueConsumen(): HasManyThrough
     {
-        return $this->faenas()->whereNot('estado', EstadoFaena::Vencido);
+        // Calificada: `carnets` entra en el join y también tiene `estado`.
+        return $this->faenas()->whereNot('permisos_faena.estado', EstadoFaena::Vencido);
     }
 
     /**
@@ -319,17 +335,6 @@ class AprovechamientoPesq extends Model
     public function estaAgotado(): bool
     {
         return $this->saldoKg() <= 0.0;
-    }
-
-    /**
-     * El número que va a llevar la próxima hoja del talonario.
-     *
-     * Sale del máximo y no de un `count()`: las faenas anuladas o vencidas
-     * siguen ocupando su número, así que contar filas repetiría uno.
-     */
-    public function siguienteNumeroFaena(): int
-    {
-        return (int) $this->faenas()->max('numero_faena') + 1;
     }
 
     //  Scopes

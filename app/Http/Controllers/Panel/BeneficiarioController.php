@@ -267,9 +267,10 @@ class BeneficiarioController extends Controller
                 ->with([
                     'tipoCarnet:id,nombre',
                     'aprovechamiento' => fn ($a) => $a
-                        ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                        ->withMax('faenas', 'numero_faena'),
-                ]),
+                        ->withSum('faenasQueConsumen', 'kilos_extraidos'),
+                ])
+                // El correlativo del talonario es del CARNET.
+                ->withMax('faenas', 'numero_faena'),
             ])
             ->ordenAlfabetico()
             ->limit(10)
@@ -306,7 +307,7 @@ class BeneficiarioController extends Controller
                      */
                     'saldo_kg' => $c->aprovechamiento?->saldoKg(),
                     'siguiente_numero_faena' => $c->aprovechamiento
-                        ? (int) ($c->aprovechamiento->faenas_max_numero_faena ?? 0) + 1
+                        ? $c->siguienteNumeroFaena()
                         : null,
                 ])->values()->all(),
             ])

@@ -97,9 +97,11 @@ class FaenaController extends Controller
                     ->with([
                         'tipoCarnet:id,nombre',
                         'aprovechamiento' => fn ($a) => $a
-                            ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                            ->withMax('faenas', 'numero_faena'),
+                            ->withSum('faenasQueConsumen', 'kilos_extraidos'),
                     ])
+                    // El correlativo es del TALONARIO DEL CARNET: el único es
+                    // (carnet_id, numero_faena).
+                    ->withMax('faenas', 'numero_faena')
                     ->get()
                     ->map($this->resumirCarnetParaEmitir(...))
                     ->values()
@@ -163,7 +165,8 @@ class FaenaController extends Controller
             'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,asociacion_id',
             'carnet.beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
             'carnet.asociacion:id,nombre,sigla',
-            'aprovechamiento.categoria',
+            // El cupo cuelga del CARNET: la faena ya no guarda su id.
+            'carnet.aprovechamiento.categoria',
         ]);
 
         return Inertia::render('panel/faenas/ver', [
@@ -174,12 +177,12 @@ class FaenaController extends Controller
                 /*
                  * EL CUPO DEL QUE SALIERON LOS KILOS.
                  */
-                'cupo' => $faena->aprovechamiento ? [
-                    'id' => $faena->aprovechamiento->id,
-                    'escala' => $faena->aprovechamiento->categoria?->nro_escala,
-                    'volumen_total_kg' => (float) $faena->aprovechamiento->volumen_total_kg,
-                    'saldo_kg' => $faena->aprovechamiento->saldoKg(),
-                    'porcentaje_usado' => $faena->aprovechamiento->porcentajeUsado(),
+                'cupo' => $faena->cupo() ? [
+                    'id' => $faena->cupo()->id,
+                    'escala' => $faena->cupo()->categoria?->nro_escala,
+                    'volumen_total_kg' => (float) $faena->cupo()->volumen_total_kg,
+                    'saldo_kg' => $faena->cupo()->saldoKg(),
+                    'porcentaje_usado' => $faena->cupo()->porcentajeUsado(),
                 ] : null,
             ],
         ]);
@@ -222,7 +225,7 @@ class FaenaController extends Controller
             'puede_emitir_guias' => $carnet->puedeEmitirGuias(),
             'saldo_kg' => $carnet->aprovechamiento?->saldoKg(),
             'siguiente_numero_faena' => $carnet->aprovechamiento
-                ? (int) ($carnet->aprovechamiento->faenas_max_numero_faena ?? 0) + 1
+                ? $carnet->siguienteNumeroFaena()
                 : null,
         ];
     }

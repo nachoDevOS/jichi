@@ -32,8 +32,8 @@ class EmitirFaenaRequest extends FormRequest
 
             /*
              * EL NÚMERO DEL TALONARIO. Entero y positivo, nada más: que no se
-             * repita dentro del cupo lo comprueba el servicio y lo garantiza el
-             * índice único `(aprovechamiento_id, numero_faena)`.
+             * repita dentro del carnet lo comprueba el servicio y lo garantiza
+             * el índice único `(carnet_id, numero_faena)`.
              */
             'numero_faena' => ['required', 'integer', 'min:1', 'max:999999'],
 

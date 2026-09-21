@@ -15,10 +15,15 @@ return new class extends Migration
         Schema::create('permisos_faena', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('aprovechamiento_id')->constrained('aprovechamientos_pesq')->restrictOnDelete();
+            /*
+             * LA FAENA CUELGA DEL CARNET Y DE NADA MÁS. El cupo se alcanza a
+             * través de él —`carnets.aprovechamiento_id`— y por eso acá NO hay
+             * una segunda FK: con las dos, un permiso podía quedar apuntando a
+             * un cupo distinto del que respalda su carnet, y nada lo impedía.
+             */
             $table->foreignId('carnet_id')->constrained('carnets')->restrictOnDelete();
 
-            $table->unsignedInteger('numero_faena')->comment('Hoja del talonario, correlativa dentro del cupo');
+            $table->unsignedInteger('numero_faena')->comment('Hoja del talonario, correlativa dentro del carnet');
 
             // Decimal: con enteros, treinta faenas redondeando medio kilo cada
             // una desajustan el cupo en quince.
@@ -35,15 +40,15 @@ return new class extends Migration
 
             /*
              * Dos hojas del talonario no pueden tener el mismo número DENTRO del
-             * mismo cupo. No es único global: cada bolsa arranca su numeración en
-             * 1, que es como se llena el papel.
+             * mismo carnet. No es único global: cada talonario arranca su
+             * numeración en 1, que es como se llena el papel.
              */
-            $table->unique(['aprovechamiento_id', 'numero_faena']);
+            $table->unique(['carnet_id', 'numero_faena']);
 
-            // La consulta caliente del módulo: la suma de kilos consumidos.
-            // Ver AprovechamientoPesq::saldoKg().
-            $table->index(['aprovechamiento_id', 'estado']);
-
+            /*
+             * La consulta caliente del módulo: la suma de kilos consumidos del
+             * cupo, que hoy llega por `carnets`. Ver AprovechamientoPesq::faenas().
+             */
             $table->index(['carnet_id', 'estado']);
 
             // Para el comando diario que marca las vencidas.

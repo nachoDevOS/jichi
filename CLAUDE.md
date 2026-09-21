@@ -60,6 +60,7 @@ PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
 >
 > | Leé esto | Para |
 > | --- | --- |
+> | [docs/REGLAS-NEGOCIO.md](docs/REGLAS-NEGOCIO.md) | **LA ESPECIFICACIÓN**, definida por el responsable. Cuando el código no coincida, manda ella |
 > | [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Entender el sistema. **Empezá acá siempre** |
 > | [docs/MAPA-ARCHIVOS.md](docs/MAPA-ARCHIVOS.md) | Qué hace cada archivo y qué tiene de no obvio |
 > | [docs/MER.md](docs/MER.md) | Las tablas, sus relaciones y qué regla impone cada restricción |

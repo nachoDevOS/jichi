@@ -344,22 +344,26 @@ usa el scope `enCurso()` —pendiente o aprobado, en fecha— y no `vigentes()`.
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
-| `aprovechamiento_id` | FK RESTRICT | De dónde salen los kilos |
-| `carnet_id` | FK RESTRICT | Quién los extrae |
-| `numero_faena` | int | Hoja del talonario |
+| `carnet_id` | FK RESTRICT | **La única**: de él cuelga la faena |
+| `numero_faena` | int | Hoja del talonario del carnet |
 | `kilos_extraidos` | decimal(12,2) | |
 | `fecha_salida` / `fecha_limite` | date | Máximo **1 mes** |
 | `estado` | string(20) | `EstadoFaena` |
 
-**Por qué apunta a dos cosas a la vez.** `aprovechamiento_id` es de dónde SALEN
-LOS KILOS —la bolsa contra la que se descuenta— y `carnet_id` es QUIÉN LOS EXTRAE
-—la credencial que un control en el río va a pedir—. Las dos apuntan a la misma
-persona, pero por caminos distintos y con vidas distintas: el cupo se renueva por
-resolución y el carnet por gestión, y no siempre en la misma fecha. Guardar solo
-una obligaría a deducir la otra, y la deducción falla justamente en el caso raro.
+**CUELGA DEL CARNET Y DE NADA MÁS** —cambiado el 20/09/2026—. Tuvo también un
+`aprovechamiento_id`, con el argumento de que el cupo es de dónde SALEN LOS KILOS
+y el carnet QUIÉN LOS EXTRAE. El problema de guardar las dos es que nada las
+obligaba a coincidir: una faena podía descontar de un cupo distinto del que
+respalda su propio carnet, y ninguna restricción lo impedía.
 
-**El único es `(aprovechamiento_id, numero_faena)`, no global**: cada bolsa madre
-arranca su numeración en 1, que es como se llena el papel.
+Hoy la bolsa se alcanza por el camino que ya existe —`carnets.aprovechamiento_id`—
+y por eso `AprovechamientoPesq::faenas()` es un **`hasManyThrough`** por
+`carnets`. `withSum` y `withMax` siguen funcionando igual, así que el saldo se
+sigue calculando con una sola consulta.
+
+**El único es `(carnet_id, numero_faena)`, no global**: cada talonario arranca su
+numeración en 1, que es como se llena el papel. El correlativo lo resuelve
+`Carnet::siguienteNumeroFaena()`.
 
 **`fecha_limite` se guarda calculada** en vez de derivarla al leer: si mañana la
 resolución cambia el plazo a quince días, los permisos ya emitidos tienen que
@@ -635,7 +639,7 @@ o queda quemado:
 | `carnets.codigo_carnet` | **global** | El plástico ya salió y está en la calle |
 | `guias_movimiento.codigo_guia` | **global** | El papel ya se entregó |
 | `recibos.numero_recibo` | **global** | Correlativo que Contabilidad audita: el hueco es lo que la hace auditable |
-| `permisos_faena (aprovechamiento_id, numero_faena)` | **global** | La hoja del talonario se gastó |
+| `permisos_faena (carnet_id, numero_faena)` | **global** | La hoja del talonario se gastó |
 
 > El criterio en una línea: **el catálogo libera, el papel entregado no.**
 

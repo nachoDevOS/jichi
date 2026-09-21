@@ -86,12 +86,13 @@ class EmitirFaenaService
                 }
             }
 
-            if ($cupo->faenas()->where('numero_faena', $numeroFaena)->exists()) {
+            // El número es correlativo DENTRO DEL CARNET: es su talonario, y
+            // así lo exige el único `(carnet_id, numero_faena)`.
+            if ($carnet->faenas()->where('numero_faena', $numeroFaena)->exists()) {
                 throw PermisoOperativoException::numeroRepetido('una faena', (string) $numeroFaena);
             }
 
             $faena = PermisoFaena::create([
-                'aprovechamiento_id' => $cupo->id,
                 'carnet_id' => $carnet->id,
                 'numero_faena' => $numeroFaena,
                 'kilos_extraidos' => $kilos,
@@ -127,8 +128,11 @@ class EmitirFaenaService
         }
 
         return DB::transaction(function () use ($faena, $kilosReales): PermisoFaena {
+            // El cupo se alcanza por el carnet: la faena ya no lo guarda.
+            $faena->loadMissing('carnet');
+
             $cupo = AprovechamientoPesq::query()
-                ->whereKey($faena->aprovechamiento_id)
+                ->whereKey($faena->carnet?->aprovechamiento_id)
                 ->lockForUpdate()
                 ->firstOrFail();
 

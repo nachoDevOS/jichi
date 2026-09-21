@@ -16,7 +16,6 @@ use Illuminate\Support\Carbon;
  * La autorización de UNA salida de pesca.
  */
 #[Fillable([
-    'aprovechamiento_id',
     'carnet_id',
     'numero_faena',
     'kilos_extraidos',
@@ -54,14 +53,22 @@ class PermisoFaena extends Model
 
     //  Relaciones
 
-    public function aprovechamiento(): BelongsTo
-    {
-        return $this->belongsTo(AprovechamientoPesq::class, 'aprovechamiento_id');
-    }
-
     public function carnet(): BelongsTo
     {
         return $this->belongsTo(Carnet::class, 'carnet_id');
+    }
+
+    /**
+     * El cupo del que descuenta, alcanzado A TRAVÉS del carnet.
+     *
+     * No es una relación: la faena no guarda `aprovechamiento_id`. Con las dos
+     * claves, un permiso podía apuntar a un cupo distinto del que respalda su
+     * carnet. Para no disparar dos consultas por fila, quien lo use en un
+     * listado carga `carnet.aprovechamiento` en el `with()`.
+     */
+    public function cupo(): ?AprovechamientoPesq
+    {
+        return $this->carnet?->aprovechamiento;
     }
 
     //  Lectura
@@ -131,8 +138,12 @@ class PermisoFaena extends Model
         return $query->whereNot($this->qualifyColumn('estado'), EstadoFaena::Vencido);
     }
 
+    /** Las de un cupo: se llega por el carnet, que es quien lo conoce. */
     public function scopeDelCupo(Builder $query, int $aprovechamientoId): Builder
     {
-        return $query->where($this->qualifyColumn('aprovechamiento_id'), $aprovechamientoId);
+        return $query->whereHas(
+            'carnet',
+            fn (Builder $c) => $c->where('carnets.aprovechamiento_id', $aprovechamientoId),
+        );
     }
 }
