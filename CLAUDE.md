@@ -775,7 +775,7 @@ Los cuatro tienen que pasar.
 - **Llamar a un servicio DENTRO de un `foreach` parte en pedazos lo que ese
   servicio construye como una unidad, y no falla nada.** `AprovechamientoController::pagar()`
   cobraba llamando a `CobrarService` una vez por depósito, así que dos boletas
-  del mismo cupo salían como **REC-2026-0001 y REC-2026-0002**: dos papeles donde
+  del mismo cupo salían como **000001 y 000002**: dos papeles donde
   va uno, dos números gastados de una serie que Contabilidad audita y dos cobros
   en el arqueo del día donde hubo uno. Lo caro fue lo otro: el control de «no
   cobrar de más» también corría por llamada —cada una leía el saldo antes de que
@@ -919,11 +919,13 @@ Los cuatro tienen que pasar.
   y ahí se pierden apellidos.
 - **Un correlativo por AÑO no sirve para un talonario de papel.**
   `CorrelativoService` lleva `(serie, anio)` y reinicia cada enero, que es lo
-  correcto para un recibo —REC-2026-0001— y lo incorrecto para una hoja
-  preimpresa: el talonario del SEDAG va en `002190` y no volvió a 1. Se resuelve
-  guardando la serie bajo el **año 0**, que ninguna gestión real ocupa; ver
-  `CorrelativoService::siguienteContinuo()`. Antes de elegir la serie,
-  preguntarse si el número lo reinicia alguien de verdad.
+  incorrecto para una hoja preimpresa: el talonario del SEDAG va en `002190` y
+  no volvió a 1. Se resuelve guardando la serie bajo el **año 0**, que ninguna
+  gestión real ocupa; ver `CorrelativoService::siguienteContinuo()`. Hoy los dos
+  documentos que se imprimen —recibo y permiso de faena— son continuos y de seis
+  dígitos; lo único que sigue contando por gestión es el número de registro del
+  carnet, que no va en ningún papel. Antes de elegir la serie, preguntarse si
+  ese número lo reinicia alguien de verdad.
 - **En CSS el `padding` SUMA al `width`**, y en una maqueta de coordenadas fijas
   eso descoloca sin avisar. **Volvió a morder al partir un renglón en dos:** la
   tira del rubro se declaró de 71 pt pensando que cerraba en 118,5, y con sus

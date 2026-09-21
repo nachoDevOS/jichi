@@ -56,7 +56,7 @@ class CajaController extends Controller
             // beneficiario, con el scope del padrón.
             ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
                 'recibo',
-                fn ($r) => $r->where('numero_recibo', 'like', '%'.mb_strtoupper($termino).'%')
+                fn ($r) => $r->where('numero_recibo', 'like', '%'.$termino.'%')
                     ->orWhereHas('beneficiario', fn ($b) => $b->buscar($termino)),
             ))
             /*

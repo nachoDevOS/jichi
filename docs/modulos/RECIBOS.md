@@ -83,17 +83,30 @@ entregado que el sistema no puede explicar.
 
 ## 2. El número
 
-Sale de `CorrelativoService`, serie `RECIBO`, **reiniciada cada año** igual que
-el talonario de papel: en enero vuelve a empezar por el 1.
+Sale de `CorrelativoService` y es **continuo**: `000001`, seis dígitos, sin
+prefijo ni gestión, y **no reinicia en enero**.
 
 ```php
-$this->correlativos->siguienteNumero(ReciboTramiteService::SERIE, $gestion);
+CorrelativoService::rellenar($this->correlativos->siguienteContinuo(CobrarService::SERIE));
 ```
 
+**Era `REC-2026-0016` y reiniciaba cada año —cambiado el 21/09/2026—.** Dos
+problemas: el papel del talonario no dice el año por ningún lado, así que el
+recibo 0016 de 2026 y el de 2027 quedaban indistinguibles en el archivo; y el
+prefijo no lo lee nadie, porque `ReciboImpreso::numeroImpreso()` lo recortaba
+con una regex antes de imprimirlo. Lo guardado ahora ES lo que va impreso.
+
+`CobrarService::SERIE` sigue valiendo `'REC'`: es la CLAVE del contador en la
+tabla `correlativos`, no lo que sale en el papel.
+
 El contador se bloquea con `SELECT ... FOR UPDATE`, así dos ventanillas cobrando
-en el mismo segundo nunca reciben el mismo número. Como el bloqueo vive dentro de
-la transacción de `tomarParaRevision()`, la fila del contador queda tomada hasta
-el commit — es breve y es lo que se quiere.
+en el mismo segundo nunca reciben el mismo número. Como el bloqueo vive dentro
+de la transacción del cobro, la fila del contador queda tomada hasta el commit
+— es breve y es lo que se quiere.
+
+**Continuo se implementa con el año 0.** La tabla `correlativos` lleva
+`(serie, anio)`; pasarle el año de verdad es lo que lo hacía reiniciar. El 0 no
+lo ocupa ninguna gestión real. Ver `CorrelativoService::SIN_GESTION`.
 
 > `CorrelativoService` existía desde el principio y estaba **sin usar**:
 > `PENDIENTES.md` lo había conservado con el argumento de que «el día que haga

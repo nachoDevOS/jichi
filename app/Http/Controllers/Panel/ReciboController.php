@@ -56,9 +56,10 @@ class ReciboController extends Controller
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $termino).'%';
 
                 // El nombre y la cédula ya no están copiados acá: se buscan
-                // sobre el beneficiario, con su propio scope.
+                // sobre el beneficiario, con su propio scope. El número es solo
+                // dígitos desde que dejó el prefijo: no hay nada que mayusculizar.
                 $q->where(fn ($s) => $s
-                    ->where('recibos.numero_recibo', $operador, mb_strtoupper($like))
+                    ->where('recibos.numero_recibo', $operador, $like)
                     ->orWhereHas('beneficiario', fn ($b) => $b->buscar($termino)));
             })
             ->when($filtros['desde'], fn ($q, $d) => $q->whereDate('created_at', '>=', $d))

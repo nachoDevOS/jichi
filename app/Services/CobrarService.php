@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\DB;
 class CobrarService
 {
     /**
-     * La serie del correlativo de caja.
+     * La serie del correlativo de caja. Es la CLAVE del contador, no lo que
+     * se imprime: el número sale «000001», sin prefijo ni gestión.
      */
     public const SERIE = 'REC';
 
@@ -36,6 +37,21 @@ class CobrarService
     ];
 
     public function __construct(private readonly CorrelativoService $correlativos) {}
+
+    /**
+     * El número del próximo recibo: «000001».
+     *
+     * CONTINUO y sin prefijo ni gestión —a pedido, 21/09/2026—. Era
+     * `REC-2026-0001`, que reiniciaba cada enero: dos recibos del mismo número
+     * en años distintos, y el papel del talonario no dice el año por ningún
+     * lado. Mismo tratamiento que `permisos_faena.numero_faena`.
+     */
+    private function siguienteNumero(): string
+    {
+        return CorrelativoService::rellenar(
+            $this->correlativos->siguienteContinuo(self::SERIE),
+        );
+    }
 
     /**
      * Emite un recibo y sus abonos.
@@ -73,7 +89,7 @@ class CobrarService
              */
             $recibo = Recibo::create([
                 'beneficiario_id' => $beneficiarioId,
-                'numero_recibo' => $this->correlativos->siguiente(self::SERIE),
+                'numero_recibo' => $this->siguienteNumero(),
                 'concepto' => $concepto ?: $this->conceptoAutomatico($resueltas),
             ]);
 
@@ -213,7 +229,7 @@ class CobrarService
             $recibo = Recibo::create([
                 // Sale a nombre del titular del trámite, no de quien lo tipeó.
                 'beneficiario_id' => $tramite->beneficiario_id,
-                'numero_recibo' => $this->correlativos->siguiente(self::SERIE),
+                'numero_recibo' => $this->siguienteNumero(),
                 'concepto' => $concepto ?: $this->nombrar($tramite),
             ]);
 

@@ -570,7 +570,7 @@ quitaría al transportista casi un día.
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `beneficiario_id` | FK RESTRICT | A nombre de quién sale |
-| `numero_recibo` | string(40), único | `REC-2026-0016` |
+| `numero_recibo` | string(40), único | Correlativo **continuo**: `000016` |
 | `monto_total` | decimal(12,2) | Suma **congelada** |
 | `concepto` | text | Tal como se imprime |
 
@@ -578,6 +578,21 @@ quitaría al transportista casi un día.
 es un CORRELATIVO DE CAJA, y un correlativo es justamente el dato que no se puede
 derivar de otras tablas: no es el id de ningún trámite ni una cuenta de filas.
 Contabilidad audita esa serie.
+
+**EL NÚMERO ES CONTINUO Y SIN PREFIJO —cambiado el 21/09/2026—.** Se guarda
+`000016`: seis dígitos, nada más. Era `REC-2026-0016` y reiniciaba en enero, lo
+que daba dos recibos con el mismo número en gestiones distintas; el papel del
+talonario no dice el año por ningún lado, así que en el archivo eran
+indistinguibles. Mismo tratamiento que `permisos_faena.numero_faena`.
+
+Lo reserva `CorrelativoService::siguienteContinuo()` bajo la serie
+`CobrarService::SERIE` —que es la CLAVE del contador, no lo que se imprime— y lo
+rellena `CorrelativoService::rellenar()`. Continuo se implementa guardando la
+serie bajo el **año 0**, que ninguna gestión real ocupa.
+
+**String y no entero**: los ceros a la izquierda son parte del número impreso.
+Con ancho fijo el orden alfabético ES el numérico, así que
+`Recibo::scopeOrdenDeSerie()` sigue ordenando bien.
 
 El **monto** y el **concepto** sí son inmutables: se congelan al emitir, así que
 corregir un abono después no cambia el papel entregado.
@@ -652,12 +667,12 @@ anula un recibo entero, su detalle se va con él.
 > PENDIENTE   ──< pago 330,00 (boleta 1242134)   recibo_id NULL
 >             ──< pago  82,50 (boleta 42341234)  recibo_id NULL
 >      │
-> [enviar a revisión]  ──▶  REC-2026-0001 (412,50) ──< los dos pagos
+> [enviar a revisión]  ──▶  recibo 000001 (412,50) ──< los dos pagos
 > ```
 >
 > Exigiéndolo desde el INSERT —como estaba— cada depósito tenía que traer su
 > propio recibo para poder escribirse, y eso es exactamente lo que estaba mal:
-> **dos boletas de un mismo cupo salían como REC-2026-0001 y REC-2026-0002**, se
+> **dos boletas de un mismo cupo salían como 000001 y 000002**, se
 > gastaban dos números de una serie que Contabilidad audita y el arqueo del día
 > mostraba dos cobros donde hubo uno.
 >

@@ -6,27 +6,23 @@ use App\Models\Correlativo;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Entrega números correlativos por serie y gestión: DOC-PESCA-2026-0001.
+ * Entrega números correlativos, bloqueando la fila del contador.
+ *
+ * Dos usos, y son distintos: `siguienteContinuo()` para lo que se IMPRIME en un
+ * papel —recibos y permisos de faena, que no reinician nunca— y
+ * `siguienteNumero()` con gestión para lo que sí se cuenta por año, como el
+ * número de registro del carnet.
  */
 class CorrelativoService
 {
-    public const RELLENO = 4;
-
     /** El «año» de las series que no reinician. Ver siguienteContinuo(). */
     public const SIN_GESTION = 0;
 
-    /**
-     * Reserva el siguiente número de la serie y devuelve el código formateado.
-     */
-    public function siguiente(string $serie, ?int $anio = null): string
-    {
-        $anio ??= (int) now()->format('Y');
-
-        return $this->formatear($serie, $anio, $this->siguienteNumero($serie, $anio));
-    }
+    /** Los ceros de una serie continua: «000001». */
+    public const RELLENO_CONTINUO = 6;
 
     /**
-     * Reserva el siguiente número y lo devuelve CRUDO, sin formatear.
+     * Reserva el siguiente número de la serie y lo devuelve CRUDO.
      */
     public function siguienteNumero(string $serie, ?int $anio = null): int
     {
@@ -74,24 +70,9 @@ class CorrelativoService
         return $this->siguienteNumero($serie, self::SIN_GESTION);
     }
 
-    /**
-     * Número que se entregaría a continuación, sin consumirlo. Solo para vistas
-     * previas: no reserva nada y puede quedar obsoleto de inmediato.
-     */
-    public function proximoPreview(string $serie, ?int $anio = null): string
+    /** Un número de serie continua con sus ceros: 42 → «000042». */
+    public static function rellenar(int|string $numero): string
     {
-        $anio ??= (int) now()->format('Y');
-
-        $ultimo = (int) Correlativo::query()
-            ->where('serie', $serie)
-            ->where('anio', $anio)
-            ->value('ultimo_numero');
-
-        return $this->formatear($serie, $anio, $ultimo + 1);
-    }
-
-    public function formatear(string $serie, int $anio, int $numero): string
-    {
-        return sprintf('%s-%d-%s', $serie, $anio, str_pad((string) $numero, self::RELLENO, '0', STR_PAD_LEFT));
+        return str_pad((string) $numero, self::RELLENO_CONTINUO, '0', STR_PAD_LEFT);
     }
 }

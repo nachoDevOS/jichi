@@ -22,9 +22,10 @@ return new class extends Migration
             $table->foreignId('beneficiario_id')->constrained('beneficiarios')->restrictOnDelete();
 
             /*
-             * String y no entero: la serie lleva prefijo y año —REC-2026-0016— y
-             * el año que viene el contador vuelve a 1. Se reserva con
-             * CorrelativoService, que bloquea la fila del contador.
+             * CORRELATIVO CONTINUO: «000001», sin prefijo ni gestión, y no
+             * reinicia en enero. String y no entero porque los ceros son parte
+             * del número impreso. Lo reserva CorrelativoService, que bloquea la
+             * fila del contador.
              */
             $table->string('numero_recibo', 40)->unique();
 

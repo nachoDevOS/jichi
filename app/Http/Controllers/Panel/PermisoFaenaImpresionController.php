@@ -45,7 +45,10 @@ class PermisoFaenaImpresionController extends Controller
             // el disco con las restricciones de `chroot` y en producción
             // termina en un recuadro vacío.
             'escudo' => $this->imagenEmbebida('image/recibo-escudo.png'),
-            'logo' => $this->imagenEmbebida('image/autorizacion-logo.png'),
+            // Los peces del talonario en vez del logo del SEDAG: ese ya está
+            // en el sello de agua, y repetirlo dejaba el escudo compitiendo
+            // con dos versiones del mismo emblema. Silueta plana, dos tintas.
+            'peces' => $this->imagenEmbebida('image/faena-peces.png'),
             // Sello propio y no el del recibo: acá se dibuja al doble de
             // tamaño, y el de 200 px salía pixelado y demasiado cargado
             // encima de los renglones. Ver el comentario de `.sello`.

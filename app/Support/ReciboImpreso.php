@@ -90,13 +90,15 @@ readonly class ReciboImpreso
     }
 
     /**
-     * El número que va en el recuadro N° del papel: 0016.
+     * El número que va en el recuadro N° del papel: «000016».
+     *
+     * Es la columna tal cual. Recortaba con una regex el sufijo de
+     * `REC-2026-0016`; desde que el número es continuo y sin prefijo, lo
+     * guardado ES lo que va impreso.
      */
     public function numeroImpreso(): string
     {
-        preg_match('/(\d+)\D*$/', (string) $this->recibo->numero_recibo, $m);
-
-        return $m[1] ?? (string) $this->recibo->numero_recibo;
+        return (string) $this->recibo->numero_recibo;
     }
 
     /**

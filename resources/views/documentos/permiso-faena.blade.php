@@ -32,9 +32,12 @@
            horneada en `faena-sello.png`, que es `sedag.png` mezclado contra
            blanco al 11% y guardado en paleta. Para aclararlo u oscurecerlo se
            REGENERA el PNG con otro factor, no con CSS. */
+        /* CENTRADO SOBRE EL MARCO, no sobre la página: el marco arranca en
+           109 pt y cierra en 714,5, así que su centro está en 412 y no en los
+           396 de la hoja. Medido sobre el PDF renderizado. */
         .sello {
             position: absolute;
-            top: 400pt;
+            top: 292pt;
             left: 186pt;
             width: 240pt;
             height: 240pt;
@@ -143,7 +146,7 @@
 
 <div class="hoja">
 
-    {{-- Encabezado: escudo a la izquierda, entidad centrada, logo a la derecha.
+    {{-- Encabezado: escudo a la izquierda, entidad centrada, peces a la derecha.
          Va FUERA del marco, igual que en el talonario. --}}
     <table width="100%" cellspacing="0" cellpadding="0">
         <tr>
@@ -160,9 +163,11 @@
                 <div class="l4">SEDAG - BENI</div>
             </td>
 
+            {{-- El emblema de peces del talonario —un surubí y un pacú—, no el
+                 logo del SEDAG: ese ya está en el sello de agua del fondo. --}}
             <td width="80" align="right" valign="top">
-                @if ($logo)
-                    <img src="{{ $logo }}" style="width: 56pt;" alt="">
+                @if ($peces)
+                    <img src="{{ $peces }}" style="width: 62pt;" alt="">
                 @endif
             </td>
         </tr>
@@ -170,33 +175,39 @@
 
     <div class="marco">
 
-        {{-- Título centrado con el N° del talonario a la derecha --}}
+        {{--
+            EL TÍTULO Y EL CUADRO DEL RECIBO VAN EN LA MISMA TABLA, en dos
+            renglones: así el cuadro cae CENTRADO DEBAJO de «PERMISO POR FAENA»
+            —como en el papel— sin depender de un margen calculado a mano, que
+            deja de servir apenas cambia el cuerpo del título.
+        --}}
         <table width="100%" cellspacing="0" cellpadding="0">
             <tr>
-                <td width="80"></td>
+                {{-- LAS DOS COLUMNAS LATERALES MIDEN LO MISMO, y tienen que
+                     medirlo: con 80 a la izquierda y 118 a la derecha el centro
+                     de la columna del medio cae 19 pt corrido, y el título se
+                     ve descentrado dentro del marco. --}}
+                <td width="118"></td>
                 <td class="titulo" align="center" valign="middle">PERMISO POR FAENA</td>
-                <td width="110" align="right" valign="middle">
+                <td width="118" align="right" valign="middle">
                     <div class="rotulo-numero">N<sup>o</sup> {{ $numero }}</div>
                 </td>
             </tr>
-        </table>
 
-        {{-- «N° RECIBO [____]» a la izquierda y «Bs. ( 15,00 )» a la derecha --}}
-        <table width="100%" cellspacing="0" cellpadding="0" style="padding-top: 6pt;">
             <tr>
-                <td width="90"></td>
+                <td></td>
 
-                <td valign="middle">
-                    <table cellspacing="0" cellpadding="0">
+                <td align="center" valign="middle" style="padding-top: 6pt;">
+                    <table cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                         <tr>
                             <td width="40" class="caja-recibo" valign="middle">N<sup>o</sup><br>RECIBO</td>
-                            <td width="150" class="caja-recibo-valor" valign="middle">{{ $recibo }}</td>
+                            <td width="130" class="caja-recibo-valor" valign="middle">{{ $recibo }}</td>
                         </tr>
                     </table>
                 </td>
 
-                <td width="140" valign="middle">
-                    <table cellspacing="0" cellpadding="0">
+                <td valign="middle" style="padding-top: 6pt;">
+                    <table cellspacing="0" cellpadding="0" align="right">
                         <tr>
                             <td width="22" valign="middle" style="font-size: 10pt; font-weight: bold;">Bs.</td>
                             <td width="86" valign="middle"><div class="caja-bs">{{ $monto }}</div></td>

@@ -51,7 +51,7 @@ decisiones que acá solo se nombran.
 | `GuiaService.php` | 244 | Emitir y anular guías, y reemplazar su carga | Cabecera y detalle se escriben en la MISMA transacción. `reemplazarDetalle()` borra todo y reinserta a propósito: la grilla manda la lista completa, no un diff |
 | `ArchivoTramiteService.php` | 107 | Subir/descartar adjuntos alrededor de una transacción | `descartar()` **no propaga errores**: se llama desde un `catch` y taparía la excepción original |
 | `ReciboTramiteService.php` | 200 | **Arma** el RECIBO OFICIAL, no lo guarda | `armar()` lo reconstruye desde el trámite. No hay tabla `recibos` |
-| `CorrelativoService.php` | 120 | Números correlativos por serie y año | `SELECT ... FOR UPDATE`. **Sin usar otra vez**: llegó con los recibos y quedó libre al retirarse esa tabla |
+| `CorrelativoService.php` | 78 | Dos usos distintos: `siguienteContinuo()` para lo que se IMPRIME —recibos y permisos de faena, seis dígitos y sin reinicio, guardados bajo el **año 0**— y `siguienteNumero()` con gestión para lo que sí cuenta por año, como el registro del carnet |
 
 ### Desglose de `SolicitudCarnetService`
 

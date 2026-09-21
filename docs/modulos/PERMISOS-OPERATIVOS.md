@@ -195,6 +195,12 @@ de lectura que escribe se dispara solo con que el navegador precargue el enlace.
   sale recién con la faena APROBADA. Su sello de agua es
   `public/image/faena-sello.png` —`sedag.png` mezclado contra blanco al 11% y
   guardado en paleta—: para aclararlo se REGENERA el PNG, nunca con `opacity`.
+- **Arriba a la derecha van los PECES, no el logo del SEDAG**
+  (`public/image/faena-peces.png`): un surubí y un pacú en silueta verde plana,
+  como el talonario. El logo se sacó porque ya está en el sello de agua del
+  fondo, y repetirlo dejaba el escudo compitiendo con dos versiones del mismo
+  emblema. Plano y sin contorno a propósito: DomPDF no dibuja degradados y un
+  trazo fino desaparece al imprimir con poco tóner.
 
 - **`emite_faenas` / `emite_guias` son DOS columnas y no un `tipo_permiso`**,
   porque no son excluyentes: una actividad piscícola necesitaría faena para la

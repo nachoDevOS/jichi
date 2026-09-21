@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoFaena;
+use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Pagable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -49,9 +50,6 @@ class PermisoFaena extends Model
 
     /** La serie del correlativo global del talonario. Ver CorrelativoService. */
     public const SERIE = 'PERMISO-FAENA';
-
-    /** Los seis dígitos con que viene impreso el talonario: 002190. */
-    public const RELLENO_NUMERO = 6;
 
     /** Ver Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [
@@ -118,7 +116,7 @@ class PermisoFaena extends Model
     protected function numeroLegible(): Attribute
     {
         return Attribute::get(
-            fn (): string => str_pad((string) $this->numero_faena, self::RELLENO_NUMERO, '0', STR_PAD_LEFT),
+            fn (): string => CorrelativoService::rellenar($this->numero_faena),
         );
     }
 
