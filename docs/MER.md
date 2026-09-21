@@ -175,6 +175,11 @@ unidad edita, y así se emitía un «Carnet Comercializador» marcado como pesca
 el plástico decía una cosa y la base otra. El formulario de emisión además
 FILTRA la lista con ella, así que los tipos de la otra actividad ni se ofrecen.
 
+**El catálogo NO se da de alta desde el panel —20/09/2026—.** Los tipos salen de
+la resolución, así que la pantalla corrige nombre, actividad, arancel y vigencia,
+pero no agrega filas: se retiraron el botón, el `store()` del controlador y la
+ruta POST. Las filas iniciales las siembra `CatalogoSeeder`.
+
 ---
 
 ### `departamentos` — los nueve de Bolivia

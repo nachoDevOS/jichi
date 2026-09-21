@@ -112,52 +112,71 @@ export default function IndiceCaja({
                     el que termina con barra de desplazamiento es el documento. */}
                 <Card className="min-w-0">
                     <CardContent className="space-y-4 p-0">
-                        <form
-                            onSubmit={(e: FormEvent) => {
-                                e.preventDefault();
-                                filtrar({});
-                            }}
-                            className="flex flex-wrap gap-2 p-5 pb-0"
-                        >
-                            <Input
-                                value={buscar}
-                                onChange={(e) => setBuscar(e.target.value)}
-                                placeholder="Buscar por recibo o nombre del comprobante…"
-                                className="min-w-48 flex-1"
-                            />
+                        {/*
+                            LA BARRA DE ARRIBA DE LA TABLA, la misma del padrón de
+                            beneficiarios: «Mostrar N» a la izquierda y los filtros
+                            pegados al buscador a la derecha, sobre doce columnas.
+                        */}
+                        <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-12 sm:items-end">
+                            <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-3">
+                                Mostrar
+                                <Select
+                                    className="w-auto"
+                                    value={filtros.por_pagina}
+                                    onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
+                                    aria-label="Registros por página"
+                                >
+                                    {opcionesPorPagina.map((n) => (
+                                        <option key={n} value={n}>
+                                            {n}
+                                        </option>
+                                    ))}
+                                </Select>
+                                registros
+                            </label>
 
-                            <Input
-                                type="date"
-                                value={filtros.desde ?? ''}
-                                onChange={(e) => filtrar({ desde: e.target.value || null })}
-                                className="w-auto"
-                                aria-label="Desde"
-                            />
+                            {/* Todos filtran lo mismo —qué filas se ven— así que van
+                                juntos: separados se leen como controles sueltos. */}
+                            <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-9">
+                                <Input
+                                    type="date"
+                                    className="w-auto"
+                                    value={filtros.desde ?? ''}
+                                    onChange={(e) => filtrar({ desde: e.target.value || null })}
+                                    aria-label="Desde"
+                                />
 
-                            <Input
-                                type="date"
-                                value={filtros.hasta ?? ''}
-                                onChange={(e) => filtrar({ hasta: e.target.value || null })}
-                                className="w-auto"
-                                aria-label="Hasta"
-                            />
+                                <Input
+                                    type="date"
+                                    className="w-auto"
+                                    value={filtros.hasta ?? ''}
+                                    onChange={(e) => filtrar({ hasta: e.target.value || null })}
+                                    aria-label="Hasta"
+                                />
 
-                            <Select
-                                value={filtros.por_pagina}
-                                onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
-                                className="w-auto"
-                            >
-                                {opcionesPorPagina.map((n) => (
-                                    <option key={n} value={n}>
-                                        {n} filas
-                                    </option>
-                                ))}
-                            </Select>
-
-                            <Button type="submit" variant="outline">
-                                <Search className="size-4" />
-                            </Button>
-                        </form>
+                                {/*
+                                    El buscador es un <form> propio para que el Enter lo
+                                    envíe. No busca mientras se teclea: cada tecla sería
+                                    una consulta que recorre la tabla entera.
+                                */}
+                                <form
+                                    className="relative min-w-48 flex-1 sm:max-w-sm"
+                                    onSubmit={(e: FormEvent) => {
+                                        e.preventDefault();
+                                        filtrar({});
+                                    }}
+                                >
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        className="pl-9"
+                                        placeholder="Buscar…"
+                                        value={buscar}
+                                        onChange={(e) => setBuscar(e.target.value)}
+                                        aria-label="Buscar por recibo o nombre del comprobante"
+                                    />
+                                </form>
+                            </div>
+                        </div>
 
                         {pagos.data.length === 0 ? (
                             <EstadoVacio

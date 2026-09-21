@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Reglas para crear y editar un tipo de carnet.
+ * Reglas para corregir un tipo de carnet. No hay alta: ver routes/panel.php.
  */
 class GuardarTipoCarnetRequest extends FormRequest
 {
@@ -67,8 +67,8 @@ class GuardarTipoCarnetRequest extends FormRequest
     {
         $this->merge([
             'nombre' => trim((string) $this->input('nombre')),
-            // Un tipo nuevo nace vigente; el checkbox llega ausente cuando está
-            // destildado, y sin este boolean() la regla lo vería como null.
+            // El checkbox llega ausente cuando está destildado, y sin este
+            // boolean() la regla lo vería como null.
             'estado' => $this->boolean('estado', true),
         ]);
     }

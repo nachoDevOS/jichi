@@ -1,5 +1,5 @@
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { Pencil, Plus, Tags, X } from 'lucide-react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Pencil, Search, Tags, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,12 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
+import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs } from '@/lib/utils';
-import type { OpcionEnum, PageProps, TipoActor } from '@/types';
+import type { OpcionEnum, PageProps, Paginado, TipoActor } from '@/types';
 import type { TipoCarnetFila } from '@/types/catalogos';
 
 /**
@@ -19,27 +20,37 @@ import type { TipoCarnetFila } from '@/types/catalogos';
  */
 export default function CatalogoTiposCarnet({
     tipos,
+    filtros,
     actores,
+    opcionesPorPagina,
 }: {
-    tipos: TipoCarnetFila[];
+    tipos: Paginado<TipoCarnetFila>;
+    filtros: { buscar: string | null; actor: string | null; por_pagina: number };
     actores: OpcionEnum[];
+    opcionesPorPagina: number[];
 }) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
-    const [editando, setEditando] = useState<TipoCarnetFila | 'nuevo' | null>(null);
+    const [buscar, setBuscar] = useState(filtros.buscar ?? '');
+
+    /*
+     * Solo EDICIÓN: los tipos de carnet salen de la resolución, así que el
+     * catálogo se corrige pero no se le agregan filas desde la pantalla.
+     */
+    const [editando, setEditando] = useState<TipoCarnetFila | null>(null);
+
+    function filtrar(valores: Record<string, string | number | null> = {}) {
+        router.get(
+            route('tipos-carnet.index'),
+            { buscar, actor: filtros.actor, ...valores },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
+    }
 
     return (
         <LayoutPanel
             titulo="Tipos de carnet"
-            descripcion="El nombre de cada credencial y su arancel."
-            acciones={
-                puede('catalogos.gestionar') && (
-                    <Button onClick={() => setEditando('nuevo')}>
-                        <Plus className="size-4" />
-                        Nuevo tipo
-                    </Button>
-                )
-            }
+            descripcion="El nombre de cada credencial y su arancel. Se corrigen; no se agregan."
         >
             <Head title="Tipos de carnet" />
 
@@ -47,8 +58,8 @@ export default function CatalogoTiposCarnet({
                 {editando !== null && puede('catalogos.gestionar') && (
                     <FormularioTipo
                         // Ver el comentario de la `key` en asociaciones.tsx.
-                        key={editando === 'nuevo' ? 'nuevo' : editando.id}
-                        tipo={editando === 'nuevo' ? null : editando}
+                        key={editando.id}
+                        tipo={editando}
                         actores={actores}
                         onCerrar={() => setEditando(null)}
                     />
@@ -59,77 +70,144 @@ export default function CatalogoTiposCarnet({
                         <CardTitle>Registrados</CardTitle>
                     </CardHeader>
 
-                    <CardContent className="p-0">
-                        {tipos.length === 0 ? (
+                    <CardContent className="space-y-4 p-0">
+                        {/*
+                            LA BARRA DE ARRIBA DE LA TABLA, la misma del padrón
+                            de beneficiarios: «Mostrar N» a la izquierda y los
+                            filtros pegados al buscador a la derecha.
+                        */}
+                        <div className="grid grid-cols-1 gap-3 border-y border-border p-4 sm:grid-cols-12 sm:items-end">
+                            <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-4">
+                                Mostrar
+                                <Select
+                                    className="w-auto"
+                                    value={filtros.por_pagina}
+                                    onChange={(e) => filtrar({ por_pagina: Number(e.target.value) })}
+                                    aria-label="Registros por página"
+                                >
+                                    {opcionesPorPagina.map((n) => (
+                                        <option key={n} value={n}>
+                                            {n}
+                                        </option>
+                                    ))}
+                                </Select>
+                                registros
+                            </label>
+
+                            <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-8">
+                                <Select
+                                    className="w-auto min-w-36"
+                                    value={filtros.actor ?? ''}
+                                    onChange={(e) => filtrar({ actor: e.target.value || null })}
+                                    aria-label="Filtrar por actividad"
+                                >
+                                    <option value="">Toda actividad</option>
+                                    {actores.map((o) => (
+                                        <option key={o.value} value={o.value}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </Select>
+
+                                {/* El buscador es un <form> propio para que el
+                                    Enter lo envíe: no busca al teclear. */}
+                                <form
+                                    className="relative min-w-48 flex-1 sm:max-w-sm"
+                                    onSubmit={(e: FormEvent) => {
+                                        e.preventDefault();
+                                        filtrar();
+                                    }}
+                                >
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        className="pl-9"
+                                        placeholder="Buscar…"
+                                        value={buscar}
+                                        onChange={(e) => setBuscar(e.target.value)}
+                                        aria-label="Buscar por nombre del tipo"
+                                    />
+                                </form>
+                            </div>
+                        </div>
+
+                        {tipos.data.length === 0 ? (
                             <EstadoVacio
                                 icono={Tags}
                                 titulo="Sin tipos de carnet"
-                                descripcion="Cargue al menos uno: sin tipo no se puede emitir una credencial."
+                                descripcion={
+                                    filtros.buscar || filtros.actor
+                                        ? 'Ninguno coincide con los filtros.'
+                                        : 'El catálogo está vacío: sin tipo no se puede emitir una credencial.'
+                                }
                             />
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                        <tr>
-                                            <th className="px-5 py-2.5 font-medium">Tipo</th>
-                                            <th className="px-5 py-2.5 font-medium">Actividad</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Emitidos</th>
-                                            <th className="px-5 py-2.5" />
-                                        </tr>
-                                    </thead>
-
-                                    <tbody className="divide-y divide-border">
-                                        {tipos.map((t) => (
-                                            <tr key={t.id} className="hover:bg-secondary/50">
-                                                <td className="px-5 py-2.5">
-                                                    <span className="font-medium">{t.nombre}</span>
-                                                    {!t.estado && (
-                                                        <Badge color="slate" className="ml-2">
-                                                            Fuera de uso
-                                                        </Badge>
-                                                    )}
-                                                </td>
-
-                                                {/* Es lo que decide en qué carnets se puede
-                                                    elegir: un tipo de comercializador no aparece
-                                                    emitiendo uno de pescador. */}
-                                                <td className="px-5 py-2.5">
-                                                    <Badge color={t.tipo_actor_color}>
-                                                        {t.tipo_actor_etiqueta}
-                                                    </Badge>
-                                                </td>
-
-                                                <td className="px-5 py-2.5 text-right tabular-nums">
-                                                    {bs(t.precio_bs, institucion.moneda)}
-                                                </td>
-
-                                                {/*
-                                                    Es lo que explica por qué no hay papelera: con
-                                                    carnets emitidos colgando, borrar la fila los
-                                                    dejaría sin tipo.
-                                                */}
-                                                <td className="px-5 py-2.5 text-right tabular-nums text-muted-foreground">
-                                                    {t.carnets_count || '—'}
-                                                </td>
-
-                                                <td className="px-5 py-2.5 text-right">
-                                                    {puede('catalogos.gestionar') && (
-                                                        <Button
-                                                            variant="editar"
-                                                            size="sm"
-                                                            title="Editar"
-                                                            onClick={() => setEditando(t)}
-                                                        >
-                                                            <Pencil className="size-4" />
-                                                        </Button>
-                                                    )}
-                                                </td>
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                            <tr>
+                                                <th className="px-5 py-2.5 font-medium">Tipo</th>
+                                                <th className="px-5 py-2.5 font-medium">Actividad</th>
+                                                <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
+                                                <th className="px-5 py-2.5 text-right font-medium">Emitidos</th>
+                                                <th className="px-5 py-2.5" />
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-border">
+                                            {tipos.data.map((t) => (
+                                                <tr key={t.id} className="hover:bg-secondary/50">
+                                                    <td className="px-5 py-2.5">
+                                                        <span className="font-medium">{t.nombre}</span>
+                                                        {!t.estado && (
+                                                            <Badge color="slate" className="ml-2">
+                                                                Fuera de uso
+                                                            </Badge>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Es lo que decide en qué carnets se puede
+                                                        elegir: un tipo de comercializador no aparece
+                                                        emitiendo uno de pescador. */}
+                                                    <td className="px-5 py-2.5">
+                                                        <Badge color={t.tipo_actor_color}>
+                                                            {t.tipo_actor_etiqueta}
+                                                        </Badge>
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-right tabular-nums">
+                                                        {bs(t.precio_bs, institucion.moneda)}
+                                                    </td>
+
+                                                    {/*
+                                                        Es lo que explica por qué no hay papelera: con
+                                                        carnets emitidos colgando, borrar la fila los
+                                                        dejaría sin tipo.
+                                                    */}
+                                                    <td className="px-5 py-2.5 text-right tabular-nums text-muted-foreground">
+                                                        {t.carnets_count || '—'}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-right">
+                                                        {puede('catalogos.gestionar') && (
+                                                            <Button
+                                                                variant="editar"
+                                                                size="sm"
+                                                                title="Editar"
+                                                                onClick={() => setEditando(t)}
+                                                            >
+                                                                <Pencil className="size-4" />
+                                                            </Button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <Paginacion paginado={tipos} />
+                            </>
                         )}
                     </CardContent>
                 </Card>
@@ -139,41 +217,36 @@ export default function CatalogoTiposCarnet({
     );
 }
 
-/** Alta y edición de un tipo. El mismo formulario para los dos casos. */
+/** CORRECCIÓN de un tipo. No hay alta: el catálogo sale de la resolución. */
 function FormularioTipo({
     tipo,
     actores,
     onCerrar,
 }: {
-    tipo: TipoCarnetFila | null;
+    tipo: TipoCarnetFila;
     actores: OpcionEnum[];
     onCerrar: () => void;
 }) {
-    const esAlta = tipo === null;
-
     const form = useForm({
-        nombre: tipo?.nombre ?? '',
-        tipo_actor: tipo?.tipo_actor ?? '',
-        precio_bs: tipo?.precio_bs ?? '',
-        estado: tipo?.estado ?? true,
+        nombre: tipo.nombre,
+        tipo_actor: tipo.tipo_actor,
+        precio_bs: String(tipo.precio_bs),
+        estado: tipo.estado,
     });
 
     function enviar(e: FormEvent) {
         e.preventDefault();
 
-        const opciones = { preserveScroll: true, onSuccess: () => onCerrar() };
-
-        if (esAlta) {
-            form.post(route('tipos-carnet.store'), opciones);
-        } else {
-            form.put(route('tipos-carnet.update', tipo.id), opciones);
-        }
+        form.put(route('tipos-carnet.update', tipo.id), {
+            preserveScroll: true,
+            onSuccess: () => onCerrar(),
+        });
     }
 
     return (
         <Card>
             <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                <CardTitle>{esAlta ? 'Nuevo tipo' : 'Editar tipo'}</CardTitle>
+                <CardTitle>Editar tipo</CardTitle>
 
                 <Button variant="ghost" size="sm" onClick={onCerrar} aria-label="Cerrar">
                     <X className="size-4" />
@@ -250,7 +323,7 @@ function FormularioTipo({
 
                     <div className="flex gap-2 pt-1">
                         <Button type="submit" disabled={form.processing}>
-                            {esAlta ? 'Registrar' : 'Guardar cambios'}
+                            Guardar cambios
                         </Button>
 
                         <Button type="button" variant="outline" onClick={onCerrar}>

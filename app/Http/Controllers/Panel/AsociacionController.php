@@ -6,6 +6,7 @@ use App\Enums\EstadoAsociacion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\GuardarAsociacionRequest;
 use App\Models\Asociacion;
+use App\Support\Paginacion;
 use App\Support\Sql;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,8 @@ class AsociacionController extends Controller
     public function index(Request $request): Response
     {
         $buscar = $request->string('buscar')->trim()->value() ?: null;
+        $estado = $request->string('estado')->trim()->value() ?: null;
+        $porPagina = Paginacion::filas($request);
 
         $asociaciones = Asociacion::query()
             ->when($buscar, function ($q) use ($buscar) {
@@ -54,10 +57,14 @@ class AsociacionController extends Controller
              * asociación no se puede borrar. Sin el número, «solo se puede
              * desactivar» suena a capricho del sistema.
              */
+            ->when($estado, fn ($q, $e) => $q->where('asociaciones.estado', $e))
             ->withCount(['carnets', 'guias'])
             ->ordenAlfabetico()
-            ->get()
-            ->map(fn (Asociacion $a): array => [
+            // Paginado como los demás listados: el catálogo crece, y la barra
+            // de arriba de la tabla es la misma en todo el panel.
+            ->paginate($porPagina)
+            ->withQueryString()
+            ->through(fn (Asociacion $a): array => [
                 'id' => $a->id,
                 'nombre' => $a->nombre,
                 'sigla' => $a->sigla,
@@ -69,12 +76,12 @@ class AsociacionController extends Controller
                 'estado_color' => $a->estado->color(),
                 'carnets_count' => $a->carnets_count,
                 'guias_count' => $a->guias_count,
-            ])
-            ->all();
+            ]);
 
         return Inertia::render('panel/catalogos/asociaciones', [
             'asociaciones' => $asociaciones,
-            'filtros' => ['buscar' => $buscar],
+            'filtros' => ['buscar' => $buscar, 'estado' => $estado, 'por_pagina' => $porPagina],
+            'opcionesPorPagina' => Paginacion::OPCIONES,
             // Las opciones salen del enum y no escritas en React: si estuvieran
             // en los dos lados, agregar un estado en la pantalla y olvidarse del
             // servidor dejaría al operador eligiendo un valor que se rechaza.

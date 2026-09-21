@@ -375,13 +375,14 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->middleware('permiso:catalogos.ver')
             ->name('tipos-carnet.index');
 
-        Route::middleware('permiso:catalogos.gestionar')->group(function () {
-            Route::post('/tipos-carnet', [TipoCarnetController::class, 'store'])
-                ->name('tipos-carnet.store');
-
-            Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
-                ->name('tipos-carnet.update');
-        });
+        /*
+         * NO HAY ALTA DE TIPOS: la lista sale de la resolución, así que el
+         * catálogo se corrige pero no se le agregan filas. Sacar el botón no
+         * alcanzaba —la ruta seguía aceptando un POST armado a mano—.
+         */
+        Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('tipos-carnet.update');
     });
 
     /*

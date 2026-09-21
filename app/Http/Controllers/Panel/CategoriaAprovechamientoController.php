@@ -6,7 +6,10 @@ use App\Enums\ModalidadAprovechamiento;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\GuardarCategoriaAprovechamientoRequest;
 use App\Models\CategoriaAprovechamiento;
+use App\Support\Paginacion;
+use App\Support\Sql;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,33 +22,55 @@ class CategoriaAprovechamientoController extends Controller
     /**
      * LISTADO Y FORMULARIO — GET /panel/catalogos/categorias-aprovechamiento
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $buscar = $request->string('buscar')->trim()->value() ?: null;
+        $modalidad = $request->string('modalidad')->trim()->value() ?: null;
+        $porPagina = Paginacion::filas($request);
+
+        /*
+         * LA ESCALA ENTERA, aparte del listado: los huecos y el número que
+         * sigue se calculan sobre TODOS los tramos. Sacados de la página que
+         * se está viendo, «Nuevo tramo» propondría un número ya usado y los
+         * huecos aparecerían y desaparecerían al cambiar de página.
+         */
+        $todos = CategoriaAprovechamiento::query()->enOrdenDeEscala()->get();
+
         $escala = CategoriaAprovechamiento::query()
+            ->when($buscar, function ($q) use ($buscar) {
+                // Se escapan % y _ porque en LIKE son comodines.
+                $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $buscar).'%';
+
+                $q->where('descripcion_kg', Sql::like($q->getConnection()), $like);
+            })
+            ->when($modalidad, fn ($q, $m) => $q->where('categorias_aprovechamiento.modalidad', $m))
             // Cuántos cupos se otorgaron bajo cada tramo: es lo que explica por
             // qué no se puede borrar, y de paso muestra cuál se usa de verdad.
             ->withCount('aprovechamientos')
             ->enOrdenDeEscala()
-            ->get();
+            ->paginate($porPagina)
+            ->withQueryString()
+            ->through(fn (CategoriaAprovechamiento $c): array => [
+                'id' => $c->id,
+                'nro_escala' => $c->nro_escala,
+                'modalidad' => $c->modalidad->value,
+                'modalidad_etiqueta' => $c->modalidad->etiqueta(),
+                'modalidad_color' => $c->modalidad->color(),
+                'descripcion_kg' => $c->descripcion_kg,
+                'kilos_min' => (float) $c->kilos_min,
+                'kilos_max' => (float) $c->kilos_max,
+                'valor_bs' => (float) $c->valor_bs,
+                'estado' => (bool) $c->estado,
+                'aprovechamientos_count' => $c->aprovechamientos_count,
+            ]);
 
         return Inertia::render('panel/catalogos/escala', [
-            'escala' => $escala
-                ->map(fn (CategoriaAprovechamiento $c): array => [
-                    'id' => $c->id,
-                    'nro_escala' => $c->nro_escala,
-                    'modalidad' => $c->modalidad->value,
-                    'modalidad_etiqueta' => $c->modalidad->etiqueta(),
-                    'modalidad_color' => $c->modalidad->color(),
-                    'descripcion_kg' => $c->descripcion_kg,
-                    'kilos_min' => (float) $c->kilos_min,
-                    'kilos_max' => (float) $c->kilos_max,
-                    'valor_bs' => (float) $c->valor_bs,
-                    'estado' => (bool) $c->estado,
-                    'aprovechamientos_count' => $c->aprovechamientos_count,
-                ])
-                ->all(),
+            'escala' => $escala,
+            'filtros' => ['buscar' => $buscar, 'modalidad' => $modalidad, 'por_pagina' => $porPagina],
+            'opcionesPorPagina' => Paginacion::OPCIONES,
 
-            'huecos' => $this->huecos($escala),
+            'huecos' => $this->huecos($todos),
+            'siguienteNumero' => ((int) $todos->max('nro_escala')) + 1,
 
             // Las opciones salen del enum y no escritas en React: si estuvieran
             // en los dos lados, agregar una modalidad en la pantalla y olvidarse
