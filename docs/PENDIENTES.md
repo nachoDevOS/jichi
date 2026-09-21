@@ -149,9 +149,10 @@ se hizo con el carnet: una plantilla Blade maquetada para DomPDF.
 Mirando el formulario de papel completo, faltan además **dos datos** que no
 tienen dónde guardarse:
 
-1. **El número preimpreso del talonario** («N° 000536»). Es el mismo patrón que
-   `permisos_faena.numero_faena`, donde ese número sí se pide y se guarda. Acá no
-   existe la columna.
+1. **El número preimpreso del talonario** («N° 000536»). En
+   `permisos_faena.numero_faena` ese número existe, pero desde el 21/09/2026 lo
+   GENERA el sistema con un correlativo continuo en vez de copiarlo del papel:
+   si acá se quiere el mismo trato, la columna sigue sin existir.
 2. **«Tiempo de Cancelación»** — el plazo que se le da al pescador para pagar la
    concesión.
 
@@ -177,11 +178,16 @@ eliminarla a mano.
 razonable es caducar también las que pasaron su `fecha_limite` sin firmarse,
 porque la salida que amparaban ya no puede ocurrir.
 
-### 🟠 La faena tiene arancel, y es un valor de PLANTILLA
+### 🟢 RESUELTO — el arancel de la faena sale del talonario
 
-`config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`— arranca en
-**30 Bs**, puesto por analogía con la guía (50 Bs). **La unidad tiene que
-confirmar el número de la resolución** antes de cobrar la primera.
+`config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`— arrancaba en
+**30 Bs**, puesto por analogía con la guía (50 Bs). El 21/09/2026 se bajó a
+**15 Bs**, que es lo que dice impreso la hoja del talonario.
+
+Y dejó de leerse al mostrar: `permisos_faena.monto` guarda la **copia
+congelada** del arancel al emitir, así que una suba por resolución no mueve el
+monto de un papel ya entregado. La config solo la lee el servicio al crear la
+fila.
 
 ### 🟠 El control de tope de cupo se puede APAGAR, y hoy está encendido
 

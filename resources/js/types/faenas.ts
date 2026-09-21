@@ -7,8 +7,11 @@ import type { EstadoFaena } from '@/types';
 /** Una faena, tal como la pintan el listado y la ficha. */
 export interface FaenaFila {
     id: number;
+    /** Correlativo GLOBAL y continuo del talonario. Lo genera el sistema. */
     numero_faena: number;
-    /** «Faena N° 0003», armado por el servidor. */
+    /** El mismo, con los seis ceros del papel: «002190». */
+    numero_legible: string;
+    /** «Faena N° 002190», armado por el servidor. */
     etiqueta: string;
 
     carnet_id: number;
@@ -24,6 +27,20 @@ export interface FaenaFila {
      * contra lo que dijo la balanza.
      */
     kilos_extraidos: number;
+
+    /**
+     * LOS RENGLONES DEL TALONARIO DE PAPEL. Null porque el formulario se llena
+     * a mano y llega incompleto: no hay padrón de embarcaciones ni de
+     * comandantes, así que son texto libre.
+     */
+    embarcacion: string | null;
+    propietario: string | null;
+    comandante_barco: string | null;
+    matricula_naval: string | null;
+    nro_kardex: string | null;
+    /** La región amparada: «desde» y «hasta» del papel. */
+    region_desde: string | null;
+    region_hasta: string | null;
 
     estado: EstadoFaena;
     estado_etiqueta: string;
@@ -55,6 +72,9 @@ export interface FaenaFila {
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     fecha_solicitud: string | null;
     fecha_salida: string | null;
+    /** La del papel: cuándo vuelve. La escribe el operador. */
+    fecha_desembarque: string | null;
+    /** El techo que calcula el sistema: salida + DIAS_VIGENCIA. */
     fecha_limite: string | null;
     /** La escribe la aprobación. Null mientras es una solicitud. */
     fecha_emision: string | null;
@@ -92,7 +112,16 @@ export interface FaenaFicha extends FaenaFila {
 /** Lo que el formulario de emisión manda de vuelta. */
 export interface FormularioFaena {
     carnet_id: number | null;
-    numero_faena: number | string;
     kilos_extraidos: number | string;
     fecha_salida: string;
+    fecha_desembarque: string;
+
+    /** Los renglones del talonario: opcionales, el papel llega incompleto. */
+    embarcacion: string;
+    propietario: string;
+    comandante_barco: string;
+    matricula_naval: string;
+    nro_kardex: string;
+    region_desde: string;
+    region_hasta: string;
 }

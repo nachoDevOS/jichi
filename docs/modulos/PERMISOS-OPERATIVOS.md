@@ -40,7 +40,7 @@ beneficiario ──< carnet (Pescador, 2026)        ──< faena  (una por sali
 | --- | --- |
 | El rubro del carnet emite ESE papel | `FaenaService` / `GuiaService` |
 | El carnet está VIGENTE | Ídem (`Carnet::estaVigente()`, que mira estado **y** fecha) |
-| El número del talonario no se repite | El índice único de la tabla; el servicio da el mensaje |
+| El número del talonario no se repite | El índice único de la tabla. En la faena ya no puede fallar: lo genera el correlativo |
 
 **Ninguna está en el controlador ni en React.** Los modelos contestan
 `Carnet::puedeEmitirFaenas()` —sí o no, para mostrar u ocultar el botón—; los
@@ -56,13 +56,26 @@ otro lado del mostrador hay alguien esperando un papel.
 
 ---
 
-## 2. El número sale del talonario de papel
+## 2. El número
 
-No lo genera el sistema: **lo tipea el operador**, copiándolo del formulario
-preimpreso. Por eso es `varchar` y no entero —viene con prefijo y ceros a la
-izquierda— y es **único en todo el sistema**: dos faenas con el mismo número
-serían dos papeles que dicen ser el mismo, y en un control nadie sabría cuál
-vale.
+**EN LA FAENA LO GENERA EL SISTEMA** —desde el 21/09/2026—: un correlativo
+**global y continuo** que arranca en `000001`, no reinicia por gestión y se
+reserva con `CorrelativoService::siguienteContinuo()` dentro de la transacción
+del servicio. El operador no lo ve al cargar; lo lee del PDF que imprime
+después y lo copia a la hoja de papel.
+
+Lo tipeaba el operador y era correlativo DENTRO DEL CARNET. Las dos cosas
+estaban mal: el talonario de papel es **uno solo para toda la unidad** —la hoja
+real dice `N° 002190`—, así que numerar por carnet daba una faena `000001` por
+cada pescador y el número dejaba de identificar nada; y tipearlo abría la
+puerta a dos ventanillas cargando el mismo, o a un dígito de más que emite el
+`000001` en lugar del `000010`.
+
+**En la guía sigue saliendo del papel**, tipeado: ahí el talonario es otro y no
+se tocó.
+
+Es **único en todo el sistema**: dos permisos con el mismo número serían dos
+papeles que dicen ser el mismo, y en un control nadie sabría cuál vale.
 
 De ahí salen las dos ausencias del módulo:
 
@@ -137,6 +150,7 @@ extracto del banco es todo lo que entró, no una parte.
 | `GET /panel/faenas/crear` | `faenas.crear` | Formulario. Acepta `?carnet=` para llegar con el carnet elegido |
 | `POST /panel/faenas` | `faenas.crear` | Alta |
 | `GET /panel/faenas/{faena}` | `faenas.ver` | Ficha |
+| `GET /panel/faenas/{faena}/imprimir` | `faenas.imprimir` | El «Permiso por Faena» en PDF. Solo aprobada |
 | `PATCH /panel/faenas/{faena}/anular` | `faenas.anular` | Baja con motivo |
 | `GET /panel/guias` … | `guias.*` | Lo mismo para guías |
 | `PUT /panel/guias/{guia}/detalle` | `guias.crear` | Reemplaza la grilla de carga |
@@ -167,6 +181,20 @@ de lectura que escribe se dispara solo con que el navegador precargue el enlace.
 ---
 
 ## 6. Lo que hay que saber antes de tocar el módulo
+
+- **LA FAENA GUARDA LOS RENGLONES DEL PAPEL**, agregados el 21/09/2026:
+  embarcación, propietario, comandante, matrícula naval, kardex y la región
+  desde/hasta. Todos nullable y texto libre — el formulario se llena a mano y
+  llega incompleto, y no hay padrón de embarcaciones ni de comandantes.
+- **`fecha_desembarque` NO es `fecha_limite`.** El desembarque es el renglón
+  del papel y lo escribe el operador; el límite es el techo de 30 días que
+  calcula el sistema. El formulario valida que el desembarque caiga entre los
+  dos.
+- **El PDF lo dibuja `PermisoFaenaImpresionController`**, con la plantilla
+  `documentos/permiso-faena.blade.php`. Calca el talonario renglón por renglón y
+  sale recién con la faena APROBADA. Su sello de agua es
+  `public/image/faena-sello.png` —`sedag.png` mezclado contra blanco al 11% y
+  guardado en paleta—: para aclararlo se REGENERA el PNG, nunca con `opacity`.
 
 - **`emite_faenas` / `emite_guias` son DOS columnas y no un `tipo_permiso`**,
   porque no son excluyentes: una actividad piscícola necesitaría faena para la

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Panel;
 
 use App\Models\PermisoFaena;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -32,11 +33,9 @@ class EmitirFaenaRequest extends FormRequest
             'carnet_id' => ['required', 'integer', Rule::exists('carnets', 'id')],
 
             /*
-             * EL NÚMERO DEL TALONARIO. Entero y positivo, nada más: que no se
-             * repita dentro del carnet lo comprueba el servicio y lo garantiza
-             * el índice único `(carnet_id, numero_faena)`.
+             * EL NÚMERO NO VIENE DEL FORMULARIO: lo genera el sistema, con un
+             * correlativo global y continuo. Ver EmitirFaenaService.
              */
-            'numero_faena' => ['required', 'integer', 'min:1', 'max:999999'],
 
             /*
              * Los kilos declarados. `gt:0` porque una faena de cero kilos no
@@ -61,6 +60,27 @@ class EmitirFaenaRequest extends FormRequest
                 'required', 'date', 'before_or_equal:today',
                 'after:'.now()->subDays(PermisoFaena::DIAS_VIGENCIA)->toDateString(),
             ],
+
+            /*
+             * LA VENTANA DE ESTA SALIDA. No puede cerrar antes de abrir, ni
+             * pasarse del techo de la resolución: la faena vence a los
+             * DIAS_VIGENCIA de la salida y un desembarque posterior prometería
+             * un permiso que ya caducó.
+             */
+            'fecha_desembarque' => ['required', 'date', 'after_or_equal:fecha_salida'],
+
+            /*
+             * LOS RENGLONES DEL PAPEL. Nullable porque el formulario se llena a
+             * mano y llega incompleto: la obligatoriedad es del trámite en
+             * ventanilla, no de la tabla.
+             */
+            'embarcacion' => ['nullable', 'string', 'max:150'],
+            'propietario' => ['nullable', 'string', 'max:150'],
+            'comandante_barco' => ['nullable', 'string', 'max:150'],
+            'matricula_naval' => ['nullable', 'string', 'max:50'],
+            'nro_kardex' => ['nullable', 'string', 'max:50'],
+            'region_desde' => ['nullable', 'string', 'max:150'],
+            'region_hasta' => ['nullable', 'string', 'max:150'],
         ];
     }
 
@@ -72,8 +92,6 @@ class EmitirFaenaRequest extends FormRequest
         return [
             'carnet_id.required' => 'Elija el carnet del pescador.',
             'carnet_id.exists' => 'Ese carnet no existe.',
-            'numero_faena.required' => 'Escriba el número de la hoja del talonario.',
-            'numero_faena.min' => 'El número del talonario arranca en 1.',
             'kilos_extraidos.required' => 'Indique cuántos kilos autoriza la faena.',
             'kilos_extraidos.gt' => 'La faena tiene que autorizar kilos: escriba un número mayor que cero.',
             'kilos_extraidos.decimal' => 'Los kilos llevan como máximo dos decimales.',
@@ -81,6 +99,8 @@ class EmitirFaenaRequest extends FormRequest
             'fecha_salida.before_or_equal' => 'La fecha de salida no puede ser futura.',
             'fecha_salida.after' => 'La faena vence a los '.PermisoFaena::DIAS_VIGENCIA
                 .' días de la salida: con esa fecha nacería vencida.',
+            'fecha_desembarque.required' => 'Indique la fecha de desembarque.',
+            'fecha_desembarque.after_or_equal' => 'El desembarque no puede ser anterior a la salida.',
         ];
     }
 
@@ -89,5 +109,31 @@ class EmitirFaenaRequest extends FormRequest
         $this->merge([
             'fecha_salida' => $this->input('fecha_salida') ?: now()->toDateString(),
         ]);
+    }
+
+    /**
+     * El techo de la ventana se valida acá y no en `rules()`: depende de
+     * `fecha_salida`, que recién existe cuando la petición ya llegó.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v): void {
+            $salida = $this->date('fecha_salida');
+            $desembarque = $this->date('fecha_desembarque');
+
+            if ($salida === null || $desembarque === null) {
+                return;
+            }
+
+            $techo = PermisoFaena::limiteDesde($salida);
+
+            if ($desembarque->gt($techo)) {
+                $v->errors()->add('fecha_desembarque', sprintf(
+                    'El permiso vale %d días desde la salida: el desembarque no puede pasar del %s.',
+                    PermisoFaena::DIAS_VIGENCIA,
+                    $techo->format('d/m/Y'),
+                ));
+            }
+        });
     }
 }

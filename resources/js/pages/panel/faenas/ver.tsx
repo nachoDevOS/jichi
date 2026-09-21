@@ -110,6 +110,24 @@ export default function VerFaena({
                         </>
                     )}
 
+                    {/*
+                        EL PERMISO EN PAPEL sale recién con la faena aprobada:
+                        hasta la firma no hay nada que autorizar. `ya_fue_aprobada`
+                        llega resuelto del servidor.
+                    */}
+                    {puede('faenas.imprimir') && faena.ya_fue_aprobada && (
+                        <a
+                            href={route('faenas.imprimir', faena.id)}
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            <Button variant="ver">
+                                <Printer className="size-4" />
+                                Permiso N° {faena.numero_legible}
+                            </Button>
+                        </a>
+                    )}
+
                     {/* El recibo existe desde el ENVÍO: antes no hay papel. */}
                     {puede('recibos.imprimir') && faena.recibo_id !== null && (
                         <a
@@ -208,12 +226,50 @@ export default function VerFaena({
                                 <Dato etiqueta="Kilos" valor={`${faena.kilos_extraidos} kg`} />
                                 <Dato etiqueta="Solicitada" valor={fecha(faena.fecha_solicitud)} />
                                 <Dato etiqueta="Salida" valor={fecha(faena.fecha_salida)} />
+                                {/* La del papel: cuándo vuelve. El límite es el
+                                    techo que calcula el sistema. */}
+                                <Dato etiqueta="Desembarque" valor={fecha(faena.fecha_desembarque)} />
                                 <Dato etiqueta="Límite" valor={fecha(faena.fecha_limite)} />
                                 {/* La emisión la escribe la aprobación: hasta
                                     entonces esto es una solicitud. */}
                                 <Dato etiqueta="Aprobada" valor={fecha(faena.fecha_emision)} />
                                 <Dato etiqueta="Arancel" valor={bs(faena.monto)} />
                                 <Dato etiqueta="Asociación" valor={faena.asociacion ?? '—'} />
+                            </dl>
+                        </CardContent>
+                    </Card>
+
+                    {/*
+                        LOS RENGLONES DEL TALONARIO. Se muestran aunque estén
+                        vacíos: el papel los tiene igual, y un hueco acá es la
+                        señal de que falta completarlo antes de imprimir.
+                    */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Datos del talonario</CardTitle>
+                        </CardHeader>
+
+                        <CardContent>
+                            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+                                <Dato etiqueta="La embarcación" valor={faena.embarcacion ?? '—'} />
+                                <Dato etiqueta="De propiedad de" valor={faena.propietario ?? '—'} />
+                                <Dato
+                                    etiqueta="Comandante de barco"
+                                    valor={faena.comandante_barco ?? '—'}
+                                />
+                                <Dato
+                                    etiqueta="Matrícula naval"
+                                    valor={faena.matricula_naval ?? '—'}
+                                />
+                                <Dato etiqueta="N° Kardex" valor={faena.nro_kardex ?? '—'} />
+                                <Dato
+                                    etiqueta="Región"
+                                    valor={
+                                        faena.region_desde || faena.region_hasta
+                                            ? `${faena.region_desde ?? '—'} → ${faena.region_hasta ?? '—'}`
+                                            : '—'
+                                    }
+                                />
                             </dl>
                         </CardContent>
                     </Card>

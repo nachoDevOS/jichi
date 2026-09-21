@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Permisos de faena — la autorización de UNA salida de pesca.
+|
+| Calca el talonario «PERMISO POR FAENA» del SEDAG. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -23,11 +25,35 @@ return new class extends Migration
              */
             $table->foreignId('carnet_id')->constrained('carnets')->restrictOnDelete();
 
-            $table->unsignedInteger('numero_faena')->comment('Hoja del talonario, correlativa dentro del carnet');
+            // CORRELATIVO GLOBAL Y CONTINUO, lo genera el sistema: el talonario
+            // de papel es uno solo para toda la unidad y no reinicia por año.
+            $table->unsignedInteger('numero_faena')->comment('Correlativo global del talonario: 000001');
+
+            // Copia congelada del arancel. Ver `pagos`: una suba por resolución
+            // no puede mover lo que dice un papel ya entregado.
+            $table->decimal('monto', 10, 2)->default(15.00);
 
             // Decimal: con enteros, treinta faenas redondeando medio kilo cada
             // una desajustan el cupo en quince.
             $table->decimal('kilos_extraidos', 12, 2)->default(0);
+
+            /*
+             * LOS RENGLONES DEL PAPEL. Nullable no es descuido: el formulario
+             * se llena a mano y llega incompleto. Texto libre porque no hay
+             * padrón de embarcaciones ni de comandantes, y un catálogo cerrado
+             * obligaría a dar de alta uno con el pescador esperando.
+             */
+            $table->string('embarcacion', 150)->nullable();
+            $table->string('propietario', 150)->nullable();
+            $table->string('comandante_barco', 150)->nullable();
+            $table->string('matricula_naval', 50)->nullable();
+            $table->string('nro_kardex', 50)->nullable();
+            $table->string('region_desde', 150)->nullable();
+            $table->string('region_hasta', 150)->nullable();
+
+            // NACE PENDIENTE: la faena se cobra y se firma como el carnet y el
+            // aprovechamiento, así que no autoriza nada hasta que la aprueban.
+            $table->string('estado', 20)->default(EstadoFaena::Pendiente->value);
 
             // El día que el pescador la pidió en ventanilla. Puede ser pasada:
             // sirve para poner al día lo que se tramitó en papel.
@@ -35,24 +61,24 @@ return new class extends Migration
 
             $table->date('fecha_salida');
 
+            // El renglón «Fecha de desembarque» del papel: la ventana real de
+            // ESTA salida, que el operador escribe y un control en el río mira.
+            $table->date('fecha_desembarque');
+
             // Se guarda calculada en vez de derivarla al leer: si la resolución
             // cambia el plazo, los permisos ya emitidos tienen que seguir
             // venciendo cuando dice el papel que el pescador tiene en la mano.
-            $table->date('fecha_limite')->comment('Máximo 1 mes desde fecha_salida');
+            $table->date('fecha_limite')->comment('Techo: 1 mes desde fecha_salida');
 
             // La escribe la APROBACIÓN. En NULL mientras es una solicitud.
             $table->date('fecha_emision')->nullable();
 
-            // NACE PENDIENTE: la faena se cobra y se firma como el carnet y el
-            // aprovechamiento, así que no autoriza nada hasta que la aprueban.
-            $table->string('estado', 20)->default(EstadoFaena::Pendiente->value);
-
             /*
-             * Dos hojas del talonario no pueden tener el mismo número DENTRO del
-             * mismo carnet. No es único global: cada talonario arranca su
-             * numeración en 1, que es como se llena el papel.
+             * ÚNICO GLOBAL y no parcial: la hoja del talonario se gastó. Dar de
+             * baja la fila no devuelve el número, que está impreso en un papel
+             * que el pescador se llevó.
              */
-            $table->unique(['carnet_id', 'numero_faena']);
+            $table->unique('numero_faena');
 
             /*
              * La consulta caliente del módulo: la suma de kilos consumidos del

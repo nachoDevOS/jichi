@@ -12,6 +12,7 @@ use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\FaenaController;
 use App\Http\Controllers\Panel\GuiaController;
 use App\Http\Controllers\Panel\PagoController;
+use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
 use App\Http\Controllers\Panel\ReciboController;
 use App\Http\Controllers\Panel\TipoCarnetController;
 use Illuminate\Support\Facades\Route;
@@ -270,6 +271,12 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     Route::patch('/faenas/{faena}/completar', [FaenaController::class, 'completar'])
         ->middleware('permiso:faenas.completar')
         ->name('faenas.completar');
+
+    // ANTES de '/faenas/{faena}': con la ficha primero, «imprimir» se toma
+    // como id. Permiso propio, como `carnets.imprimir`.
+    Route::get('/faenas/{faena}/imprimir', [PermisoFaenaImpresionController::class, 'imprimir'])
+        ->middleware('permiso:faenas.imprimir')
+        ->name('faenas.imprimir');
 
     Route::get('/faenas/{faena}', [FaenaController::class, 'show'])
         ->middleware('permiso:faenas.ver')

@@ -19,9 +19,18 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'carnet_id',
     'numero_faena',
+    'monto',
     'kilos_extraidos',
+    'embarcacion',
+    'propietario',
+    'comandante_barco',
+    'matricula_naval',
+    'nro_kardex',
+    'region_desde',
+    'region_hasta',
     'fecha_solicitud',
     'fecha_salida',
+    'fecha_desembarque',
     'fecha_limite',
     'fecha_emision',
     'estado',
@@ -38,18 +47,27 @@ class PermisoFaena extends Model
      */
     public const DIAS_VIGENCIA = 30;
 
+    /** La serie del correlativo global del talonario. Ver CorrelativoService. */
+    public const SERIE = 'PERMISO-FAENA';
+
+    /** Los seis dígitos con que viene impreso el talonario: 002190. */
+    public const RELLENO_NUMERO = 6;
+
     /** Ver Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [
         'kilos_extraidos' => 0,
+        'monto' => 0,
         'estado' => EstadoFaena::Pendiente->value,
     ];
 
     protected function casts(): array
     {
         return [
+            'monto' => 'decimal:2',
             'kilos_extraidos' => 'decimal:2',
             'fecha_solicitud' => 'date',
             'fecha_salida' => 'date',
+            'fecha_desembarque' => 'date',
             'fecha_limite' => 'date',
             'fecha_emision' => 'date',
             'estado' => EstadoFaena::class,
@@ -90,23 +108,35 @@ class PermisoFaena extends Model
 
     //  Lectura
 
-    /** Cómo se lee en un listado: «Faena N° 0003». */
+    /** Cómo se lee en un listado: «Faena N° 002190», los seis dígitos del papel. */
     protected function etiqueta(): Attribute
     {
+        return Attribute::get(fn (): string => 'Faena N° '.$this->numeroLegible);
+    }
+
+    /** El correlativo con el relleno del talonario: 000001. */
+    protected function numeroLegible(): Attribute
+    {
         return Attribute::get(
-            fn (): string => 'Faena N° '.str_pad((string) $this->numero_faena, 4, '0', STR_PAD_LEFT),
+            fn (): string => str_pad((string) $this->numero_faena, self::RELLENO_NUMERO, '0', STR_PAD_LEFT),
         );
     }
 
     //  El circuito: cobrar, presentar y firmar
 
     /**
-     * Lo que sale un permiso de faena. Exigido por el trait Pagable.
+     * Lo que sale ESTE permiso. Exigido por el trait Pagable.
      *
-     * Sale de la configuración y no de una tabla porque es UN número que la
-     * unidad ajusta por resolución, igual que la tarifa de las guías.
+     * Sale de la COLUMNA y no de la config: el arancel se copia al emitir,
+     * así que una suba por resolución no mueve el monto de un papel entregado.
      */
     public function montoACobrar(): float
+    {
+        return (float) ($this->monto ?? self::tarifaVigente());
+    }
+
+    /** Lo que se cobra HOY por una salida nueva. La copia la hace el servicio. */
+    public static function tarifaVigente(): float
     {
         return (float) config('jichi.faenas.tarifa_base', 0);
     }

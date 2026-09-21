@@ -16,17 +16,27 @@ use Illuminate\Support\Facades\DB;
  */
 class EmitirFaenaService
 {
+    public function __construct(private readonly CorrelativoService $correlativos) {}
+
     /**
      * Registra la solicitud de una salida. NACE PENDIENTE: no autoriza nada
      * hasta que se cobre el arancel y alguien la firme.
+     *
+     * @param  array<string, string|null>  $papel  Los renglones del talonario:
+     *                                             embarcacion, propietario, comandante_barco,
+     *                                             matricula_naval, nro_kardex, region_desde,
+     *                                             region_hasta.
      */
     public function emitir(
         Carnet $carnet,
-        int $numeroFaena,
         float $kilos,
         ?Carbon $salida = null,
+        ?Carbon $desembarque = null,
+        array $papel = [],
     ): PermisoFaena {
         $salida ??= now();
+        // Sin fecha del papel, la ventana es el plazo entero de la resolución.
+        $desembarque ??= PermisoFaena::limiteDesde($salida);
 
         /*
          * LAS COMPROBACIONES DEL CARNET VAN ANTES DE LA TRANSACCIÓN, y las del
@@ -46,7 +56,7 @@ class EmitirFaenaService
             throw PermisoOperativoException::sinCupoVigente();
         }
 
-        return DB::transaction(function () use ($carnet, $numeroFaena, $kilos, $salida): PermisoFaena {
+        return DB::transaction(function () use ($carnet, $kilos, $salida, $desembarque, $papel): PermisoFaena {
             // La fila del cupo es la que contiene el recurso escaso: es la que
             // se bloquea. Releerla devuelve OTRA instancia, y acá se usa esa a
             // propósito — es la que tiene el saldo al día.
@@ -87,21 +97,21 @@ class EmitirFaenaService
                 }
             }
 
-            // El número es correlativo DENTRO DEL CARNET: es su talonario, y
-            // así lo exige el único `(carnet_id, numero_faena)`.
-            if ($carnet->faenas()->where('numero_faena', $numeroFaena)->exists()) {
-                throw PermisoOperativoException::numeroRepetido('una faena', (string) $numeroFaena);
-            }
-
             $faena = PermisoFaena::create([
                 'carnet_id' => $carnet->id,
-                'numero_faena' => $numeroFaena,
+                // EL NÚMERO LO PONE EL SISTEMA, no el operador: correlativo
+                // global y continuo, como el talonario de papel.
+                'numero_faena' => $this->correlativos->siguienteContinuo(PermisoFaena::SERIE),
+                // Copia congelada del arancel: ver PermisoFaena::montoACobrar().
+                'monto' => PermisoFaena::tarifaVigente(),
                 'kilos_extraidos' => $kilos,
+                ...$this->renglonesDelPapel($papel),
                 // PENDIENTE, como el carnet y el cupo: la emisión la escribe
                 // la aprobación, y hasta entonces esto es una solicitud.
                 'estado' => EstadoFaena::Pendiente,
                 'fecha_solicitud' => now()->toDateString(),
                 'fecha_salida' => $salida->toDateString(),
+                'fecha_desembarque' => $desembarque->toDateString(),
                 // Se GUARDA la fecha calculada en vez de derivarla al leer: si
                 // mañana la resolución baja el plazo, los permisos ya emitidos
                 // tienen que seguir venciendo cuando dice el papel que el
@@ -172,6 +182,24 @@ class EmitirFaenaService
             // viejo en memoria.
             return $faena->refresh();
         });
+    }
+
+    /**
+     * Los renglones del talonario, normalizados: '' entra como null.
+     *
+     * @param  array<string, string|null>  $papel
+     * @return array<string, string|null>
+     */
+    private function renglonesDelPapel(array $papel): array
+    {
+        $campos = [
+            'embarcacion', 'propietario', 'comandante_barco',
+            'matricula_naval', 'nro_kardex', 'region_desde', 'region_hasta',
+        ];
+
+        return collect($campos)
+            ->mapWithKeys(fn (string $c): array => [$c => trim((string) ($papel[$c] ?? '')) ?: null])
+            ->all();
     }
 
     /**

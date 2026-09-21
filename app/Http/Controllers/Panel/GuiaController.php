@@ -115,7 +115,6 @@ class GuiaController extends Controller
                         'puede_emitir_faenas' => $c->puedeEmitirFaenas(),
                         'puede_emitir_guias' => $c->puedeEmitirGuias(),
                         'saldo_kg' => null,
-                        'siguiente_numero_faena' => null,
                     ])
                     ->values()
                     ->all(),

@@ -8,6 +8,7 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
+import { fecha, fechaInput } from '@/lib/utils';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 
 /**
@@ -16,11 +17,14 @@ import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/benefi
 export default function CrearFaena({
     beneficiario,
     diasVigencia,
+    tarifa,
     modoEstricto,
 }: {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
     /** El plazo de la resolución. Llega del servidor para que no haya dos copias. */
     diasVigencia: number;
+    /** El arancel de hoy. Se copia congelado en la fila al emitir. */
+    tarifa: number;
     /**
      * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor, y ES LO QUE DECIDE
      * SI EL BOTÓN SE BLOQUEA.
@@ -30,11 +34,20 @@ export default function CrearFaena({
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
     const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(null);
 
+    const hoy = new Date().toISOString().slice(0, 10);
+
     const form = useForm({
         carnet_id: null as number | null,
-        numero_faena: '',
         kilos_extraidos: '',
-        fecha_salida: new Date().toISOString().slice(0, 10),
+        fecha_salida: hoy,
+        fecha_desembarque: hoy,
+        embarcacion: '',
+        propietario: '',
+        comandante_barco: '',
+        matricula_naval: '',
+        nro_kardex: '',
+        region_desde: '',
+        region_hasta: '',
     });
 
     function elegirPersona(elegida: BeneficiarioSugerido | null) {
@@ -46,13 +59,7 @@ export default function CrearFaena({
 
     function elegirCarnet(c: CarnetVigenteSugerido) {
         setCarnet(c);
-        form.setData((datos) => ({
-            ...datos,
-            carnet_id: c.id,
-            // El número propuesto se escribe al elegir: es el que el operador va
-            // a confirmar contra la hoja, y tenerlo ya puesto le ahorra contar.
-            numero_faena: c.siguiente_numero_faena !== null ? String(c.siguiente_numero_faena) : '',
-        }));
+        form.setData('carnet_id', c.id);
         form.clearErrors('carnet_id');
     }
 
@@ -63,6 +70,15 @@ export default function CrearFaena({
 
     const saldo = carnet?.saldo_kg ?? null;
     const kilos = Number(form.data.kilos_extraidos || 0);
+
+    /*
+     * El techo de la ventana: hasta cuándo puede desembarcar. Se recalcula
+     * sobre la salida elegida y solo alimenta el texto de ayuda — quien
+     * rechaza de verdad es la validación del servidor.
+     */
+    const techo = fechaInput(
+        new Date(new Date(`${form.data.fecha_salida}T00:00:00`).getTime() + diasVigencia * 86400000),
+    );
 
     /*
      * `excede` es el HECHO —no entra en el saldo— y `bloquea` es la
@@ -106,63 +122,179 @@ export default function CrearFaena({
                         )}
 
                         {carnet && (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Campo
-                                    etiqueta="N° de la hoja del talonario"
-                                    htmlFor="numero_faena"
-                                    error={form.errors.numero_faena}
-                                    ayuda="El sistema propone el siguiente. Confírmelo contra la hoja que tiene en la mano."
-                                    obligatorio
-                                >
-                                    <Input
-                                        id="numero_faena"
-                                        type="number"
-                                        min={1}
-                                        value={form.data.numero_faena}
-                                        onChange={(e) => form.setData('numero_faena', e.target.value)}
-                                        aria-invalid={Boolean(form.errors.numero_faena)}
-                                        className="font-mono"
-                                    />
-                                </Campo>
+                            <>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Campo
+                                        etiqueta="Kilos autorizados"
+                                        htmlFor="kilos_extraidos"
+                                        error={form.errors.kilos_extraidos}
+                                        ayuda={
+                                            saldo !== null
+                                                ? `Quedan ${saldo} kg en la bolsa madre.`
+                                                : undefined
+                                        }
+                                        obligatorio
+                                    >
+                                        <Input
+                                            id="kilos_extraidos"
+                                            type="number"
+                                            step="0.01"
+                                            min={0}
+                                            value={form.data.kilos_extraidos}
+                                            onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
+                                            aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
+                                        />
+                                    </Campo>
 
-                                <Campo
-                                    etiqueta="Kilos autorizados"
-                                    htmlFor="kilos_extraidos"
-                                    error={form.errors.kilos_extraidos}
-                                    ayuda={
-                                        saldo !== null
-                                            ? `Quedan ${saldo} kg en la bolsa madre.`
-                                            : undefined
-                                    }
-                                    obligatorio
-                                >
-                                    <Input
-                                        id="kilos_extraidos"
-                                        type="number"
-                                        step="0.01"
-                                        min={0}
-                                        value={form.data.kilos_extraidos}
-                                        onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
-                                        aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
-                                    />
-                                </Campo>
+                                    <Campo
+                                        etiqueta="Fecha de salida"
+                                        htmlFor="fecha_salida"
+                                        error={form.errors.fecha_salida}
+                                        ayuda="Puede ser pasada. Futura no: el permiso empezaría a valer antes de existir."
+                                        obligatorio
+                                    >
+                                        <Input
+                                            id="fecha_salida"
+                                            type="date"
+                                            value={form.data.fecha_salida}
+                                            onChange={(e) => form.setData('fecha_salida', e.target.value)}
+                                            aria-invalid={Boolean(form.errors.fecha_salida)}
+                                        />
+                                    </Campo>
 
-                                <Campo
-                                    etiqueta="Fecha de salida"
-                                    htmlFor="fecha_salida"
-                                    error={form.errors.fecha_salida}
-                                    ayuda="Puede ser pasada. Futura no: el permiso empezaría a valer antes de existir."
-                                    obligatorio
-                                >
-                                    <Input
-                                        id="fecha_salida"
-                                        type="date"
-                                        value={form.data.fecha_salida}
-                                        onChange={(e) => form.setData('fecha_salida', e.target.value)}
-                                        aria-invalid={Boolean(form.errors.fecha_salida)}
-                                    />
-                                </Campo>
-                            </div>
+                                    <Campo
+                                        etiqueta="Fecha de desembarque"
+                                        htmlFor="fecha_desembarque"
+                                        error={form.errors.fecha_desembarque}
+                                        ayuda={`Cuándo vuelve. Como máximo el ${fecha(techo)}.`}
+                                        obligatorio
+                                    >
+                                        <Input
+                                            id="fecha_desembarque"
+                                            type="date"
+                                            value={form.data.fecha_desembarque}
+                                            onChange={(e) =>
+                                                form.setData('fecha_desembarque', e.target.value)
+                                            }
+                                            aria-invalid={Boolean(form.errors.fecha_desembarque)}
+                                        />
+                                    </Campo>
+                                </div>
+
+                                {/*
+                                    LOS RENGLONES DEL TALONARIO. Ninguno es obligatorio: el
+                                    papel se llena a mano y llega incompleto, y frenar por
+                                    una matrícula que no trajeron deja al pescador sin
+                                    permiso por un dato que nadie controla.
+                                */}
+                                <div className="space-y-4 border-t border-border pt-5">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                        Datos del talonario
+                                    </p>
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <Campo
+                                            etiqueta="La embarcación"
+                                            htmlFor="embarcacion"
+                                            error={form.errors.embarcacion}
+                                        >
+                                            <Input
+                                                id="embarcacion"
+                                                value={form.data.embarcacion}
+                                                onChange={(e) => form.setData('embarcacion', e.target.value)}
+                                                aria-invalid={Boolean(form.errors.embarcacion)}
+                                            />
+                                        </Campo>
+
+                                        <Campo
+                                            etiqueta="De propiedad de"
+                                            htmlFor="propietario"
+                                            error={form.errors.propietario}
+                                            ayuda="Solo si la embarcación no es del propio pescador."
+                                        >
+                                            <Input
+                                                id="propietario"
+                                                value={form.data.propietario}
+                                                onChange={(e) => form.setData('propietario', e.target.value)}
+                                                aria-invalid={Boolean(form.errors.propietario)}
+                                            />
+                                        </Campo>
+
+                                        <Campo
+                                            etiqueta="Comandante de barco"
+                                            htmlFor="comandante_barco"
+                                            error={form.errors.comandante_barco}
+                                        >
+                                            <Input
+                                                id="comandante_barco"
+                                                value={form.data.comandante_barco}
+                                                onChange={(e) =>
+                                                    form.setData('comandante_barco', e.target.value)
+                                                }
+                                                aria-invalid={Boolean(form.errors.comandante_barco)}
+                                            />
+                                        </Campo>
+
+                                        <Campo
+                                            etiqueta="Matrícula naval N°"
+                                            htmlFor="matricula_naval"
+                                            error={form.errors.matricula_naval}
+                                        >
+                                            <Input
+                                                id="matricula_naval"
+                                                value={form.data.matricula_naval}
+                                                onChange={(e) =>
+                                                    form.setData('matricula_naval', e.target.value)
+                                                }
+                                                aria-invalid={Boolean(form.errors.matricula_naval)}
+                                                className="font-mono"
+                                            />
+                                        </Campo>
+
+                                        <Campo
+                                            etiqueta="N° Kardex"
+                                            htmlFor="nro_kardex"
+                                            error={form.errors.nro_kardex}
+                                        >
+                                            <Input
+                                                id="nro_kardex"
+                                                value={form.data.nro_kardex}
+                                                onChange={(e) => form.setData('nro_kardex', e.target.value)}
+                                                aria-invalid={Boolean(form.errors.nro_kardex)}
+                                                className="font-mono"
+                                            />
+                                        </Campo>
+                                    </div>
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <Campo
+                                            etiqueta="Pescar en la región desde"
+                                            htmlFor="region_desde"
+                                            error={form.errors.region_desde}
+                                        >
+                                            <Input
+                                                id="region_desde"
+                                                value={form.data.region_desde}
+                                                onChange={(e) => form.setData('region_desde', e.target.value)}
+                                                aria-invalid={Boolean(form.errors.region_desde)}
+                                            />
+                                        </Campo>
+
+                                        <Campo
+                                            etiqueta="Hasta"
+                                            htmlFor="region_hasta"
+                                            error={form.errors.region_hasta}
+                                        >
+                                            <Input
+                                                id="region_hasta"
+                                                value={form.data.region_hasta}
+                                                onChange={(e) => form.setData('region_hasta', e.target.value)}
+                                                aria-invalid={Boolean(form.errors.region_hasta)}
+                                            />
+                                        </Campo>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </CardContent>
                 </Card>
@@ -241,6 +373,18 @@ export default function CrearFaena({
                                     </div>
                                 )}
 
+                                <div>
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                        Arancel
+                                    </p>
+                                    <p className="text-xl font-semibold tabular-nums">
+                                        {tarifa.toFixed(2)}
+                                        <span className="ml-1 text-sm font-normal text-muted-foreground">
+                                            Bs
+                                        </span>
+                                    </p>
+                                </div>
+
                                 <p className="text-xs text-muted-foreground">
                                     La faena vale {diasVigencia} días desde la salida. Si no se cierra
                                     antes, vence y su volumen vuelve al cupo.
@@ -253,7 +397,7 @@ export default function CrearFaena({
                             disabled={
                                 form.processing ||
                                 carnet === null ||
-                                form.data.numero_faena === '' ||
+                                form.data.fecha_desembarque === '' ||
                                 kilos <= 0 ||
                                 bloquea
                             }

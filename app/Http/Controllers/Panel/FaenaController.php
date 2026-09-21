@@ -113,9 +113,6 @@ class FaenaController extends Controller
                         'aprovechamiento' => fn ($a) => $a
                             ->withSum('faenasQueConsumen', 'kilos_extraidos'),
                     ])
-                    // El correlativo es del TALONARIO DEL CARNET: el único es
-                    // (carnet_id, numero_faena).
-                    ->withMax('faenas', 'numero_faena')
                     ->get()
                     ->map($this->resumirCarnetParaEmitir(...))
                     ->values()
@@ -123,6 +120,8 @@ class FaenaController extends Controller
             ] : null,
 
             'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
+
+            'tarifa' => PermisoFaena::tarifaVigente(),
 
             /*
              * En modo FLEXIBLE el formulario no puede frenar por exceder el
@@ -144,23 +143,21 @@ class FaenaController extends Controller
         try {
             $faena = $this->servicio->emitir(
                 Carnet::query()->findOrFail($datos['carnet_id']),
-                (int) $datos['numero_faena'],
                 (float) $datos['kilos_extraidos'],
                 now()->parse($datos['fecha_salida']),
+                now()->parse($datos['fecha_desembarque']),
+                // `validated()` devuelve SOLO lo que vino: un nullable que el
+                // formulario no mandó no existe en el arreglo.
+                $datos,
             );
         } catch (PermisoOperativoException $e) {
             /*
              * El mensaje vuelve como error del campo que el operador puede
              * corregir. Las reglas del carnet no tienen arreglo desde este
              * formulario —hay que ir a emitir o renovar el carnet— así que se
-             * cuelgan de `carnet_id`; el exceso de cupo y el número repetido sí
-             * se corrigen acá.
+             * cuelgan de `carnet_id`; el exceso de cupo sí se corrige acá.
              */
-            $campo = match (true) {
-                str_contains($e->getMessage(), 'quedan') => 'kilos_extraidos',
-                str_contains($e->getMessage(), 'número') => 'numero_faena',
-                default => 'carnet_id',
-            };
+            $campo = str_contains($e->getMessage(), 'quedan') ? 'kilos_extraidos' : 'carnet_id';
 
             return back()->withInput()->withErrors([$campo => $e->getMessage()]);
         }
@@ -170,7 +167,7 @@ class FaenaController extends Controller
             ->with('exito', sprintf(
                 'Faena N° %s registrada, PENDIENTE de pago. Cargue los depósitos —%s Bs— y envíela '.
                 'a revisión; autoriza la salida recién cuando la aprueben.',
-                $faena->numero_faena,
+                $faena->numero_legible,
                 number_format($faena->montoACobrar(), 2, ',', '.'),
             ));
     }
@@ -418,7 +415,7 @@ class FaenaController extends Controller
 
         return redirect()
             ->route('faenas.show', $faena)
-            ->with('exito', "Faena N° {$faena->numero_faena} aprobada. Ya autoriza la salida.");
+            ->with('exito', "Faena N° {$faena->numero_legible} aprobada. Ya autoriza la salida.");
     }
 
     /**
@@ -474,9 +471,6 @@ class FaenaController extends Controller
             'puede_emitir_faenas' => $carnet->puedeEmitirFaenas(),
             'puede_emitir_guias' => $carnet->puedeEmitirGuias(),
             'saldo_kg' => $carnet->aprovechamiento?->saldoKg(),
-            'siguiente_numero_faena' => $carnet->aprovechamiento
-                ? $carnet->siguienteNumeroFaena()
-                : null,
         ];
     }
 
@@ -492,6 +486,8 @@ class FaenaController extends Controller
         return [
             'id' => $faena->id,
             'numero_faena' => $faena->numero_faena,
+            // Con los seis ceros del talonario: «002190».
+            'numero_legible' => $faena->numero_legible,
             'etiqueta' => $faena->etiqueta,
 
             'carnet_id' => $faena->carnet_id,
@@ -500,6 +496,15 @@ class FaenaController extends Controller
             'beneficiario' => $faena->carnet?->beneficiario?->nombreCompleto,
 
             'kilos_extraidos' => (float) $faena->kilos_extraidos,
+
+            // LOS RENGLONES DEL TALONARIO. Nullable: el papel llega incompleto.
+            'embarcacion' => $faena->embarcacion,
+            'propietario' => $faena->propietario,
+            'comandante_barco' => $faena->comandante_barco,
+            'matricula_naval' => $faena->matricula_naval,
+            'nro_kardex' => $faena->nro_kardex,
+            'region_desde' => $faena->region_desde,
+            'region_hasta' => $faena->region_hasta,
 
             'estado' => $faena->estado->value,
             'estado_etiqueta' => $faena->estado->etiqueta(),
@@ -530,6 +535,7 @@ class FaenaController extends Controller
             // Son DÍAS, no instantes: con toDateString().
             'fecha_solicitud' => $faena->fecha_solicitud?->toDateString(),
             'fecha_salida' => $faena->fecha_salida?->toDateString(),
+            'fecha_desembarque' => $faena->fecha_desembarque?->toDateString(),
             'fecha_limite' => $faena->fecha_limite?->toDateString(),
             'fecha_emision' => $faena->fecha_emision?->toDateString(),
         ];

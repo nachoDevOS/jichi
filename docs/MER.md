@@ -419,12 +419,37 @@ usa el scope `enCurso()` —pendiente o aprobado, en fecha— y no `vigentes()`.
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `carnet_id` | FK RESTRICT | **La única**: de él cuelga la faena |
-| `numero_faena` | int | Hoja del talonario del carnet |
+| `numero_faena` | int | Correlativo **global y continuo**. Lo pone el sistema |
+| `monto` | decimal(10,2) | Copia congelada del arancel al emitir |
 | `kilos_extraidos` | decimal(12,2) | |
+| `embarcacion`, `propietario`, `comandante_barco` | string, **null** | Renglones del papel |
+| `matricula_naval`, `nro_kardex` | string, **null** | Renglones del papel |
+| `region_desde` / `region_hasta` | string(150), **null** | La región amparada |
 | `fecha_solicitud` | date | El día que se pidió; puede ser pasada |
-| `fecha_salida` / `fecha_limite` | date | Máximo **1 mes** |
+| `fecha_salida` | date | |
+| `fecha_desembarque` | date | El renglón del papel: cuándo vuelve |
+| `fecha_limite` | date | El TECHO que calcula el sistema: salida + 1 mes |
 | `fecha_emision` | date, null | La escribe la APROBACIÓN |
 | `estado` | string(20) | `EstadoFaena`; nace `pendiente` |
+
+**LA TABLA CALCA EL TALONARIO «PERMISO POR FAENA»** —completado el 21/09/2026—.
+El núcleo del 18/09 se había quedado con el esqueleto y perdió los siete
+renglones que el papel pide: embarcación, propietario, comandante, matrícula
+naval, kardex y la región desde/hasta. Todos **nullable y texto libre**: el
+formulario se llena a mano y llega incompleto, y no hay padrón de embarcaciones
+ni de comandantes —un catálogo cerrado obligaría a dar de alta uno con el
+pescador esperando en la ventanilla—.
+
+**`fecha_desembarque` y `fecha_limite` NO son lo mismo.** El desembarque es el
+renglón del papel y lo escribe el operador: la ventana real de ESTA salida,
+contra la que compara un control en el río. `fecha_limite` es el techo que pone
+la resolución —30 días— y lo calcula el sistema. El formulario valida que el
+desembarque no sea anterior a la salida ni pase del techo.
+
+**`monto` es una COPIA CONGELADA**, como en `recibos`: una suba por resolución
+no puede mover lo que dice un papel ya entregado. `PermisoFaena::montoACobrar()`
+lee la columna; `tarifaVigente()` lee la config y solo la usa el servicio al
+emitir.
 
 **LA FAENA SE COBRA Y SE FIRMA, igual que el carnet y el cupo —20/09/2026—.**
 Antes nacía ACTIVA y autorizaba en el acto: se emitía el papel sin que hubiera
@@ -437,8 +462,8 @@ PENDIENTE ──[depósitos]──▶ [enviar] ──▶ EN REVISIÓN ──[apr
 ```
 
 `PermisoFaena` usa el trait `Pagable`, el arancel sale de
-`config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`, 30 Bs por
-defecto— y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
+`config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`, **15 Bs** por
+defecto, que es lo que dice el talonario— y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
 en los otros dos. El circuito vive en `RevisarFaenaService`.
 
 **Los kilos se reservan DESDE EL PEDIDO, no desde la firma.**
@@ -463,9 +488,25 @@ y por eso `AprovechamientoPesq::faenas()` es un **`hasManyThrough`** por
 `carnets`. `withSum` y `withMax` siguen funcionando igual, así que el saldo se
 sigue calculando con una sola consulta.
 
-**El único es `(carnet_id, numero_faena)`, no global**: cada talonario arranca su
-numeración en 1, que es como se llena el papel. El correlativo lo resuelve
-`Carnet::siguienteNumeroFaena()`.
+**EL NÚMERO ES UN CORRELATIVO GLOBAL Y CONTINUO, y lo pone el SISTEMA**
+—cambiado el 21/09/2026—. Arranca en `000001`, no reinicia por gestión y su
+único es `numero_faena` a secas.
+
+Era correlativo DENTRO DEL CARNET y lo tipeaba el operador, con el argumento de
+que cada carnet es un talonario. No lo es: el talonario de papel es **uno solo
+para toda la unidad** —la hoja de la foto dice `N° 002190`— y numerar por carnet
+daba una faena `000001` por cada pescador, así que el número dejaba de
+identificar nada. Que lo escribiera el operador agregaba lo suyo: dos ventanillas
+tipeando el mismo número, y un dígito de más emitía el permiso `000001` en el
+lugar del `000010`.
+
+Lo reserva `CorrelativoService::siguienteContinuo()` dentro de la transacción
+del servicio, bajo la serie `PermisoFaena::SERIE`. **Continuo se implementa con
+el año 0**, que ninguna gestión real ocupa: la tabla `correlativos` lleva
+`(serie, anio)` y pasarle el año de verdad lo haría reiniciar cada enero.
+
+`Carnet::siguienteNumeroFaena()` fue eliminado, y con él los
+`withMax('faenas', 'numero_faena')` que lo alimentaban.
 
 **`fecha_limite` se guarda calculada** en vez de derivarla al leer: si mañana la
 resolución cambia el plazo a quince días, los permisos ya emitidos tienen que
@@ -747,7 +788,7 @@ o queda quemado:
 | `carnets.codigo_carnet` | **global** | El plástico ya salió y está en la calle |
 | `guias_movimiento.codigo_guia` | **global** | El papel ya se entregó |
 | `recibos.numero_recibo` | **global** | Correlativo que Contabilidad audita: el hueco es lo que la hace auditable |
-| `permisos_faena (carnet_id, numero_faena)` | **global** | La hoja del talonario se gastó |
+| `permisos_faena (numero_faena)` | **global** | La hoja del talonario se gastó |
 
 > El criterio en una línea: **el catálogo libera, el papel entregado no.**
 

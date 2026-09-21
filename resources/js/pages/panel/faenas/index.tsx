@@ -159,7 +159,7 @@ export default function IndiceFaenas({
                                                         href={route('faenas.show', f.id)}
                                                         className="font-mono font-medium tabular-nums text-primary hover:underline"
                                                     >
-                                                        {String(f.numero_faena).padStart(4, '0')}
+                                                        {f.numero_legible}
                                                     </Link>
                                                 </td>
 

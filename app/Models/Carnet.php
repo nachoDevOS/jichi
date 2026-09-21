@@ -95,22 +95,6 @@ class Carnet extends Model
         return $this->hasMany(GuiaMovimiento::class, 'carnet_id');
     }
 
-    /**
-     * El número que va a llevar la próxima hoja del talonario de ESTE carnet.
-     *
-     * Sale del máximo y no de un `count()`: las faenas anuladas o vencidas
-     * siguen ocupando su número, así que contar filas repetiría uno. Reusa el
-     * `withMax('faenas', 'numero_faena')` si vino en la consulta.
-     */
-    public function siguienteNumeroFaena(): int
-    {
-        if (array_key_exists('faenas_max_numero_faena', $this->getAttributes())) {
-            return (int) $this->faenas_max_numero_faena + 1;
-        }
-
-        return (int) $this->faenas()->max('numero_faena') + 1;
-    }
-
     //  Lectura
 
     /**

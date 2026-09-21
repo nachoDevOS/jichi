@@ -89,6 +89,10 @@ enum RolSistema: string
             'faenas.crear',
             'guias.crear',
 
+            // Entregar el «Permiso por Faena» en papel. Permiso propio, como
+            // `carnets.imprimir`: es un acto distinto de consultar la ficha.
+            'faenas.imprimir',
+
             /*
              * CERRAR un permiso también es de ventanilla, y es el otro medio
              * circuito: la faena se completa cuando el pescador vuelve y

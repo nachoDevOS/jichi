@@ -161,11 +161,6 @@ export interface CarnetVigenteSugerido {
      * Kilos que quedan en la bolsa madre. Null si el carnet no lleva cupo.
      */
     saldo_kg: number | null;
-
-    /**
-     * El número de talonario que el sistema PROPONE. Null si no lleva cupo.
-     */
-    siguiente_numero_faena: number | null;
 }
 
 /** Una coincidencia del autocompletado de los formularios de emisión. */

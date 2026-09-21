@@ -168,7 +168,7 @@ return [
     | guías: es UN número que la unidad ajusta por resolución.
     */
     'faenas' => [
-        'tarifa_base' => (float) env('JICHI_FAENA_TARIFA_BASE', 30),
+        'tarifa_base' => (float) env('JICHI_FAENA_TARIFA_BASE', 15),
     ],
 
     /*

@@ -12,6 +12,9 @@ class CorrelativoService
 {
     public const RELLENO = 4;
 
+    /** El «año» de las series que no reinician. Ver siguienteContinuo(). */
+    public const SIN_GESTION = 0;
+
     /**
      * Reserva el siguiente número de la serie y devuelve el código formateado.
      */
@@ -58,6 +61,17 @@ class CorrelativoService
 
             return $correlativo->ultimo_numero;
         });
+    }
+
+    /**
+     * Reserva el siguiente número de una serie CONTINUA: no reinicia por año.
+     *
+     * Es lo que hace un talonario de papel —002190 no volvió a 1 en enero— y
+     * por eso se guarda bajo el año 0, que ninguna gestión real ocupa.
+     */
+    public function siguienteContinuo(string $serie): int
+    {
+        return $this->siguienteNumero($serie, self::SIN_GESTION);
     }
 
     /**

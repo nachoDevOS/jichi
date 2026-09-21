@@ -279,9 +279,7 @@ class BeneficiarioController extends Controller
                     'tipoCarnet:id,nombre',
                     'aprovechamiento' => fn ($a) => $a
                         ->withSum('faenasQueConsumen', 'kilos_extraidos'),
-                ])
-                // El correlativo del talonario es del CARNET.
-                ->withMax('faenas', 'numero_faena'),
+                ]),
             ])
             ->ordenAlfabetico()
             ->limit(10)
@@ -311,15 +309,9 @@ class BeneficiarioController extends Controller
                     'puede_emitir_faenas' => $c->puedeEmitirFaenas(),
                     'puede_emitir_guias' => $c->puedeEmitirGuias(),
 
-                    /*
-                     * Lo que el formulario de faena necesita para abrir con los
-                     * dos campos difíciles ya resueltos: cuántos kilos quedan y
-                     * qué número de talonario propone.
-                     */
+                    // Lo que el formulario de faena necesita para abrir con el
+                    // campo difícil ya resuelto: cuántos kilos quedan.
                     'saldo_kg' => $c->aprovechamiento?->saldoKg(),
-                    'siguiente_numero_faena' => $c->aprovechamiento
-                        ? $c->siguienteNumeroFaena()
-                        : null,
                 ])->values()->all(),
 
                 'cupos_elegibles' => self::cuposElegibles($b),

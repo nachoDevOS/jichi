@@ -72,7 +72,7 @@ decisiones que acá solo se nombran.
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `FaenaController.php` | 295 | Listado, alta, ficha y anulación. **Sin editar ni borrar**: el papel ya está en manos de la persona. `create()` acepta `?carnet=` para llegar desde la ficha del carnet |
+| `FaenaController.php` | 295 | Listado, alta, ficha, cobro y circuito de revisión. **Sin editar ni borrar**: el papel ya está en manos de la persona. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario |
 | `GuiaController.php` | 358 | Ídem, más `actualizarDetalle()` — la única corrección que el módulo permite. `resumir()` usa el `withSum` del listado para no calcular los kilos por fila |
 | `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario |
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
@@ -99,6 +99,7 @@ decisiones que acá solo se nombran.
 | `Panel/PagoController.php` | 123 | Libro de caja + alta. **Sin anulación** |
 | `Panel/RubroController.php` | 97 | **Sin `destroy()`** |
 | `Panel/ReciboController.php` | 199 | Solo dibuja el PDF. Media carta apaisada. Imágenes embebidas |
+| `Panel/PermisoFaenaImpresionController.php` | 130 | El «Permiso por Faena» en PDF. Carta vertical. Sale recién con la faena **aprobada**. El monto es la copia congelada de la fila, no la tarifa de hoy; la fecha del pie sale de `fecha_emision` para que una reimpresión diga lo mismo |
 | `Panel/AutorizacionPescaController.php` | 187 | La autorización de pesca en PDF. Carta vertical. Sale recién con el cupo **aprobado**; la tabla de tamaños mínimos y las reglas de redes van como constantes —son texto del reglamento, no de la base— |
 | `Panel/DashboardController.php` | 330 | Cada bloque envuelto en `fn()` para las visitas parciales. `listos_para_aprobar` **cae en N+1**. `actividadDiaria()` arma la serie de 14 días de los indicadores |
 | `Publico/VerificacionController.php` | 232 | Cédula enmascarada. Sin ids internos. **Sin rubros suspendidos** |
@@ -129,6 +130,7 @@ decisiones que acá solo se nombran.
 
 | Archivo | Qué es | No obvio |
 | --- | --- | --- |
+| `permiso-faena.blade.php` | Calco del talonario «PERMISO POR FAENA» | Texto que FLUYE dentro de un MARCO redondeado —`border-radius`, que la 3.1.6 de DomPDF dibuja bien—. El «Kg.» lleva la línea de ancho fijo, o se sale del marco. Carta vertical, 612×792 pt |
 | `autorizacion-pesca.blade.php` | Calco de la autorización de pesca | Texto que FLUYE, al revés que el carnet y el recibo: el papel son párrafos, no coordenadas fijas. Carta vertical, 612×792 pt |
 | `recibo-oficial.blade.php` | Calco del talonario del SEDAG | Todo en `position: absolute` sobre una grilla de 592×376 pt. Ver [modulos/RECIBOS.md](modulos/RECIBOS.md) |
 | `carnet-pescador.blade.php` | La credencial impresa | Calco de la cédula de papel, una carilla de 243×153 pt (CR80). **Es el espejo de `vista-previa-carnet.tsx`**: si se toca una, se toca la otra. Ver [modulos/CARNETS.md](modulos/CARNETS.md) |
