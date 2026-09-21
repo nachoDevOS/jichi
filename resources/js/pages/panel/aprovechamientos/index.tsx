@@ -160,11 +160,11 @@ export default function IndiceCupos({
                     {cupos.data.length === 0 ? (
                         <EstadoVacio
                             icono={Waves}
-                            titulo="Sin cupos otorgados"
+                            titulo="Sin autorización de pesca para aprovechamiento pesquero"
                             descripcion={
                                 filtros.buscar || filtros.estado
                                     ? 'Ninguno coincide con los filtros.'
-                                    : 'El cupo es el paso 2 del flujo: va antes del carnet, porque el carnet necesita saber qué volumen imprimir.'
+                                    : ''
                             }
                         />
                     ) : (
