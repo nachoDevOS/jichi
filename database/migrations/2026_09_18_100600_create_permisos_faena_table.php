@@ -29,6 +29,10 @@ return new class extends Migration
             // una desajustan el cupo en quince.
             $table->decimal('kilos_extraidos', 12, 2)->default(0);
 
+            // El día que el pescador la pidió en ventanilla. Puede ser pasada:
+            // sirve para poner al día lo que se tramitó en papel.
+            $table->date('fecha_solicitud');
+
             $table->date('fecha_salida');
 
             // Se guarda calculada en vez de derivarla al leer: si la resolución
@@ -36,7 +40,12 @@ return new class extends Migration
             // venciendo cuando dice el papel que el pescador tiene en la mano.
             $table->date('fecha_limite')->comment('Máximo 1 mes desde fecha_salida');
 
-            $table->string('estado', 20)->default(EstadoFaena::Activo->value);
+            // La escribe la APROBACIÓN. En NULL mientras es una solicitud.
+            $table->date('fecha_emision')->nullable();
+
+            // NACE PENDIENTE: la faena se cobra y se firma como el carnet y el
+            // aprovechamiento, así que no autoriza nada hasta que la aprueban.
+            $table->string('estado', 20)->default(EstadoFaena::Pendiente->value);
 
             /*
              * Dos hojas del talonario no pueden tener el mismo número DENTRO del

@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
 class EmitirFaenaService
 {
     /**
-     * Emite el permiso de una salida.
+     * Registra la solicitud de una salida. NACE PENDIENTE: no autoriza nada
+     * hasta que se cobre el arancel y alguien la firme.
      */
     public function emitir(
         Carnet $carnet,
@@ -96,7 +97,10 @@ class EmitirFaenaService
                 'carnet_id' => $carnet->id,
                 'numero_faena' => $numeroFaena,
                 'kilos_extraidos' => $kilos,
-                'estado' => EstadoFaena::Activo,
+                // PENDIENTE, como el carnet y el cupo: la emisión la escribe
+                // la aprobación, y hasta entonces esto es una solicitud.
+                'estado' => EstadoFaena::Pendiente,
+                'fecha_solicitud' => now()->toDateString(),
                 'fecha_salida' => $salida->toDateString(),
                 // Se GUARDA la fecha calculada en vez de derivarla al leer: si
                 // mañana la resolución baja el plazo, los permisos ya emitidos
@@ -106,7 +110,9 @@ class EmitirFaenaService
             ]);
 
             /*
-             * SI ESTA FAENA DEJÓ EL CUPO EN CERO, EL CUPO PASA A `agotado`.
+             * SI ESTA SOLICITUD DEJÓ EL CUPO EN CERO, EL CUPO PASA A `agotado`.
+             * Los kilos se reservan desde que se piden —ver
+             * EstadoFaena::consumeCupo()—, no desde la firma.
              */
             if ($cupo->fresh()->saldoKg() <= 0.0) {
                 $cupo->update(['estado' => EstadoAprovechamiento::Agotado]);

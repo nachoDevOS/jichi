@@ -1,5 +1,5 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { Plus, Search, Ship } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Eye, Plus, Receipt, Search, Ship } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { fecha } from '@/lib/utils';
-import type { OpcionEnum, Paginado } from '@/types';
+import { bs, fecha, fechaHora, hace } from '@/lib/utils';
+import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { FaenaFila } from '@/types/faenas';
 
 /**
@@ -29,6 +29,7 @@ export default function IndiceFaenas({
     opcionesPorPagina: number[];
 }) {
     const { puede } = usePermisos();
+    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
     function filtrar(valores: Record<string, string | number | null>) {
@@ -144,6 +145,9 @@ export default function IndiceFaenas({
                                             <th className="px-5 py-2.5 font-medium">Estado</th>
                                             <th className="px-5 py-2.5 font-medium">Salida</th>
                                             <th className="px-5 py-2.5 font-medium">Límite</th>
+                                            <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
+                                            <th className="px-5 py-2.5 font-medium">Registrado</th>
+                                            <th className="px-5 py-2.5" />
                                         </tr>
                                     </thead>
 
@@ -198,6 +202,46 @@ export default function IndiceFaenas({
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fecha(f.fecha_limite)}
+                                                </td>
+
+                                                {/* Lo cobrado, no solo la tarifa: es lo que dice
+                                                    si al expediente le falta plata. */}
+                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    {bs(f.monto, institucion.moneda)}
+                                                    {!f.pagado && (
+                                                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                            faltan {bs(f.saldo_pendiente, institucion.moneda)}
+                                                        </p>
+                                                    )}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                    <p className="tabular-nums">{fechaHora(f.registrado_en)}</p>
+                                                    <p className="text-xs">{hace(f.registrado_en)}</p>
+                                                </td>
+
+                                                <td className="px-5 py-2.5">
+                                                    <div className="flex justify-end gap-1">
+                                                        <Link href={route('faenas.show', f.id)}>
+                                                            <Button variant="ver" size="sm" title="Ver">
+                                                                <Eye className="size-4" />
+                                                            </Button>
+                                                        </Link>
+
+                                                        {/* El recibo existe desde el ENVÍO. */}
+                                                        {puede('recibos.imprimir') && f.recibo_id !== null && (
+                                                            <a
+                                                                href={route('recibos.imprimir', f.recibo_id)}
+                                                                target="_blank"
+                                                                rel="noopener"
+                                                                title={`Recibo ${f.recibo_numero}`}
+                                                            >
+                                                                <Button variant="ver" size="sm">
+                                                                    <Receipt className="size-4" />
+                                                                </Button>
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}

@@ -33,15 +33,46 @@ export interface FaenaFila {
     /** Se pasó de fecha y sigue activa: trabajo sin cerrar, no una previsión. */
     caducada: boolean;
     puede_completarse: boolean;
+    /** Por qué todavía no autoriza a salir. `null` cuando sí autoriza. */
+    motivo_sin_autorizar: string | null;
+    /** Si pasó por la firma. Hasta entonces el permiso no vale. */
+    ya_fue_aprobada: boolean;
+    /** Si se le pueden cargar depósitos hoy. Solo mientras está pendiente. */
+    admite_pagos: boolean;
+
+    /** El arancel de la salida y cómo va cobrado. */
+    monto: number;
+    saldo_pendiente: number;
+    pagado: boolean;
+
+    /** El recibo del trámite. Existe desde el ENVÍO; null mientras es borrador. */
+    recibo_id: number | null;
+    recibo_numero: string | null;
+
+    /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
+    registrado_en: string | null;
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
+    fecha_solicitud: string | null;
     fecha_salida: string | null;
     fecha_limite: string | null;
+    /** La escribe la aprobación. Null mientras es una solicitud. */
+    fecha_emision: string | null;
 }
 
 /** La faena con el detalle que solo pinta la ficha. */
 export interface FaenaFicha extends FaenaFila {
     asociacion: string | null;
+
+    /**
+     * LAS DEL CIRCUITO DE REVISIÓN, resueltas en el servidor. React no vuelve
+     * a evaluar el estado: pregunta por estas.
+     */
+    puede_enviarse: boolean;
+    puede_revisarse: boolean;
+    puede_aprobarse: boolean;
+    /** Cuántas boletas quedan sin controlar. Bloquean la aprobación. */
+    pagos_sin_validar: number;
 
     /**
      * El cupo del que salieron los kilos.

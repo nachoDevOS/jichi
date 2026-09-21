@@ -175,6 +175,22 @@ class Beneficiario extends Model
         );
     }
 
+    /**
+     * Los permisos de faena que pidió COMO PESCADOR.
+     */
+    public function faenas(): HasManyThrough
+    {
+        // A TRAVÉS de sus carnets, como las guías: la faena cuelga del carnet.
+        return $this->hasManyThrough(
+            PermisoFaena::class,
+            Carnet::class,
+            'beneficiario_id',  // FK en carnets
+            'carnet_id',        // FK en permisos_faena
+            'id',
+            'id',
+        );
+    }
+
     //  Reglas de negocio
 
     /**

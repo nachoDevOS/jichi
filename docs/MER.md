@@ -53,7 +53,8 @@ propósito y el porqué de cada decisión vive acá.**
 2. cupo           se otorga (nace PENDIENTE) ─┐
 3. carnet         se emite con ese cupo       ├─ se cobran juntos
 4. caja           un recibo cubre los dos ────┘  y el cupo pasa a ACTIVO
-5. faena / guía   recién ahí se puede trabajar
+5. faena / guía   se piden, se cobran y se firman igual; recién aprobadas
+                  autorizan a trabajar
 ```
 
 ---
@@ -420,8 +421,36 @@ usa el scope `enCurso()` —pendiente o aprobado, en fecha— y no `vigentes()`.
 | `carnet_id` | FK RESTRICT | **La única**: de él cuelga la faena |
 | `numero_faena` | int | Hoja del talonario del carnet |
 | `kilos_extraidos` | decimal(12,2) | |
+| `fecha_solicitud` | date | El día que se pidió; puede ser pasada |
 | `fecha_salida` / `fecha_limite` | date | Máximo **1 mes** |
-| `estado` | string(20) | `EstadoFaena` |
+| `fecha_emision` | date, null | La escribe la APROBACIÓN |
+| `estado` | string(20) | `EstadoFaena`; nace `pendiente` |
+
+**LA FAENA SE COBRA Y SE FIRMA, igual que el carnet y el cupo —20/09/2026—.**
+Antes nacía ACTIVA y autorizaba en el acto: se emitía el papel sin que hubiera
+entrado un peso. Hoy recorre el mismo circuito que los otros dos trámites:
+
+```
+PENDIENTE ──[depósitos]──▶ [enviar] ──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ COMPLETADO
+   ▲                                         │          (autoriza la salida)
+   └──────────────[rechazar, con motivo]─────┘
+```
+
+`PermisoFaena` usa el trait `Pagable`, el arancel sale de
+`config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`, 30 Bs por
+defecto— y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
+en los otros dos. El circuito vive en `RevisarFaenaService`.
+
+**Los kilos se reservan DESDE EL PEDIDO, no desde la firma.**
+`EstadoFaena::consumeCupo()` deja afuera solo a la vencida, así que una faena
+pendiente ya pesa contra la bolsa. Es deliberado: sin eso, tres solicitudes por
+el cupo entero pasarían las tres —cada una leería el saldo sin ver a las otras—
+y el pescador terminaría con más kilos autorizados que su aprovechamiento.
+
+**El titular llega por un accesor.** El recibo sale a nombre de
+`$tramite->beneficiario_id`, que la faena no guarda: lo resuelve
+`PermisoFaena::beneficiarioId()` a través del carnet, para no duplicar la clave
+en la tabla.
 
 **CUELGA DEL CARNET Y DE NADA MÁS** —cambiado el 20/09/2026—. Tuvo también un
 `aprovechamiento_id`, con el argumento de que el cupo es de dónde SALEN LOS KILOS

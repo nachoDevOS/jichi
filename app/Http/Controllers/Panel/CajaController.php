@@ -197,6 +197,15 @@ class CajaController extends Controller
             }
         }
 
+        foreach ($beneficiario->faenas()->withSum('pagos', 'monto_parcial')->get() as $f) {
+            // Solo la que todavía admite depósitos: una faena firmada ya está
+            // cobrada por definición.
+            if ($f->saldoPendiente() > 0 && $f->admitePagos()) {
+                $deudas[] = $this->linea('faena', $f->id, $f->etiqueta,
+                    $f->kilos_extraidos.' kg', $f->montoACobrar(), $f->saldoPendiente());
+            }
+        }
+
         return $deudas;
     }
 

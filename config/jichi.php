@@ -161,6 +161,17 @@ return [
     ],
 
     /*
+    | Permiso de faena: lo que sale cada salida de pesca.
+    |
+    | La faena se cobra y se firma como el carnet y el aprovechamiento, así que
+    | necesita su arancel. Va acá y no en una tabla por lo mismo que el de las
+    | guías: es UN número que la unidad ajusta por resolución.
+    */
+    'faenas' => [
+        'tarifa_base' => (float) env('JICHI_FAENA_TARIFA_BASE', 30),
+    ],
+
+    /*
     | Aprovechamiento pesquero: qué tan duro es el tope de la bolsa madre.
     |
     | ----------------------------------------------------------------------------

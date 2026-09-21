@@ -7,6 +7,7 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\Pago;
+use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -31,6 +32,7 @@ class CobrarService
         'carnet' => Carnet::class,
         'cupo' => AprovechamientoPesq::class,
         'guia' => GuiaMovimiento::class,
+        'faena' => PermisoFaena::class,
     ];
 
     public function __construct(private readonly CorrelativoService $correlativos) {}
@@ -326,6 +328,13 @@ class CobrarService
             $tramite instanceof AprovechamientoPesq => 'Autorización de Pesca para Aprovechamiento '
                 .'Pesquero'.$this->tramoDe($tramite),
             $tramite instanceof GuiaMovimiento => 'Guía '.$tramite->codigo_guia,
+            /*
+             * «Permiso de Faena N° 0003 - 120 kg»: el número es el de la hoja
+             * del talonario que la persona se lleva, y los kilos son lo que el
+             * permiso autoriza a sacar —que es por lo que se paga—.
+             */
+            $tramite instanceof PermisoFaena => $tramite->etiqueta.' - '
+                .rtrim(rtrim(number_format((float) $tramite->kilos_extraidos, 2, '.', ''), '0'), '.').' kg',
             default => 'Trámite',
         };
     }

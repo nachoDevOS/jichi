@@ -100,6 +100,10 @@ enum RolSistema: string
             'faenas.completar',
             'guias.cerrar',
 
+            // Presentar la faena a revisión: mismo reparto que en el carnet y
+            // el cupo —presentar es de ventanilla, firmar no—.
+            'faenas.enviar',
+
             // Cobrar y entregar el comprobante numerado: el mostrador entero.
             'caja.cobrar',
             'recibos.imprimir',
@@ -139,6 +143,12 @@ enum RolSistema: string
              * la misma firma sobre el mismo expediente.
              */
             'carnets.aprobar',
+
+            /*
+             * Y LA FIRMA DE LA FAENA, que es la misma decisión sobre el mismo
+             * tipo de expediente: se miran las boletas y se habilita la salida.
+             */
+            'faenas.aprobar',
 
             /*
              * ELIMINAR un carnet cargado por error. De supervisión, igual que

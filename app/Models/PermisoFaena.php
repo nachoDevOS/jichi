@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoFaena;
 use App\Traits\Auditable;
+use App\Traits\Pagable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -19,13 +20,15 @@ use Illuminate\Support\Carbon;
     'carnet_id',
     'numero_faena',
     'kilos_extraidos',
+    'fecha_solicitud',
     'fecha_salida',
     'fecha_limite',
+    'fecha_emision',
     'estado',
 ])]
 class PermisoFaena extends Model
 {
-    use Auditable, SoftDeletes;
+    use Auditable, Pagable, SoftDeletes;
 
     /** «PermisoFaena» pluraliza a «permiso_faenas», que no es la tabla. */
     protected $table = 'permisos_faena';
@@ -38,15 +41,17 @@ class PermisoFaena extends Model
     /** Ver Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [
         'kilos_extraidos' => 0,
-        'estado' => EstadoFaena::Activo->value,
+        'estado' => EstadoFaena::Pendiente->value,
     ];
 
     protected function casts(): array
     {
         return [
             'kilos_extraidos' => 'decimal:2',
+            'fecha_solicitud' => 'date',
             'fecha_salida' => 'date',
             'fecha_limite' => 'date',
+            'fecha_emision' => 'date',
             'estado' => EstadoFaena::class,
         ];
     }
@@ -71,6 +76,18 @@ class PermisoFaena extends Model
         return $this->carnet?->aprovechamiento;
     }
 
+    /**
+     * El titular, alcanzado por el carnet.
+     *
+     * `CobrarService` lo pide como `beneficiario_id` —la columna que tienen el
+     * carnet y el cupo— así que el accesor deja a la faena hablando el mismo
+     * idioma sin duplicar la clave en la tabla.
+     */
+    protected function beneficiarioId(): Attribute
+    {
+        return Attribute::get(fn (): ?int => $this->carnet?->beneficiario_id);
+    }
+
     //  Lectura
 
     /** Cómo se lee en un listado: «Faena N° 0003». */
@@ -79,6 +96,79 @@ class PermisoFaena extends Model
         return Attribute::get(
             fn (): string => 'Faena N° '.str_pad((string) $this->numero_faena, 4, '0', STR_PAD_LEFT),
         );
+    }
+
+    //  El circuito: cobrar, presentar y firmar
+
+    /**
+     * Lo que sale un permiso de faena. Exigido por el trait Pagable.
+     *
+     * Sale de la configuración y no de una tabla porque es UN número que la
+     * unidad ajusta por resolución, igual que la tarifa de las guías.
+     */
+    public function montoACobrar(): float
+    {
+        return (float) config('jichi.faenas.tarifa_base', 0);
+    }
+
+    /** ¿Se le pueden cargar depósitos hoy? Exigido por el trait Pagable. */
+    public function admitePagos(): bool
+    {
+        return $this->estado->permitePagos();
+    }
+
+    /** ¿Se puede presentar a revisión? Estado Y arancel cubierto. */
+    public function puedeEnviarseARevision(): bool
+    {
+        return $this->estado->permiteEnvio() && $this->estaPagado();
+    }
+
+    /** ¿Está sobre la mesa de quien firma? */
+    public function puedeRevisarse(): bool
+    {
+        return $this->estado->permiteRevision();
+    }
+
+    /** ¿Ya pasó por la firma? Es lo que habilita a salir a pescar. */
+    public function yaFueAprobada(): bool
+    {
+        return ! $this->estado->estaAbierto();
+    }
+
+    /** ¿Se pueden CONTROLAR sus boletas? Solo con la faena presentada. */
+    public function admiteControlDePagos(): bool
+    {
+        return $this->estado === EstadoFaena::EnRevision;
+    }
+
+    /** Corregir se habilita antes: es lo único que levanta una observación. */
+    public function admiteCorreccionDePagos(): bool
+    {
+        return $this->estado->estaAbierto();
+    }
+
+    /**
+     * Por qué esta faena todavía no autoriza a salir. Null cuando sí autoriza.
+     *
+     * Se resuelve en el SERVIDOR y se manda resuelto: React no vuelve a
+     * evaluar el estado, que es como nacen las pantallas que mienten.
+     */
+    public function motivoSinAutorizar(): ?string
+    {
+        if ($this->estaVigente()) {
+            return null;
+        }
+
+        return match (true) {
+            $this->estado === EstadoFaena::Pendiente => 'La faena está PENDIENTE: falta cubrir el '.
+                'arancel y enviarla a revisión.',
+            $this->estado === EstadoFaena::EnRevision => 'La faena está presentada y esperando la '.
+                'firma de quien la aprueba.',
+            $this->estado === EstadoFaena::Completado => 'La salida ya se cerró: los kilos quedaron '.
+                'firmes contra el cupo.',
+            $this->estado === EstadoFaena::Vencido => 'Se pasó su fecha límite sin cerrarse.',
+            default => 'Pasó su fecha límite.',
+        };
     }
 
     //  Reglas de negocio

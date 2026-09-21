@@ -75,10 +75,10 @@ export default function CrearFaena({
 
     return (
         <LayoutPanel
-            titulo="Emitir faena"
-            descripcion={`Autoriza UNA salida. Vale ${diasVigencia} días y descuenta kilos del cupo.`}
+            titulo="Registrar faena"
+            descripcion={`Autoriza UNA salida de ${diasVigencia} días. Nace PENDIENTE: autoriza recién cuando se cobre el arancel y la aprueben.`}
         >
-            <Head title="Emitir faena" />
+            <Head title="Registrar faena" />
 
             <form onSubmit={enviar} className="grid gap-6 lg:grid-cols-3">
                 <Card className="lg:col-span-2">
@@ -170,7 +170,7 @@ export default function CrearFaena({
                 {/* ------------------------------------------------ Consecuencias */}
                 <Card className="h-fit">
                     <CardHeader>
-                        <CardTitle>Lo que se va a emitir</CardTitle>
+                        <CardTitle>Lo que se va a registrar</CardTitle>
                     </CardHeader>
 
                     <CardContent className="space-y-4">
@@ -259,7 +259,7 @@ export default function CrearFaena({
                             }
                             className="w-full"
                         >
-                            Emitir faena
+                            Registrar faena
                         </Button>
                     </CardContent>
                 </Card>

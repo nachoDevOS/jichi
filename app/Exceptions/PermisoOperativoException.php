@@ -139,6 +139,46 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
+     *  EL CIRCUITO DE LA FAENA: cobrar, presentar y firmar
+     */
+
+    /** Se quiso presentar una faena que no está PENDIENTE. */
+    public static function faenaNoSePuedeEnviar(string $estado): self
+    {
+        return new self(
+            "La faena está {$estado} y solo se presenta a revisión la que está PENDIENTE.",
+        );
+    }
+
+    /** Se quiso firmar o rechazar algo que no está presentado. */
+    public static function faenaNoSePuedeRevisar(string $estado): self
+    {
+        return new self(
+            "La faena está {$estado}: se aprueba o se rechaza la que está EN REVISIÓN.",
+        );
+    }
+
+    /** Falta plata para presentarla. */
+    public static function faltaCubrirElArancelDeLaFaena(float $saldo): self
+    {
+        return new self(sprintf(
+            'Faltan %s Bs por cubrir del arancel de la faena. Cargue los depósitos antes de '.
+            'presentarla a revisión.',
+            number_format($saldo, 2, ',', '.'),
+        ));
+    }
+
+    /** Quedan boletas sin controlar: firmar así dejaría la validación decorativa. */
+    public static function faltaControlarBoletasDeLaFaena(int $cuantas): self
+    {
+        return new self(sprintf(
+            'Quedan %d boleta(s) sin controlar. Validelas —o corrija lo observado— antes de '.
+            'aprobar la faena.',
+            $cuantas,
+        ));
+    }
+
+    /**
      * Anular sin motivo escrito no sirve de nada.
      *
      * El número del talonario queda quemado para siempre y deja un hueco en la

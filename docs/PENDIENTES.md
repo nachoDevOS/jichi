@@ -161,6 +161,28 @@ Lo que sí está cubierto: titular, documento, domicilio, **tipo de embarcación
 La tabla de especies con sus tamaños mínimos y las reglas de mallas son texto
 fijo del formulario: van en la plantilla, no en la base.
 
+### 🟠 Una faena PENDIENTE reserva kilos y nada la caduca
+
+**Desde el 20/09/2026 la faena nace PENDIENTE** y sus kilos ya pesan contra el
+cupo —`EstadoFaena::consumeCupo()` solo deja afuera a la vencida—, que es lo que
+impide que tres solicitudes por el cupo entero pasen las tres.
+
+El costo: una solicitud que nadie cobra ni rechaza **se queda reservando esos
+kilos para siempre**. El comando diario que pasa las faenas a `vencido` todavía
+no existe —es el mismo que le falta al carnet—, así que hoy no hay nada que
+suelte una pendiente abandonada. Mientras no exista, la salida es rechazarla o
+eliminarla a mano.
+
+**Al escribir ese comando hay que decidir de qué lado cae la pendiente**: lo
+razonable es caducar también las que pasaron su `fecha_limite` sin firmarse,
+porque la salida que amparaban ya no puede ocurrir.
+
+### 🟠 La faena tiene arancel, y es un valor de PLANTILLA
+
+`config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`— arranca en
+**30 Bs**, puesto por analogía con la guía (50 Bs). **La unidad tiene que
+confirmar el número de la resolución** antes de cobrar la primera.
+
 ### 🟠 El control de tope de cupo se puede APAGAR, y hoy está encendido
 
 Desde el **18/09/2026** el sistema tiene un interruptor,

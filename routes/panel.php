@@ -242,6 +242,27 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     });
 
     /*
+     * EL CIRCUITO DE COBRO Y FIRMA, igual que el del carnet y el del cupo:
+     * los depósitos se cargan desde la ficha, presentar es de ventanilla y
+     * firmar es de supervisión.
+     */
+    Route::post('/faenas/{faena}/pagos', [FaenaController::class, 'pagar'])
+        ->middleware('permiso:caja.cobrar')
+        ->name('faenas.pagar');
+
+    Route::post('/faenas/{faena}/enviar', [FaenaController::class, 'enviar'])
+        ->middleware('permiso:faenas.enviar')
+        ->name('faenas.enviar');
+
+    Route::middleware('permiso:faenas.aprobar')->group(function () {
+        Route::patch('/faenas/{faena}/aprobar', [FaenaController::class, 'aprobar'])
+            ->name('faenas.aprobar');
+
+        Route::patch('/faenas/{faena}/rechazar', [FaenaController::class, 'rechazar'])
+            ->name('faenas.rechazar');
+    });
+
+    /*
      * COMPLETAR es de VENTANILLA y no de supervisión: registrar que el pescador
      * volvió y descargó es un hecho del mostrador, no una decisión que alguien
      * firme. Recién ahí los kilos quedan firmes contra el cupo.

@@ -140,7 +140,7 @@ export type EstadoAprovechamiento =
 export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 
 /** Espejo de App\Enums\EstadoFaena. */
-export type EstadoFaena = 'activo' | 'completado' | 'vencido';
+export type EstadoFaena = 'pendiente' | 'en_revision' | 'activo' | 'completado' | 'vencido';
 
 /** Espejo de App\Enums\EstadoGuia. */
 export type EstadoGuia = 'activa' | 'cerrada' | 'anulada';
