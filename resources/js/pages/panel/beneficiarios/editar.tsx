@@ -12,7 +12,7 @@ export default function EditarBeneficiario({
     provincias,
 }: {
     beneficiario: Partial<BeneficiarioFicha> & { id: number };
-    expedidos: { value: string; label: string }[];
+    expedidos: { value: number; label: string }[];
     provincias: string[];
 }) {
     return (

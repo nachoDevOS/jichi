@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * Es un catálogo que edita la unidad desde el panel. No se borra una fila: se
  * pone en `inactivo`, porque los carnets y las guías ya emitidas apuntan acá.
  */
-#[Fillable(['nombre', 'sigla', 'estado'])]
+#[Fillable(['nombre', 'sigla', 'datos', 'estado'])]
 class Asociacion extends Model
 {
     use Auditable, SoftDeletes;
@@ -30,6 +30,30 @@ class Asociacion extends Model
     protected $table = 'asociaciones';
 
     /**
+     * LOS CAMPOS DE LA FICHA DEL GREMIO, y el rótulo con el que se muestran.
+     *
+     * Es la lista CERRADA de claves que admite la columna `datos`: el
+     * formulario dibuja estos campos y el Request descarta cualquier otro. Con
+     * un JSON abierto, la misma tabla termina guardando «telefono», «teléfono»
+     * y «tel», y después ningún reporte los puede cruzar.
+     *
+     * Para agregar un dato se suma acá y listo: no hace falta migrar.
+     *
+     * @var array<string, string>
+     */
+    public const CAMPOS = [
+        'personeria_juridica' => 'Personería jurídica',
+        'representante' => 'Representante legal',
+        'ci_representante' => 'C.I. del representante',
+        'telefono' => 'Teléfono',
+        'correo' => 'Correo electrónico',
+        'direccion' => 'Dirección',
+        'municipio' => 'Municipio',
+        'comunidad' => 'Comunidad',
+        'fundacion' => 'Fecha de fundación',
+    ];
+
+    /**
      * UN default de la base NO llega al objeto que devuelve create().
      */
     protected $attributes = [
@@ -39,6 +63,8 @@ class Asociacion extends Model
     protected function casts(): array
     {
         return [
+            // `array` y no `object`: el resto del código lee `$a->datos['x']`.
+            'datos' => 'array',
             'estado' => EstadoAsociacion::class,
         ];
     }
@@ -56,6 +82,34 @@ class Asociacion extends Model
     }
 
     //  Lectura
+
+    /**
+     * Un dato de la ficha, o null si no se cargó.
+     *
+     * `datos` es nullable y sus claves son opcionales, así que leerlo directo
+     * con `$a->datos['telefono']` revienta con «Undefined array key» en cuanto
+     * una asociación vieja no lo tenga.
+     */
+    public function dato(string $clave): ?string
+    {
+        $valor = $this->datos[$clave] ?? null;
+
+        return is_string($valor) && trim($valor) !== '' ? $valor : null;
+    }
+
+    /**
+     * La ficha completa, con TODAS las claves —las vacías en null— y su
+     * rótulo. Es lo que necesitan el formulario y la impresión: sin las
+     * ausentes, el formulario dibujaría menos campos según la fila.
+     *
+     * @return array<string, string|null>
+     */
+    public function fichaCompleta(): array
+    {
+        return collect(self::CAMPOS)
+            ->map(fn (string $rotulo, string $clave): ?string => $this->dato($clave))
+            ->all();
+    }
 
     /**
      * Cómo se muestra en un desplegable: «ASOPESCA — Asociación de Pescadores».

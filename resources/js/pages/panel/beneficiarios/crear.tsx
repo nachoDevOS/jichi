@@ -9,7 +9,7 @@ export default function CrearBeneficiario({
     expedidos,
     provincias,
 }: {
-    expedidos: { value: string; label: string }[];
+    expedidos: { value: number; label: string }[];
     provincias: string[];
 }) {
     return (

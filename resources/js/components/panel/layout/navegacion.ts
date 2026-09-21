@@ -46,7 +46,7 @@ export const NAVEGACION: ItemNavegacion[] = [
 
     // --- El flujo del mostrador, en orden.
     { titulo: 'Beneficiarios', ruta: 'beneficiarios.index', icono: Users, permiso: 'beneficiarios.ver', grupo: 'Ventanilla' },
-    { titulo: 'Aprov. Pesquero', tituloCompleto: 'Cupos de pesca (aprovechamientos)', ruta: 'aprovechamientos.index', icono: Waves, permiso: 'aprovechamientos.ver', grupo: 'Ventanilla' },
+    { titulo: 'Aprov. Pesquero', tituloCompleto: 'Autorización de Pesca para Aprovechamiento Pesquero', ruta: 'aprovechamientos.index', icono: Waves, permiso: 'aprovechamientos.ver', grupo: 'Ventanilla' },
     { titulo: 'Carnets', ruta: 'carnets.index', icono: BadgeCheck, permiso: 'carnets.ver', grupo: 'Ventanilla' },
     { titulo: 'Faenas', tituloCompleto: 'Permisos de faena', ruta: 'faenas.index', icono: Ship, permiso: 'faenas.ver', grupo: 'Ventanilla' },
     { titulo: 'Guías', tituloCompleto: 'Guías de movimiento', ruta: 'guias.index', icono: Truck, permiso: 'guias.ver', grupo: 'Ventanilla' },

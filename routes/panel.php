@@ -170,6 +170,43 @@ Route::middleware('auth')->prefix('panel')->group(function () {
      * REVOCAR es de SUPERVISIÓN: es una sanción, no se revierte, y la
      * verificación pública empieza a informarla al instante.
      */
+    /*
+     * CORREGIR Y ELIMINAR, SOLO SOBRE EL BORRADOR. Lo comprueba el servicio con
+     * la fila bloqueada: entre abrir el formulario y guardar, otra ventanilla
+     * pudo cobrarlo.
+     */
+    Route::middleware('permiso:carnets.editar')->group(function () {
+        Route::get('/carnets/{carnet}/editar', [CarnetController::class, 'edit'])
+            ->name('carnets.edit');
+
+        Route::put('/carnets/{carnet}', [CarnetController::class, 'update'])
+            ->name('carnets.update');
+    });
+
+    Route::delete('/carnets/{carnet}', [CarnetController::class, 'destroy'])
+        ->middleware('permiso:carnets.eliminar')
+        ->name('carnets.destroy');
+
+    /*
+     * CARGAR LOS DEPÓSITOS DESDE LA FICHA DEL CARNET. Mismo circuito que el
+     * aprovechamiento, y el mismo permiso: es un cobro de mostrador.
+     */
+    Route::post('/carnets/{carnet}/pagos', [CarnetController::class, 'pagar'])
+        ->middleware('permiso:caja.cobrar')
+        ->name('carnets.pagar');
+
+    Route::post('/carnets/{carnet}/enviar', [CarnetController::class, 'enviar'])
+        ->middleware('permiso:carnets.enviar')
+        ->name('carnets.enviar');
+
+    Route::middleware('permiso:carnets.aprobar')->group(function () {
+        Route::patch('/carnets/{carnet}/aprobar', [CarnetController::class, 'aprobar'])
+            ->name('carnets.aprobar');
+
+        Route::patch('/carnets/{carnet}/rechazar', [CarnetController::class, 'rechazar'])
+            ->name('carnets.rechazar');
+    });
+
     Route::patch('/carnets/{carnet}/revocar', [CarnetController::class, 'revocar'])
         ->middleware('permiso:carnets.revocar')
         ->name('carnets.revocar');

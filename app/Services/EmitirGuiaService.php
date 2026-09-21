@@ -50,10 +50,12 @@ class EmitirGuiaService
             }
 
             return GuiaMovimiento::create([
+                // La guía cuelga del CARNET: la persona se lee de él.
+                'carnet_id' => $carnet->id,
+
                 /*
                  * LA ASOCIACIÓN SE COPIA DEL CARNET, no se pregunta de nuevo.
                  */
-                'beneficiario_com_id' => $carnet->beneficiario_id,
                 'asociacion_id' => $carnet->asociacion_id,
 
                 'codigo_guia' => $codigo,

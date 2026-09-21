@@ -45,7 +45,7 @@ class FaenaController extends Controller
              */
             ->with([
                 'carnet:id,beneficiario_id,codigo_carnet,tipo_actor',
-                'carnet.beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
             ])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
                 fn ($s) => $s
@@ -163,7 +163,7 @@ class FaenaController extends Controller
     {
         $faena->load([
             'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,asociacion_id',
-            'carnet.beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+            'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
             'carnet.asociacion:id,nombre,sigla',
             // El cupo cuelga del CARNET: la faena ya no guarda su id.
             'carnet.aprovechamiento.categoria',

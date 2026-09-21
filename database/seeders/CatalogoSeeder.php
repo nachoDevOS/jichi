@@ -57,8 +57,8 @@ class CatalogoSeeder extends Seeder
      * @var list<array{nombre: string, precio_bs: float}>
      */
     private const TIPOS_CARNET = [
-        ['nombre' => 'Carnet de Pescador', 'precio_bs' => 80.00],
-        ['nombre' => 'Carnet Comercializador', 'precio_bs' => 100.00],
+        ['nombre' => 'Carnet de Pescador', 'tipo_actor' => 'pescador', 'precio_bs' => 80.00],
+        ['nombre' => 'Carnet Comercializador', 'tipo_actor' => 'comercializador', 'precio_bs' => 100.00],
     ];
 
     public function run(): void
@@ -77,7 +77,10 @@ class CatalogoSeeder extends Seeder
         }
 
         foreach (self::TIPOS_CARNET as $fila) {
-            TipoCarnet::firstOrCreate(['nombre' => $fila['nombre']], ['precio_bs' => $fila['precio_bs']]);
+            TipoCarnet::firstOrCreate(
+                ['nombre' => $fila['nombre']],
+                collect($fila)->except('nombre')->all(),
+            );
         }
 
         $this->command?->warn(

@@ -7,7 +7,16 @@ namespace App\Enums;
  */
 enum EstadoCarnet: string
 {
-    /** Vale. Es como nace toda credencial. */
+    /**
+     * Emitido y todavía sin cobrar. Es como NACE toda credencial: el plástico
+     * no se entrega hasta que el arancel esté pagado y firmado.
+     */
+    case Pendiente = 'pendiente';
+
+    /** Los depósitos cubren el arancel; falta que alguien firme. */
+    case EnRevision = 'en_revision';
+
+    /** Vale. Recién acá el carnet habilita a trabajar. */
     case Activo = 'activo';
 
     /**
@@ -21,6 +30,8 @@ enum EstadoCarnet: string
     public function etiqueta(): string
     {
         return match ($this) {
+            self::Pendiente => 'Pendiente',
+            self::EnRevision => 'En revisión',
             self::Activo => 'Activo',
             self::Revocado => 'Revocado',
             self::Vencido => 'Vencido',
@@ -36,6 +47,8 @@ enum EstadoCarnet: string
     public function color(): string
     {
         return match ($this) {
+            self::Pendiente => 'sky',
+            self::EnRevision => 'indigo',
             self::Activo => 'emerald',
             self::Revocado => 'rose',
             self::Vencido => 'slate',
@@ -51,6 +64,61 @@ enum EstadoCarnet: string
     public function habilita(): bool
     {
         return $this === self::Activo;
+    }
+
+    /**
+     *  EL CIRCUITO, igual que el del aprovechamiento
+     *
+     * Los cuatro métodos que siguen son los que deciden qué se puede hacer en
+     * cada estado. Viven acá y NO en el controlador: el servicio pregunta, y
+     * React recibe la respuesta ya resuelta en los campos `puede_*`.
+     */
+
+    /**
+     * ¿Se pueden corregir sus datos?
+     *
+     * PENDIENTE es un BORRADOR: mientras no entró plata ni nadie lo firmó, el
+     * expediente se está armando en el mostrador y equivocarse de asociación o
+     * de tipo se arregla corrigiendo la fila.
+     */
+    public function permiteEdicion(): bool
+    {
+        return $this === self::Pendiente;
+    }
+
+    /** ¿Se puede borrar la fila entera? Mismo criterio que corregir. */
+    public function permiteEliminacion(): bool
+    {
+        return $this === self::Pendiente;
+    }
+
+    /** ¿Se le pueden cargar depósitos? Solo mientras nadie lo firmó. */
+    public function permitePagos(): bool
+    {
+        return $this === self::Pendiente;
+    }
+
+    /** ¿Se puede mandar a que alguien lo firme? */
+    public function permiteEnvio(): bool
+    {
+        return $this === self::Pendiente;
+    }
+
+    /** ¿Se puede aprobar o rechazar? Solo lo que está presentado. */
+    public function permiteRevision(): bool
+    {
+        return $this === self::EnRevision;
+    }
+
+    /**
+     * Pendiente + en revisión: nadie lo firmó todavía.
+     *
+     * ⚠️ NO ES PERMISO DE ESCRITURA ni de trabajo. Para lo segundo está
+     * `habilita()`, que solo deja pasar ACTIVO.
+     */
+    public function estaAbierto(): bool
+    {
+        return $this === self::Pendiente || $this === self::EnRevision;
     }
 
     /**

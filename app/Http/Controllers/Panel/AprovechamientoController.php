@@ -10,9 +10,10 @@ use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\EliminarCupoRequest;
 use App\Http\Requests\Panel\OtorgarCupoRequest;
 use App\Http\Requests\Panel\RechazarCupoRequest;
-use App\Http\Requests\Panel\RegistrarPagoCupoRequest;
+use App\Http\Requests\Panel\RegistrarDepositosRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
+use App\Models\Carnet;
 use App\Models\CategoriaAprovechamiento;
 use App\Models\Pago;
 use App\Models\PermisoFaena;
@@ -53,7 +54,7 @@ class AprovechamientoController extends Controller
              * y el accesor contesta cualquier cosa, sin ningún error.
              */
             ->with([
-                'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
+                'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
                 'categoria',
             ])
             /*
@@ -78,7 +79,14 @@ class AprovechamientoController extends Controller
                 'aprovechamientos_pesq.estado',
                 $estado,
             ))
-            ->latest('fecha_solicitud')
+            /*
+             * LO ÚLTIMO CARGADO, ARRIBA — y por `created_at`, no por la fecha
+             * de solicitud: esa la declara el operador y puede ser pasada, así
+             * que un expediente cargado hoy con fecha vieja se iba al fondo.
+             * El `id` desempata, o el paginado repite filas entre páginas.
+             */
+            ->orderByDesc('aprovechamientos_pesq.created_at')
+            ->orderByDesc('aprovechamientos_pesq.id')
             ->paginate($filtros['por_pagina'])
             ->withQueryString()
             ->through($this->resumir(...));
@@ -128,8 +136,8 @@ class AprovechamientoController extends Controller
             $cupo = $this->servicio->otorgar(
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
                 CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
+                $datos['tipo_embarcacion'],
                 now()->parse($datos['fecha_solicitud']),
-                $datos['tipo_embarcacion'] ?? null,
             );
         } catch (CupoInvalidoException $e) {
             /*
@@ -150,7 +158,8 @@ class AprovechamientoController extends Controller
         return redirect()
             ->route('aprovechamientos.show', $cupo)
             ->with('exito', sprintf(
-                'Cupo otorgado: %s kg por %s Bs. Cargue los depósitos para poder enviarlo a revisión.',
+                'Aprovechamiento registrado, PENDIENTE de cobro: %s kg por %s Bs. Cargue los '.
+                'depósitos para poder enviarlo a revisión.',
                 number_format((float) $cupo->volumen_total_kg, 2, ',', '.'),
                 number_format($cupo->montoACobrar(), 2, ',', '.'),
             ));
@@ -162,7 +171,7 @@ class AprovechamientoController extends Controller
     public function show(AprovechamientoPesq $aprovechamiento): Response
     {
         $aprovechamiento->load([
-            'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
+            'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'categoria',
         ]);
 
@@ -246,6 +255,32 @@ class AprovechamientoController extends Controller
             ] : null,
 
             /*
+             * LAS CÉDULAS QUE SE APOYAN EN ESTE CUPO, de la más nueva a la más
+             * vieja. Son varias en teoría —el carnet se renueva a mitad de un
+             * cupo vigente, o se repone uno perdido— y desde la ficha del cupo
+             * es la pregunta natural: «¿a quién se le emitió con esto?».
+             */
+            'carnets' => $aprovechamiento->carnets()
+                ->with('tipoCarnet:id,nombre')
+                ->latest('created_at')
+                ->get()
+                ->map(fn (Carnet $c): array => [
+                    'id' => $c->id,
+                    'codigo' => $c->codigo_legible,
+                    'registro' => $c->registro_legible,
+                    'tipo' => $c->tipoCarnet?->nombre,
+                    'tipo_actor_etiqueta' => $c->tipo_actor->etiqueta(),
+                    'tipo_actor_color' => $c->tipo_actor->color(),
+                    'estado_etiqueta' => $c->estado->etiqueta(),
+                    'estado_color' => $c->estado->color(),
+                    'ya_fue_aprobado' => $c->yaFueAprobado(),
+                    'fecha_solicitud' => $c->fecha_solicitud?->toDateString(),
+                    'fecha_emision' => $c->fecha_emision?->toDateString(),
+                    'fecha_vencimiento' => $c->fecha_vencimiento?->toDateString(),
+                ])
+                ->all(),
+
+            /*
              * Las faenas que colgaron de este cupo, de la más nueva a la más
              * vieja. Es el detalle que explica el saldo: sin él, «le quedan 20
              * kg» es un número que hay que creer.
@@ -285,7 +320,7 @@ class AprovechamientoController extends Controller
         }
 
         $aprovechamiento->load([
-            'beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
+            'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'categoria',
         ]);
 
@@ -322,8 +357,8 @@ class AprovechamientoController extends Controller
             $this->servicio->editar(
                 $aprovechamiento,
                 CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
+                $datos['tipo_embarcacion'],
                 now()->parse($datos['fecha_solicitud']),
-                $datos['tipo_embarcacion'] ?? null,
             );
         } catch (CupoInvalidoException $e) {
             // Cuelga del tramo y no de la persona: al corregir, el titular no se
@@ -359,7 +394,7 @@ class AprovechamientoController extends Controller
      *  CARGAR LOS DEPÓSITOS — POST /panel/aprovechamientos/{id}/pagos
      */
     public function pagar(
-        RegistrarPagoCupoRequest $request,
+        RegistrarDepositosRequest $request,
         AprovechamientoPesq $aprovechamiento,
         CobrarService $caja,
         RevisarCupoService $revision,
@@ -610,6 +645,14 @@ class AprovechamientoController extends Controller
             'modalidad' => $cupo->modalidad->value,
             'modalidad_etiqueta' => $cupo->modalidad->etiqueta(),
             'modalidad_color' => $cupo->modalidad->color(),
+
+            /*
+             * CUÁNDO SE CARGÓ LA FILA, que no es lo mismo que la fecha de
+             * solicitud: esa la declara el operador y puede ser pasada. Es un
+             * MOMENTO, así que va con toIso8601String() y la pantalla lo
+             * muestra con la hora y el «hace…».
+             */
+            'registrado_en' => $cupo->created_at?->toIso8601String(),
 
             'estado' => $cupo->estado->value,
             'estado_etiqueta' => $cupo->estado->etiqueta(),

@@ -23,7 +23,7 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn, fecha } from '@/lib/utils';
+import { bs, cn, fecha, fechaHora, hace } from '@/lib/utils';
 import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { CupoFila } from '@/types/aprovechamientos';
 
@@ -69,18 +69,18 @@ export default function IndiceCupos({
 
     return (
         <LayoutPanel
-            titulo="Autorizacion de Pesca Para aprovechamiento Pesquero"
+            titulo="Autorización de Pesca para Aprovechamiento Pesquero"
             descripcion="La bolsa madre: el volumen anual que se le autoriza a cada pescador."
             acciones={
                 puede('aprovechamientos.crear') && (
                     <Button onClick={() => router.visit(route('aprovechamientos.create'))}>
                         <Plus className="size-4" />
-                        Otorgar cupo
+                        Registrar aprovechamiento
                     </Button>
                 )
             }
         >
-            <Head title="Aprovechamientos de Pesca" />
+            <Head title="Autorizaciones de pesca" />
 
             {!modoEstricto && <AvisoModoFlexible />}
 
@@ -164,7 +164,7 @@ export default function IndiceCupos({
                             descripcion={
                                 filtros.buscar || filtros.estado
                                     ? 'Ninguno coincide con los filtros.'
-                                    : 'El cupo es el paso 2 del flujo: va antes del carnet, porque el plástico necesita saber qué volumen imprimir.'
+                                    : 'El cupo es el paso 2 del flujo: va antes del carnet, porque el carnet necesita saber qué volumen imprimir.'
                             }
                         />
                     ) : (
@@ -176,12 +176,16 @@ export default function IndiceCupos({
                                             <th className="px-5 py-2.5 font-medium">Pescador</th>
                                             <th className="px-5 py-2.5 font-medium">Escala</th>
                                             <th className="px-5 py-2.5 font-medium">Saldo</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Cobro</th>
+                                            {/* <th className="px-5 py-2.5 text-right font-medium">Cobro</th> */}
                                             <th className="px-5 py-2.5 font-medium">Solicitado</th>
                                             {/* Vacío mientras no lo firmen: ver
                                                 `fecha_emision` en el MER. */}
                                             <th className="px-5 py-2.5 font-medium">Otorgado</th>
                                             <th className="px-5 py-2.5 font-medium">Vence</th>
+                                            {/* CUÁNDO SE CARGÓ, antes del estado: es lo que
+                                                ordena el trabajo del día —qué entró recién y qué
+                                                está esperando desde ayer—. */}
+                                            <th className="px-5 py-2.5 font-medium">Registrado</th>
                                             {/* ESTADO AL FINAL, pegado a los botones: es lo que
                                                 decide cuáles aparecen, y leerlo al lado de ellos
                                                 explica por qué falta el de imprimir. */}
@@ -237,7 +241,7 @@ export default function IndiceCupos({
                                                     <BarraSaldo cupo={c} />
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                {/* <td className="px-5 py-2.5 text-right tabular-nums">
                                                     {c.pagado ? (
                                                         <span className="text-emerald-700 dark:text-emerald-400">
                                                             Pagado
@@ -247,7 +251,7 @@ export default function IndiceCupos({
                                                             debe {bs(c.saldo_pendiente, institucion.moneda)}
                                                         </span>
                                                     )}
-                                                </td>
+                                                </td> */}
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fecha(c.fecha_solicitud)}
@@ -259,6 +263,11 @@ export default function IndiceCupos({
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fecha(c.fecha_vencimiento)}
+                                                </td>
+
+                                                <td className="px-5 py-2.5 text-xs text-muted-foreground">
+                                                    {fechaHora(c.registrado_en)}
+                                                    <span className="block">{hace(c.registrado_en)}</span>
                                                 </td>
 
                                                 <td className="px-5 py-2.5">

@@ -18,7 +18,17 @@ return new class extends Migration
             // --- Documento de identidad
             $table->string('ci', 30);
             $table->string('complemento', 5)->nullable()->comment('Complemento de CI boliviano');
-            $table->string('expedido', 5)->nullable()->comment('BN, LP, SC, CB...');
+            /*
+             * DÓNDE SE EXPIDIÓ LA CÉDULA, por ID y no con el código copiado:
+             * el departamento vive en su tabla y acá va la referencia, nada
+             * más. El código —«BN»— se lee de la relación al imprimir, así que
+             * quien muestre la cédula completa tiene que cargar
+             * `beneficiario.departamento` en el `with()`.
+             */
+            $table->foreignId('departamento_id')
+                ->nullable()
+                ->constrained('departamentos')
+                ->restrictOnDelete();
 
             // --- Nombre, en cinco partes porque así lo trae la cédula. Partirlo
             //     después con código no se puede acertar siempre. No hay columna

@@ -45,7 +45,9 @@ class GuardarBeneficiarioRequest extends FormRequest
 
             // Se valida contra la lista del SEGIP: son nueve códigos fijos y
             // aceptar cualquier cosa dejaría carnets que dicen «XX».
-            'expedido' => ['nullable', Rule::in(array_keys(config('jichi.expedido')))],
+            // Contra la TABLA y no contra el config: `departamentos` es la
+            // fuente, y la base tiene la FK que lo exige igual.
+            'departamento_id' => ['nullable', 'integer', Rule::exists('departamentos', 'id')],
 
             /*
              * El nombre, partido como viene en la cédula.
@@ -94,7 +96,7 @@ class GuardarBeneficiarioRequest extends FormRequest
         return [
             'ci.required' => 'El número de cédula es obligatorio.',
             'ci.unique' => 'Ya existe un beneficiario registrado con esa cédula.',
-            'expedido.in' => 'El lugar de expedición no es un departamento válido.',
+            'departamento_id.exists' => 'El lugar de expedición no es un departamento válido.',
             'primerNombre.required' => 'El primer nombre es obligatorio.',
             'apellidoPaterno.required' => 'El apellido paterno es obligatorio.',
             'fechaNacimiento.required' => 'La fecha de nacimiento es obligatoria.',
@@ -115,8 +117,9 @@ class GuardarBeneficiarioRequest extends FormRequest
             'complemento' => filled($this->input('complemento'))
                 ? strtoupper(trim((string) $this->input('complemento')))
                 : null,
-            'expedido' => filled($this->input('expedido'))
-                ? strtoupper(trim((string) $this->input('expedido')))
+            // Llega como texto del `<select>`; vacío es «no se declaró».
+            'departamento_id' => filled($this->input('departamento_id'))
+                ? (int) $this->input('departamento_id')
                 : null,
             'email' => filled($this->input('email'))
                 ? strtolower(trim((string) $this->input('email')))
@@ -140,7 +143,7 @@ class GuardarBeneficiarioRequest extends FormRequest
     {
         return [
             'ci' => 'cédula de identidad',
-            'expedido' => 'lugar de expedición',
+            'departamento_id' => 'lugar de expedición',
             'primerNombre' => 'primer nombre',
             'segundoNombre' => 'segundo nombre',
             'apellidoPaterno' => 'apellido paterno',

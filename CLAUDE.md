@@ -564,6 +564,14 @@ Los cuatro tienen que pasar.
   Es la misma trampa que ya estaba anotada para las cinco columnas del nombre
   del beneficiario, pero vale para CUALQUIER columna que un método lea: si el
   modelo la consulta, va en el select. Ver `FaenaController::create()`.
+
+  **Volvió a morder con la CÉDULA, y con el mismo silencio:**
+  `documento_identidad` arma «1234567-1A BN» leyendo `ci`, `complemento` y
+  `expedido`, y los `with('beneficiario:id,ci,…')` traían solo `ci`. Los
+  listados de aprovechamientos, carnets, faenas y caja mostraban el número
+  pelado —sin complemento ni expedido— y nadie lo notó porque la ficha, que
+  carga el modelo entero, lo mostraba bien. **Si el accesor concatena N
+  columnas, las N van en el select.**
 - **Un `default` de la base NO llega al objeto que devuelve `create()`.** El
   INSERT lo aplica el motor, y el modelo en memoria se queda con la columna en
   `null` hasta que alguien haga `refresh()`. Eso rompe lo obvio: emitir una
@@ -808,6 +816,12 @@ Los cuatro tienen que pasar.
   validó lo hizo sobre otros números. El control es parte de la REVISIÓN: solo
   corre EN REVISIÓN, y `RevisarCupoService::aprobar()` exige que no quede ninguna
   sin validar — sin eso, validar sería decorativo.
+- **Un `LIKE` sobre una columna JSON no encuentra nada con tildes.** Laravel
+  guarda el JSON con `json_encode` por defecto, que escapa los acentos a
+  `\uXXXX` y las barras a `\/`: buscar «Pérez» no encuentra `P\u00e9rez`, y
+  falla EN SILENCIO —devuelve cero filas, como si no existiera—. Justo con los
+  apellidos de acá. El término se escapa igual antes de comparar:
+  `trim(json_encode($termino), '"')`. Ver `AsociacionController::comoEnElJson()`.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **LAS PRUEBAS NO AVISAN SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Corren

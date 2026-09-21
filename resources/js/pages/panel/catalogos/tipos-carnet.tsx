@@ -7,16 +7,23 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs } from '@/lib/utils';
-import type { PageProps } from '@/types';
+import type { OpcionEnum, PageProps, TipoActor } from '@/types';
 import type { TipoCarnetFila } from '@/types/catalogos';
 
 /**
  *  CATÁLOGO DE TIPOS DE CARNET
  */
-export default function CatalogoTiposCarnet({ tipos }: { tipos: TipoCarnetFila[] }) {
+export default function CatalogoTiposCarnet({
+    tipos,
+    actores,
+}: {
+    tipos: TipoCarnetFila[];
+    actores: OpcionEnum[];
+}) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
     const [editando, setEditando] = useState<TipoCarnetFila | 'nuevo' | null>(null);
@@ -42,6 +49,7 @@ export default function CatalogoTiposCarnet({ tipos }: { tipos: TipoCarnetFila[]
                         // Ver el comentario de la `key` en asociaciones.tsx.
                         key={editando === 'nuevo' ? 'nuevo' : editando.id}
                         tipo={editando === 'nuevo' ? null : editando}
+                        actores={actores}
                         onCerrar={() => setEditando(null)}
                     />
                 )}
@@ -64,6 +72,7 @@ export default function CatalogoTiposCarnet({ tipos }: { tipos: TipoCarnetFila[]
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
                                             <th className="px-5 py-2.5 font-medium">Tipo</th>
+                                            <th className="px-5 py-2.5 font-medium">Actividad</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Emitidos</th>
                                             <th className="px-5 py-2.5" />
@@ -80,6 +89,15 @@ export default function CatalogoTiposCarnet({ tipos }: { tipos: TipoCarnetFila[]
                                                             Fuera de uso
                                                         </Badge>
                                                     )}
+                                                </td>
+
+                                                {/* Es lo que decide en qué carnets se puede
+                                                    elegir: un tipo de comercializador no aparece
+                                                    emitiendo uno de pescador. */}
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={t.tipo_actor_color}>
+                                                        {t.tipo_actor_etiqueta}
+                                                    </Badge>
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-right tabular-nums">
@@ -122,11 +140,20 @@ export default function CatalogoTiposCarnet({ tipos }: { tipos: TipoCarnetFila[]
 }
 
 /** Alta y edición de un tipo. El mismo formulario para los dos casos. */
-function FormularioTipo({ tipo, onCerrar }: { tipo: TipoCarnetFila | null; onCerrar: () => void }) {
+function FormularioTipo({
+    tipo,
+    actores,
+    onCerrar,
+}: {
+    tipo: TipoCarnetFila | null;
+    actores: OpcionEnum[];
+    onCerrar: () => void;
+}) {
     const esAlta = tipo === null;
 
     const form = useForm({
         nombre: tipo?.nombre ?? '',
+        tipo_actor: tipo?.tipo_actor ?? '',
         precio_bs: tipo?.precio_bs ?? '',
         estado: tipo?.estado ?? true,
     });
@@ -165,6 +192,28 @@ function FormularioTipo({ tipo, onCerrar }: { tipo: TipoCarnetFila | null; onCer
                             aria-invalid={Boolean(form.errors.nombre)}
                             placeholder="Carnet de Pescador"
                         />
+                    </Campo>
+
+                    <Campo
+                        etiqueta="Actividad"
+                        htmlFor="tipo_actor"
+                        error={form.errors.tipo_actor}
+                        ayuda="Define en qué carnets se puede elegir este tipo."
+                        obligatorio
+                    >
+                        <Select
+                            id="tipo_actor"
+                            value={form.data.tipo_actor}
+                            onChange={(e) => form.setData('tipo_actor', e.target.value as TipoActor)}
+                            aria-invalid={Boolean(form.errors.tipo_actor)}
+                        >
+                            <option value="">Elija una actividad…</option>
+                            {actores.map((a) => (
+                                <option key={a.value} value={a.value}>
+                                    {a.label}
+                                </option>
+                            ))}
+                        </Select>
                     </Campo>
 
                     <Campo

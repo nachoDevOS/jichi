@@ -47,7 +47,7 @@ export default function IndiceBeneficiarios({
     return (
         <LayoutPanel
             titulo="Beneficiarios"
-            descripcion="Padrón de personas que tramitan carnet."
+            // descripcion="Padrón de personas que tramitan carnet."
             acciones={
                 puede('beneficiarios.crear') && (
                     <Button onClick={() => router.visit(route('beneficiarios.create'))}>

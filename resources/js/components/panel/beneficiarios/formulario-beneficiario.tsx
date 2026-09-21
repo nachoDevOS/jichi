@@ -22,7 +22,7 @@ export function FormularioBeneficiarioComponente({
 }: {
     /** Null en el alta; la ficha cargada en la edición. */
     beneficiario?: (Partial<BeneficiarioFicha> & { id: number }) | null;
-    expedidos: { value: string; label: string }[];
+    expedidos: { value: number; label: string }[];
     provincias: string[];
 }) {
     const editando = Boolean(beneficiario?.id);
@@ -36,7 +36,8 @@ export function FormularioBeneficiarioComponente({
     const form = useForm<FormularioBeneficiario>({
         ci: beneficiario?.ci ?? '',
         complemento: beneficiario?.complemento ?? '',
-        expedido: beneficiario?.expedido ?? '',
+        // Se guarda el ID del departamento, no el código.
+        departamento_id: beneficiario?.departamento_id ?? ('' as number | ''),
         primerNombre: beneficiario?.primerNombre ?? '',
         segundoNombre: beneficiario?.segundoNombre ?? '',
         apellidoPaterno: beneficiario?.apellidoPaterno ?? '',
@@ -150,11 +151,20 @@ export function FormularioBeneficiarioComponente({
                                 />
                             </Campo>
 
-                            <Campo etiqueta="Expedido en" htmlFor="expedido" error={form.errors.expedido}>
+                            <Campo
+                                etiqueta="Expedido en"
+                                htmlFor="departamento_id"
+                                error={form.errors.departamento_id}
+                            >
                                 <Select
-                                    id="expedido"
-                                    value={form.data.expedido}
-                                    onChange={(e) => form.setData('expedido', e.target.value)}
+                                    id="departamento_id"
+                                    value={form.data.departamento_id}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'departamento_id',
+                                            e.target.value === '' ? '' : Number(e.target.value),
+                                        )
+                                    }
                                 >
                                     <option value="">—</option>
                                     {expedidos.map((opcion) => (
@@ -404,7 +414,7 @@ export function FormularioBeneficiarioComponente({
 
                                 <Compuesto
                                     etiqueta="Documento"
-                                    valor={componerDocumento(form.data)}
+                                    valor={componerDocumento(form.data, expedidos)}
                                     vacio="Cargue la cédula"
                                     mono
                                 />
@@ -624,7 +634,10 @@ function componerNombre(datos: FormularioBeneficiario): string {
         .join(' ');
 }
 
-function componerDocumento(datos: FormularioBeneficiario): string {
+function componerDocumento(
+    datos: FormularioBeneficiario,
+    expedidos: { value: number; label: string }[],
+): string {
     if (!datos.ci.trim()) {
         return '';
     }
@@ -633,7 +646,17 @@ function componerDocumento(datos: FormularioBeneficiario): string {
         ? `${datos.ci.trim()}-${datos.complemento.trim()}`
         : datos.ci.trim();
 
-    return [cedula, datos.expedido].filter(Boolean).join(' ');
+    /*
+     * El código sale de la etiqueta del elegido —«BN — Beni»— porque el
+     * formulario guarda el ID: es el mismo dato que el servidor va a imprimir,
+     * y traerlo aparte sería una tercera copia de la misma lista.
+     */
+    const codigo = expedidos
+        .find((o) => o.value === datos.departamento_id)
+        ?.label.split('—')[0]
+        .trim();
+
+    return [cedula, codigo].filter(Boolean).join(' ');
 }
 
 /*

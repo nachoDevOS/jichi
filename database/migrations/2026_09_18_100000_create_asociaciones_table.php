@@ -19,6 +19,20 @@ return new class extends Migration
             // La sigla es lo que entra en el renglón angosto del carnet.
             $table->string('sigla', 20)->nullable()->comment('ASOPESCA, APESCAT...');
 
+            /*
+             * EL RESTO DE LA FICHA DEL GREMIO, EN JSON.
+             *
+             * Va en una sola columna y no en ocho porque nada del sistema
+             * DECIDE con estos datos: son de contacto y de respaldo, se
+             * muestran y se imprimen. Una columna por dato obligaría a una
+             * migración cada vez que la unidad pide guardar uno más.
+             *
+             * Las claves las fija `Asociacion::CAMPOS`, que es lo que el
+             * formulario del catálogo dibuja: sin esa lista, un JSON abierto
+             * termina con «telefono», «teléfono» y «tel» en la misma tabla.
+             */
+            $table->json('datos')->nullable()->comment('Personería, representante, contacto…');
+
             // String y no ENUM nativo: regla 7 del proyecto.
             $table->string('estado', 20)->default(EstadoAsociacion::Activo->value);
 

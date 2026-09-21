@@ -112,10 +112,28 @@
 
 ---
 
-## Lo que el código todavía no cumple
+## Estado de la implementación
 
-| Regla | Estado | Qué falta |
-| --- | --- | --- |
-| Paso 5 — la guía se vincula **al carnet** | ⚠️ **No cumplida** | `guias_movimiento` guarda `beneficiario_com_id` + `asociacion_id`, no `carnet_id`. El servicio ya recibe el carnet y copia los dos datos de él, así que el cambio es la misma operación que se hizo con `permisos_faena` el 20/09/2026: quitar la columna vieja, poner `carnet_id` y ajustar modelo, servicio, controlador y pantallas |
+**Los seis pasos están implementados tal como se describen arriba** (al
+20/09/2026). Dónde se hace cumplir cada regla que no se ve en el esquema:
 
-Los pasos 1, 2, 3, 4 y 6 están implementados tal como se describen arriba.
+| Regla | Dónde se hace cumplir |
+| --- | --- |
+| El tipo de carnet y la actividad coinciden | `tipos_carnet.tipo_actor` + `EmitirCarnetService`; el formulario filtra la lista |
+| Pescador SIN cupo no saca carnet | `EmitirCarnetService::emitir()` → `pescadorSinCupo()` |
+| El carnet se cobra antes de valer | `EstadoCarnet` + `RevisarCarnetService`; imprimir exige `yaFueAprobado()` |
+| Los dos adjuntos del carnet, 3 MB | `EmitirCarnetRequest` + `StorageController` |
+| Comercializador NUNCA lleva cupo | `EmitirCarnetService` + `EmitirCarnetRequest` (`prohibitedIf`) |
+| La faena solo cuelga del carnet | `permisos_faena.carnet_id` es la única FK; el cupo llega por `hasManyThrough` |
+| Los kilos descuentan del cupo raíz | `AprovechamientoPesq::kilosConsumidos()` / `saldoKg()` |
+| Faena: máximo 30 días | `PermisoFaena::DIAS_VIGENCIA` + `EmitirFaenaRequest` |
+| La guía solo cuelga del carnet | `guias_movimiento.carnet_id` es la única FK hacia la persona |
+| Guía: máximo 5 días | `GuiaMovimiento::DIAS_VIGENCIA` + `EmitirGuiaRequest` |
+| Cada actor emite solo lo suyo | `TipoActor::emiteFaenas()` / `emiteGuias()`, en los dos servicios |
+
+> **Una lectura que conviene dejar por escrito.** «A partir de una misma bolsa
+> madre se emiten los carnets necesarios» se implementa así: el mismo cupo
+> respalda todos los carnets que hagan falta a lo largo de la gestión
+> —renovación, reposición por pérdida— pero **no dos VIGENTES a la vez de la
+> misma actividad**. Para reponer un plástico hay que revocar el actual. Si la
+> intención era otra, es una línea en `EmitirCarnetService`.

@@ -31,12 +31,10 @@ return new class extends Migration
             // no pasa a valer 800 porque alguien editó el catálogo en agosto.
             $table->decimal('volumen_total_kg', 12, 2)->comment('Kilos otorgados, COPIADOS de la escala');
 
-            // El renglón «Tipo de Embarcación» del talonario. Texto libre porque
-            // no hay padrón de embarcaciones; nullable porque el papel tampoco
-            // lo exige.
-            $table->string('tipo_embarcacion', 120)
-                ->nullable()
-                ->comment('Canoa, peque-peque, bote…');
+            // El renglón «Tipo de Embarcación» del talonario. OBLIGATORIO: sin
+            // él la autorización impresa sale con el renglón en blanco. Texto
+            // libre porque no hay padrón de embarcaciones.
+            $table->string('tipo_embarcacion', 120)->comment('Canoa, peque-peque, bote…');
 
             // Nace PENDIENTE y solo la caja lo activa, al cobrarlo entero: la
             // concesión pagada ES la autorización. Ver CobrarService.

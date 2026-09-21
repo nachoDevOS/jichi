@@ -23,10 +23,8 @@ export interface CupoFila {
      */
     volumen_total_kg: number;
 
-    /**
-     * Lo que el pescador declaró que navega: «canoa», «peque-peque», «bote»…
-     */
-    tipo_embarcacion: string | null;
+    /** Lo que el pescador declaró que navega: «canoa», «peque-peque», «bote». */
+    tipo_embarcacion: string;
 
     /** Lo comprometido por las faenas que consumen cupo (todas menos las vencidas). */
     kilos_consumidos: number;
@@ -42,6 +40,9 @@ export interface CupoFila {
     modalidad: ModalidadAprovechamiento;
     modalidad_etiqueta: string;
     modalidad_color: string;
+
+    /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
+    registrado_en: string | null;
 
     estado: EstadoAprovechamiento;
     estado_etiqueta: string;
@@ -146,6 +147,25 @@ export interface ReciboDelCupo {
     monto_total: number;
     /** Un MOMENTO —cuándo se emitió—: se muestra con fechaHora(). */
     emitido_en: string | null;
+    /** Cuántos depósitos ampara. El papel es UNO por trámite. */
+    pagos_count?: number;
+}
+
+/** Una cédula que se apoya en este cupo, en la ficha. */
+export interface CarnetDelCupo {
+    id: number;
+    codigo: string;
+    /** El número del libro, «00001». Null mientras no esté aprobado. */
+    registro: string | null;
+    tipo: string | null;
+    tipo_actor_etiqueta: string;
+    tipo_actor_color: string;
+    estado_etiqueta: string;
+    estado_color: string;
+    ya_fue_aprobado: boolean;
+    fecha_solicitud: string | null;
+    fecha_emision: string | null;
+    fecha_vencimiento: string | null;
 }
 
 /** Una faena colgada del cupo, en la ficha. */

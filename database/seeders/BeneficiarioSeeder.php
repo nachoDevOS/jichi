@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Beneficiario;
+use App\Models\Departamento;
 use Illuminate\Database\Seeder;
 
 /**
@@ -18,7 +19,7 @@ class BeneficiarioSeeder extends Seeder
          */
         Beneficiario::updateOrCreate(['ci' => '1234567'], [
             'complemento' => null,
-            'expedido' => 'BN',
+            'departamento_id' => Departamento::where('codigo', 'BN')->value('id'),
             'primerNombre' => 'Juan',
             'segundoNombre' => 'Carlos',
             'apellidoPaterno' => 'Antezana',
@@ -38,7 +39,7 @@ class BeneficiarioSeeder extends Seeder
         // casada. Es el que hace trabajar al encogido de texto del carnet.
         Beneficiario::updateOrCreate(['ci' => '2345678'], [
             'complemento' => '1A',
-            'expedido' => 'BN',
+            'departamento_id' => Departamento::where('codigo', 'BN')->value('id'),
             'primerNombre' => 'María',
             'segundoNombre' => 'Esther',
             'apellidoPaterno' => 'Justiniano',
@@ -57,7 +58,7 @@ class BeneficiarioSeeder extends Seeder
         // El caso mínimo: sin segundo nombre ni apellido materno.
         Beneficiario::updateOrCreate(['ci' => '3456789'], [
             'complemento' => null,
-            'expedido' => 'LP',
+            'departamento_id' => Departamento::where('codigo', 'LP')->value('id'),
             'primerNombre' => 'Pedro',
             'segundoNombre' => null,
             'apellidoPaterno' => 'Noza',

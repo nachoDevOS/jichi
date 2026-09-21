@@ -21,8 +21,8 @@ class OtorgarCupoService
     public function otorgar(
         Beneficiario $beneficiario,
         CategoriaAprovechamiento $categoria,
+        string $tipoEmbarcacion,
         ?Carbon $solicitud = null,
-        ?string $tipoEmbarcacion = null,
     ): AprovechamientoPesq {
         $solicitud ??= now();
 
@@ -68,7 +68,8 @@ class OtorgarCupoService
 
                 /*
                  * LO QUE EL PESCADOR DECLARA QUE NAVEGA, tal como lo pide el
-                 * renglón del talonario. Es texto libre porque no hay padrón de
+                 * renglón del talonario. OBLIGATORIO —va impreso en la
+                 * autorización— y texto libre, porque no hay padrón de
                  * embarcaciones: se escribe «canoa», «peque-peque» o «bote»
                  * según con qué llegue, y un catálogo cerrado obligaría a dar de
                  * alta un tipo nuevo con la persona esperando en la ventanilla.
@@ -106,8 +107,8 @@ class OtorgarCupoService
     public function editar(
         AprovechamientoPesq $cupo,
         CategoriaAprovechamiento $categoria,
+        string $tipoEmbarcacion,
         Carbon $solicitud,
-        ?string $tipoEmbarcacion = null,
     ): AprovechamientoPesq {
         return DB::transaction(function () use ($cupo, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();

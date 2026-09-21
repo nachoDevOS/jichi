@@ -1,4 +1,4 @@
-import type { EstadoAsociacion, ModalidadAprovechamiento } from '@/types';
+import type { EstadoAsociacion, ModalidadAprovechamiento, TipoActor } from '@/types';
 
 /**
  * Tipos de los tres CATÁLOGOS: asociaciones, escala de aprovechamiento y tipos
@@ -11,6 +11,12 @@ export interface AsociacionFila {
     nombre: string;
     /** Puede faltar: muchas asociaciones chicas no tienen una registrada. */
     sigla: string | null;
+    /**
+     * La ficha del gremio, guardada en una columna JSON. Llega SIEMPRE con
+     * todas las claves de `Asociacion::CAMPOS`; las que no se cargaron, en
+     * null.
+     */
+    datos: FichaAsociacion;
     estado: EstadoAsociacion;
     estado_etiqueta: string;
     estado_color: string;
@@ -20,10 +26,17 @@ export interface AsociacionFila {
     guias_count: number;
 }
 
+/**
+ * La ficha del gremio. Las claves las fija `Asociacion::CAMPOS` en el
+ * servidor, y el formulario las dibuja a partir de los rótulos que manda.
+ */
+export type FichaAsociacion = Record<string, string | null>;
+
 /** Lo que el formulario de asociación manda de vuelta. */
 export interface FormularioAsociacion {
     nombre: string;
     sigla: string;
+    datos: Record<string, string>;
     estado: EstadoAsociacion;
 }
 
@@ -75,6 +88,10 @@ export interface FormularioEscala {
 export interface TipoCarnetFila {
     id: number;
     nombre: string;
+    /** Para qué actividad sirve: es lo que tiene que coincidir con el carnet. */
+    tipo_actor: TipoActor;
+    tipo_actor_etiqueta: string;
+    tipo_actor_color: string;
     /**
      * El arancel de HOY, para armar un cobro nuevo.
      */
@@ -86,6 +103,7 @@ export interface TipoCarnetFila {
 /** Lo que el formulario de tipo de carnet manda de vuelta. */
 export interface FormularioTipoCarnet {
     nombre: string;
+    tipo_actor: TipoActor | '';
     precio_bs: number | string;
     estado: boolean;
 }

@@ -72,6 +72,12 @@ enum RolSistema: string
             'aprovechamientos.imprimir',
 
             'carnets.crear',
+            // Corregir el BORRADOR es de ventanilla: es el mismo mostrador el
+            // que lo está armando.
+            'carnets.editar',
+            // Presentar el carnet a revisión: mismo circuito que el cupo, y el
+            // mismo reparto —presentar es de ventanilla, firmar no—.
+            'carnets.enviar',
             // Imprimir el plástico es un hecho con fecha propia
             // (`fecha_generacion` en el modelo anterior): por eso es su propio
             // permiso y no viene incluido en `carnets.crear`.
@@ -127,6 +133,19 @@ enum RolSistema: string
              * APROBAR Y RECHAZAR un aprovechamiento presentado.
              */
             'aprovechamientos.aprobar',
+
+            /*
+             * APROBAR Y RECHAZAR un carnet presentado. Va con el del cupo: es
+             * la misma firma sobre el mismo expediente.
+             */
+            'carnets.aprobar',
+
+            /*
+             * ELIMINAR un carnet cargado por error. De supervisión, igual que
+             * en el cupo: borrar la fila la hace desaparecer de los listados y
+             * lo único que queda es la línea de `auditorias` con el motivo.
+             */
+            'carnets.eliminar',
 
             /*
              * CONTROLAR LAS BOLETAS —validar u observar— es del mismo lado que

@@ -54,7 +54,7 @@ export default function VerBeneficiario({
                             }
                         >
                             <Waves className="size-4" />
-                            Otorgar cupo
+                            Registrar aprovechamiento
                         </Button>
                     )}
 

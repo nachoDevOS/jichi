@@ -20,10 +20,13 @@ export default function CatalogoAsociaciones({
     asociaciones,
     filtros,
     estados,
+    camposFicha,
 }: {
     asociaciones: AsociacionFila[];
     filtros: { buscar: string | null };
     estados: OpcionEnum[];
+    /** Clave → rótulo de la ficha. Sale de `Asociacion::CAMPOS`. */
+    camposFicha: Record<string, string>;
 }) {
     const { puede } = usePermisos();
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
@@ -68,6 +71,7 @@ export default function CatalogoAsociaciones({
                         key={editando === 'nueva' ? 'nueva' : editando.id}
                         asociacion={editando === 'nueva' ? null : editando}
                         estados={estados}
+                        camposFicha={camposFicha}
                         onCerrar={() => setEditando(null)}
                     />
                 )}
@@ -127,11 +131,15 @@ export default function CatalogoAsociaciones({
                                             <tr key={a.id} className="hover:bg-secondary/50">
                                                 <td className="px-5 py-2.5">
                                                     <p className="font-medium">{a.nombre}</p>
-                                                    {a.sigla && (
-                                                        <p className="font-mono text-xs text-muted-foreground">
-                                                            {a.sigla}
-                                                        </p>
-                                                    )}
+
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {/* De la ficha va lo que sirve para
+                                                            reconocerla de un vistazo; el resto se
+                                                            ve al abrirla. */}
+                                                        {[a.sigla, a.datos.representante, a.datos.telefono]
+                                                            .filter(Boolean)
+                                                            .join(' · ') || '—'}
+                                                    </p>
                                                 </td>
 
                                                 <td className="px-5 py-2.5">
@@ -188,17 +196,29 @@ export default function CatalogoAsociaciones({
 function FormularioAsociacionCard({
     asociacion,
     estados,
+    camposFicha,
     onCerrar,
 }: {
     asociacion: AsociacionFila | null;
     estados: OpcionEnum[];
+    camposFicha: Record<string, string>;
     onCerrar: () => void;
 }) {
     const esAlta = asociacion === null;
 
+    /*
+     * LA FICHA ARRANCA CON TODAS LAS CLAVES, en cadena vacía: un `undefined`
+     * en `useForm` hace que el input pase de no-controlado a controlado al
+     * escribir, y React avisa en consola y pierde el primer carácter.
+     */
+    const fichaInicial = Object.fromEntries(
+        Object.keys(camposFicha).map((clave) => [clave, asociacion?.datos?.[clave] ?? '']),
+    );
+
     const form = useForm({
         nombre: asociacion?.nombre ?? '',
         sigla: asociacion?.sigla ?? '',
+        datos: fichaInicial,
         estado: asociacion?.estado ?? 'activo',
     });
 
@@ -279,6 +299,58 @@ function FormularioAsociacionCard({
                             ))}
                         </Select>
                     </Campo>
+                    </div>
+
+                    {/*
+                        LA FICHA DEL GREMIO. Los campos se dibujan a partir de
+                        los rótulos que manda el servidor —`Asociacion::CAMPOS`—
+                        así que sumar un dato es una línea en el modelo: acá no
+                        se toca nada, y tampoco hace falta migrar.
+                    */}
+                    <div className="space-y-4 border-t border-border pt-4">
+                        <div>
+                            <p className="text-sm font-medium">Ficha de la asociación</p>
+                            <p className="text-xs text-muted-foreground">
+                                Todo opcional. Son datos de respaldo y de contacto: no deciden nada
+                                en el sistema, se guardan y se muestran.
+                            </p>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {Object.entries(camposFicha).map(([clave, rotulo]) => (
+                                <Campo
+                                    key={clave}
+                                    etiqueta={rotulo}
+                                    htmlFor={`ficha-${clave}`}
+                                    error={form.errors[`datos.${clave}` as keyof typeof form.errors]}
+                                >
+                                    <Input
+                                        id={`ficha-${clave}`}
+                                        // El tipo sale de la clave y no de una
+                                        // lista aparte: un campo nuevo con
+                                        // «fecha» o «correo» en el nombre ya
+                                        // entra con el control correcto.
+                                        type={
+                                            clave === 'fundacion'
+                                                ? 'date'
+                                                : clave === 'correo'
+                                                  ? 'email'
+                                                  : 'text'
+                                        }
+                                        value={form.data.datos[clave] ?? ''}
+                                        onChange={(e) =>
+                                            form.setData('datos', {
+                                                ...form.data.datos,
+                                                [clave]: e.target.value,
+                                            })
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors[`datos.${clave}` as keyof typeof form.errors],
+                                        )}
+                                    />
+                                </Campo>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="flex gap-2 pt-1">

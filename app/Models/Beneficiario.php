@@ -14,7 +14,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /*
@@ -25,7 +27,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'ci',
     'complemento',
-    'expedido',
+    'departamento_id',
     'primerNombre',
     'segundoNombre',
     'apellidoPaterno',
@@ -99,8 +101,16 @@ class Beneficiario extends Model
     {
         return Attribute::get(fn (): string => trim(implode(' ', array_filter([
             $this->ci.($this->complemento ? '-'.$this->complemento : ''),
-            $this->expedido,
+            // El código sale del mapa memorizado y NO de la relación: se usa
+            // en cada fila de cada listado. Ver Departamento::codigoDe().
+            Departamento::codigoDe($this->departamento_id),
         ]))));
+    }
+
+    /** El código del departamento, suelto: «BN». Null si no se cargó. */
+    protected function expedido(): Attribute
+    {
+        return Attribute::get(fn (): ?string => Departamento::codigoDe($this->departamento_id));
     }
 
     /**
@@ -125,6 +135,18 @@ class Beneficiario extends Model
 
     //  Relaciones
 
+    /**
+     * Dónde se expidió su cédula.
+     *
+     * Se usa para mostrar el NOMBRE completo —«Beni»—; el código corto lo
+     * resuelve el accesor sin tocar esta relación, así que los listados no
+     * necesitan cargarla.
+     */
+    public function departamento(): BelongsTo
+    {
+        return $this->belongsTo(Departamento::class);
+    }
+
     /** Sus credenciales: puede tener una de pescador y otra de comercializador. */
     public function carnets(): HasMany
     {
@@ -140,9 +162,17 @@ class Beneficiario extends Model
     /**
      * Las guías que emitió COMO COMERCIALIZADOR.
      */
-    public function guias(): HasMany
+    public function guias(): HasManyThrough
     {
-        return $this->hasMany(GuiaMovimiento::class, 'beneficiario_com_id');
+        // A TRAVÉS de sus carnets: la guía cuelga del carnet, no de la persona.
+        return $this->hasManyThrough(
+            GuiaMovimiento::class,
+            Carnet::class,
+            'beneficiario_id',  // FK en carnets
+            'carnet_id',        // FK en guias_movimiento
+            'id',
+            'id',
+        );
     }
 
     //  Reglas de negocio

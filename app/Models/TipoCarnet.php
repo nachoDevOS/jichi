@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TipoActor;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * Una clase de credencial y su arancel: «Carnet de Pescador», 80 Bs.
  */
-#[Fillable(['nombre', 'precio_bs', 'estado'])]
+#[Fillable(['nombre', 'tipo_actor', 'precio_bs', 'estado'])]
 class TipoCarnet extends Model
 {
     use Auditable, SoftDeletes;
@@ -23,6 +24,7 @@ class TipoCarnet extends Model
 
     /** Ver el comentario de Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [
+        'tipo_actor' => TipoActor::Pescador->value,
         'precio_bs' => 0,
         'estado' => true,
     ];
@@ -30,6 +32,7 @@ class TipoCarnet extends Model
     protected function casts(): array
     {
         return [
+            'tipo_actor' => TipoActor::class,
             'precio_bs' => 'decimal:2',
             'estado' => 'boolean',
         ];

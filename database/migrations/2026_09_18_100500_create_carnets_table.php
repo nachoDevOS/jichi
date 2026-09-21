@@ -35,10 +35,58 @@ return new class extends Migration
              */
             $table->string('codigo_carnet', 40)->unique();
 
-            $table->string('estado', 20)->default(EstadoCarnet::Activo->value);
+            /*
+             * EL NÚMERO DE REGISTRO, el que va impreso en el plástico.
+             *
+             * Correlativo por GESTIÓN y compartido entre pescadores y
+             * comercializadores: la serie es del registro, no de la actividad.
+             * Se asigna AL APROBAR —lo reserva `CorrelativoService`, que
+             * bloquea la fila del contador— así que va nullable: un carnet
+             * pendiente todavía no ocupa número, y uno rechazado no gasta uno.
+             *
+             * LA GESTIÓN NO SE GUARDA: es el año de `fecha_emision`, y dos
+             * columnas que dicen lo mismo terminan contradiciéndose. Se lee
+             * con `Carnet::gestion`, que es un accesor.
+             */
+            $table->unsignedInteger('nro_registro')->nullable()->comment('Correlativo anual, al aprobar');
 
-            $table->date('fecha_emision');
+            /*
+             * LOS DOS PAPELES QUE RESPALDAN LA EMISIÓN: la fotocopia de la
+             * cédula y la carta o certificación de la asociación. Nullable
+             * porque muchos carnets se cargan para poner al día lo emitido en
+             * PAPEL, donde esos escaneos no existen; el formulario del panel sí
+             * los exige. El tope de 3 MB y el nombre aleatorio los pone
+             * StorageController, que es el único que escribe archivos.
+             */
+            $table->string('archivo_ci', 255)->nullable()->comment('Escaneo de la cédula');
+            $table->string('archivo_asociacion', 255)->nullable()->comment('Carta o certificación del gremio');
+
+            // NACE PENDIENTE y solo la firma lo activa: el plástico no se
+            // entrega hasta que el arancel esté cobrado. Ver RevisarCarnetService.
+            $table->string('estado', 20)->default(EstadoCarnet::Pendiente->value);
+
+            /*
+             * DOS FECHAS DISTINTAS, igual que en el aprovechamiento: el día
+             * que la persona lo pidió y el día que alguien lo firmó.
+             * `fecha_emision` queda en NULL hasta la aprobación —un carnet
+             * pendiente no se emitió todavía, y el plástico no salió—.
+             */
+            $table->date('fecha_solicitud');
+            $table->date('fecha_emision')->nullable()->comment('Se llena al aprobar');
             $table->date('fecha_vencimiento');
+
+            /*
+             * ÍNDICE Y NO ÚNICO, a propósito. El único tendría que ser «un
+             * número por AÑO», y el año no es una columna: expresarlo pediría
+             * un índice funcional sobre `fecha_emision`, que solo existe en
+             * PostgreSQL —y el sistema tiene que correr igual en SQLite—.
+             *
+             * Quien garantiza que no se repita es `CorrelativoService`, que
+             * reserva el número BLOQUEANDO la fila del contador dentro de la
+             * misma transacción que aprueba el carnet. Es el mismo mecanismo
+             * que numera los recibos.
+             */
+            $table->index(['nro_registro']);
 
             // «Los carnets de esta persona», que es como entra siempre la ficha.
             $table->index(['beneficiario_id', 'estado']);

@@ -61,8 +61,8 @@ export default function CrearCupo({
     // lo explicaría: mandaría al operador a buscar el error en otro lado.
     if (escala.length === 0) {
         return (
-            <LayoutPanel titulo="Otorgar cupo" descripcion="La bolsa madre del pescador.">
-                <Head title="Otorgar cupo" />
+            <LayoutPanel titulo="Registrar aprovechamiento" descripcion="La bolsa madre del pescador.">
+                <Head title="Registrar aprovechamiento" />
 
                 <Card>
                     <EstadoVacio
@@ -77,10 +77,10 @@ export default function CrearCupo({
 
     return (
         <LayoutPanel
-            titulo="Otorgar cupo"
-            descripcion="Paso 2 del flujo: va antes del carnet, porque el plástico imprime este volumen."
+            titulo="Registrar aprovechamiento"
+            // descripcion="Paso 2 del flujo: queda PENDIENTE de cobro. Va antes del carnet, porque el carnet imprime este volumen."
         >
-            <Head title="Otorgar cupo" />
+            <Head title="Registrar aprovechamiento" />
 
             <form onSubmit={enviar} className="grid gap-6 lg:grid-cols-3">
                 <Card className="lg:col-span-2">
@@ -131,7 +131,8 @@ export default function CrearCupo({
                             etiqueta="Tipo de embarcación"
                             htmlFor="tipo_embarcacion"
                             error={form.errors.tipo_embarcacion}
-                            ayuda="Como figura en el talonario. Si no la declara, déjelo vacío."
+                            ayuda="Como figura en el talonario. Va impreso en la autorización de pesca."
+                            obligatorio
                             className="max-w-sm"
                         >
                             <Input
@@ -173,7 +174,7 @@ export default function CrearCupo({
                 {/* ------------------------------------------------ Consecuencias */}
                 <Card className="h-fit">
                     <CardHeader>
-                        <CardTitle>Lo que se va a otorgar</CardTitle>
+                        <CardTitle>Lo que se va a registrar</CardTitle>
                     </CardHeader>
 
                     <CardContent className="space-y-4">
@@ -237,19 +238,16 @@ export default function CrearCupo({
                                     <p className="text-2xl font-semibold tabular-nums">
                                         {bs(tramo.valor_bs, institucion.moneda)}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Se puede pagar en cuotas. El cupo queda otorgado igual, pero
-                                        con saldo pendiente hasta cubrirlo.
-                                    </p>
                                     {/*
-                                        Se dice a dónde lleva el botón, porque ya
-                                        no lleva a la ficha: otorgar y cobrar son
-                                        un solo acto en ventanilla y el sistema
-                                        sigue ese orden.
+                                        Se dice a dónde lleva el botón. Decía que
+                                        abría la CAJA, y hace rato que termina en
+                                        la ficha: los depósitos se cargan ahí
+                                        mismo, sin salir del expediente.
                                     */}
                                     <p className="text-xs text-muted-foreground">
-                                        Al otorgarlo se abre la caja con esta persona ya cargada,
-                                        para cobrarlo en el mismo movimiento.
+                                        Al registrarlo queda PENDIENTE y se abre su ficha, donde se
+                                        cargan los depósitos. Con el monto cubierto se envía a
+                                        revisión, y recién con la firma autoriza a pescar.
                                     </p>
                                 </div>
                             </>
@@ -260,7 +258,10 @@ export default function CrearCupo({
                             disabled={form.processing || persona === null || tramo === null}
                             className="w-full"
                         >
-                            Otorgar cupo
+                            {/* REGISTRAR y no «otorgar»: lo que se crea es un
+                                expediente PENDIENTE, y el cupo queda otorgado
+                                recién con la firma. */}
+                            Registrar
                         </Button>
                     </CardContent>
                 </Card>

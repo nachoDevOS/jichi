@@ -119,7 +119,8 @@ export default function EditarCupo({
                             etiqueta="Tipo de embarcación"
                             htmlFor="tipo_embarcacion"
                             error={form.errors.tipo_embarcacion}
-                            ayuda="Como figura en el talonario. Si no la declara, déjelo vacío."
+                            ayuda="Como figura en el talonario. Va impreso en la autorización de pesca."
+                            obligatorio
                             className="max-w-sm"
                         >
                             <Input

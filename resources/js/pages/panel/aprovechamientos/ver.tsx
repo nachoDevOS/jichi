@@ -1,7 +1,9 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Banknote,
+    BadgeCheck,
     Check,
+    ExternalLink,
     Eye,
     Paperclip,
     Pencil,
@@ -15,6 +17,7 @@ import {
     X,
 } from 'lucide-react';
 import { useState } from 'react';
+import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { DialogoCorregirPago } from '@/components/panel/pagos/dialogo-corregir-pago';
 import { Badge } from '@/components/ui/badge';
@@ -31,19 +34,27 @@ import { Campo } from '@/components/ui/campo';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
-import type { CupoFicha, FaenaDelCupo, PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
+import type {
+    CarnetDelCupo,
+    CupoFicha,
+    FaenaDelCupo,
+    PagoDelCupo,
+    ReciboDelCupo,
+} from '@/types/aprovechamientos';
 
 /**
  *  LA FICHA DE UN CUPO
  */
 export default function VerCupo({
     cupo,
+    carnets,
     faenas,
     pagos,
     recibo,
     modoEstricto,
 }: {
     cupo: CupoFicha;
+    carnets: CarnetDelCupo[];
     faenas: FaenaDelCupo[];
     /** Los depósitos que pagaron este cupo, del más nuevo al más viejo. */
     pagos: PagoDelCupo[];
@@ -178,8 +189,16 @@ export default function VerCupo({
 
     return (
         <LayoutPanel
-            titulo={cupo.beneficiario ?? 'Cupo de pesca'}
-            descripcion={`Escala ${cupo.escala ?? '—'} · ${cupo.descripcion ?? ''}`}
+            /*
+             * EL ENCABEZADO NO REPITE AL TITULAR. El nombre, la cédula y el
+             * tramo están en la tarjeta de abajo, con la foto al lado; acá
+             * decían lo mismo sin la cara, y la pantalla abría con el nombre
+             * escrito dos veces. Arriba quedan las acciones, que es lo que se
+             * busca en el encabezado.
+             */
+            // El nombre oficial del documento, el mismo que imprime el
+            // recibo. Ver App\Enums\ConceptoRecibo.
+            titulo="Autorización de Pesca para Aprovechamiento Pesquero"
             acciones={
                 <div className="flex flex-wrap gap-2">
                     <Button
@@ -293,7 +312,48 @@ export default function VerCupo({
                 </div>
             }
         >
-            <Head title={`Cupo · ${cupo.beneficiario ?? ''}`} />
+            <Head title={`Autorización de pesca · ${cupo.beneficiario ?? ''}`} />
+
+            {/*
+                EL TITULAR, CON SU FOTO. El encabezado del layout solo admite
+                texto, y sobre un cupo la primera pregunta es de QUIÉN es: la
+                cara al lado del nombre es lo que deja confirmarlo de un
+                vistazo contra la persona que está en el mostrador.
+            */}
+            <Card className="mb-6 min-w-0">
+                <CardContent className="flex flex-wrap items-center gap-4 p-4">
+                    <Retrato
+                        url={cupo.foto_url}
+                        nombre={cupo.beneficiario ?? 'Sin nombre'}
+                        className="size-16"
+                    />
+
+                    <div className="min-w-0">
+                        {/* Al nombre se le va: la ficha de la persona es donde
+                            están sus otros carnets y sus otros trámites. */}
+                        <Link
+                            href={route('beneficiarios.show', cupo.beneficiario_id)}
+                            className="text-lg font-semibold text-primary hover:underline"
+                        >
+                            {cupo.beneficiario ?? '—'}
+                        </Link>
+
+                        {/* Con el rótulo adelante: «3944217 PT» solo no dice
+                            qué número es. tabular-nums para que la cédula quede
+                            alineada con el resto de los números de la ficha. */}
+                        <p className="tabular-nums text-sm text-muted-foreground">
+                            C.I. {cupo.documento ?? '—'}
+                        </p>
+
+                        {/* El TRAMO sin su número: «Escala 3» es un dato del
+                            catálogo interno, y el rango en kilos es lo que
+                            dice de verdad cuánto se autorizó. */}
+                        <p className="text-sm text-muted-foreground">
+                            {cupo.descripcion ?? '—'}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
 
             <div className="grid gap-6 lg:grid-cols-3">
                 {/* ------------------------------------------------ El saldo */}
@@ -321,17 +381,26 @@ export default function VerCupo({
                             </span>
                         </div>
 
-                        {/* «Otorgado» recién después de la firma: antes es lo pedido. */}
+                        {/*
+                            EL DESGLOSE APARECE CUANDO HAY ALGO QUE DESGLOSAR.
+                            «Otorgado» recién después de la firma —antes es lo
+                            pedido— y consumido/disponible/usado recién cuando
+                            se emitió alguna faena: con el cupo entero los tres
+                            dicen lo mismo que el primero, y «disponible 300 de
+                            300» sobre un cupo sin usar suena a que algo pasó.
+                        */}
                         <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                            {cupo.ya_fue_aprobado ? (
+                            {! cupo.ya_fue_aprobado ? (
+                                <Dato etiqueta="Solicitado" valor={`${cupo.volumen_total_kg} kg`} />
+                            ) : cupo.kilos_consumidos <= 0 ? (
+                                <Dato etiqueta="Otorgado" valor={`${cupo.volumen_total_kg} kg`} />
+                            ) : (
                                 <>
                                     <Dato etiqueta="Otorgado" valor={`${cupo.volumen_total_kg} kg`} />
                                     <Dato etiqueta="Consumido" valor={`${cupo.kilos_consumidos} kg`} />
                                     <Dato etiqueta="Disponible" valor={`${cupo.saldo_kg} kg`} />
                                     <Dato etiqueta="Usado" valor={`${cupo.porcentaje_usado}%`} />
                                 </>
-                            ) : (
-                                <Dato etiqueta="Solicitado" valor={`${cupo.volumen_total_kg} kg`} />
                             )}
                         </dl>
 
@@ -412,7 +481,7 @@ export default function VerCupo({
                         */}
                         <Dato
                             etiqueta="Embarcación"
-                            valor={cupo.tipo_embarcacion ?? 'No declarada'}
+                            valor={cupo.tipo_embarcacion}
                         />
 
                         {/* Dos fechas distintas: cuándo lo pidió y cuándo se lo
@@ -922,6 +991,124 @@ export default function VerCupo({
                         )}
                     </CardContent>
                 </Card>
+
+                {/*
+                    LAS CÉDULAS QUE SE APOYAN EN ESTE CUPO, de la más nueva a
+                    la más vieja. Aparece desde que el cupo está firmado —antes
+                    no puede haber ninguna— o si igual hubiera filas.
+                */}
+                {(cupo.ya_fue_aprobado || carnets.length > 0) && (
+                    <Card className="min-w-0 lg:col-span-3">
+                        <CardHeader>
+                            <CardTitle>Cédulas emitidas con este autorización</CardTitle>
+                        </CardHeader>
+
+                        <CardContent className="p-0">
+                            {carnets.length === 0 ? (
+                                <EstadoVacio
+                                    icono={BadgeCheck}
+                                    titulo="Sin cédulas"
+                                    descripcion="Todavía no se registró ninguna credencial contra este cupo."
+                                />
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                            <tr>
+                                                <th className="px-5 py-2.5 font-medium">Registro</th>
+                                                <th className="px-5 py-2.5 font-medium">Tipo</th>
+                                                <th className="px-5 py-2.5 font-medium">Solicitado</th>
+                                                <th className="px-5 py-2.5 font-medium">Emitido</th>
+                                                <th className="px-5 py-2.5 font-medium">Vence</th>
+                                                <th className="px-5 py-2.5 font-medium">Estado</th>
+                                                {/* Sin rótulo: el ojo se explica solo. */}
+                                                <th className="px-5 py-2.5" />
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-border">
+                                            {carnets.map((c) => (
+                                                <tr key={c.id} className="hover:bg-secondary/50">
+                                                    <td className="px-5 py-2.5">
+                                                        <a
+                                                            href={route('carnets.show', c.id)}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="font-mono font-medium text-primary hover:underline"
+                                                        >
+                                                            {c.registro ?? c.codigo}
+                                                        </a>
+
+                                                        {/* El código va debajo y en gris: en el
+                                                            mostrador se dicta el registro. */}
+                                                        {c.registro && (
+                                                            <p className="font-mono text-xs text-muted-foreground">
+                                                                {c.codigo}
+                                                            </p>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5">
+                                                        {c.tipo ?? '—'}
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {c.tipo_actor_etiqueta}
+                                                        </p>
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-muted-foreground">
+                                                        {fecha(c.fecha_solicitud)}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-muted-foreground">
+                                                        {c.fecha_emision ? fecha(c.fecha_emision) : '—'}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-muted-foreground">
+                                                        {fecha(c.fecha_vencimiento)}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5">
+                                                        <Badge color={c.estado_color}>
+                                                            {c.estado_etiqueta}
+                                                        </Badge>
+                                                    </td>
+
+                                                    {/*
+                                                        EN UNA PESTAÑA APARTE, igual que el enlace
+                                                        al cupo desde la ficha del carnet: la
+                                                        cédula se abre para contrastarla con lo
+                                                        que se está mirando acá, y salir obliga a
+                                                        volver y buscar el cupo de nuevo.
+                                                    */}
+                                                    <td className="px-5 py-2.5">
+                                                        <div className="flex justify-end">
+                                                            <a
+                                                                href={route('carnets.show', c.id)}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                title="Abrir la cédula en otra pestaña"
+                                                                aria-label={`Ver la cédula ${c.registro ?? c.codigo}`}
+                                                                className={cn(
+                                                                    buttonVariants({
+                                                                        variant: 'ver',
+                                                                        size: 'sm',
+                                                                    }),
+                                                                )}
+                                                            >
+                                                                <ExternalLink className="size-4" />
+                                                                Ver
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/*
                     LAS FAENAS, solo desde que el cupo pasó por la firma. Antes

@@ -112,7 +112,9 @@ class AutorizacionPescaController extends Controller
             'numero' => $this->numeroDe($cupo),
             'beneficiario' => $b?->nombreCompleto ?? '—',
             'domicilio' => $this->domicilioDe($cupo),
-            'documento' => trim(($b?->ci ?? '—').' '.($b?->complemento ?? '').' '.($b?->expedido ?? '')),
+            // El accesor ya arma «1234567-1A BN»: acá se armaba a mano y el
+            // complemento salía sin guion.
+            'documento' => $b?->documento_identidad ?: '—',
             'embarcacion' => $cupo->tipo_embarcacion ?: 'No declarada',
             'volumen' => number_format((float) $cupo->volumen_total_kg, 2, ',', '.'),
             'monto' => number_format($cupo->montoACobrar(), 2, ',', '.'),

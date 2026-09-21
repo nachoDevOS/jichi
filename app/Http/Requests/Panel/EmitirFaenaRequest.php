@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Panel;
 
+use App\Models\PermisoFaena;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -50,7 +51,16 @@ class EmitirFaenaRequest extends FormRequest
              *
              * Pasada sí, para poner al día lo emitido en papel.
              */
-            'fecha_salida' => ['required', 'date', 'before_or_equal:today'],
+            /*
+             * Y TAMPOCO TAN VIEJA que el permiso nazca vencido: la vigencia es
+             * de 30 días desde la salida, así que una fecha anterior a eso
+             * emitiría una hoja del talonario que ya caducó. El tope sale de la
+             * constante del modelo, no escrito acá.
+             */
+            'fecha_salida' => [
+                'required', 'date', 'before_or_equal:today',
+                'after:'.now()->subDays(PermisoFaena::DIAS_VIGENCIA)->toDateString(),
+            ],
         ];
     }
 
@@ -69,6 +79,8 @@ class EmitirFaenaRequest extends FormRequest
             'kilos_extraidos.decimal' => 'Los kilos llevan como máximo dos decimales.',
             'fecha_salida.required' => 'Indique la fecha de salida.',
             'fecha_salida.before_or_equal' => 'La fecha de salida no puede ser futura.',
+            'fecha_salida.after' => 'La faena vence a los '.PermisoFaena::DIAS_VIGENCIA
+                .' días de la salida: con esa fecha nacería vencida.',
         ];
     }
 

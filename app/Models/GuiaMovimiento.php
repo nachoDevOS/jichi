@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
  * El amparo de UN traslado de producto pesquero.
  */
 #[Fillable([
-    'beneficiario_com_id',
+    'carnet_id',
     'asociacion_id',
     'codigo_guia',
     'origen',
@@ -60,15 +60,31 @@ class GuiaMovimiento extends Model
 
     //  Relaciones
 
-    /** Quien comercializa. La clave va explícita: la columna no sigue la convención. */
-    public function comercializador(): BelongsTo
+    /** El carnet de comercializador que la ampara. Es su ÚNICA clave hacia la persona. */
+    public function carnet(): BelongsTo
     {
-        return $this->belongsTo(Beneficiario::class, 'beneficiario_com_id');
+        return $this->belongsTo(Carnet::class, 'carnet_id');
     }
 
+    /**
+     * El aval impreso. Se COPIA al emitir y no se lee del carnet cada vez: un
+     * cambio de gremio posterior no puede reescribir el papel entregado.
+     */
     public function asociacion(): BelongsTo
     {
         return $this->belongsTo(Asociacion::class);
+    }
+
+    /**
+     * Quien comercializa, alcanzado A TRAVÉS del carnet.
+     *
+     * No es una relación: la guía no guarda un beneficiario suelto. Quien lo
+     * use en un listado carga `carnet.beneficiario` en el `with()`, o son dos
+     * consultas por fila.
+     */
+    public function comercializador(): ?Beneficiario
+    {
+        return $this->carnet?->beneficiario;
     }
 
     //  Lectura
@@ -159,8 +175,12 @@ class GuiaMovimiento extends Model
         return $query->where($this->qualifyColumn('es_piscicultura'), $si);
     }
 
+    /** Las de una persona: se llega por el carnet, que es quien la conoce. */
     public function scopeDeComercializador(Builder $query, int $beneficiarioId): Builder
     {
-        return $query->where($this->qualifyColumn('beneficiario_com_id'), $beneficiarioId);
+        return $query->whereHas(
+            'carnet',
+            fn (Builder $c) => $c->where('carnets.beneficiario_id', $beneficiarioId),
+        );
     }
 }

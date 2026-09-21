@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Panel;
 
+use App\Enums\TipoActor;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\GuardarTipoCarnetRequest;
 use App\Models\TipoCarnet;
@@ -28,6 +29,9 @@ class TipoCarnetController extends Controller
             ->map(fn (TipoCarnet $t): array => [
                 'id' => $t->id,
                 'nombre' => $t->nombre,
+                'tipo_actor' => $t->tipo_actor->value,
+                'tipo_actor_etiqueta' => $t->tipo_actor->etiqueta(),
+                'tipo_actor_color' => $t->tipo_actor->color(),
                 'precio_bs' => (float) $t->precio_bs,
                 'estado' => (bool) $t->estado,
                 'carnets_count' => $t->carnets_count,
@@ -36,6 +40,7 @@ class TipoCarnetController extends Controller
 
         return Inertia::render('panel/catalogos/tipos-carnet', [
             'tipos' => $tipos,
+            'actores' => TipoActor::opciones(),
         ]);
     }
 

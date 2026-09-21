@@ -54,6 +54,11 @@ return [
     /*
     | Los nueve departamentos de Bolivia, para el campo "expedido" de la
     | cédula de identidad. Es la lista que imprime el SEGIP y no cambia.
+    |
+    | YA NO SE LEE EN TIEMPO DE EJECUCION: desde el 20/09/2026 la fuente es la
+    | tabla `departamentos`, y esta lista es la SEMILLA con la que su migración
+    | la llena. Se deja acá para no tener los nueve nombres escritos adentro de
+    | una migración.
     */
     'expedido' => [
         'BN' => 'Beni',

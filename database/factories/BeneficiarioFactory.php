@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Beneficiario;
+use App\Models\Departamento;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -29,7 +30,8 @@ class BeneficiarioFactory extends Factory
             // strtoupper, los datos sembrados muestran «8112684-8z» donde el
             // sistema real muestra «8112684-8Z».
             'complemento' => fake()->boolean(15) ? strtoupper(fake()->bothify('#?')) : null,
-            'expedido' => fake()->randomElement(array_keys(config('jichi.expedido'))),
+            // De la TABLA: `departamentos` es la fuente y la FK lo exige.
+            'departamento_id' => Departamento::query()->inRandomOrder()->value('id'),
 
             'primerNombre' => fake()->firstName($genero === 'masculino' ? 'male' : 'female'),
             // Mucha gente no tiene segundo nombre: se refleja en los datos de

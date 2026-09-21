@@ -41,8 +41,14 @@ class GuiaController extends Controller
         ];
 
         $guias = GuiaMovimiento::query()
+            /*
+             * El comercializador llega POR EL CARNET: la guía ya no guarda un
+             * beneficiario suelto. Van las CINCO partes del nombre porque
+             * `nombreCompleto` las lee todas.
+             */
             ->with([
-                'comercializador:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                'carnet:id,beneficiario_id,codigo_carnet,tipo_actor',
+                'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'asociacion:id,nombre,sigla',
             ])
             // Evita una consulta agregada POR FILA al calcular el saldo.
@@ -52,7 +58,7 @@ class GuiaController extends Controller
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], mb_strtoupper($termino)).'%';
 
                 $q->where(fn ($s) => $s
-                    ->whereHas('comercializador', fn ($b) => $b->buscar($termino))
+                    ->whereHas('carnet.beneficiario', fn ($b) => $b->buscar($termino))
                     ->orWhere('codigo_guia', $operador, $like)
                     // El origen y el destino son lo que un control pregunta:
                     // «¿qué salió para Santa Cruz esta semana?».
@@ -161,7 +167,7 @@ class GuiaController extends Controller
     public function show(GuiaMovimiento $guia): Response
     {
         $guia->load([
-            'comercializador:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+            'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
             'asociacion:id,nombre,sigla',
         ]);
 
@@ -169,7 +175,7 @@ class GuiaController extends Controller
             'guia' => [
                 ...$this->resumir($guia),
                 'asociacion_nombre' => $guia->asociacion?->nombre,
-                'documento' => $guia->comercializador?->documento_identidad,
+                'documento' => $guia->comercializador()?->documento_identidad,
             ],
         ]);
     }
@@ -221,8 +227,11 @@ class GuiaController extends Controller
             'id' => $guia->id,
             'codigo_guia' => $guia->codigo_guia,
 
-            'beneficiario_id' => $guia->beneficiario_com_id,
-            'comercializador' => $guia->comercializador?->nombreCompleto,
+            // Los dos salen del carnet: la guía no guarda a la persona.
+            'carnet_id' => $guia->carnet_id,
+            'carnet_codigo' => $guia->carnet?->codigo_legible,
+            'beneficiario_id' => $guia->carnet?->beneficiario_id,
+            'comercializador' => $guia->comercializador()?->nombreCompleto,
             'asociacion' => $guia->asociacion?->sigla ?? $guia->asociacion?->nombre,
 
             'origen' => $guia->origen,

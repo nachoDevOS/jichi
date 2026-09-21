@@ -100,8 +100,15 @@ class Pago extends Model
     protected function conceptoDetalle(): Attribute
     {
         return Attribute::get(fn (): string => match (true) {
-            $this->pagable instanceof Carnet => 'Credencial '.$this->pagable->tipo_actor->etiqueta(),
-            $this->pagable instanceof AprovechamientoPesq => 'Aprovechamiento pesquero',
+            // «Cédula de Pescador», igual que el concepto del recibo y que la
+            // casilla CÉDULAS del talonario. Decía «Credencial», que no es
+            // como se la nombra en el mostrador.
+            $this->pagable instanceof Carnet => 'Cédula de '.$this->pagable->tipo_actor->etiqueta(),
+            // Con la capacidad: en el cuadro de importes es lo que distingue
+            // un cobro de otro. El renglón es angosto, así que va el nombre
+            // corto del documento y los kilos.
+            $this->pagable instanceof AprovechamientoPesq => 'Autorización de Pesca · '
+                .number_format((float) $this->pagable->volumen_total_kg, 0, ',', '.').' kg',
             $this->pagable instanceof GuiaMovimiento => 'Guía de movimiento',
             default => 'Trámite',
         });

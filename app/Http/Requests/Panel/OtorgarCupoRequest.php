@@ -48,12 +48,11 @@ class OtorgarCupoRequest extends FormRequest
             'fecha_solicitud' => ['required', 'date', 'before_or_equal:today'],
 
             /*
-             * OPCIONAL, y no es una concesión: el renglón del talonario tampoco
-             * está marcado como obligatorio, y muchos cupos se cargan para poner
-             * al día autorizaciones de papel donde quedó en blanco. Exigirlo acá
-             * haría imposible registrar ese histórico.
+             * OBLIGATORIO. Es el renglón «Tipo de Embarcación» de la
+             * autorización de pesca: sin él, el papel que el sistema imprime
+             * sale con un hueco que después alguien llena a mano.
              */
-            'tipo_embarcacion' => ['nullable', 'string', 'max:120'],
+            'tipo_embarcacion' => ['required', 'string', 'max:120'],
         ];
     }
 
@@ -69,6 +68,7 @@ class OtorgarCupoRequest extends FormRequest
             'categoria_aprov_id.exists' => 'Ese tramo de la escala no existe o fue derogado.',
             'fecha_solicitud.required' => 'Indique la fecha de la solicitud.',
             'fecha_solicitud.before_or_equal' => 'La fecha de la solicitud no puede ser futura.',
+            'tipo_embarcacion.required' => 'Indique el tipo de embarcación: va impreso en la autorización.',
             'tipo_embarcacion.max' => 'El tipo de embarcación no puede pasar de 120 caracteres.',
         ];
     }
@@ -81,10 +81,9 @@ class OtorgarCupoRequest extends FormRequest
         $this->merge([
             'fecha_solicitud' => $this->input('fecha_solicitud') ?: now()->toDateString(),
 
-            // Se guarda NULL y no una cadena vacía: son dos cosas distintas en
-            // la base, y con «» la ficha imprimiría un renglón en blanco en vez
-            // de decir que no se declaró.
-            'tipo_embarcacion' => trim((string) $this->input('tipo_embarcacion')) ?: null,
+            // Sin espacios de más: «  canoa » y «canoa» son lo mismo, y con el
+            // espacio el `required` daría por bueno un campo en blanco.
+            'tipo_embarcacion' => trim((string) $this->input('tipo_embarcacion')),
         ]);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\TipoActor;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +16,15 @@ return new class extends Migration
             $table->id();
 
             $table->string('nombre', 120);
+
+            /*
+             * PARA QUÉ ACTIVIDAD SIRVE ESTE TIPO. Sin la columna, la coherencia
+             * entre el tipo elegido y el `tipo_actor` del carnet no se podía
+             * comprobar más que leyendo el NOMBRE —que la unidad edita— y así
+             * se emitía un «Carnet Comercializador» marcado como pescador.
+             */
+            $table->string('tipo_actor', 20)->default(TipoActor::Pescador->value);
+
             $table->decimal('precio_bs', 10, 2)->default(0);
             $table->boolean('estado')->default(true);
 

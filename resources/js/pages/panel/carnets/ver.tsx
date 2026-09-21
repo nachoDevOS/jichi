@@ -1,31 +1,64 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Ban, Printer, Ship, Truck, User, Waves } from 'lucide-react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import {
+    Check,
+    ExternalLink,
+    Paperclip,
+    Pencil,
+    Printer,
+    Send,
+    Ship,
+    Trash2,
+    Truck,
+    Undo2,
+    User,
+    Waves,
+} from 'lucide-react';
 import { useState } from 'react';
+import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TarjetaPagos } from '@/components/panel/pagos/tarjeta-pagos';
+import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha } from '@/lib/utils';
+import { bs, cn, fecha } from '@/lib/utils';
 import type { PageProps } from '@/types';
+import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
 import type { CarnetFicha } from '@/types/carnets';
 
 /**
  *  LA FICHA DE UN CARNET
  */
-export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
+export default function VerCarnet({
+    carnet,
+    pagos,
+    recibo,
+}: {
+    carnet: CarnetFicha;
+    pagos: PagoDelCupo[];
+    recibo: ReciboDelCupo | null;
+}) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
-    const [revocando, setRevocando] = useState(false);
+    const [rechazando, setRechazando] = useState(false);
+    const [aprobando, setAprobando] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
 
-    const form = useForm({ motivo: '' });
+    const borrado = useForm({ motivo: '' });
+    const rechazo = useForm({ motivo: '' });
+    const envio = useForm({});
 
     return (
         <LayoutPanel
-            titulo={carnet.beneficiario ?? 'Carnet'}
-            descripcion={`${carnet.tipo_actor_etiqueta} · ${carnet.codigo}`}
+            /*
+             * EL ENCABEZADO NO REPITE AL TITULAR, igual que en la ficha del
+             * cupo: el nombre, la cédula y el código están en la tarjeta de
+             * abajo, con la foto al lado. Arriba quedan las acciones.
+             */
+            titulo={carnet.tipo ?? 'Carnet'}
             acciones={
                 <div className="flex flex-wrap gap-2">
                     {/*
@@ -35,7 +68,75 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
                         `contentWindow.print()` sobre un PDF lo ignora o lo bloquea
                         según el navegador. La barra del visor propio funciona.
                     */}
-                    {puede('carnets.imprimir') && (
+                    {/*
+                        CORREGIR Y ELIMINAR SOLO SOBRE EL BORRADOR. Las dos
+                        banderas llegan resueltas: miran el estado Y que no
+                        haya entrado un peso.
+                    */}
+                    {puede('carnets.editar') && carnet.puede_editarse && (
+                        <Button
+                            variant="editar"
+                            onClick={() => router.visit(route('carnets.edit', carnet.id))}
+                        >
+                            <Pencil className="size-4" />
+                            Editar
+                        </Button>
+                    )}
+
+                    {puede('carnets.eliminar') && carnet.puede_eliminarse && (
+                        <Button variant="eliminar" onClick={() => setEliminando(true)}>
+                            <Trash2 className="size-4" />
+                            Eliminar
+                        </Button>
+                    )}
+
+                    {/*
+                        EL CIRCUITO, igual que en el aprovechamiento: presentar
+                        es de ventanilla y firmar es de supervisión. Las tres
+                        banderas llegan resueltas del servidor.
+                    */}
+                    {puede('carnets.enviar') && carnet.puede_enviarse && (
+                        <Button
+                            onClick={() =>
+                                envio.post(route('carnets.enviar', carnet.id), {
+                                    preserveScroll: true,
+                                })
+                            }
+                            disabled={envio.processing}
+                        >
+                            <Send className="size-4" />
+                            Enviar a revisión
+                        </Button>
+                    )}
+
+                    {puede('carnets.aprobar') && carnet.puede_revisarse && (
+                        <>
+                            {/* Apagado mientras falte validar alguna boleta, y
+                                el title dice cuántas: el servidor lo exige
+                                igual, y un botón que promete y falla es peor. */}
+                            <Button
+                                onClick={() => setAprobando(true)}
+                                disabled={envio.processing || !carnet.puede_aprobarse}
+                                title={
+                                    carnet.puede_aprobarse
+                                        ? undefined
+                                        : `Faltan ${carnet.pagos_sin_validar} depósito(s) por validar`
+                                }
+                                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                                <Check className="size-4" />
+                                Aprobar
+                            </Button>
+
+                            <Button variant="eliminar" onClick={() => setRechazando(true)}>
+                                <Undo2 className="size-4" />
+                                Rechazar
+                            </Button>
+                        </>
+                    )}
+
+                    {/* El plástico sale recién con el carnet firmado. */}
+                    {puede('carnets.imprimir') && carnet.ya_fue_aprobado && (
                         <a href={route('carnets.imprimir', carnet.id)} target="_blank" rel="noopener">
                             <Button variant="dorado">
                                 <Printer className="size-4" />
@@ -84,18 +185,41 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
                         <User className="size-4" />
                         Ver al titular
                     </Button>
-
-                    {/* No se revoca dos veces, y la revocación no se revierte. */}
-                    {puede('carnets.revocar') && carnet.estado !== 'revocado' && (
-                        <Button variant="eliminar" onClick={() => setRevocando(true)}>
-                            <Ban className="size-4" />
-                            Revocar
-                        </Button>
-                    )}
                 </div>
             }
         >
             <Head title={`Carnet ${carnet.codigo}`} />
+
+            {/* EL TITULAR, CON SU FOTO. Sobre un carnet la primera pregunta
+                es de quién es, y la cara al lado del nombre es lo que deja
+                confirmarlo contra la persona que está en el mostrador. */}
+            <Card className="mb-6 min-w-0">
+                <CardContent className="flex flex-wrap items-center gap-4 p-4">
+                    <Retrato
+                        url={carnet.foto_url}
+                        nombre={carnet.beneficiario ?? 'Sin nombre'}
+                        className="size-16"
+                    />
+
+                    <div className="min-w-0">
+                        <Link
+                            href={route('beneficiarios.show', carnet.beneficiario_id)}
+                            className="text-lg font-semibold text-primary hover:underline"
+                        >
+                            {carnet.beneficiario ?? '—'}
+                        </Link>
+
+                        <p className="tabular-nums text-sm text-muted-foreground">
+                            C.I. {carnet.documento_identidad ?? '—'}
+                        </p>
+
+                        {/* Solo el código: el estado y la actividad ya están
+                            en la tarjeta «Situación», y repetirlos hace dudar
+                            de cuál de los dos manda. */}
+                        <p className="font-mono text-sm text-muted-foreground">{carnet.codigo}</p>
+                    </div>
+                </CardContent>
+            </Card>
 
             <div className="grid gap-6 lg:grid-cols-3">
                 {/* ------------------------------------------ Qué habilita hoy */}
@@ -117,7 +241,7 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
                                     ? 'Emitir permisos de faena'
                                     : 'Emitir guías de movimiento'
                             }
-                            razon={razonDeBloqueo(carnet)}
+                            razon={carnet.motivo_sin_permisos}
                         />
 
                         {/*
@@ -126,26 +250,152 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
                             no se autoriza por volumen.
                         */}
                         {carnet.cupo && (
-                            <div className="space-y-2 rounded-md border border-border p-4">
-                                <div className="flex items-center gap-2">
-                                    <Waves className="size-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium">Cupo de pesca</span>
+                            <div className="space-y-3 rounded-md border border-border p-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Waves className="size-4 shrink-0 text-muted-foreground" />
 
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="ml-auto"
-                                        onClick={() =>
-                                            router.visit(route('aprovechamientos.show', carnet.cupo!.id))
-                                        }
+                                    {/* EL NOMBRE VERDADERO del documento, el
+                                        mismo que imprime el recibo y encabeza
+                                        su ficha. «Cupo de pesca» era jerga
+                                        nuestra. Ver App\Enums\ConceptoRecibo. */}
+                                    <span className="text-sm font-medium">
+                                        Autorización de Pesca para Aprovechamiento Pesquero
+                                    </span>
+
+                                    <Badge color={carnet.cupo.estado_color}>
+                                        {carnet.cupo.estado_etiqueta}
+                                    </Badge>
+
+                                    {/*
+                                        EN UNA PESTAÑA APARTE. El cupo se mira
+                                        para contrastarlo con lo que se está
+                                        haciendo sobre el carnet —cuántos kilos
+                                        quedan, hasta cuándo vale— y salir de la
+                                        ficha obliga a volver y buscarla de
+                                        nuevo. Es un `<a>` y no `router.visit`:
+                                        Inertia navega en la misma pestaña.
+                                    */}
+                                    <a
+                                        href={route('aprovechamientos.show', carnet.cupo.id)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        title="Abrir la autorización en otra pestaña"
+                                        className={cn(
+                                            'ml-auto',
+                                            buttonVariants({ variant: 'ver', size: 'sm' }),
+                                        )}
                                     >
-                                        Ver cupo
-                                    </Button>
+                                        <ExternalLink className="size-4" />
+                                        Ver
+                                    </a>
                                 </div>
 
+                                <p className="text-sm text-muted-foreground">
+                                    {carnet.cupo.descripcion ?? '—'}
+                                </p>
+
                                 <BarraSaldo cupo={carnet.cupo} />
+
+                                {/*
+                                    LA CAPACIDAD Y LAS FECHAS, que es lo que un
+                                    control pregunta: cuánto autoriza y hasta
+                                    cuándo. «Otorgado el» va vacío mientras el
+                                    cupo no esté firmado.
+                                */}
+                                {/* Apilado y no con `Dato`: ese pone rótulo y
+                                    valor en la misma línea, y en una grilla de
+                                    cuatro columnas quedan pegados. */}
+                                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+                                    <DatoApilado
+                                        etiqueta="Capacidad"
+                                        valor={`${carnet.cupo.volumen_total_kg} kg`}
+                                    />
+
+                                    {carnet.cupo.ya_fue_aprobado && carnet.cupo.kilos_consumidos > 0 && (
+                                        <DatoApilado
+                                            etiqueta="Disponible"
+                                            valor={`${carnet.cupo.saldo_kg} kg`}
+                                        />
+                                    )}
+
+                                    <DatoApilado
+                                        etiqueta="Solicitado el"
+                                        valor={fecha(carnet.cupo.fecha_solicitud)}
+                                    />
+
+                                    <DatoApilado
+                                        etiqueta="Otorgado el"
+                                        valor={
+                                            carnet.cupo.fecha_emision
+                                                ? fecha(carnet.cupo.fecha_emision)
+                                                : '—'
+                                        }
+                                    />
+
+                                    <DatoApilado
+                                        etiqueta="Vence el"
+                                        valor={fecha(carnet.cupo.fecha_vencimiento)}
+                                    />
+                                </dl>
                             </div>
                         )}
+                        {/*
+                            LOS RESPALDOS DE LA EMISIÓN. Son los papeles que la
+                            persona trajo al mostrador: tenerlos acá evita ir a
+                            buscar la carpeta cuando alguien pregunta con qué se
+                            emitió. Abren en otra pestaña —son archivos— y quien
+                            no tenga permiso de ver la ficha no llega hasta acá.
+                        */}
+                        <div className="space-y-2 rounded-md border border-border p-4">
+                            <div className="flex items-center gap-2">
+                                <Paperclip className="size-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">Respaldos de la emisión</span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                {carnet.archivo_ci_url ? (
+                                    <a
+                                        href={carnet.archivo_ci_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
+                                    >
+                                        <ExternalLink className="size-4" />
+                                        Cédula del titular
+                                    </a>
+                                ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                        Sin la cédula adjunta
+                                    </span>
+                                )}
+
+                                {carnet.archivo_asociacion_url ? (
+                                    <a
+                                        href={carnet.archivo_asociacion_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
+                                    >
+                                        <ExternalLink className="size-4" />
+                                        Documento de la asociación
+                                    </a>
+                                ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                        Sin el documento de la asociación
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Los carnets viejos —los cargados para poner al
+                                día lo emitido en papel— no tienen escaneos, y
+                                eso no es un error: conviene decirlo. */}
+                            {!carnet.archivo_ci_url && !carnet.archivo_asociacion_url && (
+                                <p className="text-xs text-muted-foreground">
+                                    Este carnet se cargó sin adjuntos. Se pueden subir corrigiéndolo,
+                                    mientras siga PENDIENTE.
+                                </p>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -166,11 +416,29 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
                             <Badge color={carnet.tipo_actor_color}>{carnet.tipo_actor_etiqueta}</Badge>
                         </div>
 
+                        {/* EL REGISTRO PRIMERO: es el número que va impreso en
+                            el carnet y el que se dicta. El código largo es la
+                            llave de la verificación pública. */}
+                        <Dato
+                            etiqueta="Registro"
+                            valor={
+                                carnet.registro
+                                    ? `${carnet.registro}${carnet.gestion ? ` / ${carnet.gestion}` : ''}`
+                                    : 'Se asigna al aprobar'
+                            }
+                            mono
+                        />
+
                         <Dato etiqueta="Código" valor={carnet.codigo} mono />
                         <Dato etiqueta="Documento" valor={carnet.documento_identidad ?? '—'} mono />
                         <Dato etiqueta="Tipo" valor={carnet.tipo ?? '—'} />
                         <Dato etiqueta="Asociación" valor={carnet.asociacion_nombre ?? '—'} />
-                        <Dato etiqueta="Emitido el" valor={fecha(carnet.fecha_emision)} />
+                        <Dato etiqueta="Solicitado el" valor={fecha(carnet.fecha_solicitud)} />
+
+                        {/* Vacío hasta la firma: recién ahí hay carnet emitido. */}
+                        {carnet.fecha_emision !== null && (
+                            <Dato etiqueta="Emitido el" valor={fecha(carnet.fecha_emision)} />
+                        )}
                         <Dato etiqueta="Vence el" valor={fecha(carnet.fecha_vencimiento)} />
 
                         <div className="flex items-center justify-between gap-2">
@@ -205,47 +473,133 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
                 </Card>
             </div>
 
+            {/* EL COBRO DEL ARANCEL, con el mismo formulario que el cupo. */}
+            <div className="mt-6">
+                <TarjetaPagos
+                    pagos={pagos}
+                    recibo={recibo}
+                    saldoPendiente={carnet.saldo_pendiente}
+                    titular={carnet.beneficiario ?? 'el titular'}
+                    admitePagos={carnet.admite_pagos}
+                    rutaPagar={route('carnets.pagar', carnet.id)}
+                    permisoEnviar="carnets.enviar"
+                    textoAlEnviar="El carnet pasa a EN REVISIÓN y se emite el recibo con el total; el plástico se imprime recién cuando esté aprobado."
+                />
+            </div>
+
             {/*
-                REVOCAR PIDE MOTIVO. Es una sanción, no se revierte, y la
-                verificación pública empieza a informarla al instante: sin el
-                motivo, dentro de seis meses nadie puede explicar por qué esa
-                persona perdió su credencial.
+                APROBAR PIDE CASILLA: es la FIRMA. Desde acá el carnet habilita
+                a trabajar y se puede imprimir, y no hay «des-aprobar».
             */}
-            <ConfirmarConMotivo
-                abierto={revocando}
-                titulo="¿Revocar el carnet?"
+            <ConfirmarAccion
+                abierto={aprobando}
+                tono="afirmativo"
+                titulo="Aprobar el carnet"
                 descripcion={
                     <div className="space-y-2">
                         <p>
-                            El plástico deja de valer al instante y la verificación pública va a
-                            informarlo como <strong>REVOCADO</strong> a quien lo consulte.
+                            El carnet <strong>{carnet.codigo}</strong> de{' '}
+                            <strong>{carnet.beneficiario ?? 'el titular'}</strong> queda ACTIVO hasta
+                            el <strong>{fecha(carnet.fecha_vencimiento)}</strong>, y desde ese momento
+                            se puede imprimir.
                         </p>
                         <p>
-                            No se revierte. Si la persona vuelve a estar en regla, hay que emitirle un
-                            carnet nuevo con otro código —el viejo pudo quedar en manos de cualquiera—.
+                            <strong>No se puede deshacer.</strong>
                         </p>
                     </div>
                 }
-                etiquetaMotivo="Motivo de la revocación"
-                ayuda="Queda en la auditoría con su nombre."
-                placeholder="Infracción constatada en acta 18/2026: pesca fuera de temporada."
-                textoConfirmar="Revocar carnet"
-                confirmacion="Entiendo que el carnet deja de valer y que esto no se puede revertir."
-                valor={form.data.motivo}
-                onCambiar={(v) => form.setData('motivo', v)}
-                error={form.errors.motivo}
-                procesando={form.processing}
-                onCancelar={() => setRevocando(false)}
+                confirmacion="Verifiqué las boletas contra el extracto del banco y el expediente está completo."
+                textoConfirmar="Aprobar"
+                procesando={envio.processing}
+                onCancelar={() => setAprobando(false)}
                 onConfirmar={() =>
-                    form.patch(route('carnets.revocar', carnet.id), {
+                    envio.patch(route('carnets.aprobar', carnet.id), {
+                        preserveScroll: true,
+                        onSuccess: () => setAprobando(false),
+                    })
+                }
+            />
+
+            {/*
+                RECHAZAR PIDE MOTIVO Y CASILLA, igual que en el cupo: es la otra
+                mitad de la firma y se confirma igual.
+            */}
+            <ConfirmarConMotivo
+                abierto={rechazando}
+                titulo="Rechazar y devolver a ventanilla"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            El carnet vuelve a <strong>PENDIENTE</strong>.
+                        </p>
+                        <p>
+                            Los depósitos ya cargados <strong>no se tocan</strong>, y el recibo
+                            entregado sigue valiendo: ventanilla corrige lo observado y lo vuelve a
+                            presentar sin recargar nada.
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo del rechazo"
+                ayuda="Es lo que va a leer quien tenga que corregirlo. Queda en la auditoría con su nombre."
+                placeholder="La boleta 0012345 no figura en el extracto del banco."
+                confirmacion="El expediente vuelve a ventanilla con este motivo escrito, y queda registrado a mi nombre."
+                textoConfirmar="Rechazar"
+                valor={rechazo.data.motivo}
+                onCambiar={(v) => rechazo.setData('motivo', v)}
+                error={rechazo.errors.motivo}
+                procesando={rechazo.processing}
+                onCancelar={() => {
+                    setRechazando(false);
+                    rechazo.reset();
+                }}
+                onConfirmar={() =>
+                    rechazo.patch(route('carnets.rechazar', carnet.id), {
                         preserveScroll: true,
                         onSuccess: () => {
-                            setRevocando(false);
-                            form.reset();
+                            setRechazando(false);
+                            rechazo.reset();
                         },
                     })
                 }
             />
+
+            {/*
+                ELIMINAR PIDE MOTIVO **Y** CASILLA. La fila desaparece de los
+                listados y lo único que queda es la línea de auditoría: sin el
+                motivo, dentro de seis meses nadie puede explicar el hueco en la
+                serie de códigos.
+            */}
+            <ConfirmarConMotivo
+                abierto={eliminando}
+                titulo="Eliminar este carnet"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            El carnet <strong>{carnet.codigo}</strong> desaparece de los listados. Se
+                            elimina solo porque está PENDIENTE y sin cobrar.
+                        </p>
+                        <p>
+                            <strong>El código no se libera:</strong> el índice es global y ese
+                            número pudo alcanzar a imprimirse.
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo de la eliminación"
+                ayuda="Queda en la auditoría con su nombre. Es lo único que va a explicar el hueco."
+                placeholder="Cargado por error: la persona ya tenía carnet de esta gestión."
+                confirmacion="Entiendo que el carnet desaparece de los listados y que el código queda quemado."
+                textoConfirmar="Eliminar carnet"
+                valor={borrado.data.motivo}
+                onCambiar={(v) => borrado.setData('motivo', v)}
+                error={borrado.errors.motivo}
+                procesando={borrado.processing}
+                onCancelar={() => {
+                    setEliminando(false);
+                    borrado.reset();
+                }}
+                onConfirmar={() => borrado.delete(route('carnets.destroy', carnet.id))}
+            />
+
         </LayoutPanel>
     );
 }
@@ -253,32 +607,6 @@ export default function VerCarnet({ carnet }: { carnet: CarnetFicha }) {
 /**
  * Por qué el carnet no habilita, cuando no habilita.
  */
-function razonDeBloqueo(carnet: CarnetFicha): string | null {
-    if (carnet.estado === 'revocado') {
-        return 'El carnet está revocado.';
-    }
-
-    if (!carnet.vigente) {
-        return 'El carnet no está vigente: pasó su fecha de vencimiento.';
-    }
-
-    if (carnet.tipo_actor === 'pescador') {
-        if (carnet.cupo === null) {
-            return 'No tiene una bolsa madre asociada.';
-        }
-
-        if (!carnet.cupo.vigente) {
-            return 'El cupo de pesca no está vigente.';
-        }
-
-        if (carnet.cupo.saldo_kg <= 0) {
-            return 'El cupo de pesca no tiene kilos disponibles. Hay que tramitar otro.';
-        }
-    }
-
-    return null;
-}
-
 function Habilitacion({
     icono: Icono,
     puede,
@@ -327,6 +655,16 @@ function Habilitacion({
                     {puede ? 'Habilitado hoy.' : (razon ?? 'No habilitado.')}
                 </p>
             </div>
+        </div>
+    );
+}
+
+/** Rótulo arriba y valor abajo: para las grillas de varias columnas. */
+function DatoApilado({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+    return (
+        <div className="min-w-0">
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</dt>
+            <dd className="truncate font-medium tabular-nums">{valor}</dd>
         </div>
     );
 }

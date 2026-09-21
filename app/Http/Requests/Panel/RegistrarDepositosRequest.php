@@ -6,9 +6,12 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Reglas para cargar UNO O VARIOS depósitos contra un aprovechamiento.
+ * Reglas para cargar UNO O VARIOS depósitos contra un trámite.
+ *
+ * Lo usan el aprovechamiento y el carnet: los dos se cobran igual, con una
+ * sección por boleta y la misma exigencia de cubrir el monto entero.
  */
-class RegistrarPagoCupoRequest extends FormRequest
+class RegistrarDepositosRequest extends FormRequest
 {
     /** El permiso ya lo revisa el middleware de la ruta. */
     public function authorize(): bool

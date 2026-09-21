@@ -16,7 +16,9 @@ class PermisoOperativoException extends RuntimeException
      */
     public static function actorNoEmite(string $permiso, TipoActor $actor): self
     {
-        $correcto = $actor === TipoActor::Pescador ? 'guías de movimiento' : 'permisos de faena';
+        // Lo que SÍ emite esa credencial. Estaba al revés: a un pescador le
+        // decía que su carnet sirve para emitir guías.
+        $correcto = $actor === TipoActor::Pescador ? 'permisos de faena' : 'guías de movimiento';
 
         return new self(
             "Un carnet de {$actor->etiqueta()} no emite {$permiso}. Esa credencial sirve para ".

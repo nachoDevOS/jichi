@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Panel;
 
+use App\Models\GuiaMovimiento;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -51,7 +52,14 @@ class EmitirGuiaRequest extends FormRequest
              * momento, y adelantarla daría un papel que empieza a valer antes de
              * existir. Pasada sí, para poner al día lo emitido en papel.
              */
-            'fecha_emision' => ['required', 'date', 'before_or_equal:now'],
+            /*
+             * Y tampoco tan vieja que la guía nazca vencida: ampara 5 días
+             * desde la emisión. El tope sale de la constante del modelo.
+             */
+            'fecha_emision' => [
+                'required', 'date', 'before_or_equal:now',
+                'after:'.now()->subDays(GuiaMovimiento::DIAS_VIGENCIA)->toDateTimeString(),
+            ],
         ];
     }
 
@@ -72,6 +80,8 @@ class EmitirGuiaRequest extends FormRequest
             'peso_total_kg.decimal' => 'El peso lleva como máximo dos decimales.',
             'es_piscicultura.required' => 'Indique si el producto es de piscicultura.',
             'fecha_emision.before_or_equal' => 'La fecha de emisión no puede ser futura.',
+            'fecha_emision.after' => 'La guía ampara '.GuiaMovimiento::DIAS_VIGENCIA
+                .' días desde la emisión: con esa fecha nacería vencida.',
         ];
     }
 

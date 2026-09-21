@@ -47,9 +47,9 @@ class CajaController extends Controller
                 'recibo:id,numero_recibo,beneficiario_id',
                 'recibo.beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'pagable' => fn ($m) => $m->morphWith([
-                    Carnet::class => ['beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
-                    AprovechamientoPesq::class => ['beneficiario:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado', 'categoria'],
-                    GuiaMovimiento::class => ['comercializador:id,ci,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
+                    Carnet::class => ['beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
+                    AprovechamientoPesq::class => ['beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado', 'categoria'],
+                    GuiaMovimiento::class => ['carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'],
                 ]),
             ])
             // El nombre ya no está copiado en el recibo: se busca sobre su
@@ -250,7 +250,7 @@ class CajaController extends Controller
 
         return match (true) {
             $pagable instanceof Carnet, $pagable instanceof AprovechamientoPesq => $pagable->beneficiario?->nombreCompleto,
-            $pagable instanceof GuiaMovimiento => $pagable->comercializador?->nombreCompleto,
+            $pagable instanceof GuiaMovimiento => $pagable->comercializador()?->nombreCompleto,
             default => null,
         };
     }

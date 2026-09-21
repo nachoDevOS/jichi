@@ -112,7 +112,12 @@ export type TipoTramite = 'emision_inicial' | 'actualizacion';
 /**
  * Espejo de App\Enums\EstadoCarnet.
  */
-export type EstadoCarnet = 'activo' | 'revocado' | 'vencido';
+export type EstadoCarnet =
+    | 'pendiente'
+    | 'en_revision'
+    | 'activo'
+    | 'revocado'
+    | 'vencido';
 
 /**
  * Espejo de App\Enums\TipoActor.

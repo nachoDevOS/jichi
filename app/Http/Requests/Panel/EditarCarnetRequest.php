@@ -8,9 +8,13 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Reglas para emitir una credencial.
+ * Reglas para CORREGIR una credencial pendiente.
+ *
+ * Casi las mismas que al emitir, con dos diferencias: el titular no viaja —no
+ * se corrige de quién es un carnet, eso es otro carnet— y los adjuntos son
+ * opcionales, porque lo normal es no volver a subir lo que ya está.
  */
-class EmitirCarnetRequest extends FormRequest
+class EditarCarnetRequest extends FormRequest
 {
     /** El permiso ya lo revisa el middleware de la ruta. */
     public function authorize(): bool
@@ -24,13 +28,6 @@ class EmitirCarnetRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // El whereNull deja fuera a los dados de baja: la tabla usa borrado
-            // lógico, así que sin él el id de una ficha muerta pasaría.
-            'beneficiario_id' => [
-                'required', 'integer',
-                Rule::exists('beneficiarios', 'id')->whereNull('deleted_at'),
-            ],
-
             /*
              * Solo asociaciones ACTIVAS y no dadas de baja. Una inactiva sigue
              * existiendo —los carnets viejos apuntan a ella— pero no se puede
@@ -77,8 +74,8 @@ class EmitirCarnetRequest extends FormRequest
              * StorageController —la última línea de defensa—; acá está para que
              * el mensaje diga qué pasó en vez de un error de subida.
              */
-            'archivo_ci' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:3072'],
-            'archivo_asociacion' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:3072'],
+            'archivo_ci' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:3072'],
+            'archivo_asociacion' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:3072'],
         ];
     }
 
@@ -88,8 +85,6 @@ class EmitirCarnetRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'beneficiario_id.required' => 'Elija a la persona que recibe la credencial.',
-            'beneficiario_id.exists' => 'Esa persona no está en el padrón o fue dada de baja.',
             'asociacion_id.required' => 'Elija la asociación que la certifica.',
             'asociacion_id.exists' => 'Esa asociación no existe o está inactiva.',
             'tipo_carnet_id.required' => 'Elija el tipo de carnet.',
@@ -98,10 +93,8 @@ class EmitirCarnetRequest extends FormRequest
             'aprovechamiento_id.exists' => 'Ese aprovechamiento no existe o fue dado de baja.',
             'fecha_solicitud.required' => 'Indique la fecha de la solicitud.',
             'fecha_solicitud.before_or_equal' => 'La fecha de la solicitud no puede ser futura.',
-            'archivo_ci.required' => 'Adjunte la cédula del titular.',
             'archivo_ci.mimes' => 'La cédula tiene que ser una imagen (JPG, PNG, WEBP) o un PDF.',
             'archivo_ci.max' => 'La cédula no puede pasar de 3 MB.',
-            'archivo_asociacion.required' => 'Adjunte la carta o certificación de la asociación.',
             'archivo_asociacion.mimes' => 'El documento de la asociación tiene que ser una imagen '.
                 '(JPG, PNG, WEBP) o un PDF.',
             'archivo_asociacion.max' => 'El documento de la asociación no puede pasar de 3 MB.',

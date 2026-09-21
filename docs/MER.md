@@ -66,7 +66,26 @@ propósito y el porqué de cada decisión vive acá.**
 | --- | --- | --- |
 | `nombre` | string(160) | |
 | `sigla` | string(20) null | Es lo que entra en el renglón angosto del carnet |
+| `datos` | **json** null | La ficha del gremio: personería, representante, contacto |
 | `estado` | string(20) | `EstadoAsociacion`. Activo / inactivo |
+
+**LA FICHA VA EN UN JSON Y NO EN OCHO COLUMNAS** —agregado el 20/09/2026—.
+Personería jurídica, representante legal y su cédula, teléfono, correo,
+dirección, municipio, comunidad y fecha de fundación: nada de eso DECIDE algo en
+el sistema, se guarda, se muestra y se imprime. Con una columna por dato, sumar
+el noveno sería una migración; así es una línea en `Asociacion::CAMPOS`.
+
+**Las claves son una lista CERRADA**, justamente por eso: `CAMPOS` es lo que el
+formulario dibuja y lo que el Request deja pasar —descarta cualquier otra clave
+que llegue del navegador—. Sin esa lista, la misma tabla termina con
+«telefono», «teléfono» y «tel», y después ningún reporte los puede cruzar. Los
+campos vacíos no se guardan: la columna queda en NULL si no se cargó nada.
+
+> ⚠️ **Buscar dentro del JSON con `LIKE` exige escapar el término.** Laravel
+> guarda el JSON con las tildes en `\uXXXX` y las barras en `\/`, así que un
+> `LIKE '%Pérez%'` no encuentra `P\u00e9rez` y la búsqueda falla **en
+> silencio**, justo con los apellidos de acá. Ver
+> `AsociacionController::comoEnElJson()`.
 
 **Nunca se borra una fila.** Los carnets y las guías ya emitidas apuntan acá; una
 asociación borrada los dejaría huérfanos. Para sacarla de circulación se pone
@@ -135,6 +154,7 @@ mintiendo—.
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `nombre` | string(120), único | |
+| `tipo_actor` | string(20) | Para qué actividad sirve |
 | `precio_bs` | decimal(10,2) | El arancel de HOY |
 | `estado` | boolean | |
 
@@ -143,11 +163,47 @@ en marzo a 80 Bs tiene que seguir diciendo 80 Bs en agosto aunque el arancel hay
 subido a 100. Esta columna sirve para armar el cobro; lo cobrado de verdad queda
 en `pagos`, que no se recalcula.
 
-**No confundirlo con `carnets.tipo_actor`.** `tipo_actor` es la REGLA —qué
-habilita el documento, qué puede emitir— y vive en un enum de PHP porque de ella
-cuelga lógica. `tipos_carnet` es el CATÁLOGO —cómo se llama y cuánto sale— y vive
-en una tabla porque de él no cuelga ninguna decisión. **Nunca se decide nada con
-un `match` sobre este nombre.**
+**No confundirlo con `carnets.tipo_actor`.** El `tipo_actor` DEL CARNET es la
+REGLA —qué habilita el documento, qué puede emitir—; `tipos_carnet` es el
+CATÁLOGO —cómo se llama y cuánto sale—. **Nunca se decide nada con un `match`
+sobre el nombre.**
+
+**Y el catálogo lleva su propio `tipo_actor` —agregado el 20/09/2026—**: es con
+lo que `EmitirCarnetService` comprueba que el tipo elegido y la actividad del
+carnet digan lo mismo. Sin la columna, lo único comparable era el NOMBRE, que la
+unidad edita, y así se emitía un «Carnet Comercializador» marcado como pescador:
+el plástico decía una cosa y la base otra. El formulario de emisión además
+FILTRA la lista con ella, así que los tipos de la otra actividad ni se ofrecen.
+
+---
+
+### `departamentos` — los nueve de Bolivia
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `codigo` | string(5), único | **La llave de negocio**: BN, LP, SC… |
+| `nombre` | string(60) | Beni, La Paz, Santa Cruz… |
+
+**CATÁLOGO CERRADO: no tiene pantalla, ni alta, ni baja.** No se agrega un
+departamento. Por eso se siembra **dentro de su migración** y no en un seeder:
+la tabla tiene que existir llena aunque nadie corra `db:seed`, o no se puede
+cargar ni una ficha de beneficiario. La lista sale de `config('jichi.expedido')`,
+que quedó solo como semilla.
+
+**Sin `timestamps` ni `softDeletes`**, al revés que el resto del dominio: no es
+una fila que alguien cargue, corrija o dé de baja, así que no hay nada que
+auditar ni que preservar.
+
+**`beneficiarios` la referencia con `departamento_id`**: la ficha guarda el ID y
+nada más, no una copia del código.
+
+**El código se resuelve con un MAPA MEMORIZADO, no con la relación.**
+`documento_identidad` arma «1234567-1A BN» y se usa en cada fila de cada
+listado: con `belongsTo` habría que acordarse de `with('beneficiario.departamento')`
+en trece consultas, y el día que alguien lo olvide aparece un N+1 en silencio.
+`Departamento::codigoDe()` lee las nueve filas UNA vez por petición y las
+guarda —medido: 20 fichas, **1 consulta**—. La relación `departamento()` sigue
+estando, para cuando hace falta el nombre completo.
 
 ---
 
@@ -155,7 +211,7 @@ un `match` sobre este nombre.**
 
 | Grupo | Columnas |
 | --- | --- |
-| Documento | `ci`, `complemento`, `expedido` |
+| Documento | `ci`, `complemento`, `departamento_id` (**FK a `departamentos`**) |
 | Nombre | `primerNombre`, `segundoNombre`, `apellidoPaterno`, `apellidoMaterno`, `apellidoCasado` |
 | Personales | `fechaNacimiento`, `genero`, `nacionalidad` |
 | Contacto | `direccion`, `ciudad`, `provincia`, `telefono`, `email`, `foto` |
@@ -200,7 +256,7 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `categoria_aprov_id` | FK RESTRICT | Bajo qué tramo se otorgó |
 | `modalidad` | string(30) | **Copiada** del tramo |
 | `volumen_total_kg` | decimal(12,2) | **Copiado** del techo del tramo |
-| `tipo_embarcacion` | string(120) null | El renglón del talonario |
+| `tipo_embarcacion` | string(120) | El renglón del talonario. **Obligatorio** |
 | `estado` | string(20) | `EstadoAprovechamiento` |
 | `fecha_solicitud` | date | El día que la persona lo pidió |
 | `fecha_emision` | date **null** | El día que lo firmaron. NULL hasta aprobar |
@@ -306,8 +362,20 @@ bajo su nombre.
 | `beneficiario_id`, `asociacion_id`, `tipo_carnet_id` | FK RESTRICT | |
 | `aprovechamiento_id` | FK **nullable**, nullOnDelete | Solo el pescador |
 | `tipo_actor` | string(20) | `TipoActor`: pescador / comercializador |
-| `codigo_carnet` | string(40), **único global** | Lo impreso en el plástico |
+| `codigo_carnet` | string(40), **único global** | 16 alfanuméricos: `PES26QK7RJ2M4XPB` |
 | `estado` | string(20) | `EstadoCarnet` |
+
+**EL CÓDIGO SON 16 CARACTERES, generados por el sistema** —cambiado el
+20/09/2026; eran 12—. Los cinco primeros son el prefijo `PES`/`COM` más los dos
+dígitos del año, y los once restantes salen de `random_int()`, el generador
+criptográfico: el azar es lo único que impide recorrer el padrón entero
+probando códigos en la verificación pública.
+
+El alfabeto excluye **I, L, O, S, 0, 1 y 5**, que se confunden de a pares: el
+código se dicta por teléfono y se tipea de un plástico gastado. Se guarda sin
+separadores y se muestra de a cuatro —`PES2 6QK7 RJ2M 4XPB`— con
+`Carnet::codigoLegible()`; lo que llega tipeado se limpia con
+`normalizarCodigo()`.
 
 **`aprovechamiento_id` es nullable y eso es la regla, no un descuido.** La pesca
 se autoriza por VOLUMEN —tantos kilos, contrastables contra una guía de
@@ -385,8 +453,8 @@ salida no ocurrió.
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
-| `beneficiario_com_id` | FK RESTRICT | **Quien comercializa** |
-| `asociacion_id` | FK RESTRICT | |
+| `carnet_id` | FK RESTRICT | **La única**: de él cuelga la guía |
+| `asociacion_id` | FK RESTRICT | El aval impreso, COPIADO del carnet |
 | `codigo_guia` | string(40), único | |
 | `origen` / `destino` | string(160) | |
 | `peso_total_kg` | decimal(12,2) | |
@@ -394,10 +462,16 @@ salida no ocurrió.
 | `fecha_emision` / `fecha_vencimiento` | **dateTime** | Máximo **5 días** |
 | `estado` | string(20) | `EstadoGuia` |
 
-**Se llama `beneficiario_com_id` y no `beneficiario_id`** porque acá la persona
-entra en un papel concreto: es quien comercializa. El nombre largo evita que
-alguien la confunda con el pescador que extrajo la carga, que es otra persona y no
-está en esta tabla.
+**CUELGA DEL CARNET DE COMERCIALIZADOR Y DE NADA MÁS** —cambiado el 20/09/2026,
+mismo criterio que `permisos_faena`—. Tuvo un `beneficiario_com_id` propio, y el
+problema era el de siempre con dos claves: nada obligaba a que la persona de la
+guía fuera la titular de su propio carnet. Hoy se llega por
+`carnets.beneficiario_id`, y `Beneficiario::guias()` es un **`hasManyThrough`**
+por `carnets`.
+
+**La asociación SÍ se sigue copiando**, y no es una inconsistencia: es el aval
+que va IMPRESO en el papel. Si la persona cambia de gremio el año que viene, las
+guías ya entregadas tienen que seguir diciendo con qué aval salieron.
 
 **`es_piscicultura` no es un dato descriptivo: es plata.** Marcado, el arancel se
 cobra al 50% — el pescado de criadero no sale del río, así que no consume el

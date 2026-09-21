@@ -8,6 +8,7 @@ use App\Http\Requests\Panel\GuardarBeneficiarioRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
+use App\Models\Departamento;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -121,7 +122,7 @@ class BeneficiarioController extends Controller
         return Inertia::render('panel/beneficiarios/ver', [
             'beneficiario' => [
                 ...$beneficiario->only([
-                    'id', 'ci', 'complemento', 'expedido', 'primerNombre',
+                    'id', 'ci', 'complemento', 'departamento_id', 'primerNombre',
                     'segundoNombre', 'apellidoPaterno', 'apellidoMaterno',
                     'apellidoCasado', 'genero', 'nacionalidad', 'direccion',
                     'ciudad', 'provincia', 'telefono', 'email',
@@ -190,7 +191,7 @@ class BeneficiarioController extends Controller
         return Inertia::render('panel/beneficiarios/editar', [
             'beneficiario' => [
                 ...$beneficiario->only([
-                    'id', 'ci', 'complemento', 'expedido', 'primerNombre',
+                    'id', 'ci', 'complemento', 'departamento_id', 'primerNombre',
                     'segundoNombre', 'apellidoPaterno', 'apellidoMaterno',
                     'apellidoCasado', 'genero', 'nacionalidad', 'direccion',
                     'ciudad', 'provincia', 'telefono', 'email',
@@ -262,6 +263,16 @@ class BeneficiarioController extends Controller
             /*
              * EL CUPO VIAJA CON EL CARNET, y los dos agregados con él.
              */
+            /*
+             * SU BOLSA MADRE, para el formulario de carnet: es de dónde va a
+             * salir el cupo impreso, y la pantalla tiene que poder decir cuál.
+             * Va con la categoría y el agregado de kilos, o cada fila del
+             * autocompletado dispararía dos consultas más.
+             */
+            ->with(['aprovechamientos' => fn ($a) => $a
+                ->with('categoria')
+                ->withSum('faenasQueConsumen', 'kilos_extraidos'),
+            ])
             ->with(['carnets' => fn ($q) => $q
                 ->vigentes()
                 ->with([
@@ -310,7 +321,54 @@ class BeneficiarioController extends Controller
                         ? $c->siguienteNumeroFaena()
                         : null,
                 ])->values()->all(),
+
+                'cupos_elegibles' => self::cuposElegibles($b),
             ])
+            ->all();
+    }
+
+    /**
+     * Las bolsas madre que pueden respaldar un carnet de pescador nuevo.
+     *
+     * Son las EN CURSO —pendiente, en revisión o aprobada, en fecha—, que es
+     * exactamente lo que acepta `EmitirCarnetService`. Miraba solo las
+     * aprobadas y la pantalla avisaba «no tiene cupo» sobre alguien que sí
+     * podía sacar el carnet: el plástico se emite con el cupo todavía sin
+     * cobrar, y los dos se pagan juntos.
+     *
+     * Estática y pública porque la usan el buscador y `CarnetController`: el
+     * dato tiene que ser el mismo venga la persona preseleccionada o elegida
+     * a mano. Devuelve una LISTA: la regla de una bolsa por persona deja una
+     * sola en curso, pero si mañana hubiera dos, la pantalla las ofrece en vez
+     * de elegir por su cuenta.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function cuposElegibles(Beneficiario $beneficiario): array
+    {
+        $cupos = $beneficiario->relationLoaded('aprovechamientos')
+            ? $beneficiario->aprovechamientos->filter(
+                fn (AprovechamientoPesq $a): bool => $a->estado->estaAbierto() || $a->estado->habilita(),
+            )->filter(fn (AprovechamientoPesq $a): bool => $a->estaEnFecha())
+            : $beneficiario->aprovechamientos()->with('categoria')->enCurso()->get();
+
+        return $cupos
+            ->sortByDesc('fecha_solicitud')
+            ->map(fn (AprovechamientoPesq $a): array => [
+                'id' => $a->id,
+                'escala' => $a->categoria?->nro_escala,
+                'descripcion' => $a->categoria?->descripcion_kg,
+                'volumen_total_kg' => (float) $a->volumen_total_kg,
+                'saldo_kg' => $a->saldoKg(),
+                'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
+                // El estado va a la pantalla: un cupo PENDIENTE respalda el
+                // carnet igual, pero todavía no autoriza a pescar, y quien
+                // emite tiene que verlo.
+                'estado_etiqueta' => $a->estado->etiqueta(),
+                'estado_color' => $a->estado->color(),
+                'habilita_faenas' => $a->estado->habilita(),
+            ])
+            ->values()
             ->all();
     }
 
@@ -355,13 +413,9 @@ class BeneficiarioController extends Controller
     private function catalogos(): array
     {
         return [
-            'expedidos' => collect(config('jichi.expedido'))
-                ->map(fn (string $nombre, string $codigo): array => [
-                    'value' => $codigo,
-                    'label' => $codigo.' — '.$nombre,
-                ])
-                ->values()
-                ->all(),
+            // De la TABLA, que es la fuente desde que existe `departamentos`.
+            // El config quedó solo como la semilla de esa migración.
+            'expedidos' => Departamento::opciones(),
             'provincias' => config('jichi.provincias'),
         ];
     }

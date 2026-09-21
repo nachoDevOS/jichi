@@ -39,6 +39,20 @@ class CarnetImpresionController extends Controller
         $carnet->load(['beneficiario', 'asociacion', 'aprovechamiento']);
 
         /*
+         * UN CARNET SIN FIRMAR NO SE IMPRIME. El plástico es el documento que
+         * la persona se lleva: si sale antes de la aprobación, queda en la
+         * calle una credencial que el sistema todavía no autorizó —y que puede
+         * terminar rechazada—.
+         */
+        if (! $carnet->yaFueAprobado()) {
+            return back()->with(
+                'error',
+                'El carnet está '.mb_strtolower($carnet->estado->etiqueta()).': se imprime recién '.
+                'cuando esté aprobado.',
+            );
+        }
+
+        /*
          * UN CARNET REVOCADO NO SE IMPRIME.
          */
         if ($carnet->estado === EstadoCarnet::Revocado) {
@@ -141,7 +155,13 @@ class CarnetImpresionController extends Controller
     /**
      *  LA JERARQUIA TIPOGRAFICA
      */
-    private const CUERPO_VALOR = 6.0;
+    /*
+     * 5,2 pt y no 6: es el tamaño al que venía saliendo la ASOCIACIÓN, que es
+     * el renglón más largo y el único que el encogido de `texto()` bajaba.
+     * Con 6 fijo, el nombre salía notoriamente más grande que el gremio y la
+     * tira se leía despareja; igualado, los seis renglones pesan lo mismo.
+     */
+    private const CUERPO_VALOR = 5.2;
 
     /**
      * El cuerpo y el alto de una tira que pasó a DOS líneas.
@@ -273,8 +293,15 @@ class CarnetImpresionController extends Controller
         /*
          *  LA GESTIÓN YA NO SE IMPRIME, Y NO ES UN OLVIDO
          */
+        /*
+         * EL RÓTULO ES «REGISTRO» Y EL VALOR SU NÚMERO ANUAL —«00001»—, no el
+         * código de 16 caracteres: en el plástico entra un número que se puede
+         * dictar y buscar en el libro, y el código largo llenaba la tira sin
+         * que nadie lo pueda leer de un vistazo. El código sigue existiendo y
+         * es el que usa la verificación pública.
+         */
         if ($cupo === null) {
-            return $this->campo('CÓDIGO', $carnet->codigo_legible, '—', self::ANCHO_VALOR);
+            return $this->campo('REGISTRO', $carnet->registro_legible, '—', self::ANCHO_VALOR);
         }
 
         /*
@@ -284,7 +311,7 @@ class CarnetImpresionController extends Controller
          * a 6,1 pt en negrita cada carácter mide ~3,7, así que «CUPO» entra con
          * holgura y «APROVECHAMIENTO» se desbordaría en silencio.
          */
-        return $this->campo('CÓDIGO', $carnet->codigo_legible, '—', self::ANCHO_VALOR_ANGOSTO) + [
+        return $this->campo('REGISTRO', $carnet->registro_legible, '—', self::ANCHO_VALOR_ANGOSTO) + [
             'segundo' => ['rotulo' => 'CUPO', 'alto' => self::ALTO_UNA_LINEA] + $cupo,
         ];
     }

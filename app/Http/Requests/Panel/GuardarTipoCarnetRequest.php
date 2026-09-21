@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Panel;
 
+use App\Enums\TipoActor;
 use App\Models\TipoCarnet;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -35,6 +36,12 @@ class GuardarTipoCarnetRequest extends FormRequest
                 Rule::unique('tipos_carnet', 'nombre')->ignore($idActual),
             ],
 
+            /*
+             * PARA QUÉ ACTIVIDAD SIRVE. Es lo que después obliga a que el tipo
+             * elegido y el `tipo_actor` del carnet coincidan.
+             */
+            'tipo_actor' => ['required', Rule::enum(TipoActor::class)],
+
             'precio_bs' => ['required', 'numeric', 'min:0', 'max:99999999', 'decimal:0,2'],
 
             'estado' => ['required', 'boolean'],
@@ -49,6 +56,7 @@ class GuardarTipoCarnetRequest extends FormRequest
         return [
             'nombre.required' => 'El nombre del tipo de carnet es obligatorio.',
             'nombre.unique' => 'Ya existe un tipo de carnet con ese nombre.',
+            'tipo_actor.required' => 'Indique si el tipo es de pescador o de comercializador.',
             'precio_bs.required' => 'Indique el precio en bolivianos.',
             'precio_bs.decimal' => 'El precio lleva como máximo dos decimales.',
             'precio_bs.min' => 'El precio no puede ser negativo.',

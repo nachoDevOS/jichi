@@ -46,7 +46,7 @@ class ReciboController extends Controller
              * CON LAS COLUMNAS DEL NOMBRE Y LAS DE LA CÉDULA: los dos accesores
              * las leen todas, y una que falte vuelve null sin ningún error.
              */
-            ->with('beneficiario:id,ci,complemento,expedido,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado')
+            ->with('beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado')
             ->withCount('pagos')
             // El total de lo que HAY, para contrastarlo con lo impreso sin una
             // consulta agregada por fila.
@@ -107,7 +107,7 @@ class ReciboController extends Controller
             'pagable' => fn ($m) => $m->morphWith([
                 Carnet::class => ['beneficiario', 'tipoCarnet'],
                 AprovechamientoPesq::class => ['beneficiario', 'categoria'],
-                GuiaMovimiento::class => ['comercializador'],
+                GuiaMovimiento::class => ['carnet.beneficiario'],
             ]),
         ])]);
 

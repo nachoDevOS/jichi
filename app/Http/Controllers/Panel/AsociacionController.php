@@ -33,7 +33,21 @@ class AsociacionController extends Controller
 
                 $q->where(fn ($s) => $s
                     ->where('nombre', $operador, $like)
-                    ->orWhere('sigla', $operador, $like));
+                    ->orWhere('sigla', $operador, $like)
+                    /*
+                     * También por la ficha: el representante o la personería
+                     * es lo que alguien recuerda cuando el nombre exacto del
+                     * gremio no.
+                     *
+                     * EL TÉRMINO VA JSON-ESCAPADO, y no es un detalle: Laravel
+                     * guarda el JSON con las tildes en `\uXXXX` y las barras
+                     * en `\/`, así que un LIKE con «Pérez» no encuentra
+                     * «P\u00e9rez» y la búsqueda falla EN SILENCIO justo con
+                     * los apellidos de acá. `json_encode` del término lo deja
+                     * escrito igual que en la columna; el `trim` saca las
+                     * comillas que agrega.
+                     */
+                    ->orWhere('datos', $operador, $this->comoEnElJson($buscar)));
             })
             /*
              * El conteo de uso NO es decorativo: es lo que explica por qué una
@@ -47,6 +61,9 @@ class AsociacionController extends Controller
                 'id' => $a->id,
                 'nombre' => $a->nombre,
                 'sigla' => $a->sigla,
+                // La ficha COMPLETA, con las claves vacías en null: el
+                // formulario dibuja los mismos campos para todas las filas.
+                'datos' => $a->fichaCompleta(),
                 'estado' => $a->estado->value,
                 'estado_etiqueta' => $a->estado->etiqueta(),
                 'estado_color' => $a->estado->color(),
@@ -62,7 +79,22 @@ class AsociacionController extends Controller
             // en los dos lados, agregar un estado en la pantalla y olvidarse del
             // servidor dejaría al operador eligiendo un valor que se rechaza.
             'estados' => EstadoAsociacion::opciones(),
+
+            // Los rótulos salen del modelo: agregar un dato a la ficha es
+            // sumar una línea en `Asociacion::CAMPOS`, sin tocar la pantalla
+            // ni migrar.
+            'camposFicha' => Asociacion::CAMPOS,
         ]);
+    }
+
+    /**
+     * El término de búsqueda, escrito como quedaría DENTRO del JSON guardado.
+     */
+    private function comoEnElJson(string $termino): string
+    {
+        $escapado = trim((string) json_encode($termino), '"');
+
+        return '%'.str_replace(['%', '_'], ['\%', '\_'], $escapado).'%';
     }
 
     /**

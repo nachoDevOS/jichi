@@ -237,7 +237,10 @@
             top: 2.4pt;
             left: 0;
             width: 44pt;
-            font-size: 6.1pt;
+            /* 5,8 y no 6,1: un punto menos que el valor, lo justo para que
+               el rótulo no compita con el dato. Ver la nota de «PROV.»: a
+               menor cuerpo, además, el rótulo largo tiene más margen. */
+            font-size: 5.8pt;
             font-weight: bold;
             color: #ffffff;
         }
@@ -246,7 +249,10 @@
             position: absolute;
             top: 2.4pt;
             left: 44pt;
-            font-size: 6.1pt;
+            /* 5,8 y no 6,1: un punto menos que el valor, lo justo para que
+               el rótulo no compita con el dato. Ver la nota de «PROV.»: a
+               menor cuerpo, además, el rótulo largo tiene más margen. */
+            font-size: 5.8pt;
             font-weight: bold;
             color: #ffffff;
         }

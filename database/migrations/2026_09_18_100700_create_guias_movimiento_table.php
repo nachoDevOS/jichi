@@ -15,9 +15,17 @@ return new class extends Migration
         Schema::create('guias_movimiento', function (Blueprint $table) {
             $table->id();
 
-            // Se llama `_com_` porque acá la persona entra en un papel concreto:
-            // es QUIEN COMERCIALIZA, no el pescador que extrajo la carga.
-            $table->foreignId('beneficiario_com_id')->constrained('beneficiarios')->restrictOnDelete();
+            /*
+             * LA GUÍA CUELGA DEL CARNET DE COMERCIALIZADOR. La persona se
+             * alcanza por él —`carnets.beneficiario_id`— y por eso acá NO hay
+             * un beneficiario suelto: con las dos claves, una guía podía quedar
+             * a nombre de alguien distinto del titular de su propio carnet.
+             * Mismo criterio que `permisos_faena`.
+             */
+            $table->foreignId('carnet_id')->constrained('carnets')->restrictOnDelete();
+
+            // La asociación SÍ se copia: es el aval que va impreso en el papel,
+            // y un cambio de gremio posterior no puede reescribir lo entregado.
             $table->foreignId('asociacion_id')->constrained('asociaciones')->restrictOnDelete();
 
             // Global y NO parcial: igual que el carnet, el papel ya se entregó y
@@ -41,7 +49,7 @@ return new class extends Migration
             $table->dateTime('fecha_emision');
             $table->dateTime('fecha_vencimiento')->comment('Máximo 5 días desde fecha_emision');
 
-            $table->index(['beneficiario_com_id', 'estado']);
+            $table->index(['carnet_id', 'estado']);
             $table->index('asociacion_id');
 
             // Para el comando diario que cierra las que se pasaron de fecha.

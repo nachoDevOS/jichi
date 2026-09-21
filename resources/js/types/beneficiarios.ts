@@ -1,3 +1,4 @@
+import type { CupoVigente } from '@/types/carnets';
 import type { EstadoAprovechamiento, EstadoCarnet, TipoActor } from '@/types';
 
 /**
@@ -33,7 +34,11 @@ export interface BeneficiarioFicha {
     id: number;
     ci: string;
     complemento: string | null;
-    expedido: string | null;
+    /**
+     * El departamento donde se expidió la cédula. Es lo ÚNICO que se guarda: el
+     * código —«BN»— llega ya armado dentro de `documento_identidad`.
+     */
+    departamento_id: number | null;
     primerNombre: string;
     segundoNombre: string | null;
     apellidoPaterno: string;
@@ -58,7 +63,8 @@ export interface BeneficiarioFicha {
 export interface FormularioBeneficiario {
     ci: string;
     complemento: string;
-    expedido: string;
+    /** El id del departamento. Vacío cuando no se declaró. */
+    departamento_id: number | '';
     primerNombre: string;
     segundoNombre: string;
     apellidoPaterno: string;
@@ -184,4 +190,12 @@ export interface BeneficiarioSugerido {
      * que corresponde es emitirle una antes de cualquier otra cosa.
      */
     carnets_vigentes: CarnetVigenteSugerido[];
+
+    /**
+     * Sus bolsas madre EN CURSO, las que pueden respaldar un carnet nuevo.
+     * Solo las mandan las pantallas que las necesitan —emitir un carnet—; en
+     * las demás llega `undefined`. Normalmente es una: la regla deja una sola
+     * en curso por persona.
+     */
+    cupos_elegibles?: CupoVigente[];
 }

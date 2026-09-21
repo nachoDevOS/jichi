@@ -304,11 +304,45 @@ class CobrarService
     private function nombrar(Model $tramite): string
     {
         return match (true) {
-            $tramite instanceof Carnet => 'Carnet '.$tramite->codigo_legible,
-            $tramite instanceof AprovechamientoPesq => 'Aprovechamiento escala '.($tramite->categoria?->nro_escala ?? '—'),
+            /*
+             * «Cédula de Pescador», no «Carnet»: es como lo llama el talonario
+             * —la casilla marcada en el recibo dice CÉDULAS— y es lo que la
+             * persona reconoce.
+             *
+             * SIN EL CÓDIGO: son 16 caracteres que llenan el renglón y que el
+             * pescador no tiene cómo contrastar en el mostrador. Y con la
+             * CAPACIDAD cuando la lleva —la del cupo que respalda la cédula—,
+             * porque es lo que distingue una de otra; el comercializador no
+             * lleva volumen, así que ahí no va nada.
+             */
+            $tramite instanceof Carnet => 'Cédula de '.$tramite->tipo_actor->etiqueta()
+                .$this->tramoDe($tramite->aprovechamiento),
+            /*
+             * EL NOMBRE COMPLETO Y LA CAPACIDAD. Decía «Aprovechamiento escala
+             * 3»: el número del tramo es del catálogo interno y no le dice
+             * nada a quien recibe el papel; lo que identifica lo cobrado es el
+             * documento y cuántos kilos autoriza.
+             */
+            $tramite instanceof AprovechamientoPesq => 'Autorización de Pesca para Aprovechamiento '
+                .'Pesquero'.$this->tramoDe($tramite),
             $tramite instanceof GuiaMovimiento => 'Guía '.$tramite->codigo_guia,
             default => 'Trámite',
         };
+    }
+
+    /**
+     * El tramo de la escala, tal como se escribe en el recibo: « - 201 Kg
+     * Hasta 300 Kg».
+     *
+     * Devuelve cadena VACÍA si no hay cupo o no tiene tramo: así el concepto
+     * de un comercializador —que no lleva volumen— no queda con un guion
+     * colgando al final.
+     */
+    private function tramoDe(?AprovechamientoPesq $cupo): string
+    {
+        $tramo = $cupo?->categoria?->descripcion_kg;
+
+        return $tramo ? ' - '.$tramo : '';
     }
 
     /**
