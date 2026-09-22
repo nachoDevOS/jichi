@@ -3,13 +3,17 @@
 Sistema de credenciales y permisos de pesca del Gobierno Autónomo Departamental
 del Beni. **PostgreSQL 18** (corre igual en SQLite).
 
-Describe el núcleo rehecho el **18/09/2026**. Las diez tablas del dominio se
+Describe el núcleo rehecho el **18/09/2026**. Las once tablas del dominio se
 crean en `database/migrations/2026_09_18_*`; **las migraciones quedaron cortas a
 propósito y el porqué de cada decisión vive acá.**
 
-> El modelo ANTERIOR —`rubros`, `tramites`, `faenas`, `guias`,
-> `guia_detalles`— ya no existe en la base. Sus migraciones quedaron en
-> `database/migrations-anterior/`, que Laravel no escanea.
+> El modelo ANTERIOR —`rubros`, `tramites`, `faenas`, `guias`— ya no existe en
+> la base. Sus migraciones quedaron en `database/migrations-anterior/`, que
+> Laravel no escanea.
+>
+> ⚠️ `guia_detalles` VOLVIÓ el 22/09/2026, y no es la tabla vieja: aquella
+> colgaba de `guias`, esta cuelga de `guias_movimiento` y calca el cuadro D del
+> talonario. Ver su sección.
 
 ---
 
@@ -19,19 +23,24 @@ propósito y el porqué de cada decisión vive acá.**
                         ┌──────────────────┐
                         │  beneficiarios   │  la persona, UNA sola vez
                         └────────┬─────────┘
-             ┌───────────────────┼───────────────────┐
-             │                   │                   │
-    ┌────────▼─────────┐ ┌───────▼────────┐ ┌────────▼──────────┐
-    │ aprovechamientos │ │    carnets     │ │ guias_movimiento  │
-    │      _pesq       │◄┤ (pescador o    │ │ (un traslado)     │
-    │ (el cupo en kg)  │ │ comercializador)│ └───────────────────┘
-    └────────┬─────────┘ └───────┬────────┘
-             │                   │
-             └────────┬──────────┘
-                      │
-             ┌────────▼─────────┐
-             │  permisos_faena  │  una salida de pesca
-             └──────────────────┘
+                    ┌────────────┴────────────┐
+                    │                         │
+           ┌────────▼─────────┐     ┌─────────▼────────┐
+           │ aprovechamientos │     │     carnets      │
+           │      _pesq       │◄────┤  (pescador o     │
+           │  (el cupo en kg) │     │ comercializador) │
+           └──────────────────┘     └─────────┬────────┘
+                                 ┌────────────┴────────────┐
+                                 │                         │
+                        ┌────────▼─────────┐     ┌─────────▼─────────┐
+                        │  permisos_faena  │     │ guias_movimiento  │
+                        │   una salida     │     │   un traslado     │
+                        └──────────────────┘     └─────────┬─────────┘
+                                                           │
+                                                 ┌─────────▼─────────┐
+                                                 │  guia_detalles    │
+                                                 │ una fila x especie│
+                                                 └───────────────────┘
 
     ┌──────────┐        ┌────────────────────────────────────┐
     │ recibos  │──────< │ pagos  (polimórfico: pagable_type) │
@@ -41,6 +50,15 @@ propósito y el porqué de cada decisión vive acá.**
                   ▼             ▼             ▼
                carnets   aprovechamientos   guias
                               _pesq       _movimiento
+
+    La llave pública, para los CINCO documentos que se entregan:
+    ┌─────────────────────────────────────────┐
+    │ codigos  (polimórfico: codigable_type)  │  16 al azar, único GLOBAL
+    └──────────────────┬──────────────────────┘
+        ┌────────┬─────┴────┬──────────┬─────────┐
+        ▼        ▼          ▼          ▼         ▼
+     carnets  aprov.   permisos_   guias_    recibos
+              _pesq      faena    movimiento
 
     Catálogos que alimentan lo de arriba:
       asociaciones · categorias_aprovechamiento · tipos_carnet
@@ -368,20 +386,13 @@ bajo su nombre.
 | `beneficiario_id`, `asociacion_id`, `tipo_carnet_id` | FK RESTRICT | |
 | `aprovechamiento_id` | FK **nullable**, nullOnDelete | Solo el pescador |
 | `tipo_actor` | string(20) | `TipoActor`: pescador / comercializador |
-| `codigo_carnet` | string(40), **único global** | 16 alfanuméricos: `PES26QK7RJ2M4XPB` |
 | `estado` | string(20) | `EstadoCarnet` |
 
-**EL CÓDIGO SON 16 CARACTERES, generados por el sistema** —cambiado el
-20/09/2026; eran 12—. Los cinco primeros son el prefijo `PES`/`COM` más los dos
-dígitos del año, y los once restantes salen de `random_int()`, el generador
-criptográfico: el azar es lo único que impide recorrer el padrón entero
-probando códigos en la verificación pública.
-
-El alfabeto excluye **I, L, O, S, 0, 1 y 5**, que se confunden de a pares: el
-código se dicta por teléfono y se tipea de un plástico gastado. Se guarda sin
-separadores y se muestra de a cuatro —`PES2 6QK7 RJ2M 4XPB`— con
-`Carnet::codigoLegible()`; lo que llega tipeado se limpia con
-`normalizarCodigo()`.
+**EL CÓDIGO YA NO ES UNA COLUMNA DE ESTA TABLA.** Vivía en `codigo_carnet` y se
+mudó a **`codigos`** el 22/09/2026, cuando los otros cuatro documentos pasaron a
+necesitar lo mismo. Se lee con `$carnet->codigo_legible` igual que antes, pero
+**toda consulta que lo muestre necesita `with('codigo')`**. Ver la ficha de
+`codigos`, más abajo.
 
 **`aprovechamiento_id` es nullable y eso es la regla, no un descuido.** La pesca
 se autoriza por VOLUMEN —tantos kilos, contrastables contra una guía de
@@ -541,12 +552,45 @@ salida no ocurrió.
 | --- | --- | --- |
 | `carnet_id` | FK RESTRICT | **La única**: de él cuelga la guía |
 | `asociacion_id` | FK RESTRICT | El aval impreso, COPIADO del carnet |
-| `codigo_guia` | string(40), único | |
-| `origen` / `destino` | string(160) | |
-| `peso_total_kg` | decimal(12,2) | |
+| `numero_guia` | unsigned, único **global** | Correlativo **continuo**: `000308` |
+| `monto` | decimal(10,2) | Copia congelada del arancel |
+| `origen` / `destino` | string(160) | Bloque B del papel |
+| `origen_*` / `destino_*` | string(100), nullable | Departamento, provincia, distrito o cuenca |
+| `medio_transporte` | string(20), nullable | `MedioTransporte`: el casillero 10 |
+| `tipo_transporte` | string(25), nullable | `TipoTransporte`: los renglones a/b/c del bloque C |
+| `transporte_nombre` / `_placa` | string, nullable | El vehículo |
+| `transporte_capacidad_kg` | decimal(12,2), nullable | Cap. máxima |
+| `peso_total_kg` | decimal(12,2) | **La suma del cuadro D**, guardada |
 | `es_piscicultura` | boolean | **50% de descuento** |
-| `fecha_emision` / `fecha_vencimiento` | **dateTime** | Máximo **5 días** |
-| `estado` | string(20) | `EstadoGuia` |
+| `observaciones` | text, nullable | El recuadro del papel |
+| `estado` | string(20) | `EstadoGuia`, nace `pendiente` |
+| `fecha_solicitud` | date | El día que la persona vino al mostrador |
+| `fecha_emision` / `fecha_vencimiento` | **dateTime**, nullable | Máximo **5 días**, los escribe la APROBACIÓN |
+
+**LA GUÍA CALCA EL TALONARIO, BLOQUE POR BLOQUE** —rehecha el 22/09/2026—. Antes
+guardaba cuatro datos sueltos: código tipeado, origen, destino y un peso. El
+papel que hay que imprimir pide la ubicación con departamento, provincia y
+cuenca de ida y de vuelta, el medio y el vehículo, y el cuadro de productos
+especie por especie. Sin esas columnas el PDF salía con la mitad de los
+renglones en blanco y había que completarlo a mano, que es lo que el sistema
+viene a evitar.
+
+**EL NÚMERO LO PONE EL SISTEMA, no el operador.** Era `codigo_guia`, tipeado a
+mano y único global. Ahora es `numero_guia`, correlativo **continuo** de seis
+dígitos por `CorrelativoService::siguienteContinuo()` —el talonario del SEDAG va
+en 000308 y no reinicia en enero—. Mismo tratamiento que
+`permisos_faena.numero_faena` y que `recibos.numero_recibo`.
+
+**LAS DOS FECHAS DE VIGENCIA SON NULLABLE, y eso es el circuito.** La guía nace
+PENDIENTE y hasta la firma no ampara nada, así que no hay nada que venza:
+`RevisarGuiaService::aprobar()` escribe las dos. Contarlas desde que se cargó el
+borrador le comería al camión los días que el expediente estuvo esperando en
+ventanilla.
+
+**`monto` es una COPIA, no la tarifa de hoy.** Se escribe al emitir con el
+descuento de piscicultura ya aplicado, por lo mismo que en `permisos_faena`: una
+suba por resolución no puede mover lo que dice un papel entregado. Por eso
+`GuiaMovimiento::montoACobrar()` lee la columna y no `config()`.
 
 **CUELGA DEL CARNET DE COMERCIALIZADOR Y DE NADA MÁS** —cambiado el 20/09/2026,
 mismo criterio que `permisos_faena`—. Tuvo un `beneficiario_com_id` propio, y el
@@ -566,13 +610,65 @@ recurso que la tasa viene a proteger. El descuento se aplica en UN SOLO lugar,
 escrito en tres lados, el día que la resolución cambie el 50% a 40% se corrige en
 dos y el tercero sigue cobrando mal sin que nadie lo note.
 
-**Las fechas son `dateTime` y no `date`** porque los cinco días se cuentan desde
-la HORA de emisión: una guía emitida a las 18:00 del lunes vence a las 18:00 del
-sábado, no a la medianoche del viernes. Con `date` se le regalaría o se le
-quitaría al transportista casi un día.
+**Las fechas de vigencia son `dateTime` y no `date`** porque los cinco días se
+cuentan desde la HORA de emisión: una guía firmada a las 18:00 del lunes vence a
+las 18:00 del sábado, no a la medianoche del viernes. Con `date` se le regalaría
+o se le quitaría al transportista casi un día.
 
 > Por lo mismo, al mandarlas a React van con `toIso8601String()` —son MOMENTOS—
-> mientras que las de faenas y carnets van con `toDateString()`.
+> mientras que `fecha_solicitud` va con `toDateString()`: esa guarda un DÍA.
+
+**EL CIRCUITO ES EL MISMO DEL CARNET, EL CUPO Y LA FAENA** —desde el 22/09/2026—:
+
+```
+PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ ACTIVA ──[cerrar]──▶ CERRADA
+(borrador)       │           │                        │
+                 │           └──[rechazar]────────────┘  └──[anular]──▶ ANULADA
+                 └── acá sale el RECIBO
+```
+
+Lo decide `EstadoGuia`, no el controlador: `permiteEdicion()`,
+`permiteEliminacion()`, `permiteEnvio()`, `permiteRevision()` y `admitePagos()`.
+Editar y eliminar valen SOLO en pendiente y **sin un depósito cargado** —lo
+suma `GuiaMovimiento::puedeEditarse()`—: un depósito significa que el
+comerciante pagó por ESTE traslado, y mover el peso o la piscicultura después
+cambiaría lo que se cobró.
+
+> **ANULAR Y ELIMINAR NO SON LO MISMO.** Eliminar es sobre el BORRADOR —la fila
+> se dio de baja y nunca hubo papel—; anular es sobre una guía YA FIRMADA, cuyo
+> papel está en la calle. Las dos queman el número del talonario igual.
+
+---
+
+### `guia_detalles` — el cuadro D, una fila por especie
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `guia_movimiento_id` | FK **CASCADE** | La excepción del dominio: ver abajo |
+| `especie` | string(120) | Texto libre: no hay padrón |
+| `condicion` | string(30) | `CondicionProducto`: las DIEZ columnas de tilde |
+| `cantidad_kg` | decimal(12,2) | CANT. ADQUIRIDA |
+| `precio_kg` / `importe_total` | decimal(12,2) | **Declarativos**, ver abajo |
+
+**UN SOLO ENUM Y NO DOS COLUMNAS.** El cuadro del papel tiene diez casillas de
+tilde: «Fresco o Refrigerado» se subdivide en entero y eviscerado, «Congelado»
+en entero, eviscerado y fileteado, y después vienen Seco, Sal Preso, Vivos, A
+Granel y Otros sueltas. Partirlo en estado × presentación dejaría combinaciones
+que en el talonario no existen —«seco fileteado»— así que va un enum de diez
+casos que mapea 1:1 con las columnas impresas.
+
+**`precio_kg` e `importe_total` NO son el arancel del SEDAG**: son lo que el
+comerciante declara haber pagado por el pescado en origen, y solo se imprimen.
+Lo que cobra caja sale de `guias_movimiento.monto`. Confundirlos haría que una
+carga cara pagara más tasa que una barata, que no es la regla.
+
+**La FK es CASCADE y no RESTRICT, al revés que todo el resto del dominio**,
+porque el detalle no tiene vida propia: es el cuerpo de la guía, no un documento
+aparte. ⚠️ Eso **no se dispara con la baja lógica** —`delete()` sobre una tabla
+con `SoftDeletes` es un UPDATE— así que `EmitirGuiaService::eliminar()` baja el
+detalle a mano antes de bajar la guía. Y al corregir el borrador el detalle se
+**reemplaza entero**: casar renglón por renglón sin un id estable del papel
+inventa una identidad que el talonario no tiene.
 
 ---
 
@@ -629,6 +725,54 @@ amparar trámites de dos personas: `CobrarService::titularDe()` lo rechaza.
 el momento de emitir. Recalcularla al leer haría que el papel entregado cambiara si
 después se corrige un abono. Ver `Recibo::montoCalculado()` para el contraste entre
 lo impreso y lo que hay hoy.
+
+---
+
+### `codigos` — la llave pública de los documentos
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `codigo` | string(16), **único global** | 16 al azar, **sin prefijo** |
+| `codigable_type` + `codigable_id` | polimórfico, **únicos juntos** | Un documento, un código |
+
+**Una tabla y no una columna por tabla.** Es el mismo argumento que sostiene a
+`pagos`: el número tiene que ser único **entre todos los documentos**, no dentro
+de cada uno. Partido en cinco columnas, dos papeles de tipo distinto podrían
+llevar el mismo código y `/verificar` no sabría cuál mostrar. Con un solo índice
+lo garantiza el motor, y por eso el código **no lleva prefijo**: no hace falta un
+espacio de nombres si la unicidad es global.
+
+El costo es el mismo que el de `pagos`: **se pierde la clave foránea**. La
+integridad la sostienen la aplicación y el índice único, no el motor.
+
+**16 caracteres del alfabeto sin `I L O S 0 1 5`** —se confunden de a pares, y el
+código se dicta por teléfono y se tipea de un plástico gastado—. Son
+2,5 × 10²³ combinaciones: con un millón de documentos la probabilidad de
+colisión es 2 × 10⁻¹², y al tope de 20 intentos por minuto de `/verificar`
+recorrerlo entero llevaría 10⁹ años. Salen de `random_int()`, el generador
+criptográfico: el azar es lo único que impide recorrer el padrón entero probando
+códigos.
+
+Se guarda sin separadores y se muestra de a cuatro —`EFGT-96R4-CJ42-AHYJ`— con
+`codigo_legible`; lo que llega tipeado se limpia con `normalizarCodigo()`. Las
+dos viven en `App\Traits\Codificable`.
+
+> ⚠️ **`UNIQUE(codigo)` es COMPLETO, no parcial.** Un código que salió impreso
+> queda **quemado para siempre**, aunque su documento se dé de baja: es papel
+> entregado, y el criterio está en §3. Y el `morphTo` va con `withTrashed()`,
+> porque un documento anulado tiene que contestar «fue anulado» y no
+> «no existe» — si no, anular vuelve el documento invisible en vez de inválido.
+
+> ⚠️ **TODA consulta que muestre el código necesita `with('codigo')`.** Sin eso
+> no falla: hace N+1 en silencio. Y en `carnets` el accesor va en `#[Appends]`,
+> así que el N+1 aparece con solo serializar la fila.
+
+**El código NO reemplaza a los correlativos** —`numero_recibo`, `numero_faena`,
+`nro_registro`—. Son dos números con trabajos opuestos: el correlativo es
+consecutivo **a propósito**, porque Contabilidad audita sus huecos; el código es
+imposible de adivinar **a propósito**, porque es la llave de una pantalla
+pública. Un código al azar no tiene huecos que auditar, y un correlativo lo
+adivina cualquiera probando el siguiente.
 
 ---
 
@@ -788,7 +932,7 @@ que primero acota.
 
 ---
 
-## 3. Borrado lógico: las diez tablas lo tienen
+## 3. Borrado lógico: las once tablas lo tienen
 
 **Todas** las tablas del dominio llevan `softDeletes()` y su modelo usa el trait.
 Nada del dominio se borra de verdad: se da de baja, la fila queda con
@@ -812,7 +956,7 @@ o queda quemado:
 | `tipos_carnet.nombre` | **parcial** | Ídem |
 | `beneficiarios.ci` | **parcial** | Una ficha dada de baja libera la cédula |
 | `carnets.codigo_carnet` | **global** | El plástico ya salió y está en la calle |
-| `guias_movimiento.codigo_guia` | **global** | El papel ya se entregó |
+| `guias_movimiento (numero_guia)` | **global** | La hoja del talonario se gastó |
 | `recibos.numero_recibo` | **global** | Correlativo que Contabilidad audita: el hueco es lo que la hace auditable |
 | `permisos_faena (numero_faena)` | **global** | La hoja del talonario se gastó |
 

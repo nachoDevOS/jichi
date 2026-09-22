@@ -76,7 +76,7 @@ export interface RecaudacionMes {
 /** Una fila de la tabla de últimas credenciales emitidas. */
 export interface UltimoCarnet {
     id: number;
-    /** En grupos de cuatro: «PES2 6000 0017». Se guarda sin separadores. */
+    /** En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». Se guarda sin separadores. */
     codigo: string;
     beneficiario: string | null;
     asociacion: string | null;

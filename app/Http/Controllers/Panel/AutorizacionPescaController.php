@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Models\AprovechamientoPesq;
 use App\Models\Configuracion;
+use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -68,7 +69,7 @@ class AutorizacionPescaController extends Controller
             );
         }
 
-        $aprovechamiento->loadMissing(['beneficiario', 'categoria']);
+        $aprovechamiento->loadMissing(['codigo', 'beneficiario', 'categoria']);
 
         $pdf = Pdf::loadView('documentos.autorizacion-pesca', [
             ...$this->datos($aprovechamiento),
@@ -79,10 +80,15 @@ class AutorizacionPescaController extends Controller
             // disco con las restricciones de `chroot` y en producción termina en
             // un recuadro vacío.
             'escudo' => $this->imagenEmbebida('image/recibo-escudo.png'),
-            // Copia a medida del logo: el original mide 2048 px y pesa 1 MB, y
-            // embebido hacía un PDF de 3 MB para dibujar 56 pt.
-            'logo' => $this->imagenEmbebida('image/autorizacion-logo.png'),
+            // El emblema de peces del talonario —un surubí y un pacú—, no el
+            // logo del SEDAG: ese ya está en el sello de agua del fondo, y
+            // repetirlo dejaba el escudo compitiendo con dos versiones del
+            // mismo emblema. Es el mismo del permiso de faena.
+            'peces' => $this->imagenEmbebida('image/faena-peces.png'),
             'selloSedag' => $this->imagenEmbebida('image/recibo-sello.png'),
+
+            // El QR y el código, para verificarlo desde el papel.
+            'verificacion' => QrVerificacion::de($aprovechamiento),
         ])
             // CARTA VERTICAL: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])

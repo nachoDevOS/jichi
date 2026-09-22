@@ -1,43 +1,41 @@
-import type { EstadoCarnet } from '@/types';
-
 /**
  * Tipos de la parte pública (verificación de carnets por QR).
  */
 
-/** Lo que se muestra de un carnet en la pantalla pública. */
-export interface CarnetPublico {
-    /**
-     * El código impreso en el carnet, en grupos de cuatro: «PES2 6000 0017».
-     * Es el único dato de esta pantalla que también está en el plástico, así
-     * que es lo que el inspector cruza para confirmar que el acta corresponde
-     * a la credencial que tiene en la mano.
-     */
-    codigo: string;
+/** Un renglón del acta, ya resuelto por el servidor. */
+export interface RenglonPublico {
+    etiqueta: string;
+    valor: string;
+    /** Monoespaciada: en un número se confunden el 0 con la O. */
+    mono: boolean;
+}
+
+/**
+ * Lo que se muestra de CUALQUIER documento verificado.
+ *
+ * Misma forma para los cinco —carnet, aprovechamiento, faena, guía y recibo—:
+ * lo que cambia de uno a otro son los `renglones`, que arma
+ * VerificacionController::renglones(). Sumar un tipo nuevo no toca este
+ * archivo.
+ */
+export interface DocumentoPublico {
+    /** «Carnet de Pescador», «Permiso de Faena»… */
+    tipo_etiqueta: string;
+    /** En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». */
+    codigo: string | null;
     titular: string | null;
     /** Enmascarado: solo los últimos 3 dígitos ('••••779'). */
     documento_titular: string;
-    gestion: number;
-    fecha_emision: string | null;
-    fecha_vencimiento: string | null;
-    estado: EstadoCarnet;
     estado_etiqueta: string;
     estado_color: string;
     /**
-     * NO es lo mismo que estado === 'vigente'. Se calcula además contra la
-     * fecha, porque el estado lo escribe un comando programado que corre una vez
-     * al día. Ver Carnet::estaVigente().
+     * NO es lo mismo que el estado guardado. Se calcula además contra la
+     * fecha, porque `vencido` lo escribe un comando que corre una vez al día.
      */
     vigente: boolean;
-    /** Frase para el inspector: «Carnet auténtico y vigente...». */
+    /** Frase para el inspector: «Documento auténtico y vigente…». */
     mensaje: string;
-    /**
-     * La actividad que el carnet autoriza: «Pescador» o «Comercializador».
-     */
-    actividad: string | null;
-    /** El nombre del catálogo: «Carnet de Pescador». Null por lo mismo. */
-    tipo_carnet: string | null;
-    /** Los kilos autorizados. Null si es comercializador: no lleva cupo. */
-    cupo_kg: number | null;
+    renglones: RenglonPublico[];
 }
 
 /** Datos institucionales que se muestran en el encabezado y el pie. */

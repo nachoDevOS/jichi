@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EstadoFaena;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
+use App\Traits\Codificable;
 use App\Traits\Pagable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,7 +39,7 @@ use Illuminate\Support\Carbon;
 ])]
 class PermisoFaena extends Model
 {
-    use Auditable, Pagable, SoftDeletes;
+    use Auditable, Codificable, Pagable, SoftDeletes;
 
     /** «PermisoFaena» pluraliza a «permiso_faenas», que no es la tabla. */
     protected $table = 'permisos_faena';

@@ -92,7 +92,7 @@ export interface FormularioBeneficiario {
  */
 export interface CarnetResumen {
     id: number;
-    /** En grupos de cuatro: «PES2 6000 0017». Se guarda sin separadores. */
+    /** En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». Se guarda sin separadores. */
     codigo: string;
     /** El nombre del catálogo: «Carnet de Pescador». Es texto, no una regla. */
     tipo: string | null;

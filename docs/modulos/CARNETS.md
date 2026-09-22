@@ -597,27 +597,46 @@ Dos líneas y no tres: el renglón siguiente está plantado 14 pt más abajo.
 
 ---
 
-## 5. La tarjeta no lleva QR, y eso tiene un costo
+## 5. El QR de verificación — volvió el 22/09/2026, y va en el DORSO
 
-**Lo tuvo y se sacó a pedido.** Conviene tener presente qué se perdió:
+**Se sacó a pedido y se volvió a pedir.** Mientras no estuvo, la verificación
+pública seguía existiendo —la pantalla, `VerificacionController::datosPublicos()`,
+todo— pero **desde el plástico no había forma de llegar a ella**: quien tenía el
+carnet en la mano tenía que creerle, que era exactamente el problema de la
+credencial de papel.
 
-La verificación pública sigue existiendo —la pantalla, la firma de validación,
-`VerificacionController::datosPublicos()`, todo— pero **desde el plástico ya no
-hay forma de llegar a ella**. Quien tenga el carnet en la mano no puede
-comprobar si es real ni ver qué rubros habilita; eso ahora solo se consulta
-desde el panel.
+Va abajo a la izquierda del dorso (§6 bis), y lleva adentro la dirección de la
+pantalla pública con el código del carnet:
 
-Es la misma limitación que tenía la credencial de papel, y era su problema
-central: quien la miraba tenía que creerle.
+```
+https://<dominio>/verificar/PES26K2RUBM22MVR
+```
 
-Lo que sí se imprime es el **número de registro** —`000013`, el id del carnet—:
-corto, dictable por teléfono y, sobre todo, inofensivo, porque no abre nada. La
-**firma de validación** no se imprime en ningún lado del plástico.
+**El dominio sale de `APP_URL`, y de ningún otro lado.** Hubo una clave aparte
+—`jichi.url_verificacion`, más una `sistema.url_verificacion` en la tabla— y las
+dos se retiraron el 22/09/2026: tres lugares que dicen el mismo dominio se
+contradicen el día que alguien cambia uno solo. Hoy la URL la arma
+`route('verificar.show', $codigo)`. Ver
+`App\Support\QrVerificacion`, que lo comparten los cuatro PDF.
 
-> `App\Support\CodigoQr` **queda escrito y sin usar**, igual que quedó
-> `CorrelativoService` en su momento: el día que el QR vuelva, la parte difícil
-> —que la salida PNG no depende de `imagick`, que no está en este servidor— ya
-> está resuelta. Ver §8.
+> ⚠️ **`route()` absoluta usa el host de LA PETICIÓN, no `APP_URL`.** Un
+> operador que entre al panel por la IP de la red imprimiría carnets con el
+> QR apuntando a esa IP, muerto fuera de ella. Por eso el helper arma la
+> ruta RELATIVA y le pega `config('app.url')`. Está medido.
+
+> ⚠️ **Lo que diga `APP_URL` queda impreso en el plástico.** Con un valor local
+> —`http://jichi.test`— el QR no resuelve desde el teléfono de nadie, y eso
+> recién se descubre cuando alguien intenta verificar un carnet en la calle.
+> Antes de imprimir un lote, `APP_URL` tiene que ser el dominio público real.
+
+**Va el QR Y el código escrito al lado**, no uno de los dos. El QR es lo rápido;
+el código es lo que funciona con un plástico rayado, poca luz o un teléfono
+viejo. La pantalla de verificación acepta las dos entradas por el mismo motivo.
+El código va en **monoespaciada** —lo único del carnet que la usa— porque quien
+lo tipea está copiando de un plástico gastado y ahí se confunden el 0 con la O.
+
+> El **número de registro** se sigue imprimiendo en el anverso: corto, dictable
+> por teléfono y, sobre todo, inofensivo, porque no abre nada.
 
 ---
 
@@ -748,6 +767,8 @@ aterrizarían encima del anverso.
 | Lockup | 5,2 → 24,4 | El MISMO del anverso pero **sin el renglón «GOBERNACIÓN»**: en el plástico son tres líneas. Mismas `x` para que los dos lados calcen al trasluz |
 | Título, 2 líneas | 25,8 → 46,9 | `DIRECCIÓN DE SERVICIO DEPARTAMENTAL` / `AGROPECUARIO GANADERO SEDAG-BENI`. Serif, blanco perfilado, 8,2 pt |
 | Las 7 reglas | 49,7 → 101,9 | Serif, blanco perfilado, 5,55 pt, renglón de 7,5 |
+| QR de verificación | 103 → 147 | Blanco, 44 × 44 desde 8,5. La imagen va de 40 pt: ver §5 y §8 |
+| Código escrito | 112,5 → 134 | A la derecha del QR, de 56 a 118. Monoespaciada, perfilado |
 | Recuadro de firma | 103 → 145 | Blanco, redondeado. Cierra en 234,5 —el mismo margen derecho que los renglones del anverso— |
 
 Los dos bloques de texto arrancan en **8,5**, el margen del anverso. Estaban en
@@ -886,10 +907,10 @@ carga en la ficha del beneficiario.
 
 ---
 
-## 8. `App\Support\CodigoQr` — escrito y sin usar
+## 8. `App\Support\CodigoQr` — el que dibuja el QR
 
-Hoy la tarjeta no lleva QR (§5), así que esta clase no la llama nadie. Se
-conserva porque la parte difícil ya está resuelta:
+Estuvo escrita y sin llamar desde que el QR se sacó hasta que volvió, el
+22/09/2026. Lo que resuelve:
 
 **`simplesoftwareio/simple-qrcode` no sirve en este servidor.** Su salida PNG
 necesita la extensión `imagick`, que no está instalada (`php -m` lista `gd`), y
@@ -907,6 +928,28 @@ tranquila.
 
 > Se verificó módulo por módulo contra la matriz de la librería: 0 desajustes y
 > la zona tranquila limpia.
+
+### Cuánto aguanta, medido
+
+Un QR que se dibuja no es un QR que se lee, y la diferencia solo aparece cuando
+alguien intenta verificar un carnet en la calle. Así que se **decodificó el PDF
+ya rasterizado**, que es lo que ve la cámara:
+
+| Condición | Resultado |
+| --- | --- |
+| Página a 300, 600 y 1200 dpi | Devuelve la URL correcta |
+| Con desenfoque de 1,2 px | La devuelve igual |
+| Achicado hasta ~69 px de lado | La devuelve igual |
+| Por debajo de ~60 px de lado | Deja de leerse |
+
+A 40 pt son **29 módulos más 4 de zona tranquila a cada lado**, o sea 1,08 pt =
+**0,38 mm por módulo**. Una foto de teléfono a 10-15 cm saca el QR con 200 px o
+más de lado, así que el margen contra el piso de 69 px es de unas tres veces.
+
+> ⚠️ **NO se comprueba sacando la imagen del PDF con el xref.** Extraída así
+> —`fitz.Pixmap(doc, xref)`— vuelve reescalada y suavizada, y **no decodifica
+> aunque el documento esté perfecto**. Costó un diagnóstico equivocado. Se
+> rasteriza la PÁGINA y se lee el recorte.
 
 ---
 
@@ -960,7 +1003,7 @@ siempre, cada visita a una ficha pediría un PDF que nadie va a mirar.
 | `resources/js/components/panel/carnets/dialogo-imprimir-carnet.tsx` | La vista previa antes de imprimir |
 | `public/image/carnet-fondo.png` | El verde con el sello horneado |
 | `public/image/carnet-escudo.png` | El escudo del encabezado, recortado de `recibo-escudo.png` |
-| `app/Support/CodigoQr.php` | El QR. **Escrito y sin usar** — ver §8 |
+| `app/Support/CodigoQr.php` | El QR del dorso: BaconQrCode + `gd`, sin `imagick` — ver §8 |
 
 Tocados: `Carnet` (`puedeImprimirse()`, `urlVerificacion()`), `Archivos`
 (`contenido()`), `CarnetController` (se le quitó `urlVerificacion()`),

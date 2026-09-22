@@ -1,13 +1,13 @@
-> # ⚠️ DESACTUALIZADO desde el 18/09/2026
+> # ⚠️ LA MITAD DE ABAJO DESCRIBE EL MODELO ANTERIOR
 >
-> El núcleo de datos se rehízo desde cero: ya no existen `rubros`,
-> `tramites`, `faenas`, `guias` ni `guia_detalles`, y `beneficiarios`,
-> `carnets` y `pagos` cambiaron de columnas. Lo de abajo describe el modelo
-> ANTERIOR: sirve para entender el código del panel, que todavía está escrito
-> contra él, NO para entender el esquema.
+> Los dos módulos ya están portados al núcleo del 18/09/2026: **faenas** el
+> 21/09 y **guías** el 22/09. Lo que sigue vale entero hasta el final de la
+> sección «El circuito, punto por punto»; **desde «1. Las tres reglas» en
+> adelante el texto es del modelo VIEJO** —habla de `rubros`, `faenas`,
+> `guias` y `guia_detalles` colgando de `guias`— y sirve para leer código
+> histórico, no para entender el esquema.
 >
-> El esquema vigente está en las migraciones `database/migrations/2026_09_18_*`
-> y explicado en [docs/sesiones/09-2026/2026-09-18.md](../sesiones/09-2026/2026-09-18.md).
+> El esquema vigente está en [docs/MER.md](../MER.md), que está al día.
 
 ---
 
@@ -19,18 +19,86 @@ De cada carnet cuelgan los papeles con los que la persona trabaja de verdad, y
 son muchos por gestión:
 
 ```
-beneficiario ──< carnet (Pescador, 2026)        ──< faena  (una por salida)
-             ──< carnet (Comercializador, 2026) ──< guia   (una por traslado)
-                                                       └──< guia_detalle
+beneficiario ──< carnet (Pescador, 2026)        ──< permiso_faena   (una por salida)
+             ──< carnet (Comercializador, 2026) ──< guia_movimiento (una por traslado)
+                                                        └──< guia_detalle (una por especie)
 ```
 
-| | FAENA | GUÍA ÚNICA DE TRANSPORTE |
+| | PERMISO DE FAENA | GUÍA ÚNICA DE TRANSPORTE |
 | --- | --- | --- |
 | Autoriza | UNA salida de pesca | UN traslado de carga |
 | Dice | Embarcación, comandante, de tal día a tal día, tantos kilos | De dónde a dónde, en qué vehículo, con qué carga |
-| Sale del carnet de | **Pescador** (`rubros.emite_faenas`) | **Comercializador** (`rubros.emite_guias`) |
-| Se cobra | Tarifa fija por salida (`faenas.monto`, hoy 15 Bs) | Sobre el valor de la carga: suma de `guia_detalles` |
-| Tiene detalle | No | Sí, una fila por especie |
+| Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
+| Se cobra | Tarifa fija por salida — `permisos_faena.monto`, hoy 15 Bs | Tarifa fija por traslado — `guias_movimiento.monto`, hoy 50 Bs, **la mitad si es piscicultura** |
+| Tiene detalle | No | Sí, `guia_detalles`: una fila por especie |
+| Consume cupo | **Sí**, al firmarla | No |
+| Vale | 30 días desde la salida | **5 días desde la firma** |
+| Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
+
+---
+
+## El circuito, punto por punto — vigente desde el 22/09/2026
+
+**LOS DOS PAPELES SIGUEN EL MISMO CIRCUITO QUE EL CARNET Y EL CUPO**, y es a
+propósito: el operador aprende uno solo.
+
+```
+PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ ACTIVO/ACTIVA
+(borrador)      │            │                          │
+                │            └──[rechazar]──────────────┘
+                └── acá sale el RECIBO, uno por trámite
+```
+
+| | Editar | Eliminar | Pagar | Enviar | Aprobar/Rechazar | Imprimir |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| **Pendiente** | ✔ | ✔ | ✔ | ✔ | ✘ | ✘ |
+| **En revisión** | ✘ | ✘ | ✘ | ✘ | ✔ | ✘ |
+| Activo / Activa | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
+| Completado / Cerrada | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
+
+Lo dictan los enums —`EstadoFaena` y `EstadoGuia`— y **nada más**: el servicio
+pregunta, el controlador no decide y React recibe la respuesta ya resuelta en
+los campos `puede_*` de la ficha.
+
+> **EDITAR Y ELIMINAR PIDEN DOS COSAS, NO UNA.** El estado PENDIENTE y que
+> **no haya ningún depósito cargado** — lo suma `puedeEditarse()` en los dos
+> modelos. Un depósito significa que la persona pagó por ESTE papel, y mover
+> los kilos o la piscicultura después cambiaría lo que se cobró. Primero se da
+> de baja el depósito.
+
+> **EL RECIBO SALE AL ENVIAR, y es UNO por trámite**, no uno por boleta. La
+> persona entrega sus depósitos —uno o cinco— y se lleva un papel con el total.
+> Un REENVÍO no emite un segundo: `CobrarService::emitirRecibo()` solo toma los
+> pagos que quedaron sueltos.
+
+> **LAS FECHAS DE VIGENCIA LAS ESCRIBE LA APROBACIÓN.** En la guía las dos
+> —`fecha_emision` y `fecha_vencimiento`— están en NULL mientras es un borrador:
+> los cinco días empiezan a correr con la firma, no cuando se cargó. Contarlos
+> desde antes le comería al camión los días que el expediente estuvo esperando
+> en ventanilla.
+
+**Qué NO comparten:** la faena consume el cupo de la bolsa madre al firmarse y
+`RevisarFaenaService::aprobar()` vuelve a medir el saldo con la fila del cupo
+bloqueada; la guía no toca ningún cupo. Y el cierre es distinto: la faena se
+**completa** cuando el pescador vuelve y descarga, la guía se **cierra** cuando
+la carga llega a destino.
+
+**ANULAR NO ES ELIMINAR, y en la guía conviven las dos.** Eliminar es sobre el
+BORRADOR —nunca hubo papel—; anular es sobre una guía YA FIRMADA, cuyo papel
+está en la calle. Las dos queman el número del talonario igual, y las dos piden
+motivo por escrito.
+
+**Los archivos del circuito de guías:**
+
+| Archivo | Qué hace |
+| --- | --- |
+| `app/Enums/EstadoGuia.php` | El circuito: quién puede qué en cada estado |
+| `app/Enums/CondicionProducto.php` | Las DIEZ columnas de tilde del cuadro D |
+| `app/Enums/MedioTransporte.php` / `TipoTransporte.php` | El casillero 10 y los renglones a/b/c |
+| `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar, cerrar, anular |
+| `app/Services/RevisarGuiaService.php` | Enviar, aprobar, rechazar |
+| `app/Http/Controllers/Panel/GuiaImpresionController.php` | El PDF |
+| `resources/views/documentos/guia-transporte.blade.php` | La maqueta, calco del talonario |
 
 ---
 
@@ -262,6 +330,11 @@ de lectura que escribe se dispara solo con que el navegador precargue el enlace.
   fondo, y repetirlo dejaba el escudo compitiendo con dos versiones del mismo
   emblema. Plano y sin contorno a propósito: DomPDF no dibuja degradados y un
   trazo fino desaparece al imprimir con poco tóner.
+
+  **Desde el 22/09/2026 la AUTORIZACIÓN DE PESCA usa el mismo PNG y al mismo
+  cuerpo**, a pedido: los dos papeles del talonario se ven de la misma familia,
+  y el documento adelgazó de 139 a 104 KB —la silueta pesa 4 KB contra los 47
+  de la copia del logo—. Quedó sin usar `public/image/autorizacion-logo.png`.
 
 - **`emite_faenas` / `emite_guias` son DOS columnas y no un `tipo_permiso`**,
   porque no son excluyentes: una actividad piscícola necesitaría faena para la

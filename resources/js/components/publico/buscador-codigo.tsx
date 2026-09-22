@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 /**
- * Caja para escribir a mano el código del carnet.
+ * Caja para escribir a mano el código de un documento.
  */
 export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | null }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -30,16 +30,16 @@ export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | nul
                     // para que no falle por tipearlo en minúscula, que es como
                     // arranca el teclado del teléfono.
                     onChange={(e) => setData('codigo', e.target.value.toUpperCase())}
-                    placeholder="Código del carnet — ej. PES2 6000 0017"
+                    placeholder="Código del documento — ej. EFGT-96R4-CJ42-AHYJ"
                     /*
                      * El tope es generoso a propósito: el código se imprime en
                      * grupos de cuatro para poder leerlo, y quien lo copia
-                     * escribe los espacios o los guiones. Cortarle la mano al
+                     * escribe los guiones. Cortarle la mano al
                      * llegar al largo exacto le comería el final sin decirle por
                      * qué; el servidor limpia los separadores antes de validar.
                      */
                     maxLength={50}
-                    aria-label="Código del carnet"
+                    aria-label="Código del documento"
                     aria-invalid={Boolean(errors.codigo)}
                     // font-mono: en monoespaciado no se confunden 0 con O ni 1 con l.
                     className="font-mono tracking-wider"

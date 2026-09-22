@@ -267,6 +267,7 @@ class DashboardController extends Controller
              * consultas.
              */
             ->with([
+                'codigo',
                 'beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'asociacion:id,nombre,sigla',
                 'tipoCarnet',

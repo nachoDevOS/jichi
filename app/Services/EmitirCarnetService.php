@@ -19,23 +19,6 @@ use Illuminate\Support\Facades\DB;
 class EmitirCarnetService
 {
     /**
-     * El alfabeto del código impreso.
-     *
-     * Sin I, L, O, S, 0, 1 ni 5: el código se dicta por teléfono y se tipea de
-     * un plástico gastado, y esos seis se confunden de a pares.
-     */
-    private const ALFABETO = 'ABCDEFGHJKMNPQRTUVWXYZ2346789';
-
-    /**
-     * LARGO TOTAL DEL CÓDIGO: 16 caracteres alfanuméricos.
-     *
-     * Los cinco primeros son el prefijo —PES/COM + los dos dígitos del año— y
-     * los once restantes van al azar. Se muestra en grupos de cuatro:
-     * «PES2 6QK7 RJ2M 4XPB».
-     */
-    private const LARGO_CODIGO = 16;
-
-    /**
      * Emite la credencial.
      */
     public function emitir(
@@ -117,7 +100,7 @@ class EmitirCarnetService
                 }
             }
 
-            return Carnet::create([
+            $carnet = Carnet::create([
                 'beneficiario_id' => $beneficiario->id,
                 'asociacion_id' => $asociacion->id,
                 'tipo_carnet_id' => $tipo->id,
@@ -125,7 +108,6 @@ class EmitirCarnetService
                 // no se autoriza por volumen.
                 'aprovechamiento_id' => $cupo?->id,
                 'tipo_actor' => $actor,
-                'codigo_carnet' => $this->codigoUnico($actor, $emision),
 
                 // Los respaldos de la emisión.
                 'archivo_ci' => $archivoCi,
@@ -146,6 +128,15 @@ class EmitirCarnetService
                 'fecha_emision' => null,
                 'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
             ]);
+
+            /*
+             * SU LLAVE PÚBLICA, adentro de la misma transacción: un carnet sin
+             * código es un documento que nadie puede verificar. Ver
+             * App\Traits\Codificable.
+             */
+            $carnet->asignarCodigo();
+
+            return $carnet;
         });
     }
 
@@ -358,42 +349,5 @@ class EmitirCarnetService
             // entonces su `fecha_emision` es NULL.
             ->latest('fecha_solicitud')
             ->first();
-    }
-
-    /**
-     *  EL CÓDIGO IMPRESO EN EL PLÁSTICO
-     */
-    private function codigoUnico(TipoActor $actor, Carbon $emision): string
-    {
-        $prefijo = ($actor === TipoActor::Pescador ? 'PES' : 'COM').$emision->format('y');
-
-        // Lo que falta para los 16: el prefijo mide 5, así que van 11 al azar.
-        $alAzar = self::LARGO_CODIGO - strlen($prefijo);
-
-        for ($intento = 0; $intento < 10; $intento++) {
-            $codigo = $prefijo.$this->azar($alAzar);
-
-            if (! Carnet::query()->where('codigo_carnet', $codigo)->exists()) {
-                return $codigo;
-            }
-        }
-
-        // Diez colisiones seguidas no es mala suerte: es que algo está mal en el
-        // generador. Falla ruidosamente en vez de entregar un código repetido.
-        throw new \RuntimeException('No se pudo generar un código de carnet único después de 10 intentos.');
-    }
-
-    /** Una tira al azar del alfabeto sin caracteres confundibles. */
-    private function azar(int $largo): string
-    {
-        $tira = '';
-
-        for ($i = 0; $i < $largo; $i++) {
-            // random_int y no rand(): es el generador criptográfico, y acá el
-            // azar es lo único que impide recorrer el padrón entero.
-            $tira .= self::ALFABETO[random_int(0, strlen(self::ALFABETO) - 1)];
-        }
-
-        return $tira;
     }
 }

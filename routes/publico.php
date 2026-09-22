@@ -26,6 +26,6 @@ Route::get('/verificar/{codigo?}', [VerificacionController::class, 'show'])
  * limita más fuerte porque es el que permitiría probar combinaciones al azar
  * buscando acertar una.
  */
-Route::post('/verificar', [VerificacionController::class, 'buscar'])
+Route::post('/verificar', [VerificacionController::class, 'buscarPorFormulario'])
     ->middleware('throttle:20,1')
     ->name('verificar.buscar');

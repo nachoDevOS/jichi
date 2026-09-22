@@ -264,8 +264,8 @@ calcando la cédula de papel—. **La maqueta impresa y `vista-previa-carnet.tsx
 son el mismo diseño escrito dos veces**: ese componente es el recuadro «así va a
 salir el carnet» del paso 3 del formulario, así que si se toca una hay que tocar
 la otra, o la vista previa pasa a prometer algo que el PDF no cumple. La tarjeta
-NO lleva QR —se sacó a pedido— así que `App\Support\CodigoQr` queda escrito y
-sin usar.
+lleva QR de nuevo desde el 22/09/2026, en el DORSO: `App\Support\CodigoQr` con la
+dirección de `/verificar/{codigo}`.
 
 **El plástico SÍ lleva el rubro y el cupo**, al revés de lo que valía con el
 modelo anterior: son seis renglones y tres de ellos comparten dos pares
@@ -545,12 +545,20 @@ Los cuatro tienen que pasar.
 - **El estado guardado de un carnet puede mentir.** `vencido` lo escribe un
   comando programado que corre una vez al día. Para saber si un carnet vale HOY
   se mira además `fecha_vencimiento`. Ver `Carnet::estaVigente()`.
-- **El carnet NO tiene número: se identifica por su `firma_validacion`.** Son 16
-  caracteres alfanuméricos al azar, únicos, y son a la vez el identificador y la
-  llave de la verificación pública. Se guardan sin separadores y se muestran en
-  grupos de cuatro con `Carnet::firmaLegible()`; lo que llega tipeado se limpia
-  con `Carnet::normalizarFirma()`. **Una firma por carnet, no por rubro**: una
-  adición no la cambia, o el QR ya impreso dejaría de funcionar.
+- **EL CÓDIGO DE UN DOCUMENTO NO ES UNA COLUMNA SUYA: vive en `codigos`.**
+  Desde el 22/09/2026 los cinco documentos que se entregan —carnet,
+  aprovechamiento, faena, guía y recibo— comparten una tabla polimórfica con un
+  único índice global, y por eso el código **no lleva prefijo**. Se lee con
+  `$doc->codigo_legible` y se asigna con `$doc->asignarCodigo()`; las dos las
+  pone `App\Traits\Codificable`. **Toda consulta que lo muestre necesita
+  `with('codigo')`** o hace N+1 en silencio — y en `carnets` el accesor va en
+  `#[Appends]`, así que basta con serializar la fila.
+- **El código de verificación NO reemplaza al correlativo, y al revés tampoco.**
+  `numero_recibo`, `numero_faena` y `nro_registro` son consecutivos **a
+  propósito**: Contabilidad audita sus huecos. El código es imposible de
+  adivinar **a propósito**: es la llave de una pantalla pública, y un `000002`
+  lo prueba cualquiera. Un número al azar no tiene huecos que auditar. Conviven,
+  no compiten.
 - **Dos botones en la misma posición de un ternario necesitan `key` distinto.**
   React los reconcilia como el MISMO `<button>` y solo le cambia el atributo
   `type`; si uno es `type="button"` y el otro `type="submit"`, el cambio ocurre
@@ -881,6 +889,27 @@ Los cuatro tienen que pasar.
   que alguien intenta verificar un carnet en la calle. El QR se arma con
   `App\Support\CodigoQr`, que pide la matriz a BaconQrCode —la librería que ese
   paquete trae adentro— y la pinta con `gd`.
+- **El atributo `width` de un `<img>` se mide en PÍXELES, no en puntos.** En
+  una maqueta donde todo lo demás va en `pt`, un `width="44"` sale de **33 pt**
+  —un 25% más chico— y no lo marca nada. Mordió con el QR de los documentos: el
+  módulo quedó en 0,31 mm cuando se había calculado 0,38, al borde de lo que una
+  cámara engancha. La medida va en `style="width: 44pt; height: 44pt"`. Y se
+  comprueba midiendo el PDF: `page.get_image_info()` de PyMuPDF da la caja real
+  de cada imagen en puntos.
+- **`route()` ABSOLUTA usa el host de LA PETICIÓN, no `APP_URL`.** Es lo que
+  hay que tener presente en cualquier URL que quede IMPRESA: un operador que
+  entre al panel por `http://192.168.1.50:8000` imprimiría carnets con el QR
+  apuntando a esa IP, muerto para cualquier teléfono fuera de la red — y eso se
+  descubre recién en la calle. Se arma la ruta RELATIVA y se le pega el dominio
+  configurado: `rtrim(config('app.url'), '/').route('x', $p, false)`. Ver
+  `App\Support\QrVerificacion`.
+- **Un QR que se DIBUJA no es un QR que se LEE, y sacarlo del PDF con el xref
+  miente.** Extraída así —`fitz.Pixmap(doc, xref)` de PyMuPDF— la imagen vuelve
+  reescalada y suavizada, y **no decodifica aunque el documento esté
+  perfecto**: costó un diagnóstico equivocado en el dorso del carnet. Se
+  rasteriza la PÁGINA a 300 dpi, se recorta el QR y se decodifica eso, que es lo
+  que ve la cámara. Y conviene medir hasta dónde aguanta —desenfoque y
+  reducción— en vez de darlo por bueno porque se ve bien.
 - **Un PNG de PALETA devuelve ÍNDICES, no colores.** `imagecolorat()` sobre una
   imagen de paleta no da el RGB sino la posición en la tabla, así que medir
   brillo o transparencia con esos números da resultados absurdos —el sello del
@@ -947,8 +976,18 @@ Los cuatro tienen que pasar.
   dígitos; lo único que sigue contando por gestión es el número de registro del
   carnet, que no va en ningún papel. Antes de elegir la serie, preguntarse si
   ese número lo reinicia alguien de verdad.
+- **DomPDF no rota texto: no tiene `transform` ni `writing-mode`.** Lo escrito
+  con ellas sale horizontal y sin avisar, y en una columna de 16 pt eso se
+  desborda sobre la vecina. Los rótulos rotados de un talonario —las diez
+  casillas del cuadro D de la guía— se arman apilando **una letra por
+  renglón**, con el alto DECLARADO en cada una: `line-height` tampoco manda acá.
+  Ver `guia-transporte.blade.php`.
 - **En CSS el `padding` SUMA al `width`**, y en una maqueta de coordenadas fijas
-  eso descoloca sin avisar. **Volvió a morder al partir un renglón en dos:** la
+  eso descoloca sin avisar. **En una GRILLA se paga por columna, y ahí el error
+  se multiplica:** el cuadro D de la guía tiene quince, así que sus 2 pt de cada
+  lado son 60 pt —el cuadro declaraba 544 y cerraba en 603, 25 fuera del papel—.
+  Se mide con `page.get_text('blocks')` de PyMuPDF: el borde derecho de la hoja
+  es un número, no una impresión. **Volvió a morder al partir un renglón en dos:** la
   tira del rubro se declaró de 71 pt pensando que cerraba en 118,5, y con sus
   4 pt de relleno cerraba en 122,5 — así que el rótulo «CUPO», plantado en 121,
   salió impreso ENCIMA de la tira blanca. Al plantar una caja con coordenadas,

@@ -466,6 +466,82 @@
         .reglas .cara { top: 0; left: 0; color: #ffffff; }
 
         /* ---------------------------------------------------------------
+           EL QR DE VERIFICACIÓN — abajo a la izquierda
+           --------------------------------------------------------------- */
+        /*
+         * Lleva ADENTRO la dirección de la pantalla pública con el código del
+         * carnet: `.../verificar/PES26K2RUBM22MVR`. El inspector escanea y el
+         * sistema le contesta si el documento existe y si está vigente, sin que
+         * tenga que tipear nada. Ver CarnetImpresionController::urlVerificacion().
+         *
+         * VA SOBRE BLANCO Y NO SOBRE EL VERDE: un QR necesita su zona de
+         * silencio clara alrededor, y sobre un fondo de color con un sello de
+         * agua debajo las cámaras dejan de engancharlo.
+         */
+        .qr-caja {
+            top: 103pt;
+            left: 8.5pt;
+            width: 44pt;
+            height: 44pt;
+            background-color: #ffffff;
+            border-radius: 3pt;
+        }
+
+        /* Con `top`/`left` y no con `padding`: el relleno SUMA al ancho, y en
+           una maqueta de coordenadas fijas eso descoloca sin avisar. */
+        /*
+          * 40 pt y no menos: el QR son 29 módulos más 4 de zona de silencio a
+          * cada lado, o sea 37 de ancho, así que cada módulo mide 40/37 = 1,08
+          * pt = 0,38 mm. Debajo de eso las cámaras de teléfono empiezan a
+          * fallar, y un QR que no se lee no se descubre hasta que alguien
+          * intenta verificar un carnet en la calle.
+          */
+        .qr-caja img { position: absolute; top: 2pt; left: 2pt; width: 40pt; height: 40pt; }
+
+        /* ---------------------------------------------------------------
+           EL CÓDIGO ESCRITO, al lado del QR
+           --------------------------------------------------------------- */
+        /*
+         * Va el código ADEMÁS del QR porque es lo que funciona cuando la cámara
+         * no lo agarra —plástico rayado, poca luz, teléfono viejo—: la pantalla
+         * de verificación acepta las dos entradas.
+         *
+         * Cierra en 118, antes del recuadro de la firma, que arranca en 120,5.
+         */
+        .qr-texto { left: 56pt; width: 62pt; }
+        .qr-texto span { position: absolute; font-weight: bold; }
+        .qr-texto .borde { color: #14350f; }
+        .qr-texto .cara { top: 0; left: 0; color: #ffffff; }
+
+        /* El corrimiento va contra el cuerpo de cada línea, el ~6% de siempre. */
+        .qr-texto.chico .e1 { top: 0.25pt; left: 0.25pt; }
+        .qr-texto.chico .e2 { top: 0.25pt; left: -0.25pt; }
+        .qr-texto.chico .e3 { top: -0.25pt; left: 0.25pt; }
+        .qr-texto.chico .e4 { top: -0.25pt; left: -0.25pt; }
+
+        .qr-texto.dato .e1 { top: 0.3pt; left: 0.3pt; }
+        .qr-texto.dato .e2 { top: 0.3pt; left: -0.3pt; }
+        .qr-texto.dato .e3 { top: -0.3pt; left: 0.3pt; }
+        .qr-texto.dato .e4 { top: -0.3pt; left: -0.3pt; }
+
+        .qr-rotulo { top: 112.5pt; height: 6pt; font-size: 4.2pt; }
+
+        /*
+         * MONOESPACIADA, y es lo único del carnet que la usa: en el código se
+         * confunden el 0 con la O y el 1 con la l, y quien lo tipea en el
+         * teléfono lo está copiando de un plástico gastado. A 5,2 pt los 19
+         * caracteres —16 más los tres espacios— miden 60 de los 62.
+         */
+        .qr-codigo {
+            top: 119pt;
+            height: 8pt;
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-size: 5.2pt;
+        }
+
+        .qr-pie { top: 128pt; height: 6pt; font-size: 4pt; }
+
+        /* ---------------------------------------------------------------
            EL RECUADRO DE LA FIRMA — se llena a mano, sobre el plástico
            --------------------------------------------------------------- */
         /*
@@ -618,6 +694,26 @@
         @foreach ($reverso['reglas'] as $i => $regla)
             <div>@include('documentos.partes.texto-perfilado', ['texto' => ($i + 1).'. '.$regla])</div>
         @endforeach
+    </div>
+
+    {{-- El QR y el código escrito. Sin QR —si gd falló— el código solo sigue
+         sirviendo para verificar, así que el bloque de texto va igual. --}}
+    @if ($reverso['qr'] !== '')
+        <div class="bloque qr-caja">
+            <img src="{{ $reverso['qr'] }}" alt="">
+        </div>
+    @endif
+
+    <div class="bloque qr-texto chico qr-rotulo">
+        @include('documentos.partes.texto-perfilado', ['texto' => 'CÓDIGO DEL CARNET'])
+    </div>
+
+    <div class="bloque qr-texto dato qr-codigo">
+        @include('documentos.partes.texto-perfilado', ['texto' => $reverso['codigo']])
+    </div>
+
+    <div class="bloque qr-texto chico qr-pie">
+        @include('documentos.partes.texto-perfilado', ['texto' => 'Escanee para verificar'])
     </div>
 
     <div class="bloque firma"></div>

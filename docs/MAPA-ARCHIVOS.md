@@ -44,11 +44,13 @@ decisiones que acá solo se nombran.
 
 | Archivo | Ln | Qué hace | No obvio |
 | --- | --- | --- | --- |
+| `CodigoService.php` | 93 | Genera el código de 16, reintenta diez veces y falla ruidoso. `asignar()` es **idempotente**: un reenvío no puede gastar un código nuevo, porque el anterior ya salió impreso |
 | `SolicitudCarnetService.php` | 1053 | **El caso de uso central.** Reglas A, B y C + todo el circuito | El archivo más importante del sistema. Ver el desglose abajo |
 | `PagoTramiteService.php` | 223 | Pagos parciales, 1 a N | Los métodos vienen **de a pares**: uno recibe `UploadedFile`, el otro `...ConRuta`. No es duplicación — ver §2.4 de ARQUITECTURA |
 | `ValidacionPagoService.php` | 127 | Validar u observar un depósito | Aparte de `PagoTramiteService` porque son actos de PERSONAS distintas: uno es de ventanilla, este de supervisión. Y vale para los tres, porque `pagos` es polimórfica |
 | `FaenaService.php` | 155 | Emitir y anular faenas | Tres comprobaciones y el ORDEN importa: el rubro primero, porque elegir el carnet equivocado es el error más probable. El número se comprueba ANTES del INSERT, porque en PostgreSQL un INSERT fallido aborta la transacción |
-| `GuiaService.php` | 244 | Emitir y anular guías, y reemplazar su carga | Cabecera y detalle se escriben en la MISMA transacción. `reemplazarDetalle()` borra todo y reinserta a propósito: la grilla manda la lista completa, no un diff |
+| `EmitirGuiaService.php` | 330 | Emitir, corregir, eliminar, cerrar y anular guías | Cabecera y detalle en la MISMA transacción. El detalle se **reemplaza entero** al corregir: casarlo fila por fila sin un id estable del papel inventa una identidad que el talonario no tiene. `eliminar()` baja el detalle A MANO —la FK es CASCADE, y eso no se dispara con una baja lógica—. El arancel se copia DESPUÉS del `create()`: el factor de piscicultura lo calcula el modelo leyendo su propia columna |
+| `RevisarGuiaService.php` | 118 | El circuito de la guía: enviar, aprobar, rechazar | Espejo de `RevisarFaenaService`. **Las dos fechas de vigencia las escribe `aprobar()`**: los 5 días corren desde la firma, no desde que se cargó el borrador. Aprobar exige las tres cosas: estado, arancel cubierto y ninguna boleta sin validar |
 | `ArchivoTramiteService.php` | 107 | Subir/descartar adjuntos alrededor de una transacción | `descartar()` **no propaga errores**: se llama desde un `catch` y taparía la excepción original |
 | `ReciboTramiteService.php` | 200 | **Arma** el RECIBO OFICIAL, no lo guarda | `armar()` lo reconstruye desde el trámite. No hay tabla `recibos` |
 | `CorrelativoService.php` | 78 | Dos usos distintos: `siguienteContinuo()` para lo que se IMPRIME —recibos y permisos de faena, seis dígitos y sin reinicio, guardados bajo el **año 0**— y `siguienteNumero()` con gestión para lo que sí cuenta por año, como el registro del carnet |
@@ -73,15 +75,15 @@ decisiones que acá solo se nombran.
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
 | `FaenaController.php` | 400 | Listado, alta, ficha, cobro y circuito de revisión, más **corregir y eliminar el BORRADOR** (21/09/2026): solo en PENDIENTE y sin un peso cargado, porque el número lo pone el sistema y el papel sale recién al aprobar. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario. `edit()` manda el saldo del cupo **con los kilos de esta faena sumados de vuelta**, o el formulario diría que no entra lo que ya entró |
-| `GuiaController.php` | 358 | Ídem, más `actualizarDetalle()` — la única corrección que el módulo permite. `resumir()` usa el `withSum` del listado para no calcular los kilos por fila |
+| `GuiaController.php` | 745 | Listado, alta, ficha, corrección del borrador, cobro y circuito de revisión, más cerrar y anular. `resumir()` usa el `withSum` del listado para no calcular el saldo por fila, y `reciboDe()` lo resuelve desde los pagos ya precargados. El buscador OMITE la condición del número cuando el término no trae dígitos: un `like '%%'` traería la tabla entera |
 | `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario |
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
 | `Tramite.php` | 310 | Cuelga del **carnet**. `montoPagado()` reusa `pagos_sum_monto` si el listado hizo `withSum`. Las 5 fechas van en `#[Fillable]` aunque ningún formulario las mande — `update()` las descartaría |
 | `CarnetRubro.php` | 71 | Pivote **con modelo propio**, porque `attach()` no dispara eventos y `Auditable` no registraría nada |
 | `Pago.php` | 243 | **`pagable()` es un `morphTo`**: el depósito cubre un trámite, una faena o una guía. Sin morphMap — en la columna va el nombre completo de la clase. La columna del archivo es **`urlFile`**, el accesor es `comprobante_url`. No se anulan ni se borran |
 | `Faena.php` | 288 | Cuelga del **carnet**, no del beneficiario. `$attributes` declara `estado` por defecto **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `diasAutorizados()` suma uno — salir y desembarcar el mismo día es un día, no cero. `estaVigente()` mira TRES cosas, y la que se olvida es el carnet |
-| `Guia.php` | 279 | Cabecera; la carga está en `GuiaDetalle`. **`montoRequerido()` no es una columna**: sale de sumar el detalle, porque la guía se cobra sobre lo que traslada y no por tarifa fija. `excedeCapacidad()` devuelve `null` cuando no se sabe la capacidad |
-| `GuiaDetalle.php` | 133 | `$table` declarado a mano. **`importe()` prefiere `imponible` sobre cantidad × precio**, y el orden no es intercambiable: `imponible` es lo que dice el papel firmado |
+| `GuiaMovimiento.php` | 350 | Cuelga del **carnet**, no del beneficiario; la carga está en `GuiaDetalle`. **`montoACobrar()` lee la COLUMNA**, no `config()`: el arancel se congela al emitir. `factorArancel()` es el único lugar donde vive el 50% de piscicultura. `$attributes` declara `estado`, `monto` y `peso_total_kg` **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `beneficiarioId` es un accesor —no una columna— para que `CobrarService` le hable igual que al carnet |
+| `GuiaDetalle.php` | 65 | Un renglón del cuadro D. `condicion` es UN enum de diez casos y no dos columnas: partirlo en estado × presentación dejaría combinaciones que el talonario no tiene. `precio_kg` e `importe_total` son **declarativos** —lo que el comerciante pagó en origen— y no el arancel |
 | `Rubro.php` | 70 | `Auditable` pero **sin** `SoftDeletes`: no se borra, se inactiva |
 | `Configuracion.php` | 63 | Cache `rememberForever`, invalidada en `saved`/`deleted` |
 | `Correlativo.php` | 18 | Solo la tabla del contador |
@@ -100,9 +102,10 @@ decisiones que acá solo se nombran.
 | `Panel/RubroController.php` | 97 | **Sin `destroy()`** |
 | `Panel/ReciboController.php` | 199 | Solo dibuja el PDF. Media carta apaisada. Imágenes embebidas |
 | `Panel/PermisoFaenaImpresionController.php` | 130 | El «Permiso por Faena» en PDF. Carta vertical. Sale recién con la faena **aprobada**. El monto es la copia congelada de la fila, no la tarifa de hoy; la fecha del pie sale de `fecha_emision` para que una reimpresión diga lo mismo |
+| `Panel/GuiaImpresionController.php` | 190 | La «Guía Única de Transporte» en PDF. Carta vertical. Sale recién con la guía **aprobada**. **Rellena el cuadro D hasta cinco renglones** aunque la guía traiga menos: la hoja impresa tiene que medir siempre lo mismo que la preimpresa del archivo. Un cero entra como celda VACÍA, no como «0,00» |
 | `Panel/AutorizacionPescaController.php` | 187 | La autorización de pesca en PDF. Carta vertical. Sale recién con el cupo **aprobado**; la tabla de tamaños mínimos y las reglas de redes van como constantes —son texto del reglamento, no de la base— |
 | `Panel/DashboardController.php` | 330 | Cada bloque envuelto en `fn()` para las visitas parciales. `listos_para_aprobar` **cae en N+1**. `actividadDiaria()` arma la serie de 14 días de los indicadores |
-| `Publico/VerificacionController.php` | 232 | Cédula enmascarada. Sin ids internos. **Sin rubros suspendidos** |
+| `Publico/VerificacionController.php` | 265 | Atiende los CINCO documentos, no solo el carnet: una consulta a `codigos` y `morphTo`. Devuelve **renglones ya resueltos**, así que sumar un tipo no toca React. Cédula enmascarada, sin ids internos |
 | `Publico/InicioController.php` | 52 | La portada institucional. **No consulta el dominio**: todo sale de `configuraciones`, con valor por defecto para que se dibuje en una base sin seeder. Manda la prop como `portada` y no `institucion` porque esa clave ya la ocupa una prop compartida, y una de página con el mismo nombre la tapa sin avisar |
 
 ## `app/Http/Requests/Panel/`
@@ -122,7 +125,9 @@ decisiones que acá solo se nombran.
 | --- | --- | --- |
 | `Sql.php` | 70 | `ILIKE` vs `LIKE`, truncado a mes (`periodoMes`) y a día (`periodoDia`). Lo que cambia entre motores |
 | `Archivos.php` | 142 | `url()` mira qué recibió antes de decidir. **`borrar()` no puede borrar** lo guardado como URL completa. `contenido()` devuelve los bytes, para embeber en un PDF |
-| `CodigoQr.php` | 134 | **Escrito y sin usar**: la tarjeta ya no lleva QR. Cuando vuelva, la parte difícil está resuelta — el PNG de simple-qrcode exige imagick, que no está |
+| `QrVerificacion.php` | 57 | El bloque de verificación de los CUATRO PDF: QR + código + URL. **Fuerza `APP_URL`**, porque `route()` absoluta usa el host de la petición y el QR queda impreso |
+| `CodigoQr.php` | 134 | El QR en sí. BaconQrCode + `gd`, porque el PNG de simple-qrcode exige `imagick` y acá no está |
+| `Codificable.php` | 66 | El código de 16 de los CINCO documentos que se entregan. `$doc->codigo_legible` para mostrar, `$doc->asignarCodigo()` para emitir. **Toda consulta que lo muestre necesita `with('codigo')`** o hace N+1 en silencio |
 | `SituacionCarnet.php` | 149 | Lo comparten el autocompletado y el formulario. Es **para la pantalla**, no la regla |
 | `Paginacion.php` | 62 | Lista blanca de tamaños: el número llega por la URL |
 | `Auditable.php` | 83 | Bitácora automática. **No se entera de `attach()` ni de los DELETE en cascada** |
@@ -132,6 +137,7 @@ decisiones que acá solo se nombran.
 | Archivo | Qué es | No obvio |
 | --- | --- | --- |
 | `permiso-faena.blade.php` | Calco del talonario «PERMISO POR FAENA» | Texto que FLUYE dentro de un MARCO redondeado —`border-radius`, que la 3.1.6 de DomPDF dibuja bien—. El «Kg.» lleva la línea de ancho fijo, o se sale del marco. Carta vertical, 612×792 pt |
+| `guia-transporte.blade.php` | Calco del talonario «Guía Única de Transporte» | Al revés que la faena, NO es texto que fluye: es una grilla de cuadros con anchos declarados. **El relleno de cada celda suma al ancho y acá se paga por columna** — el cuadro D tiene quince, así que sus 2 pt de cada lado son 60 que hay que descontar de los 544 de la hoja. Los rótulos rotados del papel se apilan **una letra por renglón**: DomPDF no tiene `transform` ni `writing-mode`. El sello de agua va ABAJO, detrás de observaciones y las firmas, no detrás del cuadro de productos |
 | `autorizacion-pesca.blade.php` | Calco de la autorización de pesca | Texto que FLUYE, al revés que el carnet y el recibo: el papel son párrafos, no coordenadas fijas. Carta vertical, 612×792 pt |
 | `recibo-oficial.blade.php` | Calco del talonario del SEDAG | Todo en `position: absolute` sobre una grilla de 592×376 pt. Ver [modulos/RECIBOS.md](modulos/RECIBOS.md) |
 | `carnet-pescador.blade.php` | La credencial impresa | Calco de la cédula de papel, una carilla de 243×153 pt (CR80). **Es el espejo de `vista-previa-carnet.tsx`**: si se toca una, se toca la otra. Ver [modulos/CARNETS.md](modulos/CARNETS.md) |

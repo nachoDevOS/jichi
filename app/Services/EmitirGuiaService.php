@@ -2,33 +2,53 @@
 
 namespace App\Services;
 
+use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\Carnet;
+use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
  *  PASO 4 DEL FLUJO, RAMA COMERCIALIZADOR — la GUÍA DE MOVIMIENTO
+ *
+ * Nace PENDIENTE y se cobra y se firma como el carnet, el cupo y la faena; el
+ * circuito de revisión vive aparte, en `RevisarGuiaService`.
  */
 class EmitirGuiaService
 {
+    /** Los renglones del papel que el formulario manda tal cual. */
+    private const RENGLONES = [
+        'origen', 'origen_departamento', 'origen_provincia', 'origen_distrito',
+        'destino', 'destino_departamento', 'destino_provincia', 'destino_distrito',
+        'medio_transporte', 'tipo_transporte', 'transporte_nombre', 'transporte_placa',
+        'observaciones',
+    ];
+
+    public function __construct(private readonly CorrelativoService $correlativos) {}
+
     /**
-     * Emite el amparo de un traslado.
+     * Registra la solicitud de un traslado. NACE PENDIENTE: no ampara nada
+     * hasta que se cobre el arancel y alguien la firme.
+     *
+     * @param  array<string, mixed>  $datos  Los renglones del talonario.
+     * @param  array<int, array<string, mixed>>  $detalles  El cuadro D.
      */
     public function emitir(
         Carnet $carnet,
-        string $codigo,
-        string $origen,
-        string $destino,
-        float $pesoKg,
-        bool $esPiscicultura,
-        ?Carbon $emision = null,
+        array $datos,
+        array $detalles,
+        ?Carbon $solicitud = null,
     ): GuiaMovimiento {
-        $emision ??= now();
-        $codigo = trim($codigo);
+        $solicitud ??= now();
 
+        /*
+         * LAS COMPROBACIONES DEL CARNET VAN ANTES DE LA TRANSACCIÓN: no se
+         * revoca en el medio de esta operación, y abrirla para nada sostiene
+         * una conexión con el operador esperando.
+         */
         if (! $carnet->tipo_actor->emiteGuias()) {
             throw PermisoOperativoException::actorNoEmite('guías de movimiento', $carnet->tipo_actor);
         }
@@ -37,19 +57,14 @@ class EmitirGuiaService
             throw PermisoOperativoException::carnetNoVigente($carnet->estado);
         }
 
-        return DB::transaction(function () use ($carnet, $codigo, $origen, $destino, $pesoKg, $esPiscicultura, $emision): GuiaMovimiento {
-            /*
-             * La comprobación va DENTRO de la transacción aunque no haya nada
-             * bloqueado: entre el control y el INSERT otra ventanilla puede usar
-             * el mismo código, y ahí el índice único lo rechazaría con un error
-             * de base de datos ilegible. Esto convierte esa carrera en un
-             * mensaje que el operador entiende, y el índice queda como red.
-             */
-            if (GuiaMovimiento::query()->where('codigo_guia', $codigo)->exists()) {
-                throw PermisoOperativoException::numeroRepetido('una guía', $codigo);
-            }
+        $renglones = $this->normalizarDetalle($detalles);
 
-            return GuiaMovimiento::create([
+        if ($renglones === []) {
+            throw PermisoOperativoException::guiaSinDetalle();
+        }
+
+        return DB::transaction(function () use ($carnet, $datos, $renglones, $solicitud): GuiaMovimiento {
+            $guia = GuiaMovimiento::create([
                 // La guía cuelga del CARNET: la persona se lee de él.
                 'carnet_id' => $carnet->id,
 
@@ -58,20 +73,146 @@ class EmitirGuiaService
                  */
                 'asociacion_id' => $carnet->asociacion_id,
 
-                'codigo_guia' => $codigo,
-                'origen' => $origen,
-                'destino' => $destino,
-                'peso_total_kg' => $pesoKg,
-                'es_piscicultura' => $esPiscicultura,
+                // EL NÚMERO LO PONE EL SISTEMA, no el operador: correlativo
+                // global y continuo, como el talonario de papel.
+                'numero_guia' => $this->correlativos->siguienteContinuo(GuiaMovimiento::SERIE),
 
-                'estado' => EstadoGuia::Activa,
-                'fecha_emision' => $emision,
-                // Se GUARDA el vencimiento calculado en vez de derivarlo al
-                // leer: si mañana la resolución cambia el plazo, las guías ya
-                // emitidas tienen que seguir venciendo cuando dice el papel que
-                // va dentro del camión.
-                'fecha_vencimiento' => GuiaMovimiento::vencimientoDesde($emision),
+                ...$this->renglonesDelPapel($datos),
+
+                'transporte_capacidad_kg' => $this->numeroONull($datos['transporte_capacidad_kg'] ?? null),
+                'es_piscicultura' => (bool) ($datos['es_piscicultura'] ?? false),
+                'peso_total_kg' => $this->kilosDe($renglones),
+
+                // PENDIENTE, como el carnet y el cupo: la emisión y el
+                // vencimiento los escribe la aprobación.
+                'estado' => EstadoGuia::Pendiente,
+                'fecha_solicitud' => $solicitud->toDateString(),
             ]);
+
+            /*
+             * EL ARANCEL SE COPIA DESPUÉS DEL create(), no adentro: el factor
+             * de piscicultura lo calcula el modelo leyendo su propia columna,
+             * que recién existe con la fila escrita.
+             */
+            $guia->update(['monto' => $guia->arancelCalculado(GuiaMovimiento::tarifaVigente())]);
+
+            $this->guardarDetalle($guia, $renglones);
+
+            /*
+             * SU LLAVE PÚBLICA, dentro de la misma transacción: un documento
+             * sin código no se puede verificar. Ver App\Traits\Codificable.
+             */
+            $guia->asignarCodigo();
+
+            return $guia->refresh();
+        });
+    }
+
+    /**
+     *  CORREGIR EL BORRADOR
+     *
+     * El CARNET no se toca: cambiar de titular no es corregir un traslado, es
+     * emitir otro. Dejarlo editable movería una guía de una persona a otra sin
+     * más rastro que la auditoría.
+     *
+     * @param  array<string, mixed>  $datos
+     * @param  array<int, array<string, mixed>>  $detalles
+     */
+    public function editar(GuiaMovimiento $guia, array $datos, array $detalles): GuiaMovimiento
+    {
+        $renglones = $this->normalizarDetalle($detalles);
+
+        if ($renglones === []) {
+            throw PermisoOperativoException::guiaSinDetalle();
+        }
+
+        return DB::transaction(function () use ($guia, $datos, $renglones): GuiaMovimiento {
+            $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
+
+            // Se comprueba con la copia bloqueada, no con la que llegó: entre
+            // que la pantalla se dibujó y llegó el submit, otra ventanilla
+            // pudo enviarla a revisión.
+            if (! $bloqueada->estado->permiteEdicion()) {
+                throw PermisoOperativoException::guiaNoSePuedeEditar(
+                    mb_strtolower($bloqueada->estado->etiqueta()),
+                );
+            }
+
+            if (($pagos = $bloqueada->pagos()->count()) > 0) {
+                throw PermisoOperativoException::guiaTienePagos($pagos);
+            }
+
+            $bloqueada->update([
+                ...$this->renglonesDelPapel($datos),
+                'transporte_capacidad_kg' => $this->numeroONull($datos['transporte_capacidad_kg'] ?? null),
+                'es_piscicultura' => (bool) ($datos['es_piscicultura'] ?? false),
+                'peso_total_kg' => $this->kilosDe($renglones),
+            ]);
+
+            // El arancel se vuelve a copiar: la piscicultura pudo cambiar, y
+            // con ella la mitad del monto.
+            $bloqueada->refresh();
+            $bloqueada->update([
+                'monto' => $bloqueada->arancelCalculado(GuiaMovimiento::tarifaVigente()),
+            ]);
+
+            /*
+             * EL DETALLE SE REEMPLAZA ENTERO y no se hace un diff fila por
+             * fila: son cinco renglones que el operador reescribe, y casar
+             * cuál es cuál sin un id estable del papel inventa una identidad
+             * que el talonario no tiene.
+             */
+            $bloqueada->detalles()->delete();
+            $this->guardarDetalle($bloqueada, $renglones);
+
+            // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
+            return $guia->refresh();
+        });
+    }
+
+    /**
+     *  ELIMINAR UNA GUÍA CARGADA POR ERROR
+     */
+    public function eliminar(GuiaMovimiento $guia, string $motivo): void
+    {
+        if (trim($motivo) === '') {
+            throw PermisoOperativoException::motivoObligatorio();
+        }
+
+        DB::transaction(function () use ($guia, $motivo): void {
+            $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
+
+            if (! $bloqueada->estado->permiteEliminacion()) {
+                throw PermisoOperativoException::guiaNoSePuedeEliminar(
+                    mb_strtolower($bloqueada->estado->etiqueta()),
+                );
+            }
+
+            if (($pagos = $bloqueada->pagos()->count()) > 0) {
+                throw PermisoOperativoException::guiaTienePagos($pagos);
+            }
+
+            /*
+             * EL DETALLE SE BAJA A MANO. La FK es CASCADE, pero eso es una
+             * restricción del MOTOR y `delete()` sobre una tabla con
+             * SoftDeletes es un UPDATE: sin esto quedarían renglones vivos
+             * colgando de una guía que ya no está. Ver CLAUDE.md.
+             */
+            $bloqueada->detalles()->delete();
+
+            /*
+             * EL MOTIVO SE DEJA EN EL MODELO Y SE BORRA: el trait `Auditable`
+             * ya engancha el `deleted`, y llamar además a `registrarAuditoria()`
+             * dejaría el mismo borrado dos veces, una sin explicación.
+             */
+            $bloqueada->motivoAuditoria = $motivo;
+            $bloqueada->delete();
+
+            /*
+             * EL NÚMERO DEL TALONARIO NO SE REUSA. La baja es lógica y el
+             * correlativo sigue donde estaba: la serie queda con un hueco, que
+             * es justamente lo que el motivo en la auditoría explica.
+             */
         });
     }
 
@@ -130,5 +271,81 @@ class EmitirGuiaService
 
             return $guia->refresh();
         });
+    }
+
+    //  Auxiliares
+
+    /**
+     * Los renglones del talonario, normalizados: '' entra como null.
+     *
+     * @param  array<string, mixed>  $datos
+     * @return array<string, string|null>
+     */
+    private function renglonesDelPapel(array $datos): array
+    {
+        return collect(self::RENGLONES)
+            ->mapWithKeys(fn (string $c): array => [$c => trim((string) ($datos[$c] ?? '')) ?: null])
+            ->all();
+    }
+
+    /**
+     * El cuadro D, limpio: se descartan los renglones sin especie.
+     *
+     * El formulario manda cinco filas fijas como el papel, y las que el
+     * operador no llenó llegan vacías. Guardarlas dejaría el PDF con renglones
+     * de cero kilos que un control tiene que leer igual.
+     *
+     * @param  array<int, array<string, mixed>>  $detalles
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizarDetalle(array $detalles): array
+    {
+        return collect($detalles)
+            ->filter(fn (array $d): bool => trim((string) ($d['especie'] ?? '')) !== '')
+            ->map(function (array $d): array {
+                $cantidad = round((float) ($d['cantidad_kg'] ?? 0), 2);
+                $precio = round((float) ($d['precio_kg'] ?? 0), 2);
+
+                return [
+                    'especie' => trim((string) $d['especie']),
+                    'condicion' => $d['condicion'] instanceof CondicionProducto
+                        ? $d['condicion']
+                        : CondicionProducto::from((string) $d['condicion']),
+                    'cantidad_kg' => $cantidad,
+                    'precio_kg' => $precio,
+                    // Se acepta el importe declarado si vino; si no, se
+                    // multiplica. Ver GuiaDetalle::importeDe().
+                    'importe_total' => isset($d['importe_total']) && $d['importe_total'] !== ''
+                        ? round((float) $d['importe_total'], 2)
+                        : GuiaDetalle::importeDe($cantidad, $precio),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $renglones
+     */
+    private function guardarDetalle(GuiaMovimiento $guia, array $renglones): void
+    {
+        foreach ($renglones as $renglon) {
+            // `create()` y no `insert()`: el trait Auditable engancha eventos
+            // de Eloquent, y una inserción masiva no dispara ninguno.
+            $guia->detalles()->create($renglon);
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $renglones
+     */
+    private function kilosDe(array $renglones): float
+    {
+        return round(array_sum(array_column($renglones, 'cantidad_kg')), 2);
+    }
+
+    private function numeroONull(mixed $valor): ?float
+    {
+        return $valor === null || $valor === '' ? null : round((float) $valor, 2);
     }
 }

@@ -83,8 +83,10 @@ anterior— una vez cada una. Ver `database/seeders/DemoSeeder.php`.
 
 ### Usuarios sembrados
 
-Contraseña común: la de `JICHI_SEED_PASSWORD` en `.env`
-(`password` por defecto). **Cambiar antes de cualquier despliegue.**
+Contraseña común: **`password`**. Es el valor por defecto de
+`jichi.password_semilla`, y **no está en `.env`**: si hace falta otra, se agrega
+ahí la línea `JICHI_SEED_PASSWORD` y la toma. **Cambiar antes de cualquier
+despliegue.**
 
 | Rol | Correo |
 | --- | --- |

@@ -207,6 +207,81 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
+     *  EL CIRCUITO DE LA GUÍA: el mismo de la faena, sobre otro papel
+     */
+
+    /** Se quiso presentar una guía que no está PENDIENTE. */
+    public static function guiaNoSePuedeEnviar(string $estado): self
+    {
+        return new self(
+            "La guía está {$estado} y solo se presenta a revisión la que está PENDIENTE.",
+        );
+    }
+
+    /** Se quiso firmar o rechazar algo que no está presentado. */
+    public static function guiaNoSePuedeRevisar(string $estado): self
+    {
+        return new self(
+            "La guía está {$estado}: se aprueba o se rechaza la que está EN REVISIÓN.",
+        );
+    }
+
+    /** Se quiso corregir una guía que ya salió del borrador. */
+    public static function guiaNoSePuedeEditar(string $estado): self
+    {
+        return new self(
+            "La guía está {$estado} y solo se corrige la que está PENDIENTE.",
+        );
+    }
+
+    /** Se quiso borrar una guía que ya salió del borrador. */
+    public static function guiaNoSePuedeEliminar(string $estado): self
+    {
+        return new self(
+            "La guía está {$estado} y solo se elimina la que está PENDIENTE.",
+        );
+    }
+
+    /** Tiene depósitos encima: se resuelven por caja, no borrando la fila. */
+    public static function guiaTienePagos(int $cuantos): self
+    {
+        return new self(sprintf(
+            'La guía tiene %d depósito(s) cargados. Dé de baja los depósitos antes de '.
+            'corregirla o eliminarla: lo que se cobró es por ESTE traslado.',
+            $cuantos,
+        ));
+    }
+
+    /** Falta plata para presentarla. */
+    public static function faltaCubrirElArancelDeLaGuia(float $saldo): self
+    {
+        return new self(sprintf(
+            'Faltan %s Bs por cubrir del arancel de la guía. Cargue los depósitos antes de '.
+            'presentarla a revisión.',
+            number_format($saldo, 2, ',', '.'),
+        ));
+    }
+
+    /** Quedan boletas sin controlar: firmar así dejaría la validación decorativa. */
+    public static function faltaControlarBoletasDeLaGuia(int $cuantas): self
+    {
+        return new self(sprintf(
+            'Quedan %d boleta(s) sin controlar. Validelas —o corrija lo observado— antes de '.
+            'aprobar la guía.',
+            $cuantas,
+        ));
+    }
+
+    /** Una guía sin renglones no ampara nada: el cuadro D es el traslado. */
+    public static function guiaSinDetalle(): self
+    {
+        return new self(
+            'La guía necesita al menos una especie en el detalle: el cuadro de productos '.
+            'es lo que el control mira en la ruta.',
+        );
+    }
+
+    /**
      * Anular sin motivo escrito no sirve de nada.
      *
      * El número del talonario queda quemado para siempre y deja un hueco en la

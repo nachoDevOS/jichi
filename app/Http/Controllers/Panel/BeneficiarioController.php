@@ -276,6 +276,7 @@ class BeneficiarioController extends Controller
             ->with(['carnets' => fn ($q) => $q
                 ->vigentes()
                 ->with([
+                    'codigo',
                     'tipoCarnet:id,nombre',
                     'aprovechamiento' => fn ($a) => $a
                         ->withSum('faenasQueConsumen', 'kilos_extraidos'),
@@ -375,7 +376,7 @@ class BeneficiarioController extends Controller
     {
         return [
             'id' => $carnet->id,
-            // En grupos de cuatro: «PES2 6000 0017». Se guarda sin separadores.
+            // En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». Se guarda sin separadores.
             'codigo' => $carnet->codigo_legible,
             'tipo' => $carnet->tipoCarnet?->nombre,
             'tipo_actor' => $carnet->tipo_actor->value,

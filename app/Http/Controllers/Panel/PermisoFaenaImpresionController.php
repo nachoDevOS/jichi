@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Models\Configuracion;
 use App\Models\PermisoFaena;
+use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -35,7 +36,7 @@ class PermisoFaenaImpresionController extends Controller
             return back()->with('error', 'El permiso sale recién con la faena aprobada.');
         }
 
-        $faena->loadMissing(['carnet.beneficiario']);
+        $faena->loadMissing(['codigo', 'carnet.beneficiario']);
 
         $pdf = Pdf::loadView('documentos.permiso-faena', [
             ...$this->datos($faena),
@@ -53,6 +54,9 @@ class PermisoFaenaImpresionController extends Controller
             // tamaño, y el de 200 px salía pixelado y demasiado cargado
             // encima de los renglones. Ver el comentario de `.sello`.
             'selloSedag' => $this->imagenEmbebida('image/faena-sello.png'),
+
+            // El QR y el código, para verificarlo desde el papel.
+            'verificacion' => QrVerificacion::de($faena),
         ])
             // CARTA VERTICAL: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])

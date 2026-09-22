@@ -162,7 +162,7 @@ export default function IndiceGuias({
                                 <table className="w-full text-sm">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">Código</th>
+                                            <th className="px-5 py-2.5 font-medium">N°</th>
                                             <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 font-medium">Ruta</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Carga</th>
@@ -180,7 +180,7 @@ export default function IndiceGuias({
                                                         href={route('guias.show', g.id)}
                                                         className="font-mono font-medium text-primary hover:underline"
                                                     >
-                                                        {g.codigo_guia}
+                                                        {g.numero_legible}
                                                     </Link>
                                                 </td>
 
@@ -229,8 +229,10 @@ export default function IndiceGuias({
                                                     )}
                                                 </td>
 
+                                                {/* En NULL mientras es borrador: el vencimiento
+                                                    lo escribe la aprobación. */}
                                                 <td className="px-5 py-2.5 text-muted-foreground">
-                                                    {fechaHora(g.fecha_vencimiento)}
+                                                    {g.fecha_vencimiento ? fechaHora(g.fecha_vencimiento) : '—'}
                                                 </td>
                                             </tr>
                                         ))}

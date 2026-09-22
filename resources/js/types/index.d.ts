@@ -143,7 +143,7 @@ export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 export type EstadoFaena = 'pendiente' | 'en_revision' | 'activo' | 'completado' | 'vencido';
 
 /** Espejo de App\Enums\EstadoGuia. */
-export type EstadoGuia = 'activa' | 'cerrada' | 'anulada';
+export type EstadoGuia = 'pendiente' | 'en_revision' | 'activa' | 'cerrada' | 'anulada';
 
 /**
  * Espejo de App\Enums\EstadoAsociacion.

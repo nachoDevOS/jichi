@@ -2,6 +2,8 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { Info, ShieldAlert, Truck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
+import { CamposGuia } from '@/components/panel/guias/campos-guia';
+import { filaVacia, TablaDetalle } from '@/components/panel/guias/tabla-detalle';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,38 +12,61 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
+import type { CatalogosGuia, FormularioGuia } from '@/types/guias';
 
 /**
- *  EMITIR UNA GUÍA DE MOVIMIENTO — paso 4, rama comercializador
+ *  REGISTRAR UNA GUÍA DE MOVIMIENTO — paso 4, rama comercializador
+ *
+ * NACE PENDIENTE: acá se arma el papel y nada más. Los depósitos se cargan
+ * desde la ficha, y recién con la firma la guía ampara el traslado.
  */
 export default function CrearGuia({
     beneficiario,
+    medios,
+    tiposTransporte,
+    condiciones,
     diasVigencia,
     tarifaBase,
     descuentoPiscicultura,
-}: {
+}: CatalogosGuia & {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
-    diasVigencia: number;
-    tarifaBase: number;
-    descuentoPiscicultura: number;
 }) {
     const { institucion } = usePage<PageProps>().props;
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
     const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(null);
 
-    const form = useForm({
-        carnet_id: null as number | null,
-        codigo_guia: '',
+    const form = useForm<FormularioGuia & { carnet_id: number | null }>({
+        carnet_id: null,
+
         origen: '',
+        origen_departamento: '',
+        origen_provincia: '',
+        origen_distrito: '',
+
         destino: '',
-        peso_total_kg: '',
+        destino_departamento: '',
+        destino_provincia: '',
+        destino_distrito: '',
+
+        medio_transporte: '',
+        tipo_transporte: '',
+        transporte_nombre: '',
+        transporte_placa: '',
+        transporte_capacidad_kg: '',
+
         es_piscicultura: false,
-        // Se manda con HORA: los cinco días se cuentan desde el instante, no
-        // desde la medianoche. `toISOString().slice(0,16)` da el formato que
-        // espera un <input type="datetime-local">.
-        fecha_emision: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+        observaciones: '',
+
+        /*
+         * LA SOLICITUD ES UN DÍA, no un instante: es la fecha en que la persona
+         * vino al mostrador. La emisión —y con ella los cinco días de validez—
+         * la escribe la APROBACIÓN.
+         */
+        fecha_solicitud: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
             .toISOString()
-            .slice(0, 16),
+            .slice(0, 10),
+
+        detalles: [filaVacia()],
     });
 
     function elegirPersona(elegida: BeneficiarioSugerido | null) {
@@ -57,158 +82,117 @@ export default function CrearGuia({
     }
 
     const monto = form.data.es_piscicultura ? tarifaBase * (1 - descuentoPiscicultura) : tarifaBase;
+    const kilos = form.data.detalles.reduce((suma, f) => suma + Number(f.cantidad_kg || 0), 0);
+
+    const completo =
+        carnet !== null &&
+        form.data.origen.trim() !== '' &&
+        form.data.destino.trim() !== '' &&
+        form.data.detalles.some(
+            (f) => f.especie.trim() !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
+        );
 
     return (
         <LayoutPanel
-            titulo="Emitir guía"
-            descripcion={`Ampara UN traslado. Vale ${diasVigencia} días desde la hora de emisión.`}
+            titulo="Registrar guía"
+            descripcion={`Ampara UN traslado. Vale ${diasVigencia} días desde que la aprueban.`}
         >
-            <Head title="Emitir guía" />
+            <Head title="Registrar guía" />
 
             <form onSubmit={enviar} className="grid gap-6 lg:grid-cols-3">
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Datos del traslado</CardTitle>
-                    </CardHeader>
+                <div className="space-y-6 lg:col-span-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>A. Interesado</CardTitle>
+                        </CardHeader>
 
-                    <CardContent className="space-y-5">
-                        <Campo etiqueta="Comercializador" obligatorio error={form.errors.carnet_id}>
-                            <BuscadorBeneficiario
-                                seleccionado={persona}
-                                onSeleccionar={elegirPersona}
-                                ayuda="Tiene que tener carnet de comercializador vigente."
-                            />
-                        </Campo>
-
-                        {persona && (
-                            <Campo etiqueta="Carnet" obligatorio>
-                                <ListaDeCarnets
-                                    carnets={persona.carnets_vigentes}
-                                    elegido={carnet}
-                                    onElegir={(c) => {
-                                        setCarnet(c);
-                                        form.setData('carnet_id', c.id);
-                                        form.clearErrors('carnet_id');
-                                    }}
+                        <CardContent className="space-y-5">
+                            <Campo etiqueta="Comercializador" obligatorio error={form.errors.carnet_id}>
+                                <BuscadorBeneficiario
+                                    seleccionado={persona}
+                                    onSeleccionar={elegirPersona}
+                                    ayuda="Tiene que tener carnet de comercializador vigente."
                                 />
                             </Campo>
-                        )}
 
-                        {carnet && (
-                            <>
-                                <Campo
-                                    etiqueta="Código de la hoja del talonario"
-                                    htmlFor="codigo_guia"
-                                    error={form.errors.codigo_guia}
-                                    ayuda="Único en todo el sistema. El servidor lo guarda en mayúsculas."
-                                    obligatorio
-                                    className="max-w-sm"
-                                >
-                                    <Input
-                                        id="codigo_guia"
-                                        value={form.data.codigo_guia}
-                                        onChange={(e) =>
-                                            form.setData('codigo_guia', e.target.value.toUpperCase())
-                                        }
-                                        aria-invalid={Boolean(form.errors.codigo_guia)}
-                                        placeholder="GUI-2026-0001"
-                                        className="font-mono"
+                            {persona && (
+                                <Campo etiqueta="Carnet" obligatorio>
+                                    <ListaDeCarnets
+                                        carnets={persona.carnets_vigentes}
+                                        elegido={carnet}
+                                        onElegir={(c) => {
+                                            setCarnet(c);
+                                            form.setData('carnet_id', c.id);
+                                            form.clearErrors('carnet_id');
+                                        }}
                                     />
                                 </Campo>
+                            )}
 
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Campo
-                                        etiqueta="Origen"
-                                        htmlFor="origen"
-                                        error={form.errors.origen}
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="origen"
-                                            value={form.data.origen}
-                                            onChange={(e) => form.setData('origen', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.origen)}
-                                            placeholder="Puerto Almacén, Trinidad"
-                                        />
-                                    </Campo>
-
-                                    <Campo
-                                        etiqueta="Destino"
-                                        htmlFor="destino"
-                                        error={form.errors.destino}
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="destino"
-                                            value={form.data.destino}
-                                            onChange={(e) => form.setData('destino', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.destino)}
-                                            placeholder="Santa Cruz de la Sierra"
-                                        />
-                                    </Campo>
-
-                                    <Campo
-                                        etiqueta="Peso total (kg)"
-                                        htmlFor="peso_total_kg"
-                                        error={form.errors.peso_total_kg}
-                                        ayuda="Lo que dijo la balanza del origen. Al cerrar se puede corregir."
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="peso_total_kg"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={form.data.peso_total_kg}
-                                            onChange={(e) => form.setData('peso_total_kg', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.peso_total_kg)}
-                                        />
-                                    </Campo>
-
-                                    <Campo
-                                        etiqueta="Emisión"
-                                        htmlFor="fecha_emision"
-                                        error={form.errors.fecha_emision}
-                                        ayuda="Con hora: los 5 días se cuentan desde este instante."
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="fecha_emision"
-                                            type="datetime-local"
-                                            value={form.data.fecha_emision}
-                                            onChange={(e) => form.setData('fecha_emision', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.fecha_emision)}
-                                        />
-                                    </Campo>
-                                </div>
-
+                            {carnet && (
                                 <Campo
-                                    etiqueta="Origen del producto"
-                                    error={form.errors.es_piscicultura}
-                                    ayuda="El pescado de criadero no sale del río, así que no consume el recurso que la tasa protege."
+                                    etiqueta="Fecha de solicitud"
+                                    htmlFor="fecha_solicitud"
+                                    error={form.errors.fecha_solicitud}
+                                    ayuda="El día que la persona vino al mostrador. La emisión la escribe la aprobación."
+                                    obligatorio
+                                    className="max-w-xs"
                                 >
-                                    <label className="flex items-center gap-2 text-sm">
-                                        <input
-                                            type="checkbox"
-                                            checked={form.data.es_piscicultura}
-                                            onChange={(e) =>
-                                                form.setData('es_piscicultura', e.target.checked)
-                                            }
-                                            className="size-4 rounded border-input"
-                                        />
-                                        Es producto de <strong>piscicultura</strong> — paga el{' '}
-                                        {Math.round((1 - descuentoPiscicultura) * 100)}% del arancel
-                                    </label>
+                                    <Input
+                                        id="fecha_solicitud"
+                                        type="date"
+                                        value={form.data.fecha_solicitud}
+                                        onChange={(e) => form.setData('fecha_solicitud', e.target.value)}
+                                        aria-invalid={Boolean(form.errors.fecha_solicitud)}
+                                    />
                                 </Campo>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {carnet && (
+                        <>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Ubicación y transporte</CardTitle>
+                                </CardHeader>
+
+                                <CardContent>
+                                    <CamposGuia
+                                        datos={form.data}
+                                        errores={form.errors}
+                                        medios={medios}
+                                        tiposTransporte={tiposTransporte}
+                                        descuentoPiscicultura={descuentoPiscicultura}
+                                        onCambio={(campo, valor) =>
+                                            form.setData((datos) => ({ ...datos, [campo]: valor }))
+                                        }
+                                    />
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>D. Productos hidrobiológicos</CardTitle>
+                                </CardHeader>
+
+                                <CardContent>
+                                    <TablaDetalle
+                                        filas={form.data.detalles}
+                                        condiciones={condiciones}
+                                        errores={form.errors}
+                                        onCambiar={(filas) => form.setData('detalles', filas)}
+                                    />
+                                </CardContent>
+                            </Card>
+                        </>
+                    )}
+                </div>
 
                 {/* ------------------------------------------------ Consecuencias */}
-                <Card className="h-fit">
+                <Card className="h-fit lg:sticky lg:top-6">
                     <CardHeader>
-                        <CardTitle>Lo que se va a emitir</CardTitle>
+                        <CardTitle>Lo que se va a registrar</CardTitle>
                     </CardHeader>
 
                     <CardContent className="space-y-4">
@@ -235,27 +219,26 @@ export default function CrearGuia({
                                     )}
                                 </div>
 
+                                <div>
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                        Carga declarada
+                                    </p>
+                                    <p className="text-xl font-semibold tabular-nums">
+                                        {kilos.toFixed(2)} kg
+                                    </p>
+                                </div>
+
                                 <p className="text-xs text-muted-foreground">
-                                    La guía vale {diasVigencia} días desde la hora de emisión. Pasado
-                                    ese plazo el traslado deja de estar amparado, aunque la carga
-                                    siga en camino.
+                                    La guía queda <strong>PENDIENTE</strong>: todavía no ampara
+                                    nada. Desde su ficha se cargan los depósitos y se envía a
+                                    revisión; recién con la firma vale {diasVigencia} días y se
+                                    puede imprimir.
                                 </p>
                             </>
                         )}
 
-                        <Button
-                            type="submit"
-                            disabled={
-                                form.processing ||
-                                carnet === null ||
-                                form.data.codigo_guia.trim() === '' ||
-                                form.data.origen.trim() === '' ||
-                                form.data.destino.trim() === '' ||
-                                Number(form.data.peso_total_kg || 0) <= 0
-                            }
-                            className="w-full"
-                        >
-                            Emitir guía
+                        <Button type="submit" disabled={form.processing || !completo} className="w-full">
+                            Registrar guía
                         </Button>
                     </CardContent>
                 </Card>

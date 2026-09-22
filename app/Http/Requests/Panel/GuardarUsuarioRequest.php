@@ -59,9 +59,8 @@ class GuardarUsuarioRequest extends FormRequest
                 'required', 'string', 'email', 'max:255',
                 Rule::unique('users', 'email')->ignore($idActual),
                 // Solo se exige el dominio de la Gobernación si está
-                // configurado. Sin JICHI_DOMINIO_INSTITUCIONAL en el .env la
-                // regla no se aplica, para no trabar los ambientes de prueba
-                // donde las cuentas se crean con correos cualquiera.
+                // configurado, y hoy NO lo está: la variable se sacó del .env
+                // el 22/09/2026. Cómo encenderla, en config/jichi.php.
                 ...$this->reglaDominioInstitucional(),
             ],
 

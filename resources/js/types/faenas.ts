@@ -15,7 +15,7 @@ export interface FaenaFila {
     etiqueta: string;
 
     carnet_id: number;
-    /** En grupos de cuatro: «PES2 6K7R J2M». */
+    /** En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». */
     carnet_codigo: string | null;
     /** El número del libro, con cinco dígitos: «00001». */
     carnet_registro: string | null;

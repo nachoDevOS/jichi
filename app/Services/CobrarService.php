@@ -93,6 +93,9 @@ class CobrarService
                 'concepto' => $concepto ?: $this->conceptoAutomatico($resueltas),
             ]);
 
+            // Su llave pública. Ver App\Traits\Codificable.
+            $recibo->asignarCodigo();
+
             $orden = 1;
 
             foreach ($resueltas as ['tramite' => $tramite, 'monto' => $monto]) {
@@ -233,6 +236,9 @@ class CobrarService
                 'concepto' => $concepto ?: $this->nombrar($tramite),
             ]);
 
+            // Su llave pública. Ver App\Traits\Codificable.
+            $recibo->asignarCodigo();
+
             // De a uno y no con un update() masivo: el builder no dispara
             // eventos, así que Auditable no registraría nada.
             foreach ($sueltos as $pago) {
@@ -286,15 +292,12 @@ class CobrarService
         $nombre = $this->nombrar($tramite);
 
         /*
-         * `admitePagos()` solo lo tienen los estados que pueden decir que no
-         * —hoy, la guía anulada—. Los otros no declaran el método, así que se
-         * pregunta con method_exists en vez de obligar a los tres enums a
-         * tenerlo por simetría.
+         * SE LE PREGUNTA AL MODELO, no al enum. Con `method_exists` sobre el
+         * estado, el cupo —que llama `permitePagos()`— contestaba «no existe»
+         * y no se validaba ningún estado, en silencio. Ver CLAUDE.md.
          */
-        $estado = $tramite->estado;
-
-        if (method_exists($estado, 'admitePagos') && ! $estado->admitePagos()) {
-            throw CobroInvalidoException::noAdmitePagos($nombre);
+        if (! $tramite->admitePagos()) {
+            throw CobroInvalidoException::noAdmitePagos($nombre, $tramite->estado->etiqueta());
         }
 
         $saldo = $tramite->saldoPendiente();
@@ -343,7 +346,7 @@ class CobrarService
              */
             $tramite instanceof AprovechamientoPesq => 'Autorización de Pesca para Aprovechamiento '
                 .'Pesquero'.$this->tramoDe($tramite),
-            $tramite instanceof GuiaMovimiento => 'Guía '.$tramite->codigo_guia,
+            $tramite instanceof GuiaMovimiento => $tramite->etiqueta,
             /*
              * «Permiso de Faena N° 0003 - 120 kg»: el número es el de la hoja
              * del talonario que la persona se lleva, y los kilos son lo que el

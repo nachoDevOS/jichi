@@ -33,9 +33,11 @@ vez de dejarlo apuntando a tablas que no existen.
 | `/panel/faenas` | ✅ 200 | marca las caducadas sin cerrar |
 | `/panel/faenas/crear` | ✅ 200 | descuenta del cupo, con el número propuesto |
 | `/panel/faenas/{id}` | ✅ 200 | ficha con cierre y corrección de kilos |
-| `/panel/guias` | ✅ 200 | busca por código, origen y destino |
-| `/panel/guias/crear` | ✅ 200 | muestra el arancel con el descuento |
-| `/panel/guias/{id}` | ✅ 200 | cierre con peso y anulación con motivo |
+| `/panel/guias` | ✅ 200 | busca por número, nombre, origen y destino |
+| `/panel/guias/crear` | ✅ 200 | bloques A–D, con el arancel y el descuento |
+| `/panel/guias/{id}/editar` | ✅ 200 | solo el borrador y sin depósitos cargados |
+| `/panel/guias/{id}` | ✅ 200 | circuito completo, cierre con peso y anulación con motivo |
+| `/panel/guias/{id}/imprimir` | ✅ PDF | una página, QR legible a 150 dpi |
 | `/panel/caja` | ✅ 200 | abonos + arqueo del día por método |
 | `/panel/caja/cobrar` | ✅ 200 | un recibo cubre varios trámites |
 | `/panel/recibos` | ✅ 200 | avisa los que dejaron de cuadrar |
@@ -273,6 +275,57 @@ producción**. En cuanto sean los de la resolución, sube al bloque de siempre d
 `DatabaseSeeder`.
 
 Ver [docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md).
+
+---
+
+## ~~🟠 La guía de transporte no tiene PDF~~ — ✅ resuelto el 22/09/2026
+
+`GuiaImpresionController` + `documentos/guia-transporte.blade.php`, calcando el
+talonario: los cuatro bloques, el cuadro D y el QR. Sale con
+`GET /panel/guias/{guia}/imprimir`, permiso `guias.imprimir`, y **solo con la
+guía aprobada**. Los cinco documentos se imprimen ahora.
+
+Medido sobre el PDF, no mirado: una página, el texto cierra en x=577 contra el
+borde de la hoja en 578, el QR mide los 46 pt declarados y decodifica
+rasterizando la página hasta 150 dpi.
+
+---
+
+## 🔴 HAY QUE VOLVER A MIGRAR — 22/09/2026
+
+`carnets.codigo_carnet` **dejó de existir**: la llave de verificación se mudó a
+la tabla nueva `codigos`, compartida por los cinco documentos. Se editó la
+migración `create_carnets_table` y se agregó `create_codigos_table`, así que el
+esquema real queda viejo hasta que alguien corra:
+
+```sh
+php artisan migrate:fresh --seed
+```
+
+**Hasta que se corra, el panel revienta** con `no such column: codigo_carnet` en
+cuanto se abra un listado de carnets. Se verificó el esquema completo en una
+base descartable, no sobre la de trabajo.
+
+## 🔴 `APP_URL` queda IMPRESO en CUATRO documentos — revisarlo antes de un lote
+
+El carnet, la autorización de pesca, el permiso de faena y el recibo llevan el
+QR con `<APP_URL>/verificar/<codigo>`. **`APP_URL` es la única fuente del
+dominio** desde el 22/09/2026: se retiraron las otras dos
+—`JICHI_URL_VERIFICACION` del `.env` y `sistema.url_verificacion` de
+`configuraciones`— porque tres lugares que dicen lo mismo se contradicen.
+
+**Hoy `APP_URL=http://jichi.test`**, que es un nombre local: un teléfono con
+datos móviles no lo resuelve. Cada documento que se imprima así sale con un QR
+que no abre nada, y el papel ya está entregado cuando alguien lo nota.
+
+> ⚠️ **`route()` absoluta NO respeta `APP_URL`: usa el host de la petición.**
+> Un operador que entre al panel por la IP de la red imprimiría documentos con
+> el QR apuntando a esa IP. Por eso `QrVerificacion` arma la ruta RELATIVA y le
+> pega `config('app.url')`. Está medido; ver «Trampas conocidas».
+
+El código escrito al lado del QR sigue funcionando igual —se tipea en
+`/verificar`—, así que un documento mal impreso no queda sin forma de
+verificarse.
 
 ---
 
@@ -590,6 +643,13 @@ falta la pantalla para editarla.
 - Subir el logo y el escudo (son del tipo `archivo`).
 - Alta y edición de usuarios: `GuardarUsuarioRequest` ya está escrito y
   comentado, pero **no tiene ruta ni controlador todavía**.
+
+  > Al construirlo, ojo con una regla que está escrita y APAGADA: el correo del
+  > funcionario puede exigirse que termine en el dominio de la Gobernación. La
+  > enciende `jichi.dominio_institucional`, y su variable **se sacó del `.env` y
+  > del `.env.example` el 22/09/2026** justamente porque el módulo no existe.
+  > Para encenderla se agrega al `.env`, sin arroba:
+  > `JICHI_DOMINIO_INSTITUCIONAL=beniautonomo.gob.bo`.
 
 ---
 

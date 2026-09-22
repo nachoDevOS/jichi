@@ -24,7 +24,6 @@ class ConfiguracionSeeder extends Seeder
             ['sistema.nombre', 'Jichi', 'string', 'general', 'Nombre del sistema', true],
             ['sistema.descripcion', 'Sistema de gestión de carnets, rubros y trámites del sector pesquero', 'string', 'general', 'Descripción', true],
             ['sistema.logo_path', 'institucional/logo-jichi.png', 'archivo', 'general', 'Logo de Jichi', true],
-            ['sistema.url_verificacion', 'https://jichi.soluciondigital.dev/verificar', 'string', 'general', 'URL base de verificación pública', true],
 
             // Documentos
             ['documentos.firmante_nombre', 'Lic. Responsable de Recaudaciones', 'string', 'documentos', 'Nombre del firmante', false],

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Carnet;
 use App\Models\Configuracion;
 use App\Support\Archivos;
+use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -37,7 +38,7 @@ class CarnetImpresionController extends Controller
          * error: el renglón CUPO saldría vacío en un carnet perfectamente
          * válido.
          */
-        $carnet->load(['beneficiario', 'asociacion', 'aprovechamiento']);
+        $carnet->load(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
 
         /*
          * UN CARNET SIN FIRMAR NO SE IMPRIME. El plástico es el documento que
@@ -92,7 +93,7 @@ class CarnetImpresionController extends Controller
             /*
              * LA CARILLA DE ATRÁS. Ver reverso().
              */
-            'reverso' => $this->reverso(),
+            'reverso' => $this->reverso($carnet),
         ])
             ->setPaper([0, 0, self::ANCHO, self::ALTO])
 
@@ -106,7 +107,7 @@ class CarnetImpresionController extends Controller
         // `stream` y no `download`: se abre en el visor del navegador, que es
         // desde donde el operador aprieta imprimir. Un archivo descargado
         // obligaría a buscarlo en la carpeta de descargas y abrirlo aparte.
-        return $pdf->stream("carnet-{$carnet->codigo_carnet}.pdf");
+        return $pdf->stream("carnet-{$carnet->codigo?->codigo}.pdf");
     }
 
     /**
@@ -140,11 +141,24 @@ class CarnetImpresionController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function reverso(): array
+    private function reverso(Carnet $carnet): array
     {
+        /*
+         * EL QR Y EL CÓDIGO ESCRITO, los dos: el QR es lo rápido y el código es
+         * lo que funciona cuando la cámara no lo agarra —un plástico rayado,
+         * poca luz, un teléfono viejo—. La pantalla de verificación acepta las
+         * dos entradas por el mismo motivo.
+         *
+         * Se resuelve UNA vez: dibujar el PNG del QR no es gratis.
+         */
+        $verificacion = QrVerificacion::de($carnet);
+
         return [
             'titulo' => self::TITULO_REVERSO,
             'reglas' => self::REGLAS_REVERSO,
+
+            'qr' => $verificacion['qr'] ?? '',
+            'codigo' => $verificacion['codigo'] ?? '',
 
             /*
              * Quién firma sale de `configuraciones` y no de una constante: es

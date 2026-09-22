@@ -10,7 +10,7 @@ export interface CarnetFila {
     beneficiario_id: number;
     beneficiario: string | null;
 
-    /** En grupos de cuatro: «PES2 6K7R J2M». Se guarda sin separadores. */
+    /** En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». Se guarda sin separadores. */
     codigo: string;
 
     /**

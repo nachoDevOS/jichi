@@ -3138,11 +3138,12 @@
    dirección del sistema y tipearla. Con la URL completa, escanear y verificar es
    un solo gesto.
    ¿Y POR QUÉ LA URL LA ARMA EL SERVIDOR Y SE RECIBE HECHA?
-   Porque lleva la firma de validación, y porque el dominio público no es el de
-   la red departamental: el ciudadano escanea desde su teléfono, fuera de la
-   institución. Armarla acá con route() daría algo como http://jichi.test/... que
-   no abre nada. Sale de config('jichi.url_verificacion'); ver
-   CarnetController::urlVerificacion().
+   Porque lleva la firma de validación, y porque el dominio tiene que ser el
+   público: el ciudadano escanea desde su teléfono, fuera de la institución.
+   DESACTUALIZADO desde el 22/09/2026: config('jichi.url_verificacion') se
+   retiró y el dominio sale de APP_URL, que pasó a ser la única fuente. La
+   advertencia sigue valiendo, pero apuntada a APP_URL: si dice http://jichi.test
+   el QR impreso no abre nada. Ver App\Support\QrVerificacion.
    ¿POR QUÉ SE GENERA EN EL NAVEGADOR Y NO EN PHP?
    Este componente es para las pantallas del panel, donde el QR se dibuja
    mientras el operador carga los datos. Generarlo en el servidor obligaría a

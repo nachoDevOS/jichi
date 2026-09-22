@@ -57,7 +57,7 @@ class OtorgarCupoService
                 throw CupoInvalidoException::escalaDerogada($tramo->nro_escala);
             }
 
-            return AprovechamientoPesq::create([
+            $cupo = AprovechamientoPesq::create([
                 'beneficiario_id' => $beneficiario->id,
                 'categoria_aprov_id' => $tramo->id,
 
@@ -98,6 +98,14 @@ class OtorgarCupoService
                 'fecha_emision' => null,
                 'fecha_vencimiento' => $this->vencimientoDe($solicitud),
             ]);
+
+            /*
+             * SU LLAVE PÚBLICA, dentro de la misma transacción: un documento
+             * sin código no se puede verificar. Ver App\Traits\Codificable.
+             */
+            $cupo->asignarCodigo();
+
+            return $cupo;
         });
     }
 

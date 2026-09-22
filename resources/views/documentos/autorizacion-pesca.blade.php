@@ -53,8 +53,10 @@
 
         .raya { border-bottom: 1pt solid #2e7d32; height: 1pt; margin: 6pt 0 8pt; }
 
+        /* 13 y no 14: centrado, a 14 pt el renglón más largo mide 249 y cierra
+           a 7 pt de «Bs.» — pegado. A 13 mide 231 y quedan 16. */
         .titulo {
-            font-size: 14pt;
+            font-size: 13pt;
             font-weight: bold;
             color: #2e7d32;
             line-height: 1.2;
@@ -64,15 +66,21 @@
         /* El número va en rojo, como en el talonario: es lo único con otra
            tinta, para que salte a la vista al archivar. */
         .rotulo-numero { color: #c62828; font-size: 11pt; font-weight: bold; }
+        /* ACHICADA a pedido —era 150 × 15 a 10 pt—: el hueco que deja se lo
+           lleva el QR, que ahora va al lado. Ver la fila del título.
+
+           SIN `padding-top`, y el alto entero en `height`: con 2,5 de relleno
+           el número caía 3,1 pt bajo el centro del recuadro y se le salía por
+           abajo —medido: su caja llegaba a 146,2 y el recuadro cierra en
+           145,8—. El total sigue siendo el mismo, 15,5 pt. */
         .caja-bs {
             border: 0.9pt solid #444;
             border-radius: 9pt;
-            height: 15pt;
+            height: 15.5pt;
             text-align: center;
-            font-size: 10pt;
+            font-size: 9.5pt;
             font-weight: bold;
             color: #111;
-            padding-top: 3pt;
         }
 
         /* --- Renglones --- */
@@ -106,6 +114,57 @@
         .vinetas .punto { width: 14pt; text-align: center; }
 
         .cierre { text-align: center; font-size: 8.5pt; padding-top: 14pt; }
+
+        /* ---------------------------------------------------------------
+           EL BLOQUE DE VERIFICACIÓN — QR + código escrito
+           --------------------------------------------------------------- */
+        /*
+         * El andamio lo pone `partes/qr-verificacion`; acá van el color y el
+         * cuerpo. El QR va SOBRE BLANCO: necesita su zona de silencio clara, y
+         * sobre el sello de agua las cámaras dejan de engancharlo.
+         */
+        /*
+         * ABAJO A LA DERECHA, a pedido. Va absoluto y no en el flujo: el
+         * contenido de este papel cierra en y=745 de una hoja de 792, y apilado
+         * debajo del pie se salía de la página.
+         *
+         * OJO: SE POSICIONA DENTRO DE `.hoja`, que está en top 28 / left 34, así
+         * que lo declarado no es donde cae: hay que sumarle ese desfase. Con
+         * `top: 612 / left: 430` el bloque aterriza en x 464..580 y el QR de 62
+         * —centrado— en x 491..553, y 640..702.
+         *
+         * SIN EL CÓDIGO ESCRITO, a pedido, el bloque perdió su último renglón y
+         * sobraban 30 pt hasta el pie: bajó 20 y volvió a subir 10, que es
+         * donde quedó — 35 pt de aire arriba y 20 hasta «Trinidad - Beni…».
+         *
+         * LOS DOS TOPES, medidos en el PDF:
+         *   arriba  y=605  — ahí cierra la tabla de especies, cuyo borde
+         *                    derecho llega a x=510 y se le encimaría.
+         *   abajo   y=731  — el renglón «Trinidad - Beni…» del pie, cuya
+         *                    última línea punteada cierra en x=471; el código
+         *                    del QR arranca en 470,5 y la rozaba.
+         * Entre los dos la columna derecha está libre: el párrafo de redes
+         * cierra en x=487 y las viñetas en 439.
+         */
+        .qr-bloque {
+            position: absolute;
+            top: 612pt;
+            left: 430pt;
+            width: 116pt;
+            text-align: center;
+        }
+        .qr-caja { background-color: #ffffff; }
+        .qr-rotulo { font-size: 6pt; font-weight: bold; letter-spacing: 0.4pt; color: #1f3d13; }
+        .qr-codigo {
+            /* Monoespaciada: en el código se confunden el 0 con la O. */
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-size: 8pt;
+            font-weight: bold;
+            letter-spacing: 0.6pt;
+            padding-top: 1pt;
+            color: #000000;
+        }
+
     </style>
 </head>
 
@@ -117,7 +176,7 @@
 
 <div class="hoja">
 
-    {{-- Encabezado: escudo a la izquierda, entidad centrada, logo a la derecha --}}
+    {{-- Encabezado: escudo a la izquierda, entidad centrada, peces a la derecha --}}
     <table width="100%" cellspacing="0" cellpadding="0">
         <tr>
             <td width="80" valign="top">
@@ -133,9 +192,12 @@
                 <div class="l4">SEDAG - BENI</div>
             </td>
 
+            {{-- El emblema de peces del talonario —un surubí y un pacú—, no el
+                 logo del SEDAG: ese ya está en el sello de agua del fondo. Es
+                 el mismo del permiso de faena, y al mismo cuerpo. --}}
             <td width="80" align="right" valign="top">
-                @if ($logo)
-                    <img src="{{ $logo }}" style="width: 56pt;" alt="">
+                @if ($peces)
+                    <img src="{{ $peces }}" style="width: 62pt;" alt="">
                 @endif
             </td>
         </tr>
@@ -143,22 +205,40 @@
 
     <div class="raya"></div>
 
-    {{-- Título a la izquierda en DOS renglones —nowrap, o a 14 pt se parte en
-         cuatro— y a la derecha el N° arriba con la caja de Bs. abajo. --}}
+    {{-- TÍTULO CENTRADO, con el N° y la caja de Bs. a la derecha.
+
+         LAS DOS COLUMNAS LATERALES MIDEN LO MISMO, y tienen que medirlo: es lo
+         único que deja el título centrado en la hoja y no corrido. Mismo patrón
+         que el permiso de faena.
+
+         140 y no más: el título va en `nowrap` y su renglón más largo mide
+         231 pt a 13 pt, así que al medio tienen que quedarle 544 − 2×140 = 264.
+         Y no menos: a la derecha entran «Bs.» (24) más la caja (112). --}}
     <table width="100%" cellspacing="0" cellpadding="0">
         <tr>
-            <td class="titulo" width="290" valign="top">
+            <td width="140"></td>
+
+            <td class="titulo" align="center" valign="top">
                 <div>AUTORIZACIÓN DE PESCA PARA</div>
                 <div>APROVECHAMIENTO PESQUERO</div>
             </td>
 
-            <td valign="top" style="padding-left: 12pt;">
-                <div class="rotulo-numero">N<sup>o</sup> {{ $numero }}</div>
+            <td width="140" align="right" valign="top">
+                {{-- CENTRADO sobre el grupo «Bs. + cuadro», no pegado a la
+                     derecha: el grupo arranca en x=443 y el número heredaba el
+                     `align="right"` de la celda, así que quedaba corrido contra
+                     el margen mientras el resto empezaba 70 pt antes. --}}
+                <div class="rotulo-numero" style="text-align: center;">N<sup>o</sup> {{ $numero }}</div>
 
-                <table cellspacing="0" cellpadding="0" style="padding-top: 6pt;">
+                {{-- `width="100%"` y no `align="right"`: con la tabla ajustada a
+                     su contenido la caja cerraba en x=573,5 y el N° en 578 —los
+                     4,5 pt se veían—. Al 100% la columna del monto cae contra el
+                     margen, alineada con el número de arriba. --}}
+                <table width="100%" cellspacing="0" cellpadding="0" style="padding-top: 6pt;">
                     <tr>
-                        <td width="24" valign="middle" style="font-size: 11pt; font-weight: bold;">Bs.</td>
-                        <td width="150" valign="middle">
+                        <td valign="middle" align="right"
+                            style="font-size: 11pt; font-weight: bold; padding-right: 4pt;">Bs.</td>
+                        <td width="112" valign="middle">
                             <div class="caja-bs">{{ $monto }}</div>
                         </td>
                     </tr>
@@ -280,6 +360,8 @@
             <td class="linea" width="40" valign="bottom" align="center">{{ $fecha['anio'] }}</td>
         </tr>
     </table>
+
+    @include('documentos.partes.qr-verificacion', ['lado' => 62, 'vertical' => true, 'codigo' => false])
 
 </div>
 

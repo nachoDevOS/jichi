@@ -55,13 +55,16 @@ class FaenaController extends Controller
              * y el método contesta cualquier cosa, sin ningún error.
              */
             ->with([
-                'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,nro_registro,fecha_emision',
+                'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision',
+                'carnet.codigo',
                 'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             ])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
                 fn ($s) => $s
                     ->whereHas('carnet.beneficiario', fn ($b) => $b->buscar($termino))
-                    ->orWhere('numero_faena', 'like', '%'.preg_replace('/\D/', '', $termino).'%'),
+                    // Sin los ceros del talonario: la columna es un ENTERO, y
+                    // «000042» tecleado tal cual no encuentra al 42.
+                    ->orWhere('numero_faena', 'like', '%'.ltrim(preg_replace('/\D/', '', $termino), '0').'%'),
             ))
             // Evita una consulta agregada POR FILA al calcular el saldo, y
             // resuelve el recibo sin ir a buscarlo de a uno.
@@ -188,7 +191,8 @@ class FaenaController extends Controller
         }
 
         $faena->load([
-            'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.aprovechamiento' => fn ($a) => $a->withSum('faenasQueConsumen', 'kilos_extraidos'),
         ]);
@@ -290,7 +294,8 @@ class FaenaController extends Controller
     public function show(PermisoFaena $faena): Response
     {
         $faena->load([
-            'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,asociacion_id,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.asociacion:id,nombre,sigla',
             // El cupo cuelga del CARNET: la faena ya no guarda su id.
@@ -608,7 +613,7 @@ class FaenaController extends Controller
              * EL NÚMERO DE REGISTRO, que es como se nombra un carnet en el
              * mostrador: «00001». Sin el año: el número ya identifica al
              * carnet dentro de la gestión que se está atendiendo, y repetirlo
-             * en cada fila era ruido. El `codigo_carnet` son 16 caracteres al
+             * en cada fila era ruido. El código del carnet son 16 caracteres al
              * azar —sirve para verificar, no para nombrar—.
              */
             'carnet_registro' => $faena->carnet?->registro_legible,

@@ -19,19 +19,13 @@
 return [
 
     /*
-    | Contraseña con la que se crean los usuarios institucionales al ejecutar
-    | `php artisan db:seed`. Se define en .env con JICHI_SEED_PASSWORD.
+    | Contraseña con la que se crea la cuenta institucional al ejecutar
+    | `php artisan db:seed`. NO está en .env: si hace falta otra, se agrega
+    | ahí la línea JICHI_SEED_PASSWORD y esta la toma.
     |
     | IMPORTANTE: cambiarla antes de cualquier despliegue real.
     */
     'password_semilla' => env('JICHI_SEED_PASSWORD', 'password'),
-
-    /*
-    | URL pública base que se imprime dentro del código QR de cada documento.
-    | Debe apuntar al dominio real del sistema, porque el ciudadano escanea
-    | el QR desde su teléfono, fuera de la red departamental.
-    */
-    'url_verificacion' => env('JICHI_URL_VERIFICACION'),
 
     /*
     | Cantidad de filas por página en los listados del panel.
@@ -42,12 +36,14 @@ return [
     | Dominio de correo de la Gobernación, para las cuentas de los
     | funcionarios (ver GuardarUsuarioRequest).
     |
-    | Queda VACÍO a propósito por defecto. Sin valor, el formulario acepta
-    | cualquier correo válido; con valor, exige que termine en este dominio.
-    | Se deja optativo porque en desarrollo y en las pruebas las cuentas se
-    | crean con correos inventados, y una regla fija ahí solo estorbaría.
+    | Queda VACÍO por defecto. Sin valor, el formulario acepta cualquier correo
+    | válido; con valor, exige que termine en este dominio. Se deja optativo
+    | porque en desarrollo las cuentas se crean con correos inventados.
     |
-    | Se escribe sin arroba: beniautonomo.gob.bo
+    | NO ESTÁ EN .env NI EN .env.example: se sacó el 22/09/2026 porque el
+    | módulo de Usuarios todavía no tiene ruta ni controlador. Para encenderlo
+    | hay que agregar la línea JICHI_DOMINIO_INSTITUCIONAL al .env, sin arroba:
+    | beniautonomo.gob.bo
     */
     'dominio_institucional' => env('JICHI_DOMINIO_INSTITUCIONAL'),
 

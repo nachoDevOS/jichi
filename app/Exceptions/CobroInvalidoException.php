@@ -59,20 +59,26 @@ class CobroInvalidoException extends RuntimeException
     }
 
     /**
-     * Sobre un papel anulado no se cobra, aunque quede saldo.
+     * El trámite está en un estado que ya no acepta plata.
      *
-     * Lo que se deba se resuelve por caja, no cargándole plata a una guía que
-     * no ampara ningún traslado. Ver EstadoGuia::admitePagos().
+     * ⚠️ EL MENSAJE LLEVA EL ESTADO, y hace falta. Decía «el papel está
+     * anulado» a secas, escrito cuando lo único que llegaba acá era una guía
+     * anulada; desde que `CobrarService::resolver()` pregunta al MODELO
+     * también llegan el carnet, el cupo y la faena firmados, y a esos llamarles
+     * anulados manda a ventanilla a buscar una anulación que no existe.
      */
-    public static function noAdmitePagos(string $tramite): self
+    public static function noAdmitePagos(string $tramite, string $estado): self
     {
         /*
-         * La frase se arma con el sujeto ENTRECOMILLADO y el adjetivo referido
-         * al «papel», no al trámite: así no hay que resolver el género de un
-         * nombre que puede ser «Carnet», «Guía» o «Aprovechamiento». Es la misma
-         * corrección que hubo que hacer en PermisoOperativoException.
+         * El sujeto va ENTRECOMILLADO y el adjetivo referido al «trámite», no
+         * al nombre: así no hay que resolver el género de algo que puede ser
+         * «Carnet», «Guía» o «Aprovechamiento». Misma corrección que en
+         * PermisoOperativoException.
          */
-        return new self("«{$tramite}» no admite cobros: el papel está anulado.");
+        return new self(
+            "«{$tramite}» no admite cobros: el trámite está en «{$estado}». ".
+            'Solo se cobra lo que está pendiente.',
+        );
     }
 
     /**

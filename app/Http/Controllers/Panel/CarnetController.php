@@ -59,6 +59,9 @@ class CarnetController extends Controller
              * null y el método contesta cualquier cosa, sin ningún error.
              */
             ->with([
+                // `codigo_legible` va en #[Appends]: sin precargar la relación,
+                // serializar el listado dispara una consulta por fila.
+                'codigo',
                 'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
                 'asociacion:id,nombre,sigla',
                 'tipoCarnet',
@@ -81,9 +84,12 @@ class CarnetController extends Controller
             ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
                 fn ($s) => $s
                     ->whereHas('beneficiario', fn ($b) => $b->buscar($termino))
-                    // El código se busca NORMALIZADO: la gente lo copia del
-                    // plástico con los espacios de los grupos de cuatro.
-                    ->orWhere('codigo_carnet', 'like', '%'.Carnet::normalizarCodigo($termino).'%'),
+                    // El código se busca NORMALIZADO —la gente lo copia del
+                    // papel con los guiones de los grupos de cuatro— y por
+                    // la RELACIÓN: desde el 22/09/2026 vive en `codigos`.
+                    ->orWhereHas('codigo', fn ($c) => $c->where(
+                        'codigo', 'like', '%'.Carnet::normalizarCodigo($termino).'%',
+                    )),
             ))
             ->when($filtros['estado'], fn ($q, $estado) => $q->where('carnets.estado', $estado))
             ->when($filtros['actor'], fn ($q, $actor) => $q->where('carnets.tipo_actor', $actor))
@@ -353,7 +359,7 @@ class CarnetController extends Controller
      */
     public function edit(Carnet $carnet): Response
     {
-        $carnet->load(['beneficiario', 'asociacion', 'tipoCarnet', 'aprovechamiento.categoria']);
+        $carnet->load(['codigo', 'beneficiario', 'asociacion', 'tipoCarnet', 'aprovechamiento.categoria']);
 
         return Inertia::render('panel/carnets/editar', [
             'carnet' => [

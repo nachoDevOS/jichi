@@ -89,9 +89,11 @@ enum RolSistema: string
             'faenas.crear',
             'guias.crear',
 
-            // Entregar el «Permiso por Faena» en papel. Permiso propio, como
-            // `carnets.imprimir`: es un acto distinto de consultar la ficha.
+            // Entregar el «Permiso por Faena» y la «Guía Única de Transporte»
+            // en papel. Permiso propio, como `carnets.imprimir`: es un acto
+            // distinto de consultar la ficha.
             'faenas.imprimir',
+            'guias.imprimir',
 
             /*
              * CERRAR un permiso también es de ventanilla, y es el otro medio
@@ -107,10 +109,12 @@ enum RolSistema: string
             // Corregir el BORRADOR es de ventanilla, igual que en el carnet y
             // el cupo: es el mismo mostrador el que lo está armando.
             'faenas.editar',
+            'guias.editar',
 
-            // Presentar la faena a revisión: mismo reparto que en el carnet y
-            // el cupo —presentar es de ventanilla, firmar no—.
+            // Presentar a revisión: mismo reparto que en el carnet y el cupo
+            // —presentar es de ventanilla, firmar no—.
             'faenas.enviar',
+            'guias.enviar',
 
             // Cobrar y entregar el comprobante numerado: el mostrador entero.
             'caja.cobrar',
@@ -159,6 +163,12 @@ enum RolSistema: string
             'faenas.aprobar',
 
             /*
+             * Y LA DE LA GUÍA, por lo mismo: se miran las boletas y recién ahí
+             * el papel ampara el traslado.
+             */
+            'guias.aprobar',
+
+            /*
              * ELIMINAR un carnet cargado por error. De supervisión, igual que
              * en el cupo: borrar la fila la hace desaparecer de los listados y
              * lo único que queda es la línea de `auditorias` con el motivo.
@@ -183,6 +193,7 @@ enum RolSistema: string
              * quemado igual, y eso es lo que el motivo tiene que explicar.
              */
             'faenas.eliminar',
+            'guias.eliminar',
 
             'reportes.exportar',
             'auditoria.ver',

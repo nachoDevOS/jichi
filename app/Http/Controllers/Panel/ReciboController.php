@@ -11,6 +11,7 @@ use App\Models\GuiaMovimiento;
 use App\Models\Pago;
 use App\Models\Recibo;
 use App\Support\Paginacion;
+use App\Support\QrVerificacion;
 use App\Support\ReciboImpreso;
 use App\Support\Sql;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -106,7 +107,7 @@ class ReciboController extends Controller
          */
         $recibo->load(['beneficiario', 'pagos' => fn ($q) => $q->with([
             'pagable' => fn ($m) => $m->morphWith([
-                Carnet::class => ['beneficiario', 'tipoCarnet'],
+                Carnet::class => ['codigo', 'beneficiario', 'tipoCarnet'],
                 AprovechamientoPesq::class => ['beneficiario', 'categoria'],
                 GuiaMovimiento::class => ['carnet.beneficiario'],
             ]),
@@ -153,7 +154,7 @@ class ReciboController extends Controller
         return match (true) {
             $x instanceof Carnet => $x->codigo_legible.' · '.($x->beneficiario?->nombreCompleto ?? '—'),
             $x instanceof AprovechamientoPesq => 'Escala '.($x->categoria?->nro_escala ?? '—').' · '.($x->beneficiario?->nombreCompleto ?? '—'),
-            $x instanceof GuiaMovimiento => $x->codigo_guia.' · '.$x->ruta,
+            $x instanceof GuiaMovimiento => $x->numero_legible.' · '.$x->ruta,
             default => null,
         };
     }
@@ -168,9 +169,9 @@ class ReciboController extends Controller
          * Eloquent no sabe qué es `pagable` hasta que lee la fila, así que lo
          * segundo se IGNORA en silencio y cada renglón dispararía su consulta.
          */
-        $recibo->load(['beneficiario', 'pagos' => fn ($q) => $q->with([
+        $recibo->load(['codigo', 'beneficiario', 'pagos' => fn ($q) => $q->with([
             'pagable' => fn ($m) => $m->morphWith([
-                Carnet::class => ['tipoCarnet'],
+                Carnet::class => ['codigo', 'tipoCarnet'],
                 AprovechamientoPesq::class => ['categoria'],
                 GuiaMovimiento::class => [],
             ]),
@@ -186,6 +187,9 @@ class ReciboController extends Controller
         $pdf = Pdf::loadView('documentos.recibo-oficial', [
             'recibo' => $impreso,
             'fecha' => $impreso->fechaEnCasilleros(),
+
+            // El QR y el código, para verificarlo desde el papel.
+            'verificacion' => QrVerificacion::de($recibo),
 
             /*
              * YA NO SE MANDA `esDeposito`, y no es un olvido.

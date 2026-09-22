@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Schema;
 /*
 | Carnets — la credencial física que se entrega en ventanilla.
 */
+/*
+| SIN COLUMNA DE CÓDIGO: la llave de verificación se mudó a la tabla `codigos`
+| el 22/09/2026, compartida con los otros cuatro documentos. Ver MER.md.
+*/
 return new class extends Migration
 {
     public function up(): void
@@ -29,11 +33,6 @@ return new class extends Migration
                 ->comment('Solo si tipo_actor = pescador');
 
             $table->string('tipo_actor', 20)->comment('pescador | comercializador');
-
-            /*
-             * Único GLOBAL, y en los dos sentidos:
-             */
-            $table->string('codigo_carnet', 40)->unique();
 
             /*
              * EL NÚMERO DE REGISTRO, el que va impreso en el plástico.

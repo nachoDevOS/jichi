@@ -289,7 +289,7 @@ class AprovechamientoController extends Controller
                 // Con `nro_registro` y `fecha_emision`: de esas dos columnas
                 // salen los accesores del número del carnet, y sin ellas
                 // devuelven null sin ningún error.
-                ->with('carnet:id,codigo_carnet,nro_registro,fecha_emision')
+                ->with(['carnet:id,nro_registro,fecha_emision', 'carnet.codigo'])
                 ->orderByDesc('numero_faena')
                 ->get()
                 ->map(fn (PermisoFaena $f): array => [

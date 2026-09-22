@@ -201,6 +201,34 @@
         /* --- Pie ---------------------------------------------------------- */
         .copias { font-size: 6pt; }
         .nota { font-size: 5.2pt; line-height: 1.4; text-align: justify; }
+
+        /* ---------------------------------------------------------------
+           EL BLOQUE DE VERIFICACIÓN — QR + código escrito
+           --------------------------------------------------------------- */
+        /*
+         * APILADO: el rótulo y el código van DEBAJO del QR, a pedido.
+         *
+         * El bolsillo de la esquina son 97 pt de alto —del marco, en y=10,5, a
+         * la caja de IMPORTE, en 107,5— por 126 de ancho. Apilado, el texto usa
+         * todo ese ancho y entra en una línea cada uno, así que lo que sobra se
+         * lo lleva el QR: 60 pt, el más grande de los cuatro documentos.
+         */
+        .qr-bloque { text-align: center; }
+        .qr-caja { background-color: #ffffff; }
+        .qr-rotulo {
+            font-size: 5pt;
+            font-weight: bold;
+            letter-spacing: 0.2pt;
+            padding-top: 2pt;
+        }
+        .qr-codigo {
+            /* Monoespaciada: en el código se confunden el 0 con la O. */
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-size: 6.5pt;
+            font-weight: bold;
+            letter-spacing: 0.3pt;
+        }
+
     </style>
 </head>
 
@@ -350,7 +378,11 @@
     {{-- ==============================================================
          COLUMNA DERECHA — IMPORTE A PAGAR
          ============================================================== --}}
-    <div class="bloque" style="top: 60pt; left: 378pt; width: 200pt;">
+    {{-- BAJÓ DE 60 A 96 el 22/09/2026, a pedido y en dos pasos: despeja el
+         encabezado y le deja sitio al QR, que comparte esa esquina. Crece hacia
+         abajo y las firmas están en 279, así que entran unos ocho renglones
+         antes de que se toquen. --}}
+    <div class="bloque" style="top: 96pt; left: 378pt; width: 200pt;">
         {{-- ==========================================================
              EL CUADRO DE IMPORTES — UNO SOLO, QUE CRECE HACIA ABAJO
              ========================================================== --}}
@@ -403,6 +435,26 @@
                 <td class="linea chica" valign="bottom">{{ $recibo->beneficiario_ci }}</td>
             </tr>
         </table>
+    </div>
+
+    {{-- EL QR, ARRIBA A LA DERECHA.
+
+         OJO CON LAS COORDENADAS: el contenedor corre este bloque +11 pt en las
+         dos direcciones, así que lo declarado NO es donde cae. Medido en el PDF
+         con la caja de importes ya bajada: el bolsillo va de 10,5 —el marco— a
+         83,5 —la caja—, o sea 73 pt, y con `top: 10` el QR de 52 aterriza en
+         21..73, centrado.
+
+         APILADO, a pedido: el rótulo va DEBAJO del QR. Eso libera el ancho
+         —centrado entra en una línea en los 126 pt del bloque— y es lo que
+         permite el QR de 60. El renglón PROGRAMA del encabezado cierra en
+         x=471,3, y el QR centrado arranca en 509, así que ya no lo roza.
+
+         SIN EL CÓDIGO ESCRITO, a pedido: el bloque bajó a 69,3 pt de alto, así
+         que para dejarlo centrado en el bolsillo de 97 arranca en y=24 — o sea
+         `top: 13` más los 11 del desfase. --}}
+    <div class="bloque" style="top: 13pt; left: 465pt; width: 126pt;">
+        @include('documentos.partes.qr-verificacion', ['lado' => 60, 'vertical' => true, 'codigo' => false])
     </div>
 
     {{-- ==============================================================

@@ -174,7 +174,7 @@ class CajaController extends Controller
     {
         $deudas = [];
 
-        foreach ($beneficiario->carnets()->with('tipoCarnet')->withSum('pagos', 'monto_parcial')->get() as $c) {
+        foreach ($beneficiario->carnets()->with(['codigo', 'tipoCarnet'])->withSum('pagos', 'monto_parcial')->get() as $c) {
             if ($c->saldoPendiente() > 0) {
                 $deudas[] = $this->linea('carnet', $c->id, 'Carnet '.$c->codigo_legible,
                     $c->tipoCarnet?->nombre ?? $c->tipo_actor->etiqueta(), $c->montoACobrar(), $c->saldoPendiente());
@@ -189,10 +189,11 @@ class CajaController extends Controller
         }
 
         foreach ($beneficiario->guias()->withSum('pagos', 'monto_parcial')->get() as $g) {
-            // Una guía anulada no admite cobros, así que ni se ofrece: lo que se
-            // deba de un papel que no vale se resuelve por caja.
-            if ($g->saldoPendiente() > 0 && $g->estado->admitePagos()) {
-                $deudas[] = $this->linea('guia', $g->id, 'Guía '.$g->codigo_guia,
+            // Solo la que todavía admite depósitos: una guía firmada ya está
+            // cobrada por definición, y sobre una anulada lo que se deba se
+            // resuelve por caja. Se le pregunta al MODELO, no al enum.
+            if ($g->saldoPendiente() > 0 && $g->admitePagos()) {
+                $deudas[] = $this->linea('guia', $g->id, $g->etiqueta,
                     $g->ruta, $g->montoACobrar(), $g->saldoPendiente());
             }
         }

@@ -11,6 +11,7 @@ use App\Http\Controllers\Panel\CategoriaAprovechamientoController;
 use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\FaenaController;
 use App\Http\Controllers\Panel\GuiaController;
+use App\Http\Controllers\Panel\GuiaImpresionController;
 use App\Http\Controllers\Panel\PagoController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
 use App\Http\Controllers\Panel\ReciboController;
@@ -316,6 +317,45 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('guias.store');
     });
 
+    /*
+     * EL CIRCUITO DE COBRO Y FIRMA, igual que el de la faena: los depósitos se
+     * cargan desde la ficha, presentar es de ventanilla y firmar es de
+     * supervisión.
+     */
+    Route::post('/guias/{guia}/pagos', [GuiaController::class, 'pagar'])
+        ->middleware('permiso:caja.cobrar')
+        ->name('guias.pagar');
+
+    Route::post('/guias/{guia}/enviar', [GuiaController::class, 'enviar'])
+        ->middleware('permiso:guias.enviar')
+        ->name('guias.enviar');
+
+    Route::middleware('permiso:guias.aprobar')->group(function () {
+        Route::patch('/guias/{guia}/aprobar', [GuiaController::class, 'aprobar'])
+            ->name('guias.aprobar');
+
+        Route::patch('/guias/{guia}/rechazar', [GuiaController::class, 'rechazar'])
+            ->name('guias.rechazar');
+    });
+
+    /*
+     * CORREGIR Y ELIMINAR EL BORRADOR. Corregir es de ventanilla —es el mismo
+     * mostrador que la está armando— y eliminar es de supervisión, igual que en
+     * la faena. Las dos solo valen en PENDIENTE y sin un depósito cargado: lo
+     * decide `GuiaMovimiento::puedeEditarse()`.
+     */
+    Route::get('/guias/{guia}/editar', [GuiaController::class, 'edit'])
+        ->middleware('permiso:guias.editar')
+        ->name('guias.edit');
+
+    Route::patch('/guias/{guia}', [GuiaController::class, 'update'])
+        ->middleware('permiso:guias.editar')
+        ->name('guias.update');
+
+    Route::delete('/guias/{guia}', [GuiaController::class, 'destroy'])
+        ->middleware('permiso:guias.eliminar')
+        ->name('guias.destroy');
+
     // Cerrar es de VENTANILLA: registrar que la carga llegó es un hecho del
     // mostrador, no una decisión que alguien firme.
     Route::patch('/guias/{guia}/cerrar', [GuiaController::class, 'cerrar'])
@@ -330,6 +370,12 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     Route::patch('/guias/{guia}/anular', [GuiaController::class, 'anular'])
         ->middleware('permiso:guias.anular')
         ->name('guias.anular');
+
+    // ANTES de '/guias/{guia}': con la ficha primero, «imprimir» se toma como
+    // id. Permiso propio, como `faenas.imprimir`.
+    Route::get('/guias/{guia}/imprimir', [GuiaImpresionController::class, 'imprimir'])
+        ->middleware('permiso:guias.imprimir')
+        ->name('guias.imprimir');
 
     Route::get('/guias/{guia}', [GuiaController::class, 'show'])
         ->middleware('permiso:guias.ver')

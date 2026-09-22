@@ -6,6 +6,7 @@ use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
 use App\Enums\ModalidadAprovechamiento;
 use App\Traits\Auditable;
+use App\Traits\Codificable;
 use App\Traits\Pagable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,7 +34,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class AprovechamientoPesq extends Model
 {
-    use Auditable, Pagable, SoftDeletes;
+    use Auditable, Codificable, Pagable, SoftDeletes;
 
     /** «AprovechamientoPesq» no pluraliza a «aprovechamientos_pesq» por sí solo. */
     protected $table = 'aprovechamientos_pesq';

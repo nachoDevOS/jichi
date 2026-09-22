@@ -124,6 +124,12 @@ class EmitirFaenaService
             ]);
 
             /*
+             * SU LLAVE PÚBLICA, dentro de la misma transacción: un documento
+             * sin código no se puede verificar. Ver App\Traits\Codificable.
+             */
+            $faena->asignarCodigo();
+
+            /*
              * EL CUPO NO SE TOCA ACÁ. Una faena nace PENDIENTE y una pendiente
              * ya no descuenta —ver EstadoFaena::consumeCupo()—, así que no hay
              * nada que agotar: eso pasa recién al firmarla.

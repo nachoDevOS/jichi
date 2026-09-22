@@ -96,15 +96,17 @@
             padding-top: 4pt;
         }
 
+        /* SIN `padding-top`, y el alto entero en `height`: con relleno el
+           número cae bajo el centro del recuadro y se le sale por abajo. El
+           total no cambia —15 + 3 = 18—. Mismo arreglo que la autorización. */
         .caja-bs {
             border: 0.9pt solid #444;
             border-radius: 9pt;
-            height: 15pt;
+            height: 18pt;
             text-align: center;
             font-size: 10pt;
             font-weight: bold;
             color: #111;
-            padding-top: 3pt;
         }
 
         /* --- Renglones --- */
@@ -123,7 +125,12 @@
         .fila { padding-top: 10pt; }
 
         .cierre { font-size: 8.5pt; padding-top: 16pt; }
-        .firma { text-align: center; font-size: 8.5pt; padding-top: 118pt; }
+
+        /* 20 y no 118: el QR se mudó a este hueco, así que el resto del espacio
+           en blanco lo ocupa él. Los 118 originales se reparten entre el relleno
+           de arriba (8), el margen del bloque (10), el bloque apilado (~80) y lo
+           que queda acá para firmar a mano. Ver el cuerpo. */
+        .firma { text-align: center; font-size: 8.5pt; padding-top: 20pt; }
 
         .nota { font-size: 7.5pt; line-height: 1.4; padding-top: 12pt; }
         .nota .titulo-nota { font-size: 8pt; }
@@ -135,6 +142,32 @@
             margin-top: 10pt;
             padding-top: 5pt;
         }
+
+        /* ---------------------------------------------------------------
+           EL BLOQUE DE VERIFICACIÓN — QR + código escrito
+           --------------------------------------------------------------- */
+        /*
+         * El andamio lo pone `partes/qr-verificacion`; acá van el color y el
+         * cuerpo. El QR va SOBRE BLANCO: necesita su zona de silencio clara, y
+         * sobre el sello de agua las cámaras dejan de engancharlo.
+         */
+        /* APILADO: el rótulo y el código van DEBAJO del QR, a pedido. Eso
+           libera el ancho, así que lo que manda el ancho del bloque pasa a ser
+           el código —103 pt a 8 pt monoespaciada— y no el QR. */
+        .qr-bloque { margin-top: 10pt; text-align: center; }
+        .qr-caja { background-color: #ffffff; }
+        .qr-rotulo { font-size: 6pt; font-weight: bold; letter-spacing: 0.4pt; color: #1f3d13; }
+        .qr-codigo {
+            /* Monoespaciada: en el código se confunden el 0 con la O. */
+            font-family: 'DejaVu Sans Mono', monospace;
+            font-size: 8pt;
+            font-weight: bold;
+            letter-spacing: 0.6pt;
+            padding-top: 1pt;
+            color: #000000;
+        }
+        .qr-pie { font-size: 5.6pt; padding-top: 1pt; color: #55604d; }
+
     </style>
 </head>
 
@@ -189,8 +222,12 @@
                      ve descentrado dentro del marco. --}}
                 <td width="118"></td>
                 <td class="titulo" align="center" valign="middle">PERMISO POR FAENA</td>
-                <td width="118" align="right" valign="middle">
-                    <div class="rotulo-numero">N<sup>o</sup> {{ $numero }}</div>
+                {{-- CENTRADO sobre el grupo «Bs. + cuadro» de la fila de
+                     abajo, no pegado a la derecha: con `align="right"` el
+                     número cerraba contra el margen mientras el grupo arranca
+                     antes, y se veía corrido. --}}
+                <td width="118" valign="middle">
+                    <div class="rotulo-numero" style="text-align: center;">N<sup>o</sup> {{ $numero }}</div>
                 </td>
             </tr>
 
@@ -206,10 +243,15 @@
                     </table>
                 </td>
 
+                {{-- `width="100%"` y no `align="right"`: ajustada a su
+                     contenido la caja no llega al margen y el N° de arriba sí,
+                     y esa diferencia se ve. Al 100% de la columna las dos
+                     mueren en el mismo borde. --}}
                 <td valign="middle" style="padding-top: 6pt;">
-                    <table cellspacing="0" cellpadding="0" align="right">
+                    <table width="100%" cellspacing="0" cellpadding="0">
                         <tr>
-                            <td width="22" valign="middle" style="font-size: 10pt; font-weight: bold;">Bs.</td>
+                            <td valign="middle" align="right"
+                                style="font-size: 10pt; font-weight: bold; padding-right: 4pt;">Bs.</td>
                             <td width="86" valign="middle"><div class="caja-bs">{{ $monto }}</div></td>
                         </tr>
                     </table>
@@ -325,8 +367,25 @@
             </tr>
         </table>
 
-        {{-- El hueco de la firma manuscrita: son los 74pt de padding de .firma,
-             no una línea, porque el talonario tampoco la trae. --}}
+        {{-- EL QR VA EN EL HUECO DE LA FIRMA, contra el margen derecho y
+             ARRIBA del nombre del responsable, a pedido. Ocupa espacio que ya
+             estaba en blanco, así que no empuja nada: lo que antes era todo
+             `padding-top` de `.firma` ahora se reparte entre el bloque y lo que
+             queda de hueco para la firma manuscrita. --}}
+        <table width="100%" cellspacing="0" cellpadding="0" style="padding-top: 8pt;">
+            {{-- La celda va con ANCHO FIJO, no con `align="right"`: sobre una
+                 tabla anidada DomPDF ignora el align y el bloque se quedaba
+                 pegado a la izquierda. Apilado, lo más ancho es el código —103
+                 pt—, así que con 112 el bloque cierra contra el margen del
+                 marco, en 569. --}}
+            <tr>
+                <td></td>
+                <td width="112">@include('documentos.partes.qr-verificacion', ['lado' => 62, 'vertical' => true])</td>
+            </tr>
+        </table>
+
+        {{-- El hueco de la firma manuscrita: es padding y no una línea, porque
+             el talonario tampoco la trae. --}}
         <div class="firma">{{ $responsable }}</div>
 
         <div class="nota">

@@ -1,12 +1,12 @@
 import { Head } from '@inertiajs/react';
 import { Printer, ScanLine } from 'lucide-react';
 import { BuscadorCodigo } from '@/components/publico/buscador-codigo';
-import { FichaCarnet } from '@/components/publico/ficha-carnet';
+import { FichaDocumento } from '@/components/publico/ficha-documento';
 import { HojaOficial } from '@/components/publico/hoja-oficial';
 import { SplashVerificacion } from '@/components/publico/splash-verificacion';
 import LayoutPublico from '@/layouts/layout-publico';
 import { fechaHora } from '@/lib/utils';
-import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
+import type { DocumentoPublico, InstitucionPublica } from '@/types/publico';
 
 /**
  *  VERIFICACIÓN PÚBLICA DE CARNETS
@@ -14,8 +14,8 @@ import type { CarnetPublico, InstitucionPublica } from '@/types/publico';
 interface Props {
     /** El código que venía en la URL, ya normalizado. Null si se entró sin nada. */
     codigo: string | null;
-    /** El carnet hallado, o null. */
-    carnet: CarnetPublico | null;
+    /** El documento hallado, sea del tipo que sea. Null si no apareció. */
+    documento: DocumentoPublico | null;
     /**
      * Tres estados posibles, y hay que distinguirlos:
      *   null   -> todavía no se buscó nada (se entró a /verificar pelado)
@@ -28,14 +28,14 @@ interface Props {
     institucion: InstitucionPublica;
 }
 
-export default function Verificar({ codigo, carnet, encontrado, institucion }: Props) {
+export default function Verificar({ codigo, documento, encontrado, institucion }: Props) {
     // El splash solo tiene sentido cuando de verdad se verificó algo. Entrar a
     // /verificar sin código es buscar el formulario, no escanear un QR.
     const seVerifico = encontrado !== null;
 
     return (
         <LayoutPublico>
-            <Head title="Verificación de carnets" />
+            <Head title="Verificación de documentos" />
 
             {seVerifico && <SplashVerificacion />}
 
@@ -53,8 +53,8 @@ export default function Verificar({ codigo, carnet, encontrado, institucion }: P
                         </h1>
 
                         <p className="mx-auto mt-2.5 max-w-sm font-serif text-[13px] leading-relaxed text-slate-600">
-                            Escanee el código QR impreso en el carnet, o ingrese aquí el código
-                            que figura debajo del QR.
+                            Escanee el código QR impreso en el documento, o ingrese aquí el
+                            código que figura debajo del QR.
                         </p>
                     </div>
 
@@ -68,7 +68,7 @@ export default function Verificar({ codigo, carnet, encontrado, institucion }: P
             {encontrado === false && <NoEncontrado codigo={codigo} institucion={institucion} />}
 
             {/* Se encontró: el acta con el resultado. */}
-            {carnet && <FichaCarnet carnet={carnet} institucion={institucion} />}
+            {documento && <FichaDocumento documento={documento} institucion={institucion} />}
 
             {/* Todo lo que sigue es de la pantalla y no del acta: por eso lleva
                 `solo-pantalla`, la clase que lo saca de la impresión. */}
@@ -87,7 +87,7 @@ export default function Verificar({ codigo, carnet, encontrado, institucion }: P
 
                     <div className="mt-5 rounded-xl bg-white/10 p-4 backdrop-blur-sm">
                         <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-white/70 uppercase">
-                            Verificar otro carnet
+                            Verificar otro documento
                         </p>
                         <BuscadorCodigo codigoInicial={null} />
                     </div>
@@ -127,13 +127,13 @@ function NoEncontrado({
                     <b className="font-mono text-[12px] font-bold tracking-wider break-all text-slate-900">
                         {codigo}
                     </b>{' '}
-                    NO corresponde a ningún carnet emitido.
+                    NO corresponde a ningún documento emitido.
                 </p>
             </div>
 
             <div className="mt-6 border-l-4 border-slate-400/50 bg-slate-50 py-2.5 pr-3 pl-3.5">
                 <p className="text-[12px] leading-snug text-slate-700">
-                    <b className="block font-semibold">Antes de dar por falso el carnet</b>
+                    <b className="block font-semibold">Antes de dar por falso el documento</b>
                     Revise que el código esté bien escrito —es fácil confundir el 0 con la O y el 1
                     con la I— o vuelva a escanear el código QR. Si el código es correcto, acérquese a
                     las oficinas del SEDAG antes de dar por válido el documento.

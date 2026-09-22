@@ -75,7 +75,7 @@ export default function VerFaena({
                             onClick={() => router.visit(route('aprovechamientos.show', faena.cupo!.id))}
                         >
                             <Waves className="size-4" />
-                            Ver cupo
+                            Ver autorización
                         </Button>
                     )}
 

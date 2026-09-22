@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Traits\Auditable;
+use App\Traits\Codificable;
 use App\Traits\Pagable;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,7 +15,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
 
 /**
  * La credencial física que se entrega en ventanilla.
@@ -28,7 +28,6 @@ use Illuminate\Support\Str;
     'archivo_ci',
     'archivo_asociacion',
     'tipo_actor',
-    'codigo_carnet',
     'nro_registro',
     'estado',
     'fecha_solicitud',
@@ -37,7 +36,7 @@ use Illuminate\Support\Str;
 ])]
 class Carnet extends Model
 {
-    use Auditable, Pagable, SoftDeletes;
+    use Auditable, Codificable, Pagable, SoftDeletes;
 
     /**
      * Ver el comentario de Asociacion::$attributes: un default de la base NO
@@ -98,19 +97,6 @@ class Carnet extends Model
     //  Lectura
 
     /**
-     * El código en grupos de cuatro: «PES2 6QK7 RJ2M 4XPB».
-     *
-     * Son 16 caracteres: dieciséis seguidos no se pueden dictar por teléfono
-     * ni tipear de un plástico gastado, y de a cuatro sí.
-     */
-    protected function codigoLegible(): Attribute
-    {
-        return Attribute::get(
-            fn (): string => trim(chunk_split((string) $this->codigo_carnet, 4, ' ')),
-        );
-    }
-
-    /**
      * La gestión del registro: el año de la emisión.
      *
      * DERIVADA y no guardada: una columna que repite un dato que ya está en
@@ -133,12 +119,6 @@ class Carnet extends Model
         return Attribute::get(fn (): ?string => $this->nro_registro === null
             ? null
             : str_pad((string) $this->nro_registro, 5, '0', STR_PAD_LEFT));
-    }
-
-    /** Lo que llega tipeado desde un lector o un buscador, listo para comparar. */
-    public static function normalizarCodigo(string $codigo): string
-    {
-        return Str::upper(preg_replace('/[^A-Za-z0-9]/', '', $codigo) ?? '');
     }
 
     //  Reglas de negocio
