@@ -223,17 +223,29 @@ líneas sueltas sin apretar todo lo demás; el registro son seis dígitos fijos 
 sobra media tira. El corte va a la mitad: 46 pt para cada valor, con el rótulo
 «GESTIÓN» en el medio. En la vista previa lo mismo se pide con dos `flex-1`.
 
-### Los rótulos van en blanco grueso, sin contorno
+### Los rótulos van en blanco grueso Y perfilado
 
 El blanco es lo que separa el andamio del dato. «NOMBRE» no es información: es el
 cartelito que dice qué se está leyendo. En el verde oscuro del valor pesaba lo
 mismo que el nombre de la persona y el ojo tenía que descartarlo en cada renglón.
 
-**Tuvieron un contorno oscuro y se les sacó.** Se les había puesto uno de 0,2 pt
-porque a 4,6 pt el blanco se desdibujaba donde pasa el sello de agua. Lo que
-resolvió el problema de verdad fue **agrandarlos**; sin el borde se leen
-francamente blancos en vez de blancos-con-suciedad. El `:` va igual, que también
-es andamio.
+**El contorno se sacó una vez y hubo que devolverlo, el 22/09/2026.** El
+argumento para sacarlo era que lo que resolvía el problema de verdad era
+agrandarlos, y que sin borde se leían francamente blancos en vez de
+blancos-con-suciedad. Medido sobre el PDF, era falso: en blanco puro los rótulos
+daban **3,3 : 1** contra los tramos claros del sello —debajo del mínimo
+legible—, y así desaparecen en un carnet impreso con poco tóner.
+
+**Las dos cosas hacían falta, no una.** El cuerpo es la única palanca contra un
+blanco que se lee gris; el contorno es la única contra un fondo que cambia de
+tono debajo de la letra. Con el contorno puesto, el anillo verde oscuro que
+rodea cada glifo da **13,6 : 1** contra el blanco, y ese número no depende de
+por dónde pase el sello. El cuerpo se dejó en 5,8: lo que faltaba no era tamaño.
+
+Corrido **0,35 sobre 5,8 pt** —el ~6% de siempre—. El `:` va igual, que también
+es andamio. El lockup del encabezado se corrigió en la misma vuelta: estaba
+corrido 0,2 sobre 7 pt, un 3%, y su contorno era tan fino que daba **3,7 : 1**;
+quedó en 0,4, y en 0,27 las dos líneas de 4,5 pt, que con 0,4 se llenarían.
 
 > ⚠️ **EL BLANCO ES `#ffffff` PURO, Y AUN ASÍ PUEDE VERSE GRIS.** No es un
 > problema de color: medido sobre el PDF, el núcleo del glifo da 255. Es de
@@ -713,6 +725,107 @@ Unos **156 KB por carnet**. El fondo es casi todo: 99 KB del PNG.
 
 ---
 
+## 6 bis. El dorso — el reglamento del SEDAG
+
+> **Volvió el 22/09/2026, a pedido, calcado del plástico de papel.** La versión
+> vieja —titular, vigencia y leyenda legal— no era esta: el dorso real lleva el
+> reglamento de pesca y el recuadro de la firma del Gobernador.
+
+Sale como **segunda página del mismo PDF**, no como un archivo aparte: el
+plástico se imprime de los dos lados y las dos carillas tienen que salir juntas,
+o ventanilla acaba imprimiendo dos veces. `->setPaper()` vale para todo el
+documento, así que las dos miden 243 × 153.
+
+Acá es donde el `position: relative` de `.carilla` deja de ser previsión y pasa
+a hacer falta: sin él, los `absolute` del dorso se medirían contra la página y
+aterrizarían encima del anverso.
+
+### Qué lleva
+
+| Bloque | Coordenadas | Notas |
+| --- | --- | --- |
+| Velo | toda la carilla | `rgba(18,48,14,0.40)` sobre el fondo. Ver «Que el blanco se lea» |
+| Lockup | 5,2 → 24,4 | El MISMO del anverso pero **sin el renglón «GOBERNACIÓN»**: en el plástico son tres líneas. Mismas `x` para que los dos lados calcen al trasluz |
+| Título, 2 líneas | 25,8 → 46,9 | `DIRECCIÓN DE SERVICIO DEPARTAMENTAL` / `AGROPECUARIO GANADERO SEDAG-BENI`. Serif, blanco perfilado, 8,2 pt |
+| Las 7 reglas | 49,7 → 101,9 | Serif, blanco perfilado, 5,55 pt, renglón de 7,5 |
+| Recuadro de firma | 103 → 145 | Blanco, redondeado. Cierra en 234,5 —el mismo margen derecho que los renglones del anverso— |
+
+Los dos bloques de texto arrancan en **8,5**, el margen del anverso. Estaban en
+11 sin motivo, y esos 2,5 pt de cada lado son justo lo que le faltaba al cuerpo
+para dejar de verse gris.
+
+### Que el blanco se lea
+
+> El dorso es **texto blanco chico sobre verde con un sello de agua debajo**, o
+> sea las dos trampas de este módulo a la vez: el trazo fino que el ojo promedia
+> con el fondo, y el sello que le cambia el tono al texto según por dónde pasa.
+> Se atacó con tres palancas, y **las tres hicieron falta**.
+
+**1. El cuerpo**, que es la única palanca contra un blanco que se lee gris —el
+núcleo del glifo ya mide 255, así que subirle el blanco no toca la causa—.
+Reglas 5,15 → **5,55**, título 7,6 → **8,2**. El techo lo pone la regla 6, que
+son 68 caracteres: medida en el PDF ocupa 224 pt de los 226 útiles, y un cuarto
+de punto más se desborda.
+
+**2. El velo**, un verde oscuro semitransparente sobre el fondo, que empareja la
+carilla entera y le saca los tramos claros al sello. Va con `rgba` y no con un
+PNG nuevo: la 3.1.6 de DomPDF lo respeta —medido— y regenerar el fondo obligaría
+a rehacer la mezcla del sello. **El anverso NO lo lleva**: ahí el texto va sobre
+tiras blancas y el sello se tiene que ver pasar.
+
+**3. El perfilado**, el mismo de cinco copias del lockup, corrido el ~6% del
+cuerpo: 0,33 en las reglas y 0,5 en el título. Es lo que despega la letra del
+fondo pase lo que pase debajo. **Medio punto en las reglas NO perfila**: a 5,55
+pt engorda la letra hasta cerrarle los huecos y la «o» se llena. Al mover el
+cuerpo hay que mover también el corrimiento.
+
+Medido sobre el PDF a 400 dpi:
+
+| | Luminancia | Contra el núcleo |
+| --- | --- | --- |
+| Núcleo del glifo | 1,000 | — |
+| Fondo medio | 0,108 | **6,6 : 1** |
+| El tramo más claro del sello | 0,130 | **5,8 : 1** |
+| El anillo del contorno | 0,027 | **13,6 : 1** |
+
+El número que manda es el último: el anillo rodea a cada letra **siempre**, así
+que el contraste deja de depender de por dónde pase el sello.
+
+Las siete reglas viven en `CarnetImpresionController::REGLAS_REVERSO` y el
+título en `TITULO_REVERSO`: son **texto del reglamento**, no un dato que la
+unidad edite, mismo criterio que la tabla de tamaños mínimos de
+`AutorizacionPescaController`.
+
+### Por qué el recuadro sale vacío arriba
+
+Los primeros 24 pt del recuadro no imprimen nada **a propósito**: son el lugar
+donde el Gobernador firma y donde cae el sello redondo, las dos cosas a mano
+sobre el plástico ya impreso, igual que en la credencial de papel. Abajo va el
+nombre de quien firma, y en la mitad izquierda —no centrado—, porque la derecha
+es donde se estampa el sello.
+
+### Quién firma sale de `configuraciones`
+
+`carnet.firmante_nombre` y `carnet.firmante_cargo`, no de una constante: es el
+Gobernador y cambia con cada gestión. **No son las claves del recibo** —ahí
+firma Recaudaciones—.
+
+El nombre se siembra **vacío** a propósito: estampar el de quien ya no está en
+el cargo es peor que no poner ninguno, así que mientras no se cargue, el dorso
+sale con el cargo y sin nombre. El cargo sí tiene valor por defecto en el
+controlador, para que el dorso salga completo aunque nadie haya corrido el
+seeder todavía.
+
+### La trampa que costó dos vueltas
+
+**`line-height` no manda sobre el alto de una línea en DomPDF.** Las dos líneas
+del título se declararon a 7,6 pt con `line-height: 1.15` —8,7 pt cada una— y
+**medidas en el PDF ocupaban 12,6**, así que el título terminaba justo encima de
+la regla 1. El alto va **declarado** con `height`, como ya lo hacían las reglas.
+Medir el PDF es lo único que lo delata: en pantalla no se puede.
+
+---
+
 ## 7. La foto del titular
 
 > **ARRANCA EN 76 pt, NO EN 66.** Estaba a la misma altura que el renglón
@@ -844,7 +957,6 @@ siempre, cada visita a una ficha pediría un PDF que nadie va a mirar.
 | `app/Http/Controllers/Panel/CarnetImpresionController.php` | Arma el PDF y resuelve los renglones |
 | `resources/views/documentos/partes/texto-perfilado.blade.php` | Las cinco copias del texto con contorno, para el título y los rótulos |
 | `resources/views/documentos/carnet-pescador.blade.php` | La maqueta impresa |
-| `resources/js/components/panel/tramites/vista-previa-carnet.tsx` | El mismo molde en pantalla. **Espejo del Blade** |
 | `resources/js/components/panel/carnets/dialogo-imprimir-carnet.tsx` | La vista previa antes de imprimir |
 | `public/image/carnet-fondo.png` | El verde con el sello horneado |
 | `public/image/carnet-escudo.png` | El escudo del encabezado, recortado de `recibo-escudo.png` |
@@ -865,9 +977,6 @@ Tocados: `Carnet` (`puedeImprimirse()`, `urlVerificacion()`), `Archivos`
 - **Impresión por lotes.** Sacar de una todos los carnets aprobados y sin
   imprimir de una gestión. `PENDIENTES.md` ya pedía el padrón para eso.
 - **Marcar impreso automáticamente** al abrir el PDF. Se decidió que no: ver §3.
-- **El reverso.** Existió —titular, vigencia y leyenda legal— y se sacó: el
-  plástico se imprime de una sola cara. Si vuelve, el `.carilla` relativo y un
-  `page-break-before` son lo único que hace falta.
 - **Una silueta en el recuadro de la foto vacío**, como la que dibuja la vista
   previa. En pantalla explica que falta cargarla; impresa en un plástico que se
   entrega, sería un dibujo raro en el lugar de la cara.

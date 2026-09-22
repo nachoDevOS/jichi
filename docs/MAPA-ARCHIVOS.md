@@ -103,6 +103,7 @@ decisiones que acá solo se nombran.
 | `Panel/AutorizacionPescaController.php` | 187 | La autorización de pesca en PDF. Carta vertical. Sale recién con el cupo **aprobado**; la tabla de tamaños mínimos y las reglas de redes van como constantes —son texto del reglamento, no de la base— |
 | `Panel/DashboardController.php` | 330 | Cada bloque envuelto en `fn()` para las visitas parciales. `listos_para_aprobar` **cae en N+1**. `actividadDiaria()` arma la serie de 14 días de los indicadores |
 | `Publico/VerificacionController.php` | 232 | Cédula enmascarada. Sin ids internos. **Sin rubros suspendidos** |
+| `Publico/InicioController.php` | 52 | La portada institucional. **No consulta el dominio**: todo sale de `configuraciones`, con valor por defecto para que se dibuje en una base sin seeder. Manda la prop como `portada` y no `institucion` porque esa clave ya la ocupa una prop compartida, y una de página con el mismo nombre la tapa sin avisar |
 
 ## `app/Http/Requests/Panel/`
 
@@ -140,9 +141,9 @@ decisiones que acá solo se nombran.
 
 | Archivo | Qué expone |
 | --- | --- |
-| `web.php` | Solo la raíz + incluye a los otros tres. Laravel carga **este** |
+| `web.php` | **Solo incluye** a los otros tres. Laravel carga este. La raíz se mudó a `publico.php` el 22/09/2026 |
 | `panel.php` | `/panel/...` — con sesión y con `permiso:` en cada ruta |
-| `publico.php` | `/verificar/{firma?}` — sin sesión, con `throttle` |
+| `publico.php` | `/` (portada) y `/verificar/{codigo?}` — sin sesión, con `throttle` |
 | `auth.php` | `/login`, `/logout` |
 
 > **El orden importa:** `/beneficiarios/crear` y `/beneficiarios/buscar` van
@@ -153,7 +154,7 @@ decisiones que acá solo se nombran.
 | Carpeta | Qué hay | No obvio |
 | --- | --- | --- |
 | `pages/panel/` | Una pantalla = un archivo | Reciben los props de `Inertia::render()` |
-| `pages/publico/` | `verificar.tsx` | |
+| `pages/publico/` | `inicio.tsx` (portada) · `verificar.tsx` (acta) | Dos pantallas con marcos distintos: la portada es ancha y azul, el acta es angosta, verde y **se imprime** |
 | `components/ui/` | Genéricas | **Única excepción a «todo en español»** |
 | `ui/button.tsx` | La escala de botones | Las variantes `ver`, `editar` y `eliminar` son el estilo ÚNICO de esas tres acciones en todo el sistema —celeste mira, ámbar cambia, rojo saca—. `eliminar` cubre también dar de baja, anular, revocar y rechazar. Una pantalla nueva las usa; **no** escribe las clases de color a mano |
 | `components/panel/` | Por módulo | `crear.tsx` de trámites: cuidado con los `key` de los botones. `tramites/vista-previa-carnet.tsx` es **el molde del carnet impreso**: si se toca, se toca también el Blade |
@@ -161,7 +162,8 @@ decisiones que acá solo se nombran.
 | `components/panel/carnets/` | `dialogo-imprimir-carnet.tsx` | La vista previa antes de imprimir. Muestra el PDF DE VERDAD en un `iframe`, no una maqueta |
 | `components/panel/layout/` | Barra lateral, encabezado, menú | El ancho de la barra está escrito **dos veces** —`w-16`/`w-64` en la barra y `lg:pl-16`/`lg:pl-64` en el layout— y los dos se mueven juntos. `moduloActual()` de `navegacion.ts` es lo ÚNICO que decide qué módulo está abierto: lo usan el menú y las migas |
 | `components/panel/dashboard/` | Los bloques del tablero | `widget-estadistica.tsx` pinta de color entero: las clases van **escritas enteras**, como en `badge.tsx`. `mini-grafico.tsx` NO usa recharts a propósito |
-| `components/publico/` | Hoja oficial, ficha, buscador | |
+| `components/publico/` | Hoja oficial, ficha, buscador | `buscador-codigo.tsx` vive en TRES sitios —el acta, su fondo verde y la portada— y por eso no lleva margen propio |
+| `components/publico/institucional/` | Las seis secciones de la portada, su cabecera y su pie | Los textos de servicios, pasos y preguntas salen de `docs/REGLAS-NEGOCIO.md`: si la regla cambia, cambian con ella. `seccion.tsx` lleva `scroll-mt` porque la cabecera es sticky y sin eso el ancla deja el título tapado |
 | `hooks/use-permisos.ts` | `puede('x.y')` | **Comodidad, no seguridad** |
 | `ui/confirmar-accion.tsx` · `ui/confirmar-con-motivo.tsx` | Las ventanas de confirmación | La prop `confirmacion` agrega una CASILLA que hay que marcar, y apaga el botón hasta entonces. Se usa solo en lo irreversible y en lo que es una declaración: marcada sin leer no protege nada. Se limpia al cerrar |
 | `lib/utils.ts` | `bs()`, `fecha()`, `fechaInput()`, `hora()`, `fechaHora()`, `hace()`, `cn()` | `aFechaLocal()` resuelve el bug de UTC-4. `fechaInput()` es su inversa —AAAA-MM-DD para un `<input type="date">`— y **no es `slice(0,10)`**: cortar un instante UTC da el día siguiente en Bolivia. `hace()` usa DOS `RelativeTimeFormat`: `auto` hasta días —para que salga «ayer»— y `always` de meses para arriba, o 40 días dirían «el mes pasado». **Sin pruebas** |

@@ -587,6 +587,19 @@ Los cuatro tienen que pasar.
   resolver lo que cuelga de él: lo que se escribe así se ignora y el N+1 sigue
   ahí, sin ningún error. Va con `morphWith`, declarando qué traer para cada
   tipo. Ver `PagoController::index()`.
+- **Una variable CSS declarada en `:root` NO crea una utilidad de Tailwind.**
+  `--institucional-azul` estaba escrita desde el principio, pero
+  `bg-institucional-azul` no existía: Tailwind 4 solo genera la utilidad si el
+  token está además registrado en el bloque `@theme inline`. La clase se escribe,
+  se compila sin un solo error y el elemento sale **transparente**. Es lo mismo
+  que ya avisaba el comentario de `--color-panel-fondo` en `app.css`, y vale para
+  cualquier color nuevo.
+- **Una prop de página con el nombre de una prop COMPARTIDA la tapa, sin avisar.**
+  `HandleInertiaRequests` comparte `institucion`, así que un
+  `Inertia::render(..., ['institucion' => ...])` deja a los componentes de esa
+  pantalla leyendo otra cosa con `usePage()`. Antes de elegir el nombre de una
+  prop, mirar la lista de `share()`: hoy son `auth`, `institucion`, `archivos`,
+  `flash`, `ziggy` y `apariencia`.
 - **Clases de Tailwind armadas juntando textos no funcionan.** Tailwind solo
   incluye en el CSS final las que puede leer literalmente en el código. Si se
   agrega un color a un enum de PHP, hay que agregarlo también al mapa de
@@ -849,6 +862,14 @@ Los cuatro tienen que pasar.
   resuelve contra el disco con las restricciones de `chroot` y en producción
   termina en un recuadro vacío. Ojo con el peso: embeber los PNG del panel hacía
   un PDF de 5,4 MB por recibo; hay copias a medida en `public/image/recibo-*.png`.
+- **`line-height` NO manda sobre el alto de una línea en DomPDF.** Se arma con
+  las métricas de la fuente, y la diferencia es grande: dos líneas de título a
+  7,6 pt con `line-height: 1.15` —8,7 pt cada una por la hoja de estilos—
+  **medidas en el PDF ocupaban 12,6**, así que el bloque terminaba 8 pt más
+  abajo de lo calculado y se comía el renglón siguiente. En una maqueta de
+  coordenadas fijas el alto va **declarado** con `height`. Y se comprueba
+  midiendo el PDF, no mirándolo: `page.get_text('blocks')` de PyMuPDF da la caja
+  de cada bloque en puntos. Ver el dorso del carnet.
 - **Blade escapa las entidades HTML de su interpolación de dos llaves.** Un
   `&nbsp;` puesto ahí se imprime como texto literal `&nbsp;` en el PDF. Se
   resuelve con un elemento de ancho fijo, no con la entidad.
@@ -938,15 +959,30 @@ Los cuatro tienen que pasar.
   parejo se lee como un diseño—; saltó recién cuando un rótulo nuevo se les
   encimó. **Al plantar una caja con coordenadas, el ancho declarado es el que se
   ocupa menos el relleno.**
+- **Al medir el contraste de un texto en un PDF, los píxeles del BORDE del
+  glifo se cuentan como fondo y arruinan la cuenta.** El antialias deja una orla
+  de tonos intermedios alrededor de cada letra; tomada como «fondo», su
+  percentil 99 da un valor claro que **no existe en ninguna parte de la imagen**.
+  Pasó midiendo el dorso del carnet: el peor caso daba 3,8:1 y no se movía por
+  más que se oscureciera el fondo —porque lo que medía eran las letras—. El
+  fondo real daba 5,3:1. Se dilata la máscara del texto y se mide **lejos** de
+  ella: `MaxFilter(9)` de Pillow sobre la máscara, y fondo = lo que quede.
 - **Un texto blanco puro puede verse GRIS, y no es un problema de color.** Es de
   grosor: a un cuerpo chico el trazo es tan fino que el ojo lo promedia con el
   fondo. Medirlo lo confirma —el núcleo del glifo da 255— así que subirle el
-  blanco o ponerle un borde no toca la causa; **la única palanca es el cuerpo**.
-  Los rótulos del carnet fueron 4,6 → 5,2 → 6,1 pt por eso.
-- **Un texto claro sobre el verde del carnet puede no necesitar contorno.** El fondo no es
-  liso: abajo corre el sello de agua del SEDAG, que le cambia el tono al texto
-  según por dónde pase. Los rótulos en blanco puro se desdibujaban en los tramos
-  claros del sello, y desaparecían del todo impresos con poco tóner.
+  blanco no toca la causa; **contra eso la única palanca es el cuerpo**. Los
+  rótulos del carnet fueron 4,6 → 5,2 → 6,1 pt por eso.
+- **Pero el cuerpo solo no alcanza sobre el verde del carnet: el contorno NO es
+  opcional.** El fondo no es liso —abajo corre el sello del SEDAG, que le cambia
+  el tono al texto según por dónde pase—, así que agrandar la letra sube el
+  contraste medio y deja igual el peor caso. Se creyó que con cuerpo bastaba y
+  se les sacó el borde a los rótulos; medido después, en blanco puro daban
+  **3,3:1** contra los tramos claros del sello, y así desaparecen impresos con
+  poco tóner. Con el contorno, el anillo oscuro que rodea cada glifo da
+  **13,6:1** y ese número no depende del fondo. **Las dos palancas son
+  distintas y hacen falta las dos**; la tercera, cuando el bloque es de texto
+  corrido y no lleva tiras blancas encima, es un velo `rgba` sobre el fondo
+  —ver el dorso—.
 - **DomPDF no tiene `object-fit`.** Una foto vertical metida en un recuadro
   cuadrado con `width` y `height` fijos sale APLASTADA, y en un documento de
   identidad eso es justamente lo que no puede pasar. El `cover` se hace a mano:

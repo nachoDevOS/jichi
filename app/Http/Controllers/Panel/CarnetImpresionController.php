@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Enums\EstadoCarnet;
 use App\Http\Controllers\Controller;
 use App\Models\Carnet;
+use App\Models\Configuracion;
 use App\Support\Archivos;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -87,6 +88,11 @@ class CarnetImpresionController extends Controller
              * LA FOTO DEL TITULAR, si la ficha tiene una cargada.
              */
             'foto' => $this->fotoEmbebida($beneficiario?->foto),
+
+            /*
+             * LA CARILLA DE ATRÁS. Ver reverso().
+             */
+            'reverso' => $this->reverso(),
         ])
             ->setPaper([0, 0, self::ANCHO, self::ALTO])
 
@@ -101,6 +107,62 @@ class CarnetImpresionController extends Controller
         // desde donde el operador aprieta imprimir. Un archivo descargado
         // obligaría a buscarlo en la carpeta de descargas y abrirlo aparte.
         return $pdf->stream("carnet-{$carnet->codigo_carnet}.pdf");
+    }
+
+    /**
+     *  EL REGLAMENTO DEL DORSO — calcado del plástico de papel
+     *
+     * Va como constante y no en la base porque es texto del reglamento, no un
+     * dato que la unidad edite; mismo criterio que la tabla de tamaños mínimos
+     * de AutorizacionPescaController.
+     */
+    private const TITULO_REVERSO = [
+        'DIRECCIÓN DE SERVICIO DEPARTAMENTAL',
+        'AGROPECUARIO GANADERO SEDAG-BENI',
+    ];
+
+    private const REGLAS_REVERSO = [
+        'Está prohibido mallas no autorizadas',
+        'Está prohibido utilizar explosivos para pescar',
+        'Respetar las áreas protegidas de reserva y desove',
+        'Respetar los instructivos emanados SEDAG - BENI',
+        'Respetar las VEDAS dictadas por el DDAG - BENI',
+        'Portar toda la documentación de pesca emitida por el SEDAG - BENI',
+        'Toda infracción será sancionada de acuerdo al reglamento',
+    ];
+
+    /**
+     *  LO QUE VA EN LA CARILLA DE ATRÁS
+     *
+     * El recuadro blanco de la firma sale SIEMPRE, con nombre o sin él: la
+     * firma y el sello se ponen a mano sobre el plástico ya impreso, igual que
+     * en la credencial de papel.
+     *
+     * @return array<string, mixed>
+     */
+    private function reverso(): array
+    {
+        return [
+            'titulo' => self::TITULO_REVERSO,
+            'reglas' => self::REGLAS_REVERSO,
+
+            /*
+             * Quién firma sale de `configuraciones` y no de una constante: es
+             * el Gobernador, y cambia con cada gestión. Vacío imprime el
+             * recuadro sin nombre, que es preferible a estampar el de quien ya
+             * no está en el cargo.
+             */
+            'firmante' => [
+                'nombre' => trim((string) Configuracion::obtener('carnet.firmante_nombre', '')),
+
+                // Con valor por defecto para que el dorso salga completo
+                // aunque todavía no se haya corrido ConfiguracionSeeder.
+                'cargo' => trim((string) Configuracion::obtener(
+                    'carnet.firmante_cargo',
+                    'GOBERNADOR DEL DEPARTAMENTO DEL BENI',
+                )),
+            ],
+        ];
     }
 
     /**

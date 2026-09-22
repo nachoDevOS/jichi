@@ -253,6 +253,16 @@
     --color-widget-4: var(--widget-4);
     --color-widget-4-fg: var(--widget-4-fg);
 
+    /*
+     * La portada institucional pinta sus propias superficies y no usa los
+     * tokens semánticos, que cambian en modo oscuro. Estos cuatro viven en
+     * :root y valen igual en los dos temas.
+     */
+    --color-institucional-azul: var(--institucional-azul);
+    --color-institucional-azul-claro: var(--institucional-azul-claro);
+    --color-institucional-dorado: var(--institucional-dorado);
+    --color-institucional-dorado-oscuro: var(--institucional-dorado-oscuro);
+
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);

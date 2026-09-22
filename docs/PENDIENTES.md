@@ -276,6 +276,77 @@ Ver [docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md).
 
 ---
 
+## 🟠 Falta cargar quién firma el dorso del carnet — 22/09/2026
+
+El carnet ya se imprime de los dos lados; el dorso lleva el reglamento del SEDAG
+y el recuadro de la firma. Ver
+[docs/modulos/CARNETS.md](modulos/CARNETS.md) §6 bis.
+
+**`carnet.firmante_nombre` se siembra VACÍO a propósito** —estampar el nombre de
+quien ya no está en el cargo es peor que no poner ninguno—, así que hoy el dorso
+sale con el cargo y sin nombre. Hay que cargar el del Gobernador en curso.
+
+Las dos claves son nuevas en `ConfiguracionSeeder`, así que hasta correrlo no
+existen en la base. El cargo tiene valor por defecto en el controlador y el
+dorso sale completo igual; lo único que falta es poder editarlos:
+
+```sh
+php artisan db:seed --class=ConfiguracionSeeder
+```
+
+> ⚠️ **Ese seeder usa `updateOrCreate`:** vuelve a escribir TODAS las claves con
+> el valor de la lista. Si alguna se ajustó a mano en la base, se pierde. Para
+> sumar solo las dos nuevas, `firstOrCreate` sobre esas claves.
+
+**Y dos cosas del dorso quedaron sin resolver:**
+
+- En el plástico de papel hay además una **franja blanca al pie**, a la
+  izquierda del recuadro de la firma. No se reprodujo porque en la foto está
+  cortada por el borde y no se ve qué lleva impreso —puede ser el borde blanco
+  de la tarjeta—. Hay que mirar un plástico de cerca.
+- La regla 5 dice **«dictadas por el DDAG - BENI»**. En la foto la sigla está
+  borrosa y podría ser UDAG. Confirmar con la unidad antes de imprimir un lote.
+
+---
+
+## 🟢 La portada institucional ya existe — 22/09/2026
+
+`/` dejó de redirigir al login y abre el sitio público: servicios, pasos,
+verificación, preguntas y contacto. Ver
+[docs/sesiones/09-2026/2026-09-22.md](sesiones/09-2026/2026-09-22.md).
+
+Tres cosas quedaron abiertas a propósito:
+
+### 🟠 Los textos de la portada están escritos en el código, no en la base
+
+Servicios, pasos y preguntas viven como constantes dentro de sus componentes.
+Es lo correcto hoy —son la especificación de `REGLAS-NEGOCIO.md`, no un dato que
+la unidad edite—, pero el día que quieran cambiar una respuesta sin tocar código
+hay que moverlos a `configuraciones` o a una tabla propia.
+
+### 🟠 `municipio.horario` no está en el seeder
+
+La portada lo lee con un valor por defecto («Lunes a viernes, de 08:00 a
+16:00»), así que se dibuja igual, pero no se puede cambiar desde el panel hasta
+que la clave exista. Va a `ConfiguracionSeeder` con `publico = true`, y después
+hay que correr `php artisan db:seed --class=ConfiguracionSeeder`.
+
+### 🟠 Los contadores públicos se dejaron fuera
+
+Se evaluó mostrar carnets vigentes, permisos emitidos y kilos autorizados.
+Publicar volumen operativo es una decisión del responsable, no técnica, y además
+son consultas agregadas que habría que cachear. El hueco está listo en la
+portada, entre servicios y pasos.
+
+### 🟠 El sitio público no se indexa bien
+
+Inertia pinta la portada en el navegador, así que un buscador que no ejecute
+JavaScript ve una página vacía. Hoy no importa —se llega por el dominio o por el
+QR—, pero si se quiere que aparezca en Google hay que activar SSR o servir la
+portada desde Blade.
+
+---
+
 ## El circuito del depósito observado quedó cerrado — y un rechazo ya no es el final
 
 El **17/09/2026**, más tarde, apareció en ventanilla un expediente TRABADO: en

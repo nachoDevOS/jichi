@@ -90,8 +90,8 @@ app/
 
 ```
 routes/
-├── web.php        Solo la raíz + incluye a los otros tres. Laravel carga ESTE.
-├── publico.php    /verificar          sin sesión
+├── web.php        Solo incluye a los otros tres. Laravel carga ESTE.
+├── publico.php    /  y  /verificar    sin sesión
 ├── auth.php       /login  /logout
 └── panel.php      /panel/...          con sesión y con permisos
 ```
@@ -127,11 +127,13 @@ resources/js/
 │   │   ├── pagos/              index (libro de caja)
 │   │   └── rubros/             index · crear · editar
 │   └── publico/            ← VISTA PÚBLICA
-│       └── verificar.tsx
+│       ├── inicio.tsx          la portada institucional (/)
+│       └── verificar.tsx       el acta de verificación por QR
 │
 ├── layouts/                El marco que envuelve a las pantallas
 │   ├── layout-panel.tsx        con barra lateral y menú
-│   └── layout-publico.tsx      limpio, sin datos internos
+│   ├── layout-publico.tsx      el acta: angosta, verde, imprimible
+│   └── layout-institucional.tsx  la portada: ancha, azul, con nav y pie
 │
 ├── components/             Piezas reutilizables
 │   ├── ui/                     genéricas, sirven en cualquier lado
@@ -157,7 +159,18 @@ resources/js/
 │       ├── hoja-oficial.tsx        el papel con membrete
 │       ├── buscador-codigo.tsx     código + firma escritos a mano
 │       ├── ficha-carnet.tsx        el acta de verificación
-│       └── splash-verificacion.tsx
+│       ├── splash-verificacion.tsx
+│       └── institucional/         las piezas de la PORTADA (/)
+│           ├── cabecera.tsx           escudo, anclas y acceso al panel
+│           ├── pie.tsx                contacto y enlaces
+│           ├── franja-tricolor.tsx    la franja de los documentos oficiales
+│           ├── seccion.tsx            el envoltorio de cada bloque
+│           ├── hero.tsx               portada
+│           ├── servicios.tsx          los cuatro trámites
+│           ├── pasos.tsx              el circuito del beneficiario
+│           ├── verificacion.tsx       reusa buscador-codigo.tsx
+│           ├── preguntas.tsx          acordeón
+│           └── contacto.tsx           dónde se atiende
 │
 ├── hooks/                  Lógica reutilizable de React
 │   ├── use-apariencia.ts       modo claro / oscuro

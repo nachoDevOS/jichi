@@ -1,11 +1,18 @@
 <?php
 
+use App\Http\Controllers\Publico\InicioController;
 use App\Http\Controllers\Publico\VerificacionController;
 use Illuminate\Support\Facades\Route;
 
 /*
 | Rutas públicas — sin autenticación
 */
+
+/*
+ * La portada institucional. Es la raíz del sitio: quien escribe el dominio ve
+ * los servicios, no el login. El acceso al panel queda en /login.
+ */
+Route::get('/', [InicioController::class, 'index'])->name('inicio');
 
 /*
  * throttle:60,1 = máximo 60 peticiones por minuto desde la misma IP.

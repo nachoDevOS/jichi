@@ -341,7 +341,24 @@ Dos mitades en carpetas paralelas, en el backend y en el frontend:
 | Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` |
 | Pantallas | `pages/panel/` | `pages/publico/` |
 | Componentes | `components/panel/` | `components/publico/` |
-| Layout | `layouts/layout-panel.tsx` | `layouts/layout-publico.tsx` |
+| Layout | `layouts/layout-panel.tsx` | `layout-publico.tsx` (acta) · `layout-institucional.tsx` (portada) |
+
+**La mitad pública tiene DOS pantallas y DOS marcos, y no son intercambiables:**
+
+| | Portada institucional | Acta de verificación |
+| --- | --- | --- |
+| Ruta | `/` | `/verificar/{codigo?}` |
+| Marco | `layout-institucional.tsx` | `layout-publico.tsx` |
+| Forma | ancha, azul, se lee de corrido | angosta, verde, **se imprime** |
+| Datos | solo `configuraciones` | un carnet, enmascarado |
+
+La portada NO consulta el dominio: todo su texto institucional sale de
+`configuraciones`, y el único bloque que va a la base es el buscador de
+códigos, que **reusa el formulario de la verificación** en vez de abrir una
+segunda puerta a la misma consulta con otro tope de peticiones.
+
+La raíz del sitio dejó de redirigir al login el 22/09/2026: quien escribe el
+dominio ve los servicios, y el acceso del funcionario quedó en un botón.
 
 La vista pública no puede exponer datos personales completos ni pistas de la
 estructura interna. La cédula va enmascarada (solo los últimos 3 dígitos), no

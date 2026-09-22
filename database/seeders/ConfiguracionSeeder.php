@@ -37,6 +37,15 @@ class ConfiguracionSeeder extends Seeder
             ['documentos.dias_alerta_vencimiento', '30', 'number', 'documentos', 'Días de anticipación para alertar el cierre de gestión', false],
 
             /*
+             * QUIÉN FIRMA EL DORSO DEL CARNET. No es el firmante del recibo:
+             * ahí firma Recaudaciones y acá el Gobernador. El nombre va VACÍO a
+             * propósito —hay que cargar el de la gestión en curso—; sin él, el
+             * plástico imprime el recuadro de firma con el cargo y sin nombre.
+             */
+            ['carnet.firmante_nombre', '', 'string', 'documentos', 'Nombre de quien firma el dorso del carnet', false],
+            ['carnet.firmante_cargo', 'GOBERNADOR DEL DEPARTAMENTO DEL BENI', 'string', 'documentos', 'Cargo de quien firma el dorso del carnet', false],
+
+            /*
              * ¿QUIEN CARGA UN DEPÓSITO PUEDE VALIDARLO ÉL MISMO?
              */
             ['pagos.revisor_distinto', '0', 'boolean', 'general', 'Exigir que el depósito lo valide otra persona', false],

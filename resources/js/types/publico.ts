@@ -46,3 +46,16 @@ export interface InstitucionPublica {
     sistema: string;
     pie_legal: string | null;
 }
+
+/** Datos institucionales de la portada. Todos salen de `configuraciones`. */
+export interface InstitucionPortada {
+    nombre: string;
+    sigla: string;
+    departamento: string;
+    direccion: string | null;
+    telefono: string | null;
+    email: string | null;
+    horario: string;
+    sistema: string;
+    descripcion: string;
+}
