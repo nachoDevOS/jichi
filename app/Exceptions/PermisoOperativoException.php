@@ -158,6 +158,34 @@ class PermisoOperativoException extends RuntimeException
         );
     }
 
+    /** Se quiso corregir una faena que ya salió del borrador. */
+    public static function faenaNoSePuedeEditar(string $estado): self
+    {
+        return new self(
+            "La faena está {$estado} y solo se corrige la que está PENDIENTE.",
+        );
+    }
+
+    /** Se quiso borrar una faena que ya salió del borrador. */
+    public static function faenaNoSePuedeEliminar(string $estado): self
+    {
+        return new self(
+            "La faena está {$estado} y solo se elimina la que está PENDIENTE.",
+        );
+    }
+
+    /**
+     * Tiene depósitos encima: se resuelven por caja, no borrando la fila.
+     */
+    public static function faenaTienePagos(int $cuantos): self
+    {
+        return new self(sprintf(
+            'La faena tiene %d depósito(s) cargados. Dé de baja los depósitos antes de '.
+            'corregirla o eliminarla: lo que se cobró es por ESTA salida.',
+            $cuantos,
+        ));
+    }
+
     /** Falta plata para presentarla. */
     public static function faltaCubrirElArancelDeLaFaena(float $saldo): self
     {

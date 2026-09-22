@@ -172,6 +172,11 @@ export interface CarnetDelCupo {
 export interface FaenaDelCupo {
     id: number;
     numero_faena: number;
+    /** Con los seis ceros del talonario: «000001». Lo arma el servidor. */
+    numero_legible: string;
+    /** De qué carnet cuelga: un cupo puede respaldar más de uno. */
+    carnet_id: number | null;
+    carnet_registro: string | null;
     kilos_extraidos: number;
     estado: EstadoFaena;
     estado_etiqueta: string;

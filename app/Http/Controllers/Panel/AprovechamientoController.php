@@ -286,12 +286,26 @@ class AprovechamientoController extends Controller
              * kg» es un número que hay que creer.
              */
             'faenas' => $aprovechamiento->faenas()
-                ->with('carnet:id,codigo_carnet')
+                // Con `nro_registro` y `fecha_emision`: de esas dos columnas
+                // salen los accesores del número del carnet, y sin ellas
+                // devuelven null sin ningún error.
+                ->with('carnet:id,codigo_carnet,nro_registro,fecha_emision')
                 ->orderByDesc('numero_faena')
                 ->get()
                 ->map(fn (PermisoFaena $f): array => [
                     'id' => $f->id,
                     'numero_faena' => $f->numero_faena,
+                    // Con los seis ceros del talonario: lo arma el modelo, no
+                    // la pantalla, o cada tabla elige su propio relleno.
+                    'numero_legible' => $f->numero_legible,
+
+                    /*
+                     * DE QUÉ CARNET CUELGA. Un cupo puede respaldar más de una
+                     * credencial, así que la columna hace falta para saber cuál
+                     * de ellas gastó esos kilos.
+                     */
+                    'carnet_id' => $f->carnet_id,
+                    'carnet_registro' => $f->carnet?->registro_legible,
                     'kilos_extraidos' => (float) $f->kilos_extraidos,
                     'estado' => $f->estado->value,
                     'estado_etiqueta' => $f->estado->etiqueta(),

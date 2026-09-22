@@ -166,7 +166,12 @@ export default function IndiceCarnets({
                                 <table className="w-full text-sm">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">Titular</th>
+                                            {/* EL NÚMERO DEL LIBRO, primero: es por donde se
+                                                busca un carnet en papel. Se llama «N° Registro»
+                                                y no «Registro» para no confundirlo con la
+                                                columna «Registrado», que es una fecha. */}
+                                            <th className="px-5 py-2.5 font-medium">N° Registro</th>
+                                            <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 font-medium">Actividad</th>
                                             <th className="px-5 py-2.5 font-medium">Asociación</th>
                                             {/* <th className="px-5 py-2.5 text-right font-medium">Cobro</th> */}
@@ -195,6 +200,17 @@ export default function IndiceCarnets({
                                                     igual que en el listado de cupos: el hueco de
                                                     la silueta se dibuja también sin foto, así las
                                                     filas no cambian de alto. */}
+                                                {/* Vacío hasta que lo firman: el número se
+                                                    asigna al aprobar, para no gastar uno en un
+                                                    carnet que se rechaza. */}
+                                                <td className="px-5 py-2.5 font-mono tabular-nums">
+                                                    {c.registro ?? (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            sin asignar
+                                                        </span>
+                                                    )}
+                                                </td>
+
                                                 <td className="px-5 py-2.5">
                                                     <div className="flex items-center gap-3">
                                                         <Retrato
@@ -337,7 +353,7 @@ export default function IndiceCarnets({
                                                                     aria-label={`Imprimir el carnet de ${c.beneficiario ?? 'la persona'}`}
                                                                     className={cn(
                                                                         buttonVariants({
-                                                                            variant: 'dorado',
+                                                                            variant: 'outline',
                                                                             size: 'sm',
                                                                         }),
                                                                     )}

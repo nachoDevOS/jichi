@@ -104,6 +104,10 @@ enum RolSistema: string
             'faenas.completar',
             'guias.cerrar',
 
+            // Corregir el BORRADOR es de ventanilla, igual que en el carnet y
+            // el cupo: es el mismo mostrador el que lo está armando.
+            'faenas.editar',
+
             // Presentar la faena a revisión: mismo reparto que en el carnet y
             // el cupo —presentar es de ventanilla, firmar no—.
             'faenas.enviar',
@@ -172,6 +176,13 @@ enum RolSistema: string
              * borrador sin pagos ni faenas.
              */
             'aprovechamientos.eliminar',
+
+            /*
+             * Y ELIMINAR UNA FAENA cargada por error, con el mismo corte: solo
+             * el borrador sin un peso encima. El número del talonario queda
+             * quemado igual, y eso es lo que el motivo tiene que explicar.
+             */
+            'faenas.eliminar',
 
             'reportes.exportar',
             'auditoria.ver',

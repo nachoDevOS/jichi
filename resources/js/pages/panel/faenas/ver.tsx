@@ -1,10 +1,10 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { BadgeCheck, CalendarX, Check, CheckCheck, Clock, Printer, Send, Undo2, User, Waves } from 'lucide-react';
+import { BadgeCheck, CalendarX, Check, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Send, Trash2, Undo2, User, Waves } from 'lucide-react';
 import { useState } from 'react';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { TarjetaPagos } from '@/components/panel/pagos/tarjeta-pagos';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
@@ -12,7 +12,7 @@ import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { Input } from '@/components/ui/input';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha } from '@/lib/utils';
+import { bs, cn, fecha } from '@/lib/utils';
 import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
 import type { FaenaFicha } from '@/types/faenas';
 
@@ -36,15 +36,17 @@ export default function VerFaena({
     const [cerrando, setCerrando] = useState(false);
     const [aprobando, setAprobando] = useState(false);
     const [rechazando, setRechazando] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
 
     const form = useForm({ kilos_extraidos: String(faena.kilos_extraidos) });
     const envio = useForm({});
     const rechazo = useForm({ motivo: '' });
+    const borrado = useForm({ motivo: '' });
 
     return (
         <LayoutPanel
             titulo={faena.etiqueta}
-            descripcion={`${faena.beneficiario ?? '—'} · ${faena.carnet_codigo ?? ''}`}
+            descripcion={`${faena.beneficiario ?? '—'} · Carnet N° ${faena.carnet_registro ?? '—'}`}
             acciones={
                 <div className="flex flex-wrap gap-2">
                     {faena.beneficiario_id !== null && (
@@ -53,7 +55,17 @@ export default function VerFaena({
                             onClick={() => router.visit(route('beneficiarios.show', faena.beneficiario_id!))}
                         >
                             <User className="size-4" />
-                            Ver al pescador
+                            Ver al beneficiario
+                        </Button>
+                    )}
+
+                    {faena.carnet_id !== null && (
+                        <Button
+                            variant="ver"
+                            onClick={() => router.visit(route('carnets.show', faena.carnet_id!))}
+                        >
+                            <IdCard className="size-4" />
+                            Ver carnet
                         </Button>
                     )}
 
@@ -64,6 +76,26 @@ export default function VerFaena({
                         >
                             <Waves className="size-4" />
                             Ver cupo
+                        </Button>
+                    )}
+
+                    {/* CORREGIR Y ELIMINAR SOLO SOBRE EL BORRADOR. Las dos
+                        banderas llegan resueltas: miran el estado Y que no
+                        haya entrado un peso. */}
+                    {puede('faenas.editar') && faena.puede_editarse && (
+                        <Button
+                            variant="editar"
+                            onClick={() => router.visit(route('faenas.edit', faena.id))}
+                        >
+                            <Pencil className="size-4" />
+                            Editar
+                        </Button>
+                    )}
+
+                    {puede('faenas.eliminar') && faena.puede_eliminarse && (
+                        <Button variant="eliminar" onClick={() => setEliminando(true)}>
+                            <Trash2 className="size-4" />
+                            Eliminar
                         </Button>
                     )}
 
@@ -119,12 +151,11 @@ export default function VerFaena({
                         <a
                             href={route('faenas.imprimir', faena.id)}
                             target="_blank"
-                            rel="noopener"
+                            rel="noreferrer"
+                            className={cn(buttonVariants({ variant: 'outline' }))}
                         >
-                            <Button variant="ver">
-                                <Printer className="size-4" />
-                                Permiso N° {faena.numero_legible}
-                            </Button>
+                            <Printer className="size-4" />
+                            Imprimir permiso
                         </a>
                     )}
 
@@ -133,12 +164,11 @@ export default function VerFaena({
                         <a
                             href={route('recibos.imprimir', faena.recibo_id)}
                             target="_blank"
-                            rel="noopener"
+                            rel="noreferrer"
+                            className={cn(buttonVariants({ variant: 'outline' }))}
                         >
-                            <Button variant="ver">
-                                <Printer className="size-4" />
-                                Recibo {faena.recibo_numero}
-                            </Button>
+                            <Receipt className="size-4" />
+                            Imprimir recibo
                         </a>
                     )}
 
@@ -235,6 +265,15 @@ export default function VerFaena({
                                 <Dato etiqueta="Aprobada" valor={fecha(faena.fecha_emision)} />
                                 <Dato etiqueta="Arancel" valor={bs(faena.monto)} />
                                 <Dato etiqueta="Asociación" valor={faena.asociacion ?? '—'} />
+                                {/* DE QUÉ CARNET CUELGA. El número del libro es
+                                    cómo se lo nombra; el código de 16 caracteres
+                                    va al lado porque es la llave con la que se
+                                    verifica el plástico. */}
+                                <Dato
+                                    etiqueta="Carnet"
+                                    valor={`N° ${faena.carnet_registro ?? '—'}`}
+                                />
+                                <Dato etiqueta="Código del carnet" valor={faena.carnet_codigo ?? '—'} />
                             </dl>
                         </CardContent>
                     </Card>
@@ -309,7 +348,9 @@ export default function VerFaena({
                                 <p className="text-xs text-muted-foreground">
                                     {faena.consume_cupo
                                         ? 'Esta faena está descontando sus kilos del saldo.'
-                                        : 'Esta faena venció: sus kilos volvieron al cupo.'}
+                                        : faena.estado === 'vencido'
+                                          ? 'Esta faena venció: sus kilos volvieron al cupo.'
+                                          : 'Todavía no descuenta: la bolsa se mueve recién cuando se aprueba.'}
                                 </p>
                             </>
                         )}
@@ -380,6 +421,47 @@ export default function VerFaena({
                         onSuccess: () => {
                             setRechazando(false);
                             rechazo.reset();
+                        },
+                    })
+                }
+            />
+
+            {/* ELIMINAR: la misma ventana que en el listado. */}
+            <ConfirmarConMotivo
+                abierto={eliminando}
+                titulo="Eliminar este permiso de faena"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            Se da de baja la faena <strong>N° {faena.numero_legible}</strong> de{' '}
+                            <strong>{faena.beneficiario ?? 'el pescador'}</strong>:{' '}
+                            {faena.kilos_extraidos} kg.
+                        </p>
+                        <p>
+                            Solo se puede porque está <strong>pendiente</strong> y sin ningún
+                            depósito cargado. Sus kilos vuelven a la bolsa madre, pero el número del
+                            talonario <strong>no se reutiliza</strong>.
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo de la eliminación"
+                ayuda="Queda en la auditoría con su nombre, y es lo que va a explicar el hueco en la serie dentro de seis meses."
+                placeholder="Cargada por error: la salida corresponde a otro pescador."
+                textoConfirmar="Eliminar faena"
+                confirmacion="Entiendo que el número del talonario queda quemado y que esto no se deshace desde el panel."
+                valor={borrado.data.motivo}
+                onCambiar={(v) => borrado.setData('motivo', v)}
+                error={borrado.errors.motivo}
+                procesando={borrado.processing}
+                onCancelar={() => {
+                    setEliminando(false);
+                    borrado.reset();
+                }}
+                onConfirmar={() =>
+                    borrado.delete(route('faenas.destroy', faena.id), {
+                        onSuccess: () => {
+                            setEliminando(false);
+                            borrado.reset();
                         },
                     })
                 }

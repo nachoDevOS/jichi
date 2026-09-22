@@ -163,7 +163,7 @@ export default function IndiceGuias({
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
                                             <th className="px-5 py-2.5 font-medium">Código</th>
-                                            <th className="px-5 py-2.5 font-medium">Comercializador</th>
+                                            <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 font-medium">Ruta</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Carga</th>
                                             <th className="px-5 py-2.5 font-medium">Estado</th>

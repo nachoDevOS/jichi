@@ -7,7 +7,9 @@ use App\Exceptions\CobroInvalidoException;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
+use App\Http\Requests\Panel\ActualizarFaenaRequest;
 use App\Http\Requests\Panel\CompletarFaenaRequest;
+use App\Http\Requests\Panel\EliminarFaenaRequest;
 use App\Http\Requests\Panel\EmitirFaenaRequest;
 use App\Http\Requests\Panel\RechazarFaenaRequest;
 use App\Http\Requests\Panel\RegistrarDepositosRequest;
@@ -53,8 +55,8 @@ class FaenaController extends Controller
              * y el método contesta cualquier cosa, sin ningún error.
              */
             ->with([
-                'carnet:id,beneficiario_id,codigo_carnet,tipo_actor',
-                'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,nro_registro,fecha_emision',
+                'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             ])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
                 fn ($s) => $s
@@ -173,13 +175,123 @@ class FaenaController extends Controller
     }
 
     /**
+     * CORREGIR EL BORRADOR — GET /panel/faenas/{faena}/editar
+     */
+    public function edit(PermisoFaena $faena): Response|RedirectResponse
+    {
+        if (! $faena->puedeEditarse()) {
+            return redirect()
+                ->route('faenas.show', $faena)
+                ->withErrors(['general' => PermisoOperativoException::faenaNoSePuedeEditar(
+                    mb_strtolower($faena->estado->etiqueta()),
+                )->getMessage()]);
+        }
+
+        $faena->load([
+            'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
+            'carnet.aprovechamiento' => fn ($a) => $a->withSum('faenasQueConsumen', 'kilos_extraidos'),
+        ]);
+
+        $cupo = $faena->carnet?->aprovechamiento;
+
+        return Inertia::render('panel/faenas/editar', [
+            /*
+             * La persona y el carnet llegan FIJOS, para mostrar: cambiar de
+             * titular no es corregir una salida, es emitir otra. Ver
+             * EmitirFaenaService::editar().
+             */
+            'faena' => [
+                'id' => $faena->id,
+                'numero_legible' => $faena->numero_legible,
+                'beneficiario' => $faena->carnet?->beneficiario?->nombreCompleto,
+                'documento' => $faena->carnet?->beneficiario?->documento_identidad,
+                'foto_url' => $faena->carnet?->beneficiario?->foto_url,
+                'carnet_codigo' => $faena->carnet?->codigo_legible,
+                /* El número del libro: «00001». Ver resumir(). */
+                'carnet_registro' => $faena->carnet?->registro_legible,
+
+                /*
+                 * LOS KILOS PROPIOS SE SUMAN SOLO SI DESCONTABAN. Desde que la
+                 * pendiente dejó de descontar, `saldoKg()` ya no la resta:
+                 * devolvérselos igual mostraría el doble de cupo disponible.
+                 * Mismo criterio que EmitirFaenaService::editar().
+                 */
+                'saldo_kg' => $cupo !== null
+                    ? $cupo->saldoKg() + ($faena->consumeCupo() ? (float) $faena->kilos_extraidos : 0.0)
+                    : null,
+
+                'kilos_extraidos' => (float) $faena->kilos_extraidos,
+                'fecha_salida' => $faena->fecha_salida?->toDateString(),
+                'fecha_desembarque' => $faena->fecha_desembarque?->toDateString(),
+                'embarcacion' => $faena->embarcacion,
+                'propietario' => $faena->propietario,
+                'comandante_barco' => $faena->comandante_barco,
+                'matricula_naval' => $faena->matricula_naval,
+                'nro_kardex' => $faena->nro_kardex,
+                'region_desde' => $faena->region_desde,
+                'region_hasta' => $faena->region_hasta,
+            ],
+
+            'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
+            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
+        ]);
+    }
+
+    /**
+     * GUARDAR LA CORRECCIÓN — PATCH /panel/faenas/{faena}
+     */
+    public function update(ActualizarFaenaRequest $request, PermisoFaena $faena): RedirectResponse
+    {
+        $datos = $request->validated();
+
+        try {
+            $this->servicio->editar(
+                $faena,
+                (float) $datos['kilos_extraidos'],
+                now()->parse($datos['fecha_salida']),
+                now()->parse($datos['fecha_desembarque']),
+                // `validated()` devuelve SOLO lo que vino: ver store().
+                $datos,
+            );
+        } catch (PermisoOperativoException $e) {
+            // El único campo con el que el operador puede reaccionar desde acá
+            // son los kilos: el titular y el carnet no se editan.
+            return back()->withInput()->withErrors(['kilos_extraidos' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('faenas.show', $faena)
+            ->with('exito', "Faena N° {$faena->numero_legible} corregida.");
+    }
+
+    /**
+     * ELIMINAR — DELETE /panel/faenas/{faena}
+     */
+    public function destroy(EliminarFaenaRequest $request, PermisoFaena $faena): RedirectResponse
+    {
+        $numero = $faena->numero_legible;
+
+        try {
+            $this->servicio->eliminar($faena, $request->validated()['motivo']);
+        } catch (PermisoOperativoException $e) {
+            return back()->withErrors(['motivo' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('faenas.index')
+            ->with('exito', "Faena N° {$numero} eliminada. El motivo quedó en la auditoría, y el ".
+                'número del talonario queda con un hueco.');
+    }
+
+    /**
      * FICHA — GET /panel/faenas/{faena}
      */
     public function show(PermisoFaena $faena): Response
     {
         $faena->load([
-            'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,asociacion_id',
-            'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+            'carnet:id,beneficiario_id,codigo_carnet,tipo_actor,asociacion_id,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.asociacion:id,nombre,sigla',
             // El cupo cuelga del CARNET: la faena ya no guarda su id.
             'carnet.aprovechamiento.categoria',
@@ -492,8 +604,18 @@ class FaenaController extends Controller
 
             'carnet_id' => $faena->carnet_id,
             'carnet_codigo' => $faena->carnet?->codigo_legible,
+            /*
+             * EL NÚMERO DE REGISTRO, que es como se nombra un carnet en el
+             * mostrador: «00001». Sin el año: el número ya identifica al
+             * carnet dentro de la gestión que se está atendiendo, y repetirlo
+             * en cada fila era ruido. El `codigo_carnet` son 16 caracteres al
+             * azar —sirve para verificar, no para nombrar—.
+             */
+            'carnet_registro' => $faena->carnet?->registro_legible,
             'beneficiario_id' => $faena->carnet?->beneficiario_id,
             'beneficiario' => $faena->carnet?->beneficiario?->nombreCompleto,
+            'documento' => $faena->carnet?->beneficiario?->documento_identidad,
+            'foto_url' => $faena->carnet?->beneficiario?->foto_url,
 
             'kilos_extraidos' => (float) $faena->kilos_extraidos,
 
@@ -514,6 +636,10 @@ class FaenaController extends Controller
             'consume_cupo' => $faena->consumeCupo(),
             'caducada' => $faena->estaCaducada(),
             'puede_completarse' => $faena->estado === EstadoFaena::Activo,
+            // Las dos puertas del borrador: estado PENDIENTE y sin un peso
+            // cargado. Se resuelven acá para que la pantalla no las recalcule.
+            'puede_editarse' => $faena->puedeEditarse(),
+            'puede_eliminarse' => $faena->puedeEliminarse(),
             // Por qué todavía no autoriza. Se resuelve en el servidor: React
             // no vuelve a evaluar el estado.
             'motivo_sin_autorizar' => $faena->motivoSinAutorizar(),

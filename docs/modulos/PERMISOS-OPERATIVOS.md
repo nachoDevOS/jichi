@@ -151,7 +151,9 @@ extracto del banco es todo lo que entró, no una parte.
 | `POST /panel/faenas` | `faenas.crear` | Alta |
 | `GET /panel/faenas/{faena}` | `faenas.ver` | Ficha |
 | `GET /panel/faenas/{faena}/imprimir` | `faenas.imprimir` | El «Permiso por Faena» en PDF. Solo aprobada |
-| `PATCH /panel/faenas/{faena}/anular` | `faenas.anular` | Baja con motivo |
+| `GET /panel/faenas/{faena}/editar` | `faenas.editar` | Corregir el borrador. Va ANTES de `/{faena}` o «editar» se toma como id |
+| `PATCH /panel/faenas/{faena}` | `faenas.editar` | Guardar la corrección |
+| `DELETE /panel/faenas/{faena}` | `faenas.eliminar` | Baja con motivo |
 | `GET /panel/guias` … | `guias.*` | Lo mismo para guías |
 | `PUT /panel/guias/{guia}/detalle` | `guias.crear` | Reemplaza la grilla de carga |
 | `GET /panel/carnets/buscar` | `carnets.ver` | Autocompletado de los dos formularios. Devuelve JSON |
@@ -169,6 +171,65 @@ TRÁMITES
 el acto es el mismo en los tres. Cada ítem lleva además un `tituloCompleto`
 —«Trámites de faena»— para las migas de pan y el globito de la barra angosta,
 donde el rótulo del grupo no se ve.
+
+### Cuándo se descuenta el cupo — cambiado el 21/09/2026
+
+**Solo la faena APROBADA y la COMPLETADA pesan contra la bolsa madre.** Una
+pendiente o en revisión es una solicitud: todavía no autoriza a pescar, así que
+no le resta kilos a nadie. Lo dice `EstadoFaena::consumeCupo()`.
+
+Antes reservaba desde el pedido, y el motivo era evitar que se otorgara de más.
+Al sacar la reserva ese riesgo vuelve: **tres solicitudes por el volumen entero
+se aceptan las tres**, porque ninguna ve a las otras. El control se movió al
+único momento en que el volumen sale de verdad — `RevisarFaenaService::aprobar()`
+bloquea la fila del cupo, vuelve a medir el saldo y rechaza la firma que no
+entra, con el mensaje de cuántos kilos quedan.
+
+Consecuencia para el mostrador: **un choque de cupo ya no aparece al cargar la
+faena sino al firmarla.** El aviso del formulario sigue estando —es un aviso
+temprano— pero deja de ser una garantía.
+
+Los tres lugares que enumeran los estados que consumen, y que tienen que decir
+lo mismo:
+
+| Dónde | Para qué |
+| --- | --- |
+| `EstadoFaena::consumeCupo()` | El filtro en memoria, cuando las faenas ya están cargadas |
+| `AprovechamientoPesq::faenasQueConsumen()` | El mismo filtro en SQL, para el `withSum` de los listados |
+| `PermisoFaena::scopeQueConsumenCupo()` | El scope suelto |
+
+---
+
+### Corregir y eliminar, agregados el 21/09/2026
+
+La faena ya no se emite y se entrega en el acto: **nace PENDIENTE** y recorre el
+mismo circuito que el carnet y el cupo —cobrar, presentar, firmar—, y el número
+lo pone el sistema. Mientras es un BORRADOR no hay ningún papel afuera, así que
+se corrige y se elimina, con el mismo corte que en los otros dos módulos:
+
+| | Pendiente | En revisión | Aprobada / completada / vencida |
+| --- | :-: | :-: | :-: |
+| Editar | ✔ | ✘ | ✘ |
+| Eliminar | ✔ | ✘ | ✘ |
+
+**El estado no alcanza: un depósito cargado cierra las dos puertas.** Un pago
+significa que el pescador pagó por ESTA salida, y mover los kilos o las fechas
+después cambiaría lo que se cobró. Se da de baja el depósito primero. Lo dicen
+`PermisoFaena::puedeEditarse()` y `puedeEliminarse()`.
+
+**El CARNET no se edita.** Cambiar de titular no es corregir una salida, es
+emitir otra: el formulario muestra a la persona fija. Ver
+`EmitirFaenaService::editar()`.
+
+**El saldo que ve el formulario suma de vuelta los kilos propios SOLO si esa
+faena estaba descontando.** Desde el 21/09/2026 una pendiente no descuenta, así
+que devolvérselos igual mostraría el doble de cupo disponible. Ver
+`FaenaController::edit()` y `EmitirFaenaService::editar()`, que aplican el mismo
+criterio.
+
+**Eliminar devuelve los kilos al cupo pero NO devuelve el número.** La baja es
+lógica y el correlativo sigue donde estaba: la serie queda con un hueco, y eso
+es justamente lo que el motivo obligatorio tiene que explicar.
 
 **Emitir es de VENTANILLA; anular es de SUPERVISIÓN.** Son papeles que se llenan
 en el mostrador y se entregan en el acto: no hay nada que firmar después, y el

@@ -133,11 +133,44 @@ class AprovechamientoPesq extends Model
         return (float) $this->faenasQueConsumen()->sum('kilos_extraidos');
     }
 
-    /** Las faenas cuyo volumen pesa contra el cupo: todas menos las vencidas. */
+    /**
+     * Las faenas cuyo volumen pesa contra el cupo: las FIRMADAS y las cerradas.
+     *
+     * La lista sale de `EstadoFaena::consumeCupo()` y tiene que decir lo mismo
+     * que él: una es el filtro en SQL y la otra el filtro en memoria, y si se
+     * separan el listado y la ficha muestran saldos distintos.
+     */
     public function faenasQueConsumen(): HasManyThrough
     {
         // Calificada: `carnets` entra en el join y también tiene `estado`.
-        return $this->faenas()->whereNot('permisos_faena.estado', EstadoFaena::Vencido);
+        return $this->faenas()->whereIn('permisos_faena.estado', [
+            EstadoFaena::Activo,
+            EstadoFaena::Completado,
+        ]);
+    }
+
+    /**
+     * Pone el cupo en `agotado` o lo devuelve a `aprobado` según su saldo real.
+     *
+     * Vive en el modelo y no en un servicio porque lo necesitan los dos: el
+     * que emite y corrige faenas, y el que las firma —que es donde ahora se
+     * consume el volumen—.
+     */
+    public function sincronizarEstadoPorSaldo(): void
+    {
+        // Un cupo VENCIDO no se toca: su problema es la fecha, no los kilos, y
+        // devolverlo a `aprobado` porque le sobró volumen sería mentir.
+        if ($this->estado === EstadoAprovechamiento::Vencido) {
+            return;
+        }
+
+        $deberiaEstar = $this->saldoKg() <= 0.0
+            ? EstadoAprovechamiento::Agotado
+            : EstadoAprovechamiento::Aprobado;
+
+        if ($this->estado !== $deberiaEstar) {
+            $this->update(['estado' => $deberiaEstar]);
+        }
     }
 
     /**

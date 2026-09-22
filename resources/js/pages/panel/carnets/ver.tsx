@@ -5,6 +5,7 @@ import {
     Paperclip,
     Pencil,
     Printer,
+    Receipt,
     Send,
     Ship,
     Trash2,
@@ -61,6 +62,14 @@ export default function VerCarnet({
             titulo={carnet.tipo ?? 'Carnet'}
             acciones={
                 <div className="flex flex-wrap gap-2">
+                    <Button
+                        variant="ver"
+                        onClick={() => router.visit(route('beneficiarios.show', carnet.beneficiario_id))}
+                    >
+                        <User className="size-4" />
+                        Ver al beneficiario
+                    </Button>
+
                     {/*
                         IMPRIMIR abre en una pestaña aparte y no en un iframe: con
                         un PDF, `iframe.onLoad` no dispara nunca —medido— así que
@@ -138,10 +147,26 @@ export default function VerCarnet({
                     {/* El plástico sale recién con el carnet firmado. */}
                     {puede('carnets.imprimir') && carnet.ya_fue_aprobado && (
                         <a href={route('carnets.imprimir', carnet.id)} target="_blank" rel="noopener">
-                            <Button variant="dorado">
+                            <Button variant="outline">
                                 <Printer className="size-4" />
                                 Imprimir carnet
                             </Button>
+                        </a>
+                    )}
+
+                    {/* EL RECIBO, arriba y no solo dentro de «Pagos»: mismo
+                        botón y mismo PDF que en el aprovechamiento. Sale
+                        cuando el recibo ya se emitió, o sea desde que el
+                        carnet pasó a revisión. */}
+                    {puede('recibos.imprimir') && recibo && (
+                        <a
+                            href={route('recibos.imprimir', recibo.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={cn(buttonVariants({ variant: 'outline' }))}
+                        >
+                            <Receipt className="size-4" />
+                            Imprimir recibo
                         </a>
                     )}
 
@@ -177,14 +202,6 @@ export default function VerCarnet({
                             Emitir guía
                         </Button>
                     )}
-
-                    <Button
-                        variant="ver"
-                        onClick={() => router.visit(route('beneficiarios.show', carnet.beneficiario_id))}
-                    >
-                        <User className="size-4" />
-                        Ver al titular
-                    </Button>
                 </div>
             }
         >

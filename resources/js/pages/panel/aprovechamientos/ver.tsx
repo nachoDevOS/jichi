@@ -9,6 +9,7 @@ import {
     Pencil,
     Plus,
     Printer,
+    Receipt,
     Send,
     Ship,
     Trash2,
@@ -208,7 +209,7 @@ export default function VerCupo({
                         }
                     >
                         <Eye className="size-4" />
-                        Ver al pescador
+                        Ver al beneficiario
                     </Button>
 
                     {/* LA AUTORIZACIÓN DE PESCA, en PDF. Sale recién con el cupo
@@ -223,6 +224,22 @@ export default function VerCupo({
                         >
                             <Printer className="size-4" />
                             Autorización de pesca
+                        </a>
+                    )}
+
+                    {/* EL RECIBO TAMBIÉN SE IMPRIME DESDE ARRIBA. Estaba solo
+                        dentro de «Pagos», al final de la ficha: el operador que
+                        venía a reimprimir el comprobante tenía que bajar a
+                        buscarlo. Misma condición y mismo PDF que el de allá. */}
+                    {puede('recibos.imprimir') && recibo && (
+                        <a
+                            href={route('recibos.imprimir', recibo.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={cn(buttonVariants({ variant: 'outline' }))}
+                        >
+                            <Receipt className="size-4" />
+                            Imprimir recibo
                         </a>
                     )}
 
@@ -1136,6 +1153,7 @@ export default function VerCupo({
                                         <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                             <tr>
                                                 <th className="px-5 py-2.5 font-medium">N°</th>
+                                                <th className="px-5 py-2.5 font-medium">Carnet</th>
                                                 <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
                                                 <th className="px-5 py-2.5 font-medium">Estado</th>
                                                 <th className="px-5 py-2.5 font-medium">Salida</th>
@@ -1146,15 +1164,36 @@ export default function VerCupo({
                                         <tbody className="divide-y divide-border">
                                             {faenas.map((f) => (
                                                 <tr key={f.id} className="hover:bg-secondary/50">
+                                                    {/* El número lo arma el servidor con los
+                                                        seis ceros del talonario: rellenarlo acá
+                                                        daba «0001» donde el resto del sistema
+                                                        dice «000001». */}
                                                     <td className="px-5 py-2.5 font-mono tabular-nums">
-                                                        {String(f.numero_faena).padStart(4, '0')}
+                                                        {f.numero_legible}
+                                                    </td>
+
+                                                    {/* DE QUÉ CARNET CUELGA. Un cupo puede
+                                                        respaldar más de una credencial, y esta es
+                                                        la columna que dice cuál gastó esos kilos. */}
+                                                    <td className="px-5 py-2.5 font-mono tabular-nums text-muted-foreground">
+                                                        {f.carnet_id !== null ? (
+                                                            <Link
+                                                                href={route('carnets.show', f.carnet_id)}
+                                                                className="text-primary hover:underline"
+                                                            >
+                                                                N° {f.carnet_registro ?? '—'}
+                                                            </Link>
+                                                        ) : (
+                                                            '—'
+                                                        )}
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-right tabular-nums">
                                                         {/*
-                                                            Tachado cuando NO consume cupo: es lo que
-                                                            hace que la suma de la columna cuadre con
-                                                            el saldo de arriba.
+                                                            Tachado cuando NO consume cupo —todavía sin
+                                                            firmar, o vencida—: es lo que hace que la
+                                                            suma de la columna cuadre con el saldo de
+                                                            arriba.
                                                         */}
                                                         <span
                                                             className={
@@ -1167,7 +1206,9 @@ export default function VerCupo({
                                                         </span>
                                                         {!f.consume_cupo && (
                                                             <span className="ml-2 text-xs text-muted-foreground">
-                                                                liberados
+                                                                {f.estado === 'vencido'
+                                                                    ? 'liberados'
+                                                                    : 'sin descontar'}
                                                             </span>
                                                         )}
                                                     </td>

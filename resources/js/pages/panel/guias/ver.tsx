@@ -36,7 +36,7 @@ export default function VerGuia({ guia }: { guia: GuiaFicha }) {
                         onClick={() => router.visit(route('beneficiarios.show', guia.beneficiario_id))}
                     >
                         <User className="size-4" />
-                        Ver al comercializador
+                        Ver al beneficiario
                     </Button>
 
                     {puede('guias.cerrar') && guia.puede_cerrarse && (

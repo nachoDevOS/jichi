@@ -173,7 +173,7 @@ export default function IndiceCupos({
                                 <table className="w-full text-sm">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">Pescador</th>
+                                            <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 font-medium">Escala</th>
                                             <th className="px-5 py-2.5 font-medium">Saldo</th>
                                             {/* <th className="px-5 py-2.5 text-right font-medium">Cobro</th> */}

@@ -466,11 +466,22 @@ PENDIENTE ──[depósitos]──▶ [enviar] ──▶ EN REVISIÓN ──[apr
 defecto, que es lo que dice el talonario— y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
 en los otros dos. El circuito vive en `RevisarFaenaService`.
 
-**Los kilos se reservan DESDE EL PEDIDO, no desde la firma.**
-`EstadoFaena::consumeCupo()` deja afuera solo a la vencida, así que una faena
-pendiente ya pesa contra la bolsa. Es deliberado: sin eso, tres solicitudes por
-el cupo entero pasarían las tres —cada una leería el saldo sin ver a las otras—
-y el pescador terminaría con más kilos autorizados que su aprovechamiento.
+**Los kilos se descuentan DESDE LA FIRMA, no desde el pedido** —cambiado el
+21/09/2026 a pedido del responsable—. `EstadoFaena::consumeCupo()` deja pasar
+solo a la **aprobada** y a la **completada**: una pendiente o en revisión es una
+solicitud, todavía no autoriza a pescar, y por eso no le resta kilos a la bolsa.
+
+Antes reservaba desde el pedido. Lo que se gana con el cambio es que el saldo
+que se ve es el volumen realmente comprometido; lo que se pierde es la reserva,
+así que **el cupo se puede sobrecomprometer**: tres solicitudes por el volumen
+entero se aceptan las tres y el choque aparece al aprobar la segunda. Ese
+control lo hace ahora `RevisarFaenaService::aprobar()`, que vuelve a medir el
+saldo con la fila del cupo bloqueada y rechaza la firma que no entra.
+
+⚠️ La lista de estados que consumen está escrita **dos veces** —en
+`EstadoFaena::consumeCupo()` para el filtro en memoria y en
+`AprovechamientoPesq::faenasQueConsumen()` para el filtro en SQL—. Si se separan,
+la ficha y el listado muestran saldos distintos.
 
 **El titular llega por un accesor.** El recibo sale a nombre de
 `$tramite->beneficiario_id`, que la faena no guarda: lo resuelve

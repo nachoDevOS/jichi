@@ -88,6 +88,10 @@ class EmitirFaenaService
 
             /*
              * EL TOPE SOLO SE HACE CUMPLIR EN MODO ESTRICTO.
+             *
+             * ⚠️ ACÁ YA NO ES UNA RESERVA, es un aviso temprano: como las
+             * pendientes no descuentan, dos solicitudes por el volumen entero
+             * pasan las dos. El control que decide de verdad corre al APROBAR.
              */
             if (AprovechamientoPesq::modoEstricto()) {
                 $saldo = $cupo->saldoKg();
@@ -120,15 +124,136 @@ class EmitirFaenaService
             ]);
 
             /*
-             * SI ESTA SOLICITUD DEJÓ EL CUPO EN CERO, EL CUPO PASA A `agotado`.
-             * Los kilos se reservan desde que se piden —ver
-             * EstadoFaena::consumeCupo()—, no desde la firma.
+             * EL CUPO NO SE TOCA ACÁ. Una faena nace PENDIENTE y una pendiente
+             * ya no descuenta —ver EstadoFaena::consumeCupo()—, así que no hay
+             * nada que agotar: eso pasa recién al firmarla.
              */
-            if ($cupo->fresh()->saldoKg() <= 0.0) {
-                $cupo->update(['estado' => EstadoAprovechamiento::Agotado]);
-            }
 
             return $faena;
+        });
+    }
+
+    /**
+     *  CORREGIR EL BORRADOR
+     *
+     * El CARNET no se toca: cambiar de titular no es corregir una salida, es
+     * emitir otra. Dejarlo editable movería un permiso de una persona a otra
+     * sin más rastro que la auditoría.
+     *
+     * @param  array<string, string|null>  $papel  Los renglones del talonario.
+     */
+    public function editar(
+        PermisoFaena $faena,
+        float $kilos,
+        Carbon $salida,
+        Carbon $desembarque,
+        array $papel = [],
+    ): PermisoFaena {
+        return DB::transaction(function () use ($faena, $kilos, $salida, $desembarque, $papel): PermisoFaena {
+            $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
+
+            // Se comprueba con la copia bloqueada, no con la que llegó: entre
+            // que la pantalla se dibujó y llegó el submit, otra ventanilla
+            // pudo enviarla a revisión.
+            if (! $bloqueada->estado->permiteEdicion()) {
+                throw PermisoOperativoException::faenaNoSePuedeEditar(
+                    mb_strtolower($bloqueada->estado->etiqueta()),
+                );
+            }
+
+            if (($pagos = $bloqueada->pagos()->count()) > 0) {
+                throw PermisoOperativoException::faenaTienePagos($pagos);
+            }
+
+            $bloqueada->loadMissing('carnet');
+
+            $cupo = AprovechamientoPesq::query()
+                ->whereKey($bloqueada->carnet?->aprovechamiento_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            /*
+             * LOS KILOS PROPIOS SE SUMAN DE VUELTA SOLO SI DESCONTABAN.
+             *
+             * Desde que la pendiente dejó de descontar, `saldoKg()` ya NO la
+             * está restando: devolvérselos igual contaría dos veces el mismo
+             * volumen y dejaría pasar el doble del cupo. Se corrige una faena
+             * pendiente, así que hoy la rama de abajo no suma nada — se
+             * pregunta igual para que siga valiendo si la edición se abre en
+             * otro estado.
+             */
+            if (AprovechamientoPesq::modoEstricto()) {
+                $disponible = $cupo->saldoKg()
+                    + ($bloqueada->consumeCupo() ? (float) $bloqueada->kilos_extraidos : 0.0);
+
+                if ($kilos > $disponible) {
+                    throw PermisoOperativoException::excedeCupo($kilos, $disponible);
+                }
+            }
+
+            $bloqueada->update([
+                'kilos_extraidos' => $kilos,
+                ...$this->renglonesDelPapel($papel),
+                'fecha_salida' => $salida->toDateString(),
+                'fecha_desembarque' => $desembarque->toDateString(),
+                // El límite se recalcula: cuelga de la salida, y si la salida
+                // se corrigió el papel vence otro día.
+                'fecha_limite' => PermisoFaena::limiteDesde($salida)->toDateString(),
+            ]);
+
+            // La corrección pudo agotar el cupo o destrabarlo.
+            $this->sincronizarEstadoDelCupo($cupo->fresh());
+
+            // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
+            return $faena->refresh();
+        });
+    }
+
+    /**
+     *  ELIMINAR UNA FAENA CARGADA POR ERROR
+     *
+     * Devuelve sus kilos a la bolsa madre: una pendiente los tenía reservados.
+     */
+    public function eliminar(PermisoFaena $faena, string $motivo): void
+    {
+        DB::transaction(function () use ($faena, $motivo): void {
+            $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
+
+            if (! $bloqueada->estado->permiteEliminacion()) {
+                throw PermisoOperativoException::faenaNoSePuedeEliminar(
+                    mb_strtolower($bloqueada->estado->etiqueta()),
+                );
+            }
+
+            if (($pagos = $bloqueada->pagos()->count()) > 0) {
+                throw PermisoOperativoException::faenaTienePagos($pagos);
+            }
+
+            $bloqueada->loadMissing('carnet');
+
+            $cupo = AprovechamientoPesq::query()
+                ->whereKey($bloqueada->carnet?->aprovechamiento_id)
+                ->lockForUpdate()
+                ->first();
+
+            /*
+             * EL MOTIVO SE DEJA EN EL MODELO Y SE BORRA: el trait `Auditable`
+             * ya engancha el `deleted`, y llamar además a `registrarAuditoria()`
+             * dejaría el mismo borrado dos veces, una sin explicación.
+             */
+            $bloqueada->motivoAuditoria = $motivo;
+            $bloqueada->delete();
+
+            /*
+             * EL NÚMERO DEL TALONARIO NO SE REUSA. La baja es lógica y el
+             * correlativo sigue donde estaba: la serie queda con un hueco, que
+             * es justamente lo que el motivo en la auditoría explica.
+             */
+
+            // Sus kilos vuelven a la bolsa: un cupo agotado puede destrabarse.
+            if ($cupo !== null) {
+                $this->sincronizarEstadoDelCupo($cupo->fresh());
+            }
         });
     }
 
@@ -158,11 +283,12 @@ class EmitirFaenaService
 
             if ($kilosReales !== null && abs($kilosReales - (float) $bloqueada->kilos_extraidos) > 0.001) {
                 /*
-                 * El saldo se mide SIN esta faena: `saldoKg()` ya la está
-                 * descontando, así que comparar el nuevo peso contra el saldo a
-                 * secas rechazaría hasta una corrección hacia abajo.
+                 * El saldo se mide SIN esta faena: está APROBADA, así que
+                 * `saldoKg()` ya la está descontando y comparar contra el
+                 * saldo pelado rechazaría hasta una corrección hacia abajo.
                  */
-                $disponible = $cupo->saldoKg() + (float) $bloqueada->kilos_extraidos;
+                $disponible = $cupo->saldoKg()
+                    + ($bloqueada->consumeCupo() ? (float) $bloqueada->kilos_extraidos : 0.0);
 
                 if ($kilosReales > $disponible) {
                     throw PermisoOperativoException::excedeCupo($kilosReales, $disponible);
@@ -203,22 +329,13 @@ class EmitirFaenaService
     }
 
     /**
-     * Pone el cupo en `agotado` o lo devuelve a `activo` según su saldo real.
+     * Pone el cupo en `agotado` o lo devuelve a `aprobado` según su saldo real.
+     *
+     * La regla vive en el MODELO porque la comparten dos servicios: este y el
+     * que firma las faenas, que es donde ahora se consume el volumen.
      */
     private function sincronizarEstadoDelCupo(AprovechamientoPesq $cupo): void
     {
-        // Un cupo VENCIDO no se toca: su problema es la fecha, no los kilos, y
-        // devolverlo a `activo` porque le sobró volumen sería mentir.
-        if ($cupo->estado === EstadoAprovechamiento::Vencido) {
-            return;
-        }
-
-        $deberiaEstar = $cupo->saldoKg() <= 0.0
-            ? EstadoAprovechamiento::Agotado
-            : EstadoAprovechamiento::Aprobado;
-
-        if ($cupo->estado !== $deberiaEstar) {
-            $cupo->update(['estado' => $deberiaEstar]);
-        }
+        $cupo->sincronizarEstadoPorSaldo();
     }
 }

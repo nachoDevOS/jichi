@@ -272,6 +272,24 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:faenas.completar')
         ->name('faenas.completar');
 
+    /*
+     * CORREGIR Y ELIMINAR EL BORRADOR. Corregir es de ventanilla —es el mismo
+     * mostrador que lo está armando— y eliminar es de supervisión, igual que
+     * en el carnet y en el cupo. Las dos solo valen en PENDIENTE y sin un peso
+     * cargado: lo decide `PermisoFaena::puedeEditarse()`.
+     */
+    Route::get('/faenas/{faena}/editar', [FaenaController::class, 'edit'])
+        ->middleware('permiso:faenas.editar')
+        ->name('faenas.edit');
+
+    Route::patch('/faenas/{faena}', [FaenaController::class, 'update'])
+        ->middleware('permiso:faenas.editar')
+        ->name('faenas.update');
+
+    Route::delete('/faenas/{faena}', [FaenaController::class, 'destroy'])
+        ->middleware('permiso:faenas.eliminar')
+        ->name('faenas.destroy');
+
     // ANTES de '/faenas/{faena}': con la ficha primero, «imprimir» se toma
     // como id. Permiso propio, como `carnets.imprimir`.
     Route::get('/faenas/{faena}/imprimir', [PermisoFaenaImpresionController::class, 'imprimir'])

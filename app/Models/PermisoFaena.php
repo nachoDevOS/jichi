@@ -145,6 +145,24 @@ class PermisoFaena extends Model
         return $this->estado->permitePagos();
     }
 
+    /**
+     * ¿Se pueden corregir sus datos?
+     *
+     * El estado no alcanza: un depósito ya cargado significa que el pescador
+     * pagó por ESTA salida, y mover los kilos o las fechas después cambiaría
+     * lo que se cobró. Se da de baja el depósito primero.
+     */
+    public function puedeEditarse(): bool
+    {
+        return $this->estado->permiteEdicion() && $this->montoPagado() <= 0.0;
+    }
+
+    /** ¿Se puede borrar la fila entera? Mismo corte que la edición. */
+    public function puedeEliminarse(): bool
+    {
+        return $this->estado->permiteEliminacion() && $this->montoPagado() <= 0.0;
+    }
+
     /** ¿Se puede presentar a revisión? Estado Y arancel cubierto. */
     public function puedeEnviarseARevision(): bool
     {
@@ -250,10 +268,13 @@ class PermisoFaena extends Model
             ->whereDate($this->qualifyColumn('fecha_limite'), '>=', now()->toDateString());
     }
 
-    /** Las que pesan contra el cupo: todas menos las vencidas. */
+    /** Las que pesan contra el cupo: las firmadas y las cerradas. */
     public function scopeQueConsumenCupo(Builder $query): Builder
     {
-        return $query->whereNot($this->qualifyColumn('estado'), EstadoFaena::Vencido);
+        return $query->whereIn($this->qualifyColumn('estado'), [
+            EstadoFaena::Activo,
+            EstadoFaena::Completado,
+        ]);
     }
 
     /** Las de un cupo: se llega por el carnet, que es quien lo conoce. */

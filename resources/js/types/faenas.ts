@@ -17,8 +17,12 @@ export interface FaenaFila {
     carnet_id: number;
     /** En grupos de cuatro: «PES2 6K7R J2M». */
     carnet_codigo: string | null;
+    /** El número del libro, con cinco dígitos: «00001». */
+    carnet_registro: string | null;
     beneficiario_id: number | null;
     beneficiario: string | null;
+    documento: string | null;
+    foto_url: string | null;
 
     /**
      * Los kilos que esta salida compromete contra la bolsa madre.
@@ -50,6 +54,8 @@ export interface FaenaFila {
     /** Se pasó de fecha y sigue activa: trabajo sin cerrar, no una previsión. */
     caducada: boolean;
     puede_completarse: boolean;
+    puede_editarse: boolean;
+    puede_eliminarse: boolean;
     /** Por qué todavía no autoriza a salir. `null` cuando sí autoriza. */
     motivo_sin_autorizar: string | null;
     /** Si pasó por la firma. Hasta entonces el permiso no vale. */
@@ -125,3 +131,30 @@ export interface FormularioFaena {
     region_desde: string;
     region_hasta: string;
 }
+
+/**
+ * Lo que necesita el formulario de CORRECCIÓN. El titular y el carnet vienen
+ * fijos, para mostrar: ver EmitirFaenaService::editar().
+ */
+export type FaenaEnCorreccion = {
+    id: number;
+    numero_legible: string;
+    beneficiario: string | null;
+    documento: string | null;
+    foto_url: string | null;
+    carnet_codigo: string | null;
+    /** El número del libro, con cinco dígitos: «00001». */
+    carnet_registro: string | null;
+    /** Con los kilos propios sumados de vuelta solo si esta faena descontaba. */
+    saldo_kg: number | null;
+    kilos_extraidos: number;
+    fecha_salida: string | null;
+    fecha_desembarque: string | null;
+    embarcacion: string | null;
+    propietario: string | null;
+    comandante_barco: string | null;
+    matricula_naval: string | null;
+    nro_kardex: string | null;
+    region_desde: string | null;
+    region_hasta: string | null;
+};

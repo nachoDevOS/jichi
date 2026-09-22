@@ -47,14 +47,19 @@ enum EstadoFaena: string
     /**
      * ¿Sus kilos pesan contra el cupo de la bolsa madre?
      *
-     * LA PENDIENTE TAMBIÉN RESERVA, y es deliberado: el volumen se aparta
-     * cuando se pide, no cuando se firma. Sin eso, tres solicitudes por el
-     * cupo entero pasarían las tres —cada una leería el saldo sin ver a las
-     * otras— y el pescador terminaría con más kilos autorizados que su bolsa.
+     * SOLO DESDE LA FIRMA (19/09/2026, a pedido del responsable). Una faena
+     * pendiente o en revisión es una SOLICITUD: todavía no autoriza a pescar,
+     * así que no puede estar restándole kilos a la bolsa.
+     *
+     * ⚠️ El costo es que el cupo se puede sobrecomprometer: tres solicitudes
+     * por el volumen entero se aceptan las tres, y el choque aparece al
+     * aprobar la segunda. Por eso `RevisarFaenaService::aprobar()` vuelve a
+     * medir el saldo con la fila del cupo bloqueada — ahí está el control que
+     * antes hacía la reserva.
      */
     public function consumeCupo(): bool
     {
-        return $this !== self::Vencido;
+        return $this === self::Activo || $this === self::Completado;
     }
 
     /** ¿Autoriza a estar pescando hoy? Solo la aprobada. */
@@ -70,6 +75,23 @@ enum EstadoFaena: string
      * en el controlador: el servicio pregunta, y React recibe la respuesta ya
      * resuelta en los campos `puede_*`.
      */
+
+    /**
+     * ¿Se pueden corregir sus datos? Solo el BORRADOR.
+     *
+     * Al enviarla a revisión sale el recibo y el pescador se va con el papel,
+     * así que desde ahí lo que no sirve se rechaza, no se edita.
+     */
+    public function permiteEdicion(): bool
+    {
+        return $this === self::Pendiente;
+    }
+
+    /** ¿Se puede borrar la fila? Mismo criterio que la edición. */
+    public function permiteEliminacion(): bool
+    {
+        return $this === self::Pendiente;
+    }
 
     /** ¿Se le pueden cargar depósitos? Solo mientras nadie la firmó. */
     public function permitePagos(): bool
@@ -92,7 +114,8 @@ enum EstadoFaena: string
     /**
      * Pendiente + en revisión: nadie la firmó todavía.
      *
-     * ⚠️ NO ES PERMISO DE TRABAJO. Para eso está `habilita()`.
+     * ⚠️ NO ES PERMISO DE TRABAJO —para eso está `habilita()`— ni de
+     * escritura: eso lo dicen `permiteEdicion()` y `permiteEliminacion()`.
      */
     public function estaAbierto(): bool
     {

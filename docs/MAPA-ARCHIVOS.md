@@ -72,7 +72,7 @@ decisiones que acá solo se nombran.
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `FaenaController.php` | 295 | Listado, alta, ficha, cobro y circuito de revisión. **Sin editar ni borrar**: el papel ya está en manos de la persona. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario |
+| `FaenaController.php` | 400 | Listado, alta, ficha, cobro y circuito de revisión, más **corregir y eliminar el BORRADOR** (21/09/2026): solo en PENDIENTE y sin un peso cargado, porque el número lo pone el sistema y el papel sale recién al aprobar. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario. `edit()` manda el saldo del cupo **con los kilos de esta faena sumados de vuelta**, o el formulario diría que no entra lo que ya entró |
 | `GuiaController.php` | 358 | Ídem, más `actualizarDetalle()` — la única corrección que el módulo permite. `resumir()` usa el `withSum` del listado para no calcular los kilos por fila |
 | `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario |
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
