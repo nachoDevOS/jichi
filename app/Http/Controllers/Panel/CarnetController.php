@@ -51,13 +51,9 @@ class CarnetController extends Controller
         ];
 
         $carnets = Carnet::query()
-            /*
-             * OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
-             * partes del nombre porque `nombreCompleto` las lee todas, y
-             * `tipoCarnet` va ENTERO porque `montoACobrar()` lee `precio_bs`.
-             * Una columna que un método consulta y no está en el select vuelve
-             * null y el método contesta cualquier cosa, sin ningún error.
-             */
+            // OJO CON PEDIR COLUMNAS SUELTAS: van las CINCO partes del nombre y
+            // `tipoCarnet` ENTERO, porque `montoACobrar()` lee `precio_bs`. La que
+            // falte vuelve null y el método contesta cualquier cosa, sin error.
             ->with([
                 // `codigo_legible` va en #[Appends]: sin precargar la relación,
                 // serializar el listado dispara una consulta por fila.
@@ -69,17 +65,11 @@ class CarnetController extends Controller
             ])
             // Evita una consulta agregada POR FILA al calcular el saldo.
             ->withSum('pagos', 'monto_parcial')
-            /*
-             * Y los dos conteos que `puedeEliminarse()` necesita: sin ellos son
-             * dos consultas más POR FILA, invisibles, solo para decidir si se
-             * dibuja un botón. Ver Carnet::sinPermisosEmitidos().
-             */
+            // Los dos conteos de `puedeEliminarse()`: sin ellos son dos consultas
+            // más POR FILA solo para decidir si se dibuja un botón.
             ->withCount(['faenas', 'guias'])
-            /*
-             * EL RECIBO PARA EL BOTÓN DE IMPRIMIR. `Pagable::recibos()` es una
-             * CONSULTA y no una relación, así que llamarla por fila serían
-             * treinta consultas: se resuelve desde los pagos precargados.
-             */
+            // `Pagable::recibos()` es una CONSULTA y no una relación: por fila
+            // serían treinta. Se resuelve desde los pagos precargados.
             ->with(['pagos:id,pagable_type,pagable_id,recibo_id', 'pagos.recibo:id,numero_recibo'])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
                 fn ($s) => $s
@@ -93,12 +83,9 @@ class CarnetController extends Controller
             ))
             ->when($filtros['estado'], fn ($q, $estado) => $q->where('carnets.estado', $estado))
             ->when($filtros['actor'], fn ($q, $actor) => $q->where('carnets.tipo_actor', $actor))
-            /*
-             * LO ÚLTIMO CARGADO, ARRIBA — y por `created_at`, no por la fecha
-             * de solicitud: esa la declara el operador y puede ser pasada, así
-             * que un expediente cargado hoy con fecha vieja se iba al fondo.
-             * El `id` desempata, o el paginado repite filas entre páginas.
-             */
+            // Por `created_at` y no por la fecha de solicitud, que el operador
+            // declara y puede ser pasada. El `id` desempata, o el paginado
+            // repite filas entre páginas.
             ->orderByDesc('carnets.created_at')
             ->orderByDesc('carnets.id')
             ->paginate($filtros['por_pagina'])
@@ -133,12 +120,8 @@ class CarnetController extends Controller
                 'documento_identidad' => $beneficiario->documento_identidad,
                 'foto_url' => $beneficiario->foto_url,
 
-                /*
-                 * SUS BOLSAS MADRE, con el MISMO shape que devuelve el
-                 * buscador: la pantalla muestra de cuál va a colgar el carnet
-                 * —y deja elegir si hubiera más de una—, y tiene que decir lo
-                 * mismo venga la persona preseleccionada o elegida a mano.
-                 */
+                // Sus bolsas madre, con la MISMA forma que devuelve el buscador:
+                // la pantalla tiene que decir lo mismo venga preseleccionada o no.
                 'cupos_elegibles' => BeneficiarioController::cuposElegibles($beneficiario),
             ] : null,
 
@@ -178,12 +161,8 @@ class CarnetController extends Controller
 
         $tipo = TipoCarnet::query()->findOrFail($datos['tipo_carnet_id']);
 
-        /*
-         * LOS ADJUNTOS SE SUBEN ANTES DE ABRIR LA TRANSACCIÓN, y el `catch` los
-         * borra: una transacción deshace filas, no escrituras en disco. Sin
-         * esto, cada emisión fallida dejaba dos archivos huérfanos para
-         * siempre. Van por StorageController, el único que escribe archivos.
-         */
+        // ANTES de abrir la transacción, y el `catch` los borra: una transacción
+        // deshace filas, no escrituras en disco. Van por StorageController.
         $subidos = [
             'archivo_ci' => app(StorageController::class)->file($request->file('archivo_ci'), 'carnets'),
             'archivo_asociacion' => app(StorageController::class)->file($request->file('archivo_asociacion'), 'carnets'),
@@ -194,11 +173,8 @@ class CarnetController extends Controller
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
                 Asociacion::query()->findOrFail($datos['asociacion_id']),
                 $tipo,
-                /*
-                 * LA ACTIVIDAD SALE DEL TIPO y no de un campo aparte: eran dos
-                 * preguntas con una sola respuesta posible. Se sigue GUARDANDO
-                 * en el carnet, que es la copia congelada de la regla.
-                 */
+                // La actividad sale del TIPO: eran dos preguntas con una sola
+                // respuesta. Se sigue guardando: es la copia congelada de la regla.
                 $tipo->tipo_actor,
                 now()->parse($datos['fecha_solicitud']),
                 // `?? null`: `validated()` devuelve SOLO las claves que vinieron,
@@ -214,12 +190,8 @@ class CarnetController extends Controller
                 Archivos::borrar($ruta);
             }
 
-            /*
-             * El mensaje vuelve como error DEL CAMPO de la persona y no como un
-             * cartel suelto: las tres reglas que puede romper —ya tiene carnet,
-             * no tiene cupo— son sobre la persona elegida, así que el texto
-             * tiene que aparecer al lado de ese campo.
-             */
+            // Error DEL CAMPO de la persona y no un cartel suelto: las reglas que
+            // puede romper son todas sobre la persona elegida.
             return back()
                 ->withInput()
                 ->withErrors(['beneficiario_id' => $e->getMessage()]);
@@ -264,11 +236,8 @@ class CarnetController extends Controller
                 'provincia' => $carnet->beneficiario?->provincia,
                 'asociacion_nombre' => $carnet->asociacion?->nombre,
 
-                /*
-                 * El cupo con su saldo: en la ficha del carnet interesa saber
-                 * cuánto le queda, porque es lo que decide si se le puede emitir
-                 * una faena hoy.
-                 */
+                // El cupo con su saldo: es lo que decide si hoy se le puede emitir
+                // una faena.
                 'cupo' => $carnet->aprovechamiento ? [
                     'id' => $carnet->aprovechamiento->id,
                     'escala' => $carnet->aprovechamiento->categoria?->nro_escala,
@@ -296,10 +265,7 @@ class CarnetController extends Controller
                 'puede_aprobarse' => $carnet->puedeRevisarse() && $sinValidar === 0,
             ],
 
-            /*
-             * EL DETALLE DE LO COBRADO, igual que en la ficha del cupo: una
-             * fila por boleta, con su control.
-             */
+            // El detalle de lo cobrado: una fila por boleta, con su control.
             'pagos' => $carnet->pagos()
                 // Precargados: si no, cinco depósitos son diez consultas.
                 ->with(['registradoPor:id,name', 'validadoPor:id,name'])
@@ -419,12 +385,8 @@ class CarnetController extends Controller
     {
         $datos = $request->validated();
 
-        /*
-         * Los adjuntos NUEVOS se suben antes de la transacción, como en la
-         * emisión, y el `catch` los borra. Los viejos se quedan donde están:
-         * hoy nada los borra, y ese es el precio de no dejar un carnet sin
-         * respaldo por una corrección a medias.
-         */
+        // Los NUEVOS, antes de la transacción; el `catch` los borra. Los viejos
+        // quedan: es el precio de no dejar un carnet sin respaldo a medias.
         $subidos = [];
 
         foreach (['archivo_ci', 'archivo_asociacion'] as $campo) {
@@ -490,11 +452,8 @@ class CarnetController extends Controller
     ): RedirectResponse {
         $datos = $request->validated();
 
-        /*
-         * EL ESTADO Y EL MONTO SE MIRAN ANTES DE SUBIR NADA: descubrirlo
-         * adentro obligaría a borrar los archivos ya escritos, porque una
-         * transacción no deshace lo que se escribió en disco.
-         */
+        // ANTES de subir nada: descubrirlo adentro obligaría a borrar los
+        // archivos ya escritos, que una transacción no deshace.
         if (! $carnet->admitePagos()) {
             return back()->withErrors([
                 'pagos' => CobroInvalidoException::noAdmiteDepositos(
@@ -684,12 +643,8 @@ class CarnetController extends Controller
             'tipo_actor' => $carnet->tipo_actor->value,
             'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
             'tipo_actor_color' => $carnet->tipo_actor->color(),
-            /*
-             * EL NOMBRE COMPLETO, no la sigla. La columna del listado tiene
-             * lugar, y «ASOPESTRI» obliga a saberse el gremio de memoria; la
-             * sigla sigue yendo donde el espacio es de verdad angosto: la tira
-             * del carnet impreso.
-             */
+            // El nombre COMPLETO: «ASOPESTRI» obliga a saberse el gremio de
+            // memoria. La sigla va donde el espacio es angosto: el carnet impreso.
             'asociacion' => $carnet->asociacion?->nombre,
             'asociacion_sigla' => $carnet->asociacion?->sigla,
 
@@ -701,12 +656,8 @@ class CarnetController extends Controller
             // Null en un comercializador, y es la regla: lo decide el enum.
             'cupo_kg' => $carnet->cupoImpreso(),
 
-            /*
-             * CUÁNDO SE CARGÓ LA FILA, que no es lo mismo que la fecha de
-             * solicitud: esa la declara el operador y puede ser pasada. Es un
-             * MOMENTO, así que va con toIso8601String() y la pantalla lo
-             * muestra con la hora y el «hace…».
-             */
+            // Cuándo se cargó, que no es la fecha de solicitud. Es un MOMENTO:
+            // va con toIso8601String().
             'registrado_en' => $carnet->created_at?->toIso8601String(),
 
             /*

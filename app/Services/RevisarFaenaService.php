@@ -77,18 +77,10 @@ class RevisarFaenaService
                 throw PermisoOperativoException::faltaControlarBoletasDeLaFaena($sinControlar);
             }
 
-            /*
-             *  ACÁ SE CONSUME EL CUPO, y por eso acá está el control de saldo.
-             *
-             * Una faena pendiente NO descuenta —ver EstadoFaena::consumeCupo()—
-             * así que la firma es el primer y único momento en que el volumen
-             * sale de la bolsa. Sin este control, tres solicitudes por el cupo
-             * entero se aprobarían las tres: ninguna vería a las otras.
-             *
-             * La fila del CUPO se bloquea, no la de la faena: es la que
-             * contiene el recurso escaso y la que pueden estar tocando dos
-             * ventanillas en el mismo segundo.
-             */
+            // ACÁ se consume el cupo, y por eso acá está el control de saldo: la
+            // pendiente no descuenta, así que la firma es el único momento en que
+            // el volumen sale de la bolsa. Se bloquea la fila del CUPO, que es la
+            // que contiene el recurso escaso.
             $bloqueada->loadMissing('carnet');
 
             $cupo = AprovechamientoPesq::query()
@@ -107,11 +99,8 @@ class RevisarFaenaService
                 }
             }
 
-            /*
-             * LA FECHA DE EMISIÓN SE ESCRIBE ACÁ: hasta la firma lo único que
-             * había era una solicitud. Las de salida y límite NO se recalculan
-             * —son el permiso que el pescador pidió y se le va a imprimir—.
-             */
+            // La emisión se escribe ACÁ. Las de salida y límite NO se recalculan:
+            // son el permiso que el pescador pidió y se le va a imprimir.
             $bloqueada->motivoAuditoria = 'Depósitos verificados: el permiso queda habilitado.';
             $bloqueada->update([
                 'estado' => EstadoFaena::Activo,

@@ -23,20 +23,12 @@ class CobrarRequest extends FormRequest
     public function rules(): array
     {
         return [
-            /*
-             * AL MENOS UNA LÍNEA. Un recibo sin nada cobrado gastaría un número
-             * del correlativo para no decir nada, y la serie quedaría con un
-             * hueco que después alguien tiene que explicar.
-             */
+            // Al menos una línea: un recibo vacío gastaría un número del
+            // correlativo para no decir nada.
             'lineas' => ['required', 'array', 'min:1'],
 
-            /*
-             * EL TIPO SE VALIDA CONTRA LA LISTA BLANCA del servicio, no contra
-             * nombres de clase. `pagos.pagable_type` guarda una clase: si el
-             * formulario la mandara directo, cualquiera podría escribir otra en
-             * el navegador y el sistema crearía filas apuntando a cualquier
-             * tabla.
-             */
+            // Contra la LISTA BLANCA del servicio y no contra nombres de clase:
+            // mandada directo, cualquiera escribiría otra desde el navegador.
             'lineas.*.tipo' => ['required', Rule::in(array_keys(CobrarService::COBRABLES))],
             'lineas.*.id' => ['required', 'integer', 'min:1'],
             'lineas.*.monto' => ['required', 'numeric', 'gt:0', 'max:99999999', 'decimal:0,2'],
@@ -48,18 +40,13 @@ class CobrarRequest extends FormRequest
                 // SOLO DÍGITOS, y va `digits_between` y no `numeric`: la boleta
                 // suele empezar con ceros y `numeric` se los comería.
                 'required', 'string', 'digits_between:1,60',
-                /*
-                 * ÚNICO entre los pagos VIVOS. Es lo que impide cargar la misma
-                 * boleta dos veces —contra el mismo trámite o contra otro—, que
-                 * es la forma más fácil de dar por pagado algo que no se pagó.
-                 */
+                // Único entre los pagos VIVOS: impide cargar la misma boleta dos
+                // veces, que es la forma más fácil de dar por pagado lo que no se pagó.
                 Rule::unique('pagos', 'nro_transaccion')->whereNull('deleted_at'),
             ],
 
-            /*
-             * LA FECHA QUE DICE LA BOLETA, no la de hoy: un depósito del viernes
-             * puede cargarse el lunes. Futura no, porque todavía no ocurrió.
-             */
+            // La que dice la BOLETA, no la de hoy: un depósito del viernes puede
+            // cargarse el lunes. Futura no.
             'fecha_deposito' => ['required', 'date', 'before_or_equal:today'],
 
             // El tope de 3 MB es el mismo que aplica StorageController, que es

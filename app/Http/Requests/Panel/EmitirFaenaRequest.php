@@ -24,38 +24,19 @@ class EmitirFaenaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            /*
-             * El carnet tiene que existir; que HABILITE a emitir faenas lo
-             * decide el servicio, mirando el tipo de actor, la vigencia y el
-             * cupo. Acá no se puede: son tres condiciones que dependen de la
-             * fecha de hoy y del saldo.
-             */
+            // Que exista. Que HABILITE lo decide el servicio: son tres condiciones
+            // que dependen de la fecha de hoy y del saldo.
             'carnet_id' => ['required', 'integer', Rule::exists('carnets', 'id')],
 
-            /*
-             * EL NÚMERO NO VIENE DEL FORMULARIO: lo genera el sistema, con un
-             * correlativo global y continuo. Ver EmitirFaenaService.
-             */
+            // El número NO viene del formulario: lo genera el correlativo.
 
-            /*
-             * Los kilos declarados. `gt:0` porque una faena de cero kilos no
-             * autoriza nada y solo gastaría una hoja del talonario.
-             */
+            // `gt:0`: una faena de cero kilos no autoriza nada y gastaría una hoja.
             'kilos_extraidos' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
 
-            /*
-             * NO SE EMITE CON FECHA FUTURA: la faena autoriza a estar pescando
-             * desde ese día, y una fecha adelantada daría un permiso que empieza
-             * a valer antes de que el papel exista.
-             *
-             * Pasada sí, para poner al día lo emitido en papel.
-             */
-            /*
-             * Y TAMPOCO TAN VIEJA que el permiso nazca vencido: la vigencia es
-             * de 30 días desde la salida, así que una fecha anterior a eso
-             * emitiría una hoja del talonario que ya caducó. El tope sale de la
-             * constante del modelo, no escrito acá.
-             */
+            // Futura no: daría un permiso que empieza a valer antes de que el papel
+            // exista. Pasada sí, para poner al día lo emitido en papel.
+            // Ni tan vieja que nazca vencido. El tope sale de la constante del
+            // modelo, no escrito acá.
             'fecha_salida' => [
                 'required', 'date', 'before_or_equal:today',
                 'after:'.now()->subDays(PermisoFaena::DIAS_VIGENCIA)->toDateString(),

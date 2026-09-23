@@ -12,10 +12,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- *  PASO 4 DEL FLUJO, RAMA COMERCIALIZADOR — la GUÍA DE MOVIMIENTO
- *
- * Nace PENDIENTE y se cobra y se firma como el carnet, el cupo y la faena; el
- * circuito de revisión vive aparte, en `RevisarGuiaService`.
+ * Paso 4 del flujo, rama comercializador. El circuito de revisión vive en
+ * `RevisarGuiaService`.
  */
 class EmitirGuiaService
 {
@@ -30,8 +28,7 @@ class EmitirGuiaService
     public function __construct(private readonly CorrelativoService $correlativos) {}
 
     /**
-     * Registra la solicitud de un traslado. NACE PENDIENTE: no ampara nada
-     * hasta que se cobre el arancel y alguien la firme.
+     * Nace PENDIENTE: no ampara nada hasta que se cobre y alguien la firme.
      *
      * @param  array<string, mixed>  $datos  Los renglones del talonario.
      * @param  array<int, array<string, mixed>>  $detalles  El cuadro D.
@@ -44,11 +41,8 @@ class EmitirGuiaService
     ): GuiaMovimiento {
         $solicitud ??= now();
 
-        /*
-         * LAS COMPROBACIONES DEL CARNET VAN ANTES DE LA TRANSACCIÓN: no se
-         * revoca en el medio de esta operación, y abrirla para nada sostiene
-         * una conexión con el operador esperando.
-         */
+        // El carnet se comprueba ANTES de abrir la transacción: no se revoca
+        // en el medio, y abrirla para nada sostiene una conexión.
         if (! $carnet->tipo_actor->emiteGuias()) {
             throw PermisoOperativoException::actorNoEmite('guías de movimiento', $carnet->tipo_actor);
         }
@@ -89,19 +83,14 @@ class EmitirGuiaService
                 'fecha_solicitud' => $solicitud->toDateString(),
             ]);
 
-            /*
-             * EL ARANCEL SE COPIA DESPUÉS DEL create(), no adentro: el factor
-             * de piscicultura lo calcula el modelo leyendo su propia columna,
-             * que recién existe con la fila escrita.
-             */
+            // Después del create(): el factor de piscicultura lo calcula el
+            // modelo leyendo su columna, que recién existe con la fila escrita.
             $guia->update(['monto' => $guia->arancelCalculado(GuiaMovimiento::tarifaVigente())]);
 
             $this->guardarDetalle($guia, $renglones);
 
-            /*
-             * SU LLAVE PÚBLICA, dentro de la misma transacción: un documento
-             * sin código no se puede verificar. Ver App\Traits\Codificable.
-             */
+            // Su llave pública, en la misma transacción: sin código no se
+            // puede verificar.
             $guia->asignarCodigo();
 
             return $guia->refresh();
@@ -109,11 +98,8 @@ class EmitirGuiaService
     }
 
     /**
-     *  CORREGIR EL BORRADOR
-     *
-     * El CARNET no se toca: cambiar de titular no es corregir un traslado, es
-     * emitir otro. Dejarlo editable movería una guía de una persona a otra sin
-     * más rastro que la auditoría.
+     * Corrige el borrador. El CARNET no se toca: cambiar de titular no es
+     * corregir un traslado, es emitir otro.
      *
      * @param  array<string, mixed>  $datos
      * @param  array<int, array<string, mixed>>  $detalles
@@ -156,12 +142,8 @@ class EmitirGuiaService
                 'monto' => $bloqueada->arancelCalculado(GuiaMovimiento::tarifaVigente()),
             ]);
 
-            /*
-             * EL DETALLE SE REEMPLAZA ENTERO y no se hace un diff fila por
-             * fila: son cinco renglones que el operador reescribe, y casar
-             * cuál es cuál sin un id estable del papel inventa una identidad
-             * que el talonario no tiene.
-             */
+            // El detalle se reemplaza ENTERO: casar fila por fila sin un id
+            // estable del papel inventa una identidad que el talonario no tiene.
             $bloqueada->detalles()->delete();
             $this->guardarDetalle($bloqueada, $renglones);
 
@@ -192,27 +174,17 @@ class EmitirGuiaService
                 throw PermisoOperativoException::guiaTienePagos($pagos);
             }
 
-            /*
-             * EL DETALLE SE BAJA A MANO. La FK es CASCADE, pero eso es una
-             * restricción del MOTOR y `delete()` sobre una tabla con
-             * SoftDeletes es un UPDATE: sin esto quedarían renglones vivos
-             * colgando de una guía que ya no está. Ver CLAUDE.md.
-             */
+            // A MANO: la FK es CASCADE, pero eso es del MOTOR y `delete()` con
+            // SoftDeletes es un UPDATE. Sin esto quedan renglones huérfanos.
             $bloqueada->detalles()->delete();
 
-            /*
-             * EL MOTIVO SE DEJA EN EL MODELO Y SE BORRA: el trait `Auditable`
-             * ya engancha el `deleted`, y llamar además a `registrarAuditoria()`
-             * dejaría el mismo borrado dos veces, una sin explicación.
-             */
+            // El motivo se deja y se borra: `Auditable` ya engancha el `deleted`,
+            // y registrarlo a mano además dejaría el hecho dos veces.
             $bloqueada->motivoAuditoria = $motivo;
             $bloqueada->delete();
 
-            /*
-             * EL NÚMERO DEL TALONARIO NO SE REUSA. La baja es lógica y el
-             * correlativo sigue donde estaba: la serie queda con un hueco, que
-             * es justamente lo que el motivo en la auditoría explica.
-             */
+            // El número NO se reusa: la serie queda con un hueco, que es lo que
+            // el motivo en la auditoría explica.
         });
     }
 
@@ -289,11 +261,8 @@ class EmitirGuiaService
     }
 
     /**
-     * El cuadro D, limpio: se descartan los renglones sin especie.
-     *
-     * El formulario manda cinco filas fijas como el papel, y las que el
-     * operador no llenó llegan vacías. Guardarlas dejaría el PDF con renglones
-     * de cero kilos que un control tiene que leer igual.
+     * El cuadro D, limpio: se descartan los renglones sin especie, que son los
+     * que el operador no llenó de las cinco filas fijas del papel.
      *
      * @param  array<int, array<string, mixed>>  $detalles
      * @return array<int, array<string, mixed>>

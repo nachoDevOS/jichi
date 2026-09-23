@@ -82,19 +82,6 @@ class CategoriaAprovechamiento extends Model
         return $kilos >= (float) $this->kilos_min && $kilos <= (float) $this->kilos_max;
     }
 
-    /**
-     * El tramo que corresponde a este volumen, o null si se pasa de la escala.
-     */
-    public static function paraVolumen(float $kilos): ?self
-    {
-        return static::query()
-            ->vigentes()
-            ->where('kilos_min', '<=', $kilos)
-            ->where('kilos_max', '>=', $kilos)
-            ->orderBy('nro_escala')
-            ->first();
-    }
-
     //  Scopes
 
     public function scopeVigentes(Builder $query): Builder

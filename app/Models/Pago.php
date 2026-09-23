@@ -162,24 +162,4 @@ class Pago extends Model
             ->where($this->qualifyColumn('pagable_type'), $tramite->getMorphClass())
             ->where($this->qualifyColumn('pagable_id'), $tramite->getKey());
     }
-
-    /** Para el arqueo: lo cobrado en una jornada. */
-    public function scopeDelDia(Builder $query, ?string $fecha = null): Builder
-    {
-        return $query->whereDate(
-            $this->qualifyColumn('created_at'),
-            $fecha ?? now()->toDateString(),
-        );
-    }
-
-    /**
-     * Los depósitos hechos en una fecha, según lo que dice la BOLETA.
-     */
-    public function scopeDepositadosEl(Builder $query, ?string $fecha = null): Builder
-    {
-        return $query->whereDate(
-            $this->qualifyColumn('fecha_deposito'),
-            $fecha ?? now()->toDateString(),
-        );
-    }
 }

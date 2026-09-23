@@ -18,10 +18,7 @@ use Illuminate\Support\Facades\DB;
  */
 class CobrarService
 {
-    /**
-     * La serie del correlativo de caja. Es la CLAVE del contador, no lo que
-     * se imprime: el número sale «000001», sin prefijo ni gestión.
-     */
+    /** La CLAVE del contador, no lo que se imprime: el número sale «000001». */
     public const SERIE = 'REC';
 
     /**
@@ -39,12 +36,9 @@ class CobrarService
     public function __construct(private readonly CorrelativoService $correlativos) {}
 
     /**
-     * El número del próximo recibo: «000001».
-     *
-     * CONTINUO y sin prefijo ni gestión —a pedido, 21/09/2026—. Era
-     * `REC-2026-0001`, que reiniciaba cada enero: dos recibos del mismo número
-     * en años distintos, y el papel del talonario no dice el año por ningún
-     * lado. Mismo tratamiento que `permisos_faena.numero_faena`.
+     * El número del próximo recibo: «000001». Continuo y sin gestión: era
+     * `REC-2026-0001` y reiniciaba en enero, así que dos recibos de años
+     * distintos salían con el mismo número.
      */
     private function siguienteNumero(): string
     {
@@ -76,12 +70,8 @@ class CobrarService
                 $resueltas[] = $this->resolver($linea);
             }
 
-            /*
-             * EL RECIBO SALE A NOMBRE DEL TITULAR DE LO COBRADO, y por eso los
-             * trámites tienen que ser todos de la MISMA persona: un papel a
-             * nombre de dos no existe. Antes el nombre venía tipeado del
-             * formulario y nada lo ataba a lo que se estaba cobrando.
-             */
+            // A nombre del TITULAR de lo cobrado, así que los trámites tienen
+            // que ser todos de la misma persona: un papel a nombre de dos no existe.
             $beneficiarioId = $this->titularDe($resueltas);
 
             /*
@@ -107,12 +97,8 @@ class CobrarService
                     'monto_parcial' => $monto,
                     'fecha_deposito' => $fechaDeposito,
 
-                    /*
-                     * LA BOLETA SE REPITE EN CADA LÍNEA DEL MISMO COBRO, y es
-                     * correcto: un solo depósito puede cubrir el carnet y el
-                     * cupo a la vez, y las dos filas están respaldadas por ese
-                     * mismo papel.
-                     */
+                    // La boleta se repite en cada línea del mismo cobro, y está
+                    // bien: un depósito puede cubrir el carnet y el cupo a la vez.
                     'nro_transaccion' => $orden === 1 ? $nroTransaccion : $nroTransaccion.'-'.$orden,
                     'comprobante' => $comprobante,
                 ]);
@@ -165,19 +151,9 @@ class CobrarService
                 throw CobroInvalidoException::yaEstaPagado($nombre);
             }
 
-            /*
-             * LOS DEPÓSITOS TIENEN QUE CUBRIR EL SALDO ENTERO, y se miran como
-             * CONJUNTO: se admiten varias boletas —la persona deposita en dos
-             * veces— pero entran todas juntas y en una sola carga. Un parcial
-             * guardado dejaba el expediente a medio cobrar, sin recibo y sin
-             * poder enviarse, y el saldo solo se descubría abriendo la ficha.
-             *
-             * DE MÁS SÍ SE ADMITE, al revés que en Caja: la boleta del banco
-             * dice lo que dice y el excedente queda a favor de la entidad. Con
-             * el tope puesto, un depósito de 170 por un trámite de 165 no se
-             * podía cargar y el expediente quedaba trabado con la plata ya
-             * depositada.
-             */
+            // Cubren el saldo ENTERO y se miran como CONJUNTO: varias boletas,
+            // pero todas juntas en una sola carga. De MÁS sí se admite —al revés
+            // que en Caja—: la boleta dice lo que dice.
             $suma = round(array_sum(array_map(
                 static fn (array $d): float => round((float) $d['monto'], 2),
                 $depositos,
@@ -208,10 +184,8 @@ class CobrarService
     }
 
     /**
-     * Emite el recibo del trámite: uno solo, con todos sus depósitos sueltos.
-     *
-     * Devuelve NULL si no había ninguno, y eso es lo que hace que un REENVÍO no
-     * emita un segundo papel: el número que la persona tiene sigue valiendo.
+     * El recibo del trámite: UNO, con todos sus depósitos sueltos. Devuelve
+     * null si no había ninguno, y por eso un REENVÍO no emite un segundo papel.
      */
     public function emitirRecibo(
         Model $tramite,
@@ -291,11 +265,8 @@ class CobrarService
 
         $nombre = $this->nombrar($tramite);
 
-        /*
-         * SE LE PREGUNTA AL MODELO, no al enum. Con `method_exists` sobre el
-         * estado, el cupo —que llama `permitePagos()`— contestaba «no existe»
-         * y no se validaba ningún estado, en silencio. Ver CLAUDE.md.
-         */
+        // Al MODELO, no al enum: con `method_exists` sobre el estado, el cupo
+        // —que llama `permitePagos()`— no validaba nada, en silencio.
         if (! $tramite->admitePagos()) {
             throw CobroInvalidoException::noAdmitePagos($nombre, $tramite->estado->etiqueta());
         }
@@ -325,33 +296,18 @@ class CobrarService
     private function nombrar(Model $tramite): string
     {
         return match (true) {
-            /*
-             * «Cédula de Pescador», no «Carnet»: es como lo llama el talonario
-             * —la casilla marcada en el recibo dice CÉDULAS— y es lo que la
-             * persona reconoce.
-             *
-             * SIN EL CÓDIGO: son 16 caracteres que llenan el renglón y que el
-             * pescador no tiene cómo contrastar en el mostrador. Y con la
-             * CAPACIDAD cuando la lleva —la del cupo que respalda la cédula—,
-             * porque es lo que distingue una de otra; el comercializador no
-             * lleva volumen, así que ahí no va nada.
-             */
+            // «Cédula» y no «Carnet»: es como lo llama el talonario. Sin el
+            // código —16 caracteres que nadie contrasta en el mostrador— y con la
+            // capacidad, que es lo que distingue una cédula de otra.
             $tramite instanceof Carnet => 'Cédula de '.$tramite->tipo_actor->etiqueta()
                 .$this->tramoDe($tramite->aprovechamiento),
-            /*
-             * EL NOMBRE COMPLETO Y LA CAPACIDAD. Decía «Aprovechamiento escala
-             * 3»: el número del tramo es del catálogo interno y no le dice
-             * nada a quien recibe el papel; lo que identifica lo cobrado es el
-             * documento y cuántos kilos autoriza.
-             */
+            // El nombre y la capacidad. El número del tramo es del catálogo
+            // interno y no le dice nada a quien recibe el papel.
             $tramite instanceof AprovechamientoPesq => 'Autorización de Pesca para Aprovechamiento '
                 .'Pesquero'.$this->tramoDe($tramite),
             $tramite instanceof GuiaMovimiento => $tramite->etiqueta,
-            /*
-             * «Permiso de Faena N° 0003 - 120 kg»: el número es el de la hoja
-             * del talonario que la persona se lleva, y los kilos son lo que el
-             * permiso autoriza a sacar —que es por lo que se paga—.
-             */
+            // «Permiso de Faena N° 0003 - 120 kg»: el número es el de la hoja
+            // que la persona se lleva, y los kilos son por lo que se paga.
             $tramite instanceof PermisoFaena => $tramite->etiqueta.' - '
                 .rtrim(rtrim(number_format((float) $tramite->kilos_extraidos, 2, '.', ''), '0'), '.').' kg',
             default => 'Trámite',

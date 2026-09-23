@@ -48,12 +48,9 @@ class FaenaController extends Controller
         ];
 
         $faenas = PermisoFaena::query()
-            /*
-             * OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
-             * partes del nombre porque `nombreCompleto` las lee todas. Una
-             * columna que un método consulta y no está en el select vuelve null
-             * y el método contesta cualquier cosa, sin ningún error.
-             */
+            // OJO CON PEDIR COLUMNAS SUELTAS: van las CINCO partes del nombre
+            // porque `nombreCompleto` las lee todas. La que falte vuelve null y
+            // el método contesta cualquier cosa, sin error.
             ->with([
                 'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision',
                 'carnet.codigo',
@@ -105,12 +102,8 @@ class FaenaController extends Controller
                 'documento_identidad' => $beneficiario->documento_identidad,
                 'foto_url' => $beneficiario->foto_url,
 
-                /*
-                 * Los carnets llegan con la MISMA forma que devuelve el
-                 * autocompletado, para que la pantalla trate igual a la persona
-                 * preseleccionada y a la que se busca a mano. Sin eso habría dos
-                 * caminos en el componente, y uno de los dos se queda viejo.
-                 */
+                // Con la MISMA forma que devuelve el autocompletado: si no, el
+                // componente tendría dos caminos y uno se queda viejo.
                 'carnets_vigentes' => $beneficiario->carnets()
                     ->vigentes()
                     ->with([
@@ -128,12 +121,8 @@ class FaenaController extends Controller
 
             'tarifa' => PermisoFaena::tarifaVigente(),
 
-            /*
-             * En modo FLEXIBLE el formulario no puede frenar por exceder el
-             * cupo, así que tiene que dejar de decir que lo va a hacer: el aviso
-             * pasa de «no entra en el cupo» a «va a quedar por encima». Sin este
-             * dato la pantalla mentiría en la mitad de los despliegues.
-             */
+            // En modo FLEXIBLE el formulario no frena, así que tampoco puede decir
+            // que va a frenar: el aviso pasa a «va a quedar por encima».
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
         ]);
     }
@@ -156,12 +145,8 @@ class FaenaController extends Controller
                 $datos,
             );
         } catch (PermisoOperativoException $e) {
-            /*
-             * El mensaje vuelve como error del campo que el operador puede
-             * corregir. Las reglas del carnet no tienen arreglo desde este
-             * formulario —hay que ir a emitir o renovar el carnet— así que se
-             * cuelgan de `carnet_id`; el exceso de cupo sí se corrige acá.
-             */
+            // Al campo que el operador PUEDE corregir: lo del carnet no tiene
+            // arreglo desde acá, el exceso de cupo sí.
             $campo = str_contains($e->getMessage(), 'quedan') ? 'kilos_extraidos' : 'carnet_id';
 
             return back()->withInput()->withErrors([$campo => $e->getMessage()]);
@@ -200,11 +185,8 @@ class FaenaController extends Controller
         $cupo = $faena->carnet?->aprovechamiento;
 
         return Inertia::render('panel/faenas/editar', [
-            /*
-             * La persona y el carnet llegan FIJOS, para mostrar: cambiar de
-             * titular no es corregir una salida, es emitir otra. Ver
-             * EmitirFaenaService::editar().
-             */
+            // La persona y el carnet llegan FIJOS: cambiar de titular no es
+            // corregir, es emitir otro.
             'faena' => [
                 'id' => $faena->id,
                 'numero_legible' => $faena->numero_legible,
@@ -215,12 +197,8 @@ class FaenaController extends Controller
                 /* El número del libro: «00001». Ver resumir(). */
                 'carnet_registro' => $faena->carnet?->registro_legible,
 
-                /*
-                 * LOS KILOS PROPIOS SE SUMAN SOLO SI DESCONTABAN. Desde que la
-                 * pendiente dejó de descontar, `saldoKg()` ya no la resta:
-                 * devolvérselos igual mostraría el doble de cupo disponible.
-                 * Mismo criterio que EmitirFaenaService::editar().
-                 */
+                // Los kilos propios se suman SOLO si descontaban: la pendiente ya
+                // no resta, así que devolvérselos mostraría el doble de cupo.
                 'saldo_kg' => $cupo !== null
                     ? $cupo->saldoKg() + ($faena->consumeCupo() ? (float) $faena->kilos_extraidos : 0.0)
                     : null,
@@ -311,10 +289,8 @@ class FaenaController extends Controller
                 ...$this->resumir($faena),
                 'asociacion' => $faena->carnet?->asociacion?->sigla ?? $faena->carnet?->asociacion?->nombre,
 
-                /*
-                 * LAS DEL CIRCUITO, resueltas en el servidor. React no vuelve a
-                 * evaluar el estado: pregunta por estas.
-                 */
+                // Las del circuito, resueltas en el servidor: React no vuelve a
+                // evaluar el estado.
                 'puede_enviarse' => $faena->puedeEnviarseARevision(),
                 'puede_revisarse' => $faena->puedeRevisarse(),
                 'puede_aprobarse' => $faena->puedeRevisarse() && $sinValidar === 0,
@@ -332,10 +308,7 @@ class FaenaController extends Controller
                 ] : null,
             ],
 
-            /*
-             * EL DETALLE DE LO COBRADO, igual que en la ficha del carnet y la
-             * del cupo: una fila por boleta, con su control.
-             */
+            // El detalle de lo cobrado: una fila por boleta, con su control.
             'pagos' => $faena->pagos()
                 // Precargados: si no, cinco depósitos son diez consultas.
                 ->with(['registradoPor:id,name', 'validadoPor:id,name'])
@@ -407,11 +380,8 @@ class FaenaController extends Controller
     ): RedirectResponse {
         $datos = $request->validated();
 
-        /*
-         * EL ESTADO Y EL MONTO SE MIRAN ANTES DE SUBIR NADA: descubrirlo
-         * adentro obligaría a borrar los archivos ya escritos, porque una
-         * transacción no deshace lo que se escribió en disco.
-         */
+        // ANTES de subir nada: descubrirlo adentro obligaría a borrar los
+        // archivos ya escritos, que una transacción no deshace.
         if (! $faena->admitePagos()) {
             return back()->withErrors([
                 'pagos' => CobroInvalidoException::noAdmiteDepositos(
@@ -609,13 +579,8 @@ class FaenaController extends Controller
 
             'carnet_id' => $faena->carnet_id,
             'carnet_codigo' => $faena->carnet?->codigo_legible,
-            /*
-             * EL NÚMERO DE REGISTRO, que es como se nombra un carnet en el
-             * mostrador: «00001». Sin el año: el número ya identifica al
-             * carnet dentro de la gestión que se está atendiendo, y repetirlo
-             * en cada fila era ruido. El código del carnet son 16 caracteres al
-             * azar —sirve para verificar, no para nombrar—.
-             */
+            // El número de registro: «00001», que es como se nombra un carnet en
+            // el mostrador. El código de 16 sirve para verificar, no para nombrar.
             'carnet_registro' => $faena->carnet?->registro_legible,
             'beneficiario_id' => $faena->carnet?->beneficiario_id,
             'beneficiario' => $faena->carnet?->beneficiario?->nombreCompleto,

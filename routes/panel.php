@@ -28,8 +28,6 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     | Panel principal
     */
 
-    // El controlador es "invocable" (tiene un único método __invoke), por eso se
-    // pasa la clase sola en vez del par [Clase::class, 'metodo'].
     Route::get('/dashboard', DashboardController::class)
         ->middleware('permiso:dashboard.ver')
         ->name('dashboard');
@@ -42,10 +40,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         Route::get('/beneficiarios', [BeneficiarioController::class, 'index'])
             ->name('beneficiarios.index');
 
-        /*
-         * El autocompletado del mostrador. Devuelve JSON, no una pantalla de
-         * Inertia, y va ANTES de la ruta con {beneficiario} por lo dicho arriba.
-         */
+        // Devuelve JSON, no una pantalla. Va ANTES de {beneficiario}.
         Route::get('/beneficiarios/buscar', [BeneficiarioController::class, 'buscar'])
             ->name('beneficiarios.buscar');
     });
@@ -70,8 +65,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:beneficiarios.eliminar')
         ->name('beneficiarios.destroy');
 
-    // La ficha va ÚLTIMA de su bloque: {beneficiario} coincide con cualquier
-    // palabra, así que puesta antes se tragaría 'crear' y 'buscar'.
+    // ÚLTIMA del bloque: {beneficiario} se tragaría 'crear' y 'buscar'.
     Route::get('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'show'])
         ->middleware('permiso:beneficiarios.ver')
         ->name('beneficiarios.show');
@@ -92,12 +86,8 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('aprovechamientos.store');
     });
 
-    /*
-     * CORREGIR EL BORRADOR. El permiso es de ventanilla, pero el estado manda:
-     * el servicio rechaza cualquier cupo que ya no esté pendiente, con la fila
-     * bloqueada, porque entre abrir el formulario y guardar alguien pudo
-     * cobrarlo.
-     */
+    // Corregir el borrador. El estado manda: el servicio lo comprueba con la
+    // fila bloqueada, porque entre abrir el formulario y guardar pudo cobrarse.
     Route::middleware('permiso:aprovechamientos.editar')->group(function () {
         Route::get('/aprovechamientos/{aprovechamiento}/editar', [AprovechamientoController::class, 'edit'])
             ->name('aprovechamientos.edit');
@@ -106,16 +96,12 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('aprovechamientos.update');
     });
 
-    /*
-     * CARGAR LOS DEPÓSITOS DESDE LA FICHA DEL CUPO.
-     */
+    // Los depósitos, desde la ficha del cupo.
     Route::post('/aprovechamientos/{aprovechamiento}/pagos', [AprovechamientoController::class, 'pagar'])
         ->middleware('permiso:caja.cobrar')
         ->name('aprovechamientos.pagar');
 
-    /*
-     *  EL CIRCUITO DE REVISIÓN
-     */
+    // El circuito de revisión.
     Route::post('/aprovechamientos/{aprovechamiento}/enviar', [AprovechamientoController::class, 'enviar'])
         ->middleware('permiso:aprovechamientos.enviar')
         ->name('aprovechamientos.enviar');
@@ -128,22 +114,13 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('aprovechamientos.rechazar');
     });
 
-    /*
-     * ELIMINAR es de SUPERVISIÓN: borrar la fila la hace desaparecer, y lo único
-     * que queda es la línea de `auditorias` con el motivo. Ver el bloque de
-     * arriba.
-     */
+    // Eliminar es de SUPERVISIÓN: lo único que queda es la auditoría.
     Route::delete('/aprovechamientos/{aprovechamiento}', [AprovechamientoController::class, 'destroy'])
         ->middleware('permiso:aprovechamientos.eliminar')
         ->name('aprovechamientos.destroy');
 
-    /*
-     * LA AUTORIZACIÓN DE PESCA, en PDF. Sale recién con el cupo aprobado.
-     *
-     * Es GET y devuelve bytes, no una pantalla: el navegador la abre en su visor
-     * de PDF, que es desde donde se imprime. Permiso propio —entregar el papel
-     * es un acto distinto de consultar la ficha—, igual que `carnets.imprimir`.
-     */
+    // El PDF, recién con el cupo aprobado. Permiso propio: entregar el papel
+    // es un acto distinto de consultar la ficha.
     Route::get('/aprovechamientos/{aprovechamiento}/autorizacion', [AutorizacionPescaController::class, 'imprimir'])
         ->middleware('permiso:aprovechamientos.imprimir')
         ->name('aprovechamientos.autorizacion');
@@ -168,15 +145,8 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('carnets.store');
     });
 
-    /*
-     * REVOCAR es de SUPERVISIÓN: es una sanción, no se revierte, y la
-     * verificación pública empieza a informarla al instante.
-     */
-    /*
-     * CORREGIR Y ELIMINAR, SOLO SOBRE EL BORRADOR. Lo comprueba el servicio con
-     * la fila bloqueada: entre abrir el formulario y guardar, otra ventanilla
-     * pudo cobrarlo.
-     */
+    // Corregir y eliminar, SOLO sobre el borrador. Lo comprueba el servicio
+    // con la fila bloqueada.
     Route::middleware('permiso:carnets.editar')->group(function () {
         Route::get('/carnets/{carnet}/editar', [CarnetController::class, 'edit'])
             ->name('carnets.edit');
@@ -189,10 +159,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:carnets.eliminar')
         ->name('carnets.destroy');
 
-    /*
-     * CARGAR LOS DEPÓSITOS DESDE LA FICHA DEL CARNET. Mismo circuito que el
-     * aprovechamiento, y el mismo permiso: es un cobro de mostrador.
-     */
+    // Los depósitos, desde la ficha. Mismo permiso: es un cobro de mostrador.
     Route::post('/carnets/{carnet}/pagos', [CarnetController::class, 'pagar'])
         ->middleware('permiso:caja.cobrar')
         ->name('carnets.pagar');
@@ -213,12 +180,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:carnets.revocar')
         ->name('carnets.revocar');
 
-    /*
-     * EL PLÁSTICO. Va ANTES de '{carnet}' aunque la URL sea más larga: el
-     * orden solo importa entre rutas que puedan coincidir con el mismo camino,
-     * y estas dos no —'/carnets/7/imprimir' no coincide con '/carnets/{carnet}'—
-     * pero se agrupa acá para que el bloque se lea de corrido.
-     */
+    // El plástico. Permiso propio, como el resto de las impresiones.
     Route::get('/carnets/{carnet}/imprimir', [CarnetImpresionController::class, 'imprimir'])
         ->middleware('permiso:carnets.imprimir')
         ->name('carnets.imprimir');
@@ -243,11 +205,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('faenas.store');
     });
 
-    /*
-     * EL CIRCUITO DE COBRO Y FIRMA, igual que el del carnet y el del cupo:
-     * los depósitos se cargan desde la ficha, presentar es de ventanilla y
-     * firmar es de supervisión.
-     */
+    // El circuito de cobro y firma: presentar es de ventanilla, firmar no.
     Route::post('/faenas/{faena}/pagos', [FaenaController::class, 'pagar'])
         ->middleware('permiso:caja.cobrar')
         ->name('faenas.pagar');
@@ -264,21 +222,14 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('faenas.rechazar');
     });
 
-    /*
-     * COMPLETAR es de VENTANILLA y no de supervisión: registrar que el pescador
-     * volvió y descargó es un hecho del mostrador, no una decisión que alguien
-     * firme. Recién ahí los kilos quedan firmes contra el cupo.
-     */
+    // Completar es de VENTANILLA: que el pescador volvió es un hecho, no una
+    // decisión. Recién ahí los kilos quedan firmes contra el cupo.
     Route::patch('/faenas/{faena}/completar', [FaenaController::class, 'completar'])
         ->middleware('permiso:faenas.completar')
         ->name('faenas.completar');
 
-    /*
-     * CORREGIR Y ELIMINAR EL BORRADOR. Corregir es de ventanilla —es el mismo
-     * mostrador que lo está armando— y eliminar es de supervisión, igual que
-     * en el carnet y en el cupo. Las dos solo valen en PENDIENTE y sin un peso
-     * cargado: lo decide `PermisoFaena::puedeEditarse()`.
-     */
+    // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
+    // PENDIENTE y sin peso cargado: lo decide PermisoFaena::puedeEditarse().
     Route::get('/faenas/{faena}/editar', [FaenaController::class, 'edit'])
         ->middleware('permiso:faenas.editar')
         ->name('faenas.edit');
@@ -291,8 +242,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:faenas.eliminar')
         ->name('faenas.destroy');
 
-    // ANTES de '/faenas/{faena}': con la ficha primero, «imprimir» se toma
-    // como id. Permiso propio, como `carnets.imprimir`.
+    // ANTES de '{faena}': con la ficha primero, «imprimir» se toma como id.
     Route::get('/faenas/{faena}/imprimir', [PermisoFaenaImpresionController::class, 'imprimir'])
         ->middleware('permiso:faenas.imprimir')
         ->name('faenas.imprimir');
@@ -317,11 +267,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('guias.store');
     });
 
-    /*
-     * EL CIRCUITO DE COBRO Y FIRMA, igual que el de la faena: los depósitos se
-     * cargan desde la ficha, presentar es de ventanilla y firmar es de
-     * supervisión.
-     */
+    // El circuito de cobro y firma, igual que el de la faena.
     Route::post('/guias/{guia}/pagos', [GuiaController::class, 'pagar'])
         ->middleware('permiso:caja.cobrar')
         ->name('guias.pagar');
@@ -338,12 +284,8 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('guias.rechazar');
     });
 
-    /*
-     * CORREGIR Y ELIMINAR EL BORRADOR. Corregir es de ventanilla —es el mismo
-     * mostrador que la está armando— y eliminar es de supervisión, igual que en
-     * la faena. Las dos solo valen en PENDIENTE y sin un depósito cargado: lo
-     * decide `GuiaMovimiento::puedeEditarse()`.
-     */
+    // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
+    // PENDIENTE y sin depósito cargado: lo dice GuiaMovimiento::puedeEditarse().
     Route::get('/guias/{guia}/editar', [GuiaController::class, 'edit'])
         ->middleware('permiso:guias.editar')
         ->name('guias.edit');
@@ -356,23 +298,17 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:guias.eliminar')
         ->name('guias.destroy');
 
-    // Cerrar es de VENTANILLA: registrar que la carga llegó es un hecho del
-    // mostrador, no una decisión que alguien firme.
+    // Cerrar es de VENTANILLA: que la carga llegó es un hecho, no una decisión.
     Route::patch('/guias/{guia}/cerrar', [GuiaController::class, 'cerrar'])
         ->middleware('permiso:guias.cerrar')
         ->name('guias.cerrar');
 
-    /*
-     * ANULAR es de SUPERVISIÓN: quema un número del talonario para siempre —no
-     * se desanula— y deja un hueco en la serie que hay que poder explicar. Por
-     * eso no lo tiene quien emite.
-     */
+    // Anular es de SUPERVISIÓN: quema un número del talonario para siempre.
     Route::patch('/guias/{guia}/anular', [GuiaController::class, 'anular'])
         ->middleware('permiso:guias.anular')
         ->name('guias.anular');
 
-    // ANTES de '/guias/{guia}': con la ficha primero, «imprimir» se toma como
-    // id. Permiso propio, como `faenas.imprimir`.
+    // ANTES de '{guia}': con la ficha primero, «imprimir» se toma como id.
     Route::get('/guias/{guia}/imprimir', [GuiaImpresionController::class, 'imprimir'])
         ->middleware('permiso:guias.imprimir')
         ->name('guias.imprimir');
@@ -391,17 +327,12 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     });
 
     Route::middleware('permiso:caja.cobrar')->group(function () {
-        // 'cobrar' va ANTES de cualquier ruta con parámetro del mismo prefijo,
-        // por lo de siempre: esa palabra se tomaría como si fuera un id.
+        // 'cobrar' ANTES de cualquier ruta con parámetro: se tomaría como id.
         Route::get('/caja/cobrar', [CajaController::class, 'create'])->name('caja.create');
         Route::post('/caja', [CajaController::class, 'store'])->name('caja.store');
     });
 
-    /*
-     * IMPRIMIR va ANTES de '/recibos/{recibo}'… no: van los dos con parámetro,
-     * así que el orden entre ellos no importa. Lo que sí importa es el PERMISO:
-     * imprimir tiene el suyo —`recibos.imprimir`— y no el de ver.
-     */
+    // Imprimir tiene su propio permiso, no el de ver.
     Route::get('/recibos/{recibo}/imprimir', [ReciboController::class, 'imprimir'])
         ->middleware('permiso:recibos.imprimir')
         ->name('recibos.imprimir');
@@ -410,9 +341,7 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:caja.ver')
         ->name('recibos.show');
 
-    /*
-     * EL CONTROL DE LAS BOLETAS — la segunda mitad de la revisión.
-     */
+    // El control de las boletas: la segunda mitad de la revisión.
     Route::middleware('permiso:pagos.controlar')->group(function () {
         Route::patch('/pagos/{pago}/validar', [PagoController::class, 'validar'])
             ->name('pagos.validar');
@@ -421,11 +350,8 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('pagos.observar');
     });
 
-    /*
-     * CORREGIR va por POST porque puede traer un ARCHIVO: un multipart no viaja
-     * en un PATCH —PHP no puebla `$_FILES`— y el truco del `_method` hay que
-     * recordarlo en cada llamada.
-     */
+    // POST y no PATCH porque puede traer un ARCHIVO: PHP no puebla `$_FILES`
+    // en un PATCH.
     Route::post('/pagos/{pago}/corregir', [PagoController::class, 'corregir'])
         ->middleware('permiso:pagos.corregir')
         ->name('pagos.corregir');
@@ -467,11 +393,8 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->middleware('permiso:catalogos.ver')
             ->name('tipos-carnet.index');
 
-        /*
-         * NO HAY ALTA DE TIPOS: la lista sale de la resolución, así que el
-         * catálogo se corrige pero no se le agregan filas. Sacar el botón no
-         * alcanzaba —la ruta seguía aceptando un POST armado a mano—.
-         */
+        // SIN alta: la lista sale de la resolución. Sacar el botón no alcanza,
+        // la ruta seguía aceptando un POST armado a mano.
         Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
             ->middleware('permiso:catalogos.gestionar')
             ->name('tipos-carnet.update');

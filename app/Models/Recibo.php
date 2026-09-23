@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -90,18 +89,4 @@ class Recibo extends Model
     }
 
     //  Scopes
-
-    /** Para el arqueo del día. */
-    public function scopeDelDia(Builder $query, ?string $fecha = null): Builder
-    {
-        return $query->whereDate(
-            $this->qualifyColumn('created_at'),
-            $fecha ?? now()->toDateString(),
-        );
-    }
-
-    public function scopeOrdenDeSerie(Builder $query): Builder
-    {
-        return $query->orderBy($this->qualifyColumn('numero_recibo'));
-    }
 }

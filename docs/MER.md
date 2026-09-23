@@ -8,8 +8,8 @@ crean en `database/migrations/2026_09_18_*`; **las migraciones quedaron cortas a
 propósito y el porqué de cada decisión vive acá.**
 
 > El modelo ANTERIOR —`rubros`, `tramites`, `faenas`, `guias`— ya no existe en
-> la base. Sus migraciones quedaron en `database/migrations-anterior/`, que
-> Laravel no escanea.
+> la base. Sus migraciones se borraron el 22/09/2026: quedan en el historial
+> de git.
 >
 > ⚠️ `guia_detalles` VOLVIÓ el 22/09/2026, y no es la tabla vieja: aquella
 > colgaba de `guias`, esta cuelga de `guias_movimiento` y calca el cuadro D del
@@ -1005,5 +1005,5 @@ sin poder recibir otro nunca más.
 | El esquema | `database/migrations/2026_09_18_*` |
 | Las reglas de negocio | `app/Services/` |
 | Los estados y sus transiciones | `app/Enums/` |
-| El esquema anterior | `database/migrations-anterior/` (Laravel no lo escanea) |
+| El esquema anterior | Borrado el 22/09/2026; está en el historial de git |
 | El registro de cómo se llegó acá | [docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md) |

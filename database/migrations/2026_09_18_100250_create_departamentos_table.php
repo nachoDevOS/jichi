@@ -8,9 +8,8 @@ use Illuminate\Support\Facades\Schema;
 /*
 | Departamentos — los nueve de Bolivia, para el «expedido» de la cédula.
 |
-| Es un catálogo CERRADO: no tiene pantalla ni CRUD, porque no se agrega un
-| departamento. Por eso se siembra acá y no en un seeder — la tabla tiene que
-| existir llena aunque nadie corra `db:seed`, o no se puede cargar ni una ficha.
+| Catálogo CERRADO: se siembra acá y no en un seeder porque la tabla tiene que
+| existir llena aunque nadie corra `db:seed`. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -19,20 +18,15 @@ return new class extends Migration
         Schema::create('departamentos', function (Blueprint $table) {
             $table->id();
 
-            // EL CÓDIGO ES LA LLAVE DE NEGOCIO: es lo que el SEGIP imprime en
-            // la cédula y lo que `beneficiarios.expedido` referencia.
+            // La llave de negocio: es lo que el SEGIP imprime en la cédula.
             $table->string('codigo', 5)->unique()->comment('BN, LP, SC…');
             $table->string('nombre', 60);
 
-            // Sin timestamps ni softDeletes, al revés que el resto del dominio:
-            // no es una fila que alguien cargue, corrija o dé de baja.
+            // Sin timestamps ni softDeletes: no es una fila que alguien cargue.
         });
 
-        /*
-         * LA LISTA SALE DE `config('jichi.expedido')`, que ya la tenía escrita.
-         * Se siembra desde ahí para no dejar los nueve nombres en dos lugares
-         * que después se contradicen.
-         */
+        // Desde la config, que ya tenía la lista: escrita en dos lugares, se
+        // contradicen.
         $filas = collect(config('jichi.expedido', []))
             ->map(fn (string $nombre, string $codigo): array => [
                 'codigo' => $codigo,

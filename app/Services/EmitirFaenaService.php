@@ -38,12 +38,8 @@ class EmitirFaenaService
         // Sin fecha del papel, la ventana es el plazo entero de la resolución.
         $desembarque ??= PermisoFaena::limiteDesde($salida);
 
-        /*
-         * LAS COMPROBACIONES DEL CARNET VAN ANTES DE LA TRANSACCIÓN, y las del
-         * cupo adentro. La diferencia es qué puede cambiar mientras tanto: el
-         * carnet no se revoca en el medio de esta operación, pero el saldo sí
-         * puede moverlo otra ventanilla en el mismo segundo.
-         */
+        // El carnet se comprueba ANTES de la transacción y el cupo adentro: el
+        // carnet no se revoca en el medio, el saldo sí puede moverlo otro.
         if (! $carnet->tipo_actor->emiteFaenas()) {
             throw PermisoOperativoException::actorNoEmite('permisos de faena', $carnet->tipo_actor);
         }
@@ -86,13 +82,9 @@ class EmitirFaenaService
                 throw PermisoOperativoException::cupoEnRevision();
             }
 
-            /*
-             * EL TOPE SOLO SE HACE CUMPLIR EN MODO ESTRICTO.
-             *
-             * ⚠️ ACÁ YA NO ES UNA RESERVA, es un aviso temprano: como las
-             * pendientes no descuentan, dos solicitudes por el volumen entero
-             * pasan las dos. El control que decide de verdad corre al APROBAR.
-             */
+            // Solo en modo ESTRICTO, y es un aviso temprano y no una reserva: dos
+            // solicitudes por el volumen entero pasan las dos. El control de
+            // verdad corre al APROBAR.
             if (AprovechamientoPesq::modoEstricto()) {
                 $saldo = $cupo->saldoKg();
 
@@ -123,17 +115,12 @@ class EmitirFaenaService
                 'fecha_limite' => PermisoFaena::limiteDesde($salida)->toDateString(),
             ]);
 
-            /*
-             * SU LLAVE PÚBLICA, dentro de la misma transacción: un documento
-             * sin código no se puede verificar. Ver App\Traits\Codificable.
-             */
+            // Su llave pública, en la misma transacción: sin código, el documento
+            // no se puede verificar.
             $faena->asignarCodigo();
 
-            /*
-             * EL CUPO NO SE TOCA ACÁ. Una faena nace PENDIENTE y una pendiente
-             * ya no descuenta —ver EstadoFaena::consumeCupo()—, así que no hay
-             * nada que agotar: eso pasa recién al firmarla.
-             */
+            // El cupo NO se toca acá: una faena nace PENDIENTE y la pendiente ya
+            // no descuenta. Eso pasa al firmarla.
 
             return $faena;
         });
@@ -178,16 +165,9 @@ class EmitirFaenaService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            /*
-             * LOS KILOS PROPIOS SE SUMAN DE VUELTA SOLO SI DESCONTABAN.
-             *
-             * Desde que la pendiente dejó de descontar, `saldoKg()` ya NO la
-             * está restando: devolvérselos igual contaría dos veces el mismo
-             * volumen y dejaría pasar el doble del cupo. Se corrige una faena
-             * pendiente, así que hoy la rama de abajo no suma nada — se
-             * pregunta igual para que siga valiendo si la edición se abre en
-             * otro estado.
-             */
+            // Se suman de vuelta SOLO si descontaban: la pendiente ya no resta, y
+            // devolvérselos contaría dos veces el mismo volumen. Hoy la rama no
+            // suma nada; se pregunta por si la edición se abre en otro estado.
             if (AprovechamientoPesq::modoEstricto()) {
                 $disponible = $cupo->saldoKg()
                     + ($bloqueada->consumeCupo() ? (float) $bloqueada->kilos_extraidos : 0.0);
@@ -242,19 +222,13 @@ class EmitirFaenaService
                 ->lockForUpdate()
                 ->first();
 
-            /*
-             * EL MOTIVO SE DEJA EN EL MODELO Y SE BORRA: el trait `Auditable`
-             * ya engancha el `deleted`, y llamar además a `registrarAuditoria()`
-             * dejaría el mismo borrado dos veces, una sin explicación.
-             */
+            // El motivo se deja y se borra: `Auditable` ya engancha el `deleted`,
+            // y registrarlo a mano además dejaría el hecho dos veces.
             $bloqueada->motivoAuditoria = $motivo;
             $bloqueada->delete();
 
-            /*
-             * EL NÚMERO DEL TALONARIO NO SE REUSA. La baja es lógica y el
-             * correlativo sigue donde estaba: la serie queda con un hueco, que
-             * es justamente lo que el motivo en la auditoría explica.
-             */
+            // El número NO se reusa: la serie queda con un hueco, que es lo que
+            // el motivo en la auditoría explica.
 
             // Sus kilos vuelven a la bolsa: un cupo agotado puede destrabarse.
             if ($cupo !== null) {
@@ -288,11 +262,8 @@ class EmitirFaenaService
             $cambios = ['estado' => EstadoFaena::Completado];
 
             if ($kilosReales !== null && abs($kilosReales - (float) $bloqueada->kilos_extraidos) > 0.001) {
-                /*
-                 * El saldo se mide SIN esta faena: está APROBADA, así que
-                 * `saldoKg()` ya la está descontando y comparar contra el
-                 * saldo pelado rechazaría hasta una corrección hacia abajo.
-                 */
+                // El saldo se mide SIN esta faena: ya está descontada, y comparar
+                // contra el saldo pelado rechazaría hasta una corrección hacia abajo.
                 $disponible = $cupo->saldoKg()
                     + ($bloqueada->consumeCupo() ? (float) $bloqueada->kilos_extraidos : 0.0);
 

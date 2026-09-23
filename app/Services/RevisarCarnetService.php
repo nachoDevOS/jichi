@@ -66,46 +66,29 @@ class RevisarCarnetService
                 throw CarnetInvalidoException::noSePuedeRevisar($bloqueado->estado->etiqueta());
             }
 
-            /*
-             * SE VUELVE A MIRAR EL ARANCEL, aunque el envío ya lo había mirado:
-             * entre una cosa y la otra se pudo dar de baja un depósito.
-             */
+            // Se vuelve a mirar el arancel: entre el envío y la firma se pudo dar
+            // de baja un depósito.
             if ($bloqueado->saldoPendiente() > 0.0) {
                 throw CarnetInvalidoException::faltaCubrirElArancel($bloqueado->saldoPendiente());
             }
 
-            /*
-             * Y QUE NINGUNA BOLETA QUEDE SIN CONTROLAR. `sinValidar()` cuenta
-             * también las observadas: un reparo abierto no se firma, y sin esta
-             * condición la validación sería decorativa.
-             */
+            // Y que ninguna boleta quede sin controlar: `sinValidar()` cuenta
+            // también las observadas. Sin esto, validar sería decorativo.
             $sinControlar = $bloqueado->pagos()->sinValidar()->count();
 
             if ($sinControlar > 0) {
                 throw CarnetInvalidoException::faltaControlarBoletas($sinControlar);
             }
 
-            /*
-             * ACÁ SE EMITE, y por eso la fecha de emisión se escribe recién
-             * ahora: hasta la firma lo único que había era una solicitud. El
-             * vencimiento se recalcula sobre ella porque el carnet vale por la
-             * GESTIÓN —uno pedido el 28/12 y firmado en enero vence con el año
-             * nuevo, no con el que ya terminó—.
-             */
+            // La emisión se escribe ACÁ: hasta la firma había una solicitud. El
+            // vencimiento se recalcula sobre ella porque el carnet vale por
+            // GESTIÓN: uno pedido el 28/12 y firmado en enero vence con el año nuevo.
             $emision = now();
             $gestion = (int) $emision->format('Y');
 
-            /*
-             * EL NÚMERO DE REGISTRO SE ASIGNA ACÁ, no al registrar el
-             * expediente: es el correlativo del libro, y un carnet que nunca
-             * se firma —o que se rechaza— no puede gastar un número y dejar un
-             * hueco que después nadie explica.
-             *
-             * `siguienteNumero()` bloquea la fila del contador, así que dos
-             * ventanillas firmando al mismo tiempo nunca sacan el mismo. Y
-             * solo se pide si NO tiene: un rechazo devuelve el carnet a
-             * pendiente, y al volver a aprobarlo conserva su número.
-             */
+            // El número se asigna ACÁ: un carnet que nunca se firma no puede
+            // gastar uno del libro. `siguienteNumero()` bloquea la fila del
+            // contador, y solo se pide si NO tiene: un rechazo conserva el suyo.
             $registro = $bloqueado->nro_registro
                 ?? $this->correlativos->siguienteNumero(self::SERIE_REGISTRO, $gestion);
 

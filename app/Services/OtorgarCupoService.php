@@ -27,12 +27,8 @@ class OtorgarCupoService
         $solicitud ??= now();
 
         return DB::transaction(function () use ($beneficiario, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
-            /*
-             * Releer con lockForUpdate() devuelve OTRA instancia del mismo
-             * registro. No se escribe sobre ella ni se la devuelve: acá solo
-             * sirve para tomar el candado, y todo lo demás se lee del modelo que
-             * llegó por parámetro.
-             */
+            // `lockForUpdate()` devuelve OTRA instancia: acá solo toma el candado,
+            // todo lo demás se lee del modelo que llegó.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
 
             $vigente = $this->cupoVigenteDe($beneficiario);
@@ -45,12 +41,8 @@ class OtorgarCupoService
                 );
             }
 
-            /*
-             * Se vuelve a leer el tramo DESDE LA BASE en vez de confiar en el
-             * modelo que llegó: entre que el operador abrió el formulario y
-             * apretó guardar pueden pasar minutos, y en el medio alguien pudo
-             * derogar la escala desde el catálogo.
-             */
+            // El tramo se relee DESDE LA BASE: entre abrir el formulario y guardar
+            // pueden pasar minutos, y alguien pudo derogar la escala.
             $tramo = CategoriaAprovechamiento::query()->whereKey($categoria->id)->firstOrFail();
 
             if (! $tramo->estado) {
@@ -66,22 +58,12 @@ class OtorgarCupoService
                  */
                 'volumen_total_kg' => $tramo->kilos_max,
 
-                /*
-                 * LO QUE EL PESCADOR DECLARA QUE NAVEGA, tal como lo pide el
-                 * renglón del talonario. OBLIGATORIO —va impreso en la
-                 * autorización— y texto libre, porque no hay padrón de
-                 * embarcaciones: se escribe «canoa», «peque-peque» o «bote»
-                 * según con qué llegue, y un catálogo cerrado obligaría a dar de
-                 * alta un tipo nuevo con la persona esperando en la ventanilla.
-                 */
+                // Obligatorio: va impreso en la autorización. Texto libre porque no
+                // hay padrón de embarcaciones.
                 'tipo_embarcacion' => $tipoEmbarcacion,
 
-                /*
-                 * LA MODALIDAD TAMBIÉN SE COPIA, y por el mismo motivo que el
-                 * volumen: la fija la resolución al definir el tramo, y si
-                 * alguien reclasifica ese tramo en el catálogo, los cupos ya
-                 * otorgados no pueden cambiar de régimen retroactivamente.
-                 */
+                // Se copia, por lo mismo que el volumen: reclasificar el tramo en el
+                // catálogo no puede cambiarle el régimen a lo ya otorgado.
                 'modalidad' => $tramo->modalidad,
 
                 /*
@@ -89,20 +71,15 @@ class OtorgarCupoService
                  */
                 'estado' => EstadoAprovechamiento::Pendiente,
 
-                /*
-                 * SE GUARDA LA FECHA EN QUE SE PIDIÓ. La de otorgamiento la
-                 * escribe la aprobación: mientras el expediente es un borrador
-                 * no hay nada otorgado. Ver RevisarCupoService::aprobar().
-                 */
+                // La fecha en que se PIDIÓ. La de otorgamiento la escribe la
+                // aprobación: en borrador no hay nada otorgado.
                 'fecha_solicitud' => $solicitud->toDateString(),
                 'fecha_emision' => null,
                 'fecha_vencimiento' => $this->vencimientoDe($solicitud),
             ]);
 
-            /*
-             * SU LLAVE PÚBLICA, dentro de la misma transacción: un documento
-             * sin código no se puede verificar. Ver App\Traits\Codificable.
-             */
+            // Su llave pública, en la misma transacción: sin código, el documento
+            // no se puede verificar.
             $cupo->asignarCodigo();
 
             return $cupo;

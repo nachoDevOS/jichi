@@ -5,8 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /*
-| Códigos — la llave pública de CUALQUIER documento que se entrega.
-| Una sola tabla y no una columna por tabla: ver MER.md.
+| Códigos — la llave pública de cualquier documento que se entrega.
+| Una sola tabla y no una columna por tabla. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -16,29 +16,19 @@ return new class extends Migration
             $table->id();
 
             /*
-             * 16 caracteres, sin prefijo, del alfabeto sin confundibles. Es la
-             * llave de /verificar, así que va al azar y no correlativa: un
-             * número consecutivo deja ver el documento del de al lado.
+             * 16 caracteres al azar, del alfabeto sin confundibles. Único
+             * COMPLETO y no parcial: un código impreso queda quemado para
+             * siempre, aunque su documento se dé de baja.
              */
-            $table->string('codigo', 16);
+            $table->string('codigo', 16)->unique();
 
-            /*
-             * A QUÉ DOCUMENTO PERTENECE. Polimórfico y sin clave foránea, con
-             * el mismo costo que `pagos`: la integridad la sostiene la
-             * aplicación.
-             */
+            // Polimórfico y sin clave foránea, igual que `pagos`: la integridad
+            // la sostiene la aplicación.
             $table->string('codigable_type');
             $table->unsignedBigInteger('codigable_id');
 
-            /*
-             * ÚNICO COMPLETO, no parcial: un código que salió impreso queda
-             * QUEMADO para siempre, aunque su documento se dé de baja. Ver la
-             * tabla de índices únicos de MER.md.
-             */
-            $table->unique('codigo');
-
-            // Un documento, un código. Sin esto, dos emisiones seguidas le
-            // colgarían dos códigos al mismo papel.
+            // Un documento, un código: sin esto dos emisiones seguidas le
+            // colgarían dos al mismo papel.
             $table->unique(['codigable_type', 'codigable_id']);
 
             $table->timestamps();

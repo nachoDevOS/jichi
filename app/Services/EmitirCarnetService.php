@@ -28,12 +28,8 @@ class EmitirCarnetService
         TipoActor $actor,
         ?Carbon $emision = null,
         ?AprovechamientoPesq $cupoElegido = null,
-        /*
-         * LOS DOS PAPELES, ya subidos. Llegan como RUTA y no como archivo: se
-         * escriben ANTES de abrir la transacción —con StorageController, que
-         * pone el tope de 3 MB y el nombre aleatorio— porque un rollback borra
-         * filas pero no deshace lo escrito en disco.
-         */
+        // Llegan como RUTA, ya escritos ANTES de la transacción: un rollback
+        // borra filas pero no deshace lo escrito en disco.
         ?string $archivoCi = null,
         ?string $archivoAsociacion = null,
     ): Carnet {
@@ -46,13 +42,9 @@ class EmitirCarnetService
 
             $this->comprobarCatalogos($asociacion, $tipo);
 
-            /*
-             * EL TIPO Y LA ACTIVIDAD TIENEN QUE DECIR LO MISMO. Se compara
-             * contra `tipos_carnet.tipo_actor` y NUNCA contra el nombre, que es
-             * un catálogo que la unidad edita: sin la columna, un «Carnet
-             * Comercializador» se emitía marcado como pescador y el plástico
-             * salía diciendo una cosa y la base otra.
-             */
+            // Contra `tipos_carnet.tipo_actor` y NUNCA contra el nombre, que la
+            // unidad edita: así se emitía un «Carnet Comercializador» marcado
+            // como pescador.
             if ($tipo->tipo_actor !== $actor) {
                 throw CarnetInvalidoException::tipoNoCorresponde($tipo->nombre, $tipo->tipo_actor, $actor);
             }
@@ -75,22 +67,14 @@ class EmitirCarnetService
                 );
             }
 
-            /*
-             * EL CUPO SOLO SE BUSCA SI EL ACTOR LO LLEVA, y quién lo lleva lo
-             * dice el enum — NUNCA el nombre del tipo de carnet, que es un
-             * catálogo que la unidad edita y donde el mismo documento figura
-             * como «Carnet de Pescador» o «Pescador Artesanal».
-             */
+            // Quién lleva cupo lo dice el ENUM, nunca el nombre del tipo: el
+            // mismo documento figura como «Carnet de Pescador» o «Pescador Artesanal».
             $cupo = null;
 
             if ($actor->requiereAprovechamiento()) {
-                /*
-                 * El cupo puede venir elegido —la misma bolsa madre respalda
-                 * los carnets que haga falta— o resolverse solo: el vigente de
-                 * la persona. Si vino, se comprueba que sea suyo y esté en
-                 * curso, o un id tipeado en el navegador colgaría el carnet de
-                 * una bolsa ajena.
-                 */
+                // Puede venir elegido o resolverse solo. Si vino, se comprueba que
+                // sea SUYO: un id tipeado en el navegador colgaría el carnet de
+                // una bolsa ajena.
                 $cupo = $cupoElegido !== null
                     ? $this->cupoUtilizable($beneficiario, $cupoElegido)
                     : $this->cupoVigenteDe($beneficiario);
@@ -113,27 +97,17 @@ class EmitirCarnetService
                 'archivo_ci' => $archivoCi,
                 'archivo_asociacion' => $archivoAsociacion,
 
-                /*
-                 * NACE PENDIENTE. El plástico no se entrega hasta que el
-                 * arancel esté cobrado y alguien firme: mismo circuito que el
-                 * aprovechamiento. Ver RevisarCarnetService.
-                 */
+                // Nace PENDIENTE: el plástico no se entrega hasta que se cobre y
+                // alguien firme.
                 'estado' => EstadoCarnet::Pendiente,
-                /*
-                 * SE GUARDA LA FECHA EN QUE SE PIDIÓ. La de emisión la escribe
-                 * la aprobación: mientras el expediente es un borrador no hay
-                 * carnet emitido. Ver RevisarCarnetService::aprobar().
-                 */
+                // La fecha en que se PIDIÓ. La de emisión la escribe la aprobación.
                 'fecha_solicitud' => $emision->toDateString(),
                 'fecha_emision' => null,
                 'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
             ]);
 
-            /*
-             * SU LLAVE PÚBLICA, adentro de la misma transacción: un carnet sin
-             * código es un documento que nadie puede verificar. Ver
-             * App\Traits\Codificable.
-             */
+            // Su llave pública, en la misma transacción: sin código, el documento
+            // no se puede verificar.
             $carnet->asignarCodigo();
 
             return $carnet;
@@ -160,15 +134,9 @@ class EmitirCarnetService
         return DB::transaction(function () use ($carnet, $asociacion, $tipo, $emision, $cupoElegido, $archivoCi, $archivoAsociacion): Carnet {
             $bloqueado = Carnet::query()->whereKey($carnet->id)->lockForUpdate()->firstOrFail();
 
-            /*
-             * Se comprueba con la copia BLOQUEADA: entre que el operador abrió
-             * el formulario y apretó guardar, otra ventanilla pudo cobrarlo.
-             *
-             * Las dos condiciones van SEPARADAS y con mensajes distintos: con
-             * `puedeEditarse()` a secas, un carnet pendiente con un depósito
-             * cargado contestaba «está Pendiente y solo se corrige lo que está
-             * PENDIENTE», que no explica nada.
-             */
+            // Con la copia BLOQUEADA: entre abrir el formulario y guardar, otra
+            // ventanilla pudo cobrarlo. Las dos condiciones van separadas porque
+            // `puedeEditarse()` a secas daba un mensaje que no explicaba nada.
             if (! $bloqueado->estado->permiteEdicion()) {
                 throw CarnetInvalidoException::noSePuedeEditar($bloqueado->estado->etiqueta());
             }
@@ -258,11 +226,8 @@ class EmitirCarnetService
                 throw CarnetInvalidoException::tienePermisos($guias, 'guía(s)');
             }
 
-            /*
-             * EL MOTIVO SE DEJA EN EL MODELO Y SE BORRA: el trait `Auditable`
-             * ya engancha el `deleted`, así que llamar a `registrarAuditoria()`
-             * a mano dejaría el hecho DOS veces, una de ellas sin motivo.
-             */
+            // El motivo se deja y se borra: `Auditable` ya engancha el `deleted`,
+            // y registrarlo a mano además dejaría el hecho dos veces.
             $bloqueado->motivoAuditoria = $motivo;
             $bloqueado->delete();
         });

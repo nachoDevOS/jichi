@@ -268,22 +268,4 @@ class PermisoFaena extends Model
             ->where($this->qualifyColumn('estado'), EstadoFaena::Activo)
             ->whereDate($this->qualifyColumn('fecha_limite'), '>=', now()->toDateString());
     }
-
-    /** Las que pesan contra el cupo: las firmadas y las cerradas. */
-    public function scopeQueConsumenCupo(Builder $query): Builder
-    {
-        return $query->whereIn($this->qualifyColumn('estado'), [
-            EstadoFaena::Activo,
-            EstadoFaena::Completado,
-        ]);
-    }
-
-    /** Las de un cupo: se llega por el carnet, que es quien lo conoce. */
-    public function scopeDelCupo(Builder $query, int $aprovechamientoId): Builder
-    {
-        return $query->whereHas(
-            'carnet',
-            fn (Builder $c) => $c->where('carnets.aprovechamiento_id', $aprovechamientoId),
-        );
-    }
 }

@@ -41,8 +41,8 @@ PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
 > `app/Traits/Pagable.php`.
 >
 > **Las migraciones son cortas a propósito: el porqué de cada decisión está en
-> `MER.md`, no en ellas.** Las anteriores quedaron en
-> `database/migrations-anterior/` como referencia; Laravel no las corre.
+> `MER.md`, no en ellas.** Las del modelo anterior se BORRARON el 22/09/2026;
+> si hace falta leerlas, están en el historial de git.
 >
 > **El panel NO está portado:** controladores, `app/Services/`, `app/Support/` y
 > las pantallas de React siguen nombrando `Rubro`, `Tramite`, `Faena` y `Guia`,
@@ -433,12 +433,41 @@ React.**
 
     ```
     id → claves foráneas → datos → estado → fechas del negocio
-       → índices → timestamps() → softDeletes()
+       → índices compuestos → timestamps() → softDeletes()
     ```
 
     El orden de esas llamadas no cambia el esquema —los índices se crean después
-    de las columnas igual—, así que es una convención de lectura: las diez tablas
+    de las columnas igual—, así que es una convención de lectura: las once tablas
     terminan iguales y se sabe de memoria dónde mirar.
+
+    **UN ÍNDICE O UN ÚNICO DE UNA SOLA COLUMNA VA INLINE**, pegado a la columna
+    —`->unique()`, `->index()`— y NO en una línea aparte más abajo: leer la
+    columna tiene que alcanzar para saber cómo está indexada. En el bloque de
+    abajo quedan solo los COMPUESTOS, que no se pueden declarar de otra forma.
+
+    ⚠️ **Tres que NO pueden ir inline, y hay que saberlas:**
+
+    - **Un índice PARCIAL** —`WHERE deleted_at IS NULL`— va con `DB::statement()`
+      después del `create()`. Es lo que se usa donde la baja lógica libera el
+      valor; ver [docs/MER.md](docs/MER.md).
+    - **`->index()` después de `constrained()` NO HACE NADA**, y no avisa: lo que
+      devuelve `constrained()` es un `ForeignKeyDefinition`, así que el `index()`
+      se lo come él y la columna queda sin índice. Va **antes**:
+      `foreignId('x')->index()->constrained(...)`. PostgreSQL no indexa solo las
+      claves foráneas —MySQL sí—, así que la FK que se filtra necesita el suyo.
+    - **Un compuesto no se puede colapsar a inline.** `index(['estado','nombre'])`
+      no es `->index()` sobre `estado`: el segundo ordena dentro del primero.
+
+    **Al tocar una migración ya escrita, se comprueba que no se perdió ningún
+    índice**, y se comprueba MIDIENDO: se arma el esquema viejo y el nuevo en dos
+    SQLite descartables y se comparan los índices reales. Las dos trampas de
+    arriba se descubrieron así, no leyendo.
+
+    ```sh
+    DB_CONNECTION=sqlite DB_DATABASE=<archivo> php artisan migrate --force
+    # y después, sobre cada una:
+    # select name, tbl_name from sqlite_master where type='index'
+    ```
 
     **Y `softDeletes()` va en TODAS las tablas del dominio**, con el trait
     `SoftDeletes` en su modelo. Nada del dominio se borra de verdad: cada fila

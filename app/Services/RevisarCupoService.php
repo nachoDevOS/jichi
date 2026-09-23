@@ -64,24 +64,16 @@ class RevisarCupoService
                 throw CupoInvalidoException::faltaCubrirElMonto($bloqueado->saldoPendiente());
             }
 
-            /*
-             * TERCERA CONDICIÓN: todas las boletas controladas. El monto cubierto
-             * dice cuánto se DECLARÓ, no que la plata haya entrado. `sinValidar()`
-             * cuenta también los observados: un reparo abierto no se firma.
-             */
+            // Tercera condición: todas las boletas controladas. El monto cubierto
+            // dice cuánto se DECLARÓ, no que la plata haya entrado.
             $sinControlar = $bloqueado->pagos()->sinValidar()->count();
 
             if ($sinControlar > 0) {
                 throw CupoInvalidoException::faltaControlarBoletas($sinControlar);
             }
 
-            /*
-             * ACÁ SE OTORGA, y por eso la fecha de emisión se escribe recién
-             * ahora: hasta la firma lo único que había era una solicitud. El
-             * vencimiento se recalcula sobre ella porque el cupo vale por la
-             * GESTIÓN —un expediente pedido el 28/12 y firmado en enero vence
-             * con el año nuevo, no con el que ya terminó—.
-             */
+            // La emisión se escribe ACÁ: hasta la firma había una solicitud. El
+            // vencimiento se recalcula sobre ella porque el cupo vale por GESTIÓN.
             $emision = now();
 
             $bloqueado->motivoAuditoria = 'Depósitos verificados: el aprovechamiento queda habilitado.';

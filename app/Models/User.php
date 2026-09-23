@@ -37,30 +37,6 @@ class User extends Authenticatable
         ];
     }
 
-    public function tramitesRecepcionados(): HasMany
-    {
-        return $this->hasMany(Tramite::class, 'user_id');
-    }
-
-    /**
-     * Los depósitos que esta persona cargó en ventanilla.
-     */
-    public function pagosRegistrados(): HasMany
-    {
-        return $this->hasMany(Pago::class, 'registrado_por');
-    }
-
-    /**
-     * Los depósitos que esta persona controló contra el extracto.
-     *
-     * Es a propósito que un mismo usuario no pueda aparecer en las dos listas
-     * para el mismo pago: quien carga no valida. Ver Pago::puedeValidarlo().
-     */
-    public function pagosValidados(): HasMany
-    {
-        return $this->hasMany(Pago::class, 'validado_por');
-    }
-
     public function accesos(): HasMany
     {
         return $this->hasMany(Acceso::class)->latest();

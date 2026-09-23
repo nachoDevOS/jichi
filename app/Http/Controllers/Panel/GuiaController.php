@@ -60,12 +60,9 @@ class GuiaController extends Controller
         ];
 
         $guias = GuiaMovimiento::query()
-            /*
-             * El comercializador llega POR EL CARNET: la guía ya no guarda un
-             * beneficiario suelto. Van las CINCO partes del nombre porque
-             * `nombreCompleto` las lee todas, y `ci`+`complemento`+
-             * `departamento_id` porque `documento_identidad` concatena las tres.
-             */
+            // Por el CARNET: la guía no guarda un beneficiario suelto. Van las
+            // cinco partes del nombre y las tres de la cédula, porque
+            // `nombreCompleto` y `documento_identidad` las concatenan.
             ->with([
                 'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision',
                 'carnet.codigo',
@@ -80,13 +77,9 @@ class GuiaController extends Controller
             ->when($filtros['buscar'], function ($q, $termino) {
                 $operador = Sql::like($q->getConnection());
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], mb_strtoupper($termino)).'%';
-                /*
-                 * EL NÚMERO SE BUSCA SIN SUS CEROS. La columna es un ENTERO y
-                 * el operador teclea lo que ve impreso —«000308»—, así que un
-                 * `like '%000308%'` contra el 308 de la base no encuentra
-                 * nada. Y sin ningún dígito se OMITE la condición: un
-                 * `like '%%'` traería la tabla entera y taparía el resto.
-                 */
+                // SIN los ceros: la columna es un ENTERO y «000308» tecleado tal
+                // cual no encuentra al 308. Sin dígitos se omite la condición:
+                // un `like '%%'` traería la tabla entera.
                 $digitos = ltrim(preg_replace('/\D/', '', $termino), '0');
 
                 $q->where(fn ($s) => $s
@@ -199,11 +192,8 @@ class GuiaController extends Controller
         ]);
 
         return Inertia::render('panel/guias/editar', [
-            /*
-             * La persona y el carnet llegan FIJOS, para mostrar: cambiar de
-             * titular no es corregir un traslado, es emitir otro. Ver
-             * EmitirGuiaService::editar().
-             */
+            // La persona y el carnet llegan FIJOS: cambiar de titular no es
+            // corregir, es emitir otro.
             'guia' => [
                 'id' => $guia->id,
                 'numero_legible' => $guia->numero_legible,
@@ -285,10 +275,8 @@ class GuiaController extends Controller
                 ...$this->resumir($guia),
                 'asociacion_nombre' => $guia->asociacion?->nombre,
 
-                /*
-                 * LAS DEL CIRCUITO, resueltas en el servidor. React no vuelve a
-                 * evaluar el estado: pregunta por estas.
-                 */
+                // Las del circuito, resueltas en el servidor: React no vuelve a
+                // evaluar el estado.
                 'puede_enviarse' => $guia->puedeEnviarseARevision(),
                 'puede_revisarse' => $guia->puedeRevisarse(),
                 'puede_aprobarse' => $guia->puedeRevisarse() && $sinValidar === 0,
@@ -297,10 +285,7 @@ class GuiaController extends Controller
                 'detalles' => $this->resumirDetalle($guia),
             ],
 
-            /*
-             * EL DETALLE DE LO COBRADO, igual que en la ficha de la faena: una
-             * fila por boleta, con su control.
-             */
+            // El detalle de lo cobrado: una fila por boleta, con su control.
             'pagos' => $guia->pagos()
                 // Precargados: si no, cinco depósitos son diez consultas.
                 ->with(['registradoPor:id,name', 'validadoPor:id,name'])
@@ -354,11 +339,8 @@ class GuiaController extends Controller
     ): RedirectResponse {
         $datos = $request->validated();
 
-        /*
-         * EL ESTADO Y EL MONTO SE MIRAN ANTES DE SUBIR NADA: descubrirlo
-         * adentro obligaría a borrar los archivos ya escritos, porque una
-         * transacción no deshace lo que se escribió en disco.
-         */
+        // ANTES de subir nada: descubrirlo adentro obligaría a borrar los
+        // archivos ya escritos, que una transacción no deshace.
         if (! $guia->admitePagos()) {
             return back()->withErrors([
                 'pagos' => CobroInvalidoException::noAdmiteDepositos(
@@ -400,11 +382,8 @@ class GuiaController extends Controller
                 ];
             }
 
-            /*
-             * UNA SOLA LLAMADA CON TODAS LAS BOLETAS, nunca una por depósito
-             * dentro de un foreach: el servicio construye el cobro como una
-             * unidad y partirlo gasta dos números de recibo. Ver CLAUDE.md.
-             */
+            // UNA sola llamada con todas las boletas, nunca una por depósito en un
+            // foreach: partirlo gasta dos números de recibo. Ver CLAUDE.md.
             $caja->registrarDepositos($guia, $depositos);
         } catch (CobroInvalidoException $e) {
             foreach ($subidos as $ruta) {

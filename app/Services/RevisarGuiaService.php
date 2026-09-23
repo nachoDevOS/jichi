@@ -8,10 +8,8 @@ use App\Models\GuiaMovimiento;
 use Illuminate\Support\Facades\DB;
 
 /**
- *  EL CIRCUITO DE REVISIÓN DE UNA GUÍA
- *
- * Espejo de `RevisarFaenaService`: el traslado se cobra y se firma igual que
- * los otros tres trámites, así que el operador aprende un solo circuito.
+ * El circuito de revisión de una guía. Espejo de `RevisarFaenaService`: el
+ * operador aprende un solo circuito para los cuatro trámites.
  */
 class RevisarGuiaService
 {
@@ -75,12 +73,8 @@ class RevisarGuiaService
                 throw PermisoOperativoException::faltaControlarBoletasDeLaGuia($sinControlar);
             }
 
-            /*
-             * LOS CINCO DÍAS EMPIEZAN A CORRER ACÁ, no cuando se cargó el
-             * borrador: hasta la firma no había nada que amparara un traslado,
-             * y contarlos desde antes le comería al camión los días que estuvo
-             * esperando en ventanilla.
-             */
+            // Los cinco días corren desde ACÁ: contarlos desde el borrador le
+            // comería al camión los días que estuvo esperando en ventanilla.
             $emision = now();
 
             $bloqueada->motivoAuditoria = 'Depósitos verificados: la guía queda habilitada.';

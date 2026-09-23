@@ -47,29 +47,19 @@ class AprovechamientoController extends Controller
         ];
 
         $cupos = AprovechamientoPesq::query()
-            /*
-             * OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
-             * partes del nombre porque `nombreCompleto` las lee todas. Una
-             * columna que el modelo consulta y no está en el select vuelve null
-             * y el accesor contesta cualquier cosa, sin ningún error.
-             */
+            // OJO CON PEDIR COLUMNAS SUELTAS: van las CINCO partes del nombre
+            // porque `nombreCompleto` las lee todas. La que falte vuelve null y
+            // el accesor contesta cualquier cosa, sin error.
             ->with([
                 'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
                 'categoria',
             ])
-            /*
-             * Los DOS withSum son lo que evita dos consultas agregadas POR FILA:
-             * una para los kilos consumidos y otra para lo cobrado. Con 30 cupos
-             * en pantalla son 61 consultas sin ellos, y el listado se ve igual.
-             */
+            // Los DOS withSum evitan dos agregados POR FILA: con 30 cupos en
+            // pantalla son 61 consultas sin ellos, y el listado se ve igual.
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
             ->withSum('pagos', 'monto_parcial')
-            /*
-             * EL RECIBO PARA EL BOTÓN DE IMPRIMIR. `recibos()` del trait NO es
-             * una relación —es una consulta que devuelve colección— así que
-             * llamarla por fila serían treinta consultas. Se precargan los
-             * pagos con el suyo.
-             */
+            // `recibos()` del trait NO es una relación sino una consulta, así
+            // que llamarla por fila serían treinta. Se precargan los pagos.
             ->with(['pagos:id,pagable_type,pagable_id,recibo_id', 'pagos.recibo:id,numero_recibo'])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
                 'beneficiario',
@@ -79,12 +69,9 @@ class AprovechamientoController extends Controller
                 'aprovechamientos_pesq.estado',
                 $estado,
             ))
-            /*
-             * LO ÚLTIMO CARGADO, ARRIBA — y por `created_at`, no por la fecha
-             * de solicitud: esa la declara el operador y puede ser pasada, así
-             * que un expediente cargado hoy con fecha vieja se iba al fondo.
-             * El `id` desempata, o el paginado repite filas entre páginas.
-             */
+            // Por `created_at` y no por la fecha de solicitud, que el operador
+            // declara y puede ser pasada. El `id` desempata, o el paginado
+            // repite filas entre páginas.
             ->orderByDesc('aprovechamientos_pesq.created_at')
             ->orderByDesc('aprovechamientos_pesq.id')
             ->paginate($filtros['por_pagina'])
@@ -140,13 +127,8 @@ class AprovechamientoController extends Controller
                 now()->parse($datos['fecha_solicitud']),
             );
         } catch (CupoInvalidoException $e) {
-            /*
-             * El mensaje del servicio se devuelve como error DEL CAMPO y no como
-             * un aviso suelto arriba de la pantalla. La regla que falló es sobre
-             * la persona elegida, así que el texto tiene que aparecer al lado de
-             * ese campo: un cartel arriba obliga al operador a adivinar qué
-             * corregir.
-             */
+            // Error DEL CAMPO y no un cartel arriba: la regla que falló es sobre
+            // la persona elegida, y el texto tiene que salir al lado de ese campo.
             return back()
                 ->withInput()
                 ->withErrors(['beneficiario_id' => $e->getMessage()]);
@@ -175,17 +157,12 @@ class AprovechamientoController extends Controller
             'categoria',
         ]);
 
-        /*
-         * El recibo del trámite: uno solo, emitido al enviar a revisión.
-         * `recibos()` devuelve colección porque el trait sirve también al carnet
-         * y a la guía; acá el primero es el único. NULL mientras está pendiente.
-         */
+        // El recibo del trámite: uno solo, emitido al enviar a revisión. NULL
+        // mientras está pendiente.
         $recibo = $aprovechamiento->recibos()->first();
 
-        /*
-         * Cuántas boletas quedan sin dar por buenas, observadas incluidas. Acá y
-         * no en `resumir()`: el listado lo usa para treinta filas.
-         */
+        // Boletas sin dar por buenas, observadas incluidas. Acá y no en
+        // `resumir()`, que el listado corre treinta veces.
         $sinValidar = $aprovechamiento->pagos()->sinValidar()->count();
 
         return Inertia::render('panel/aprovechamientos/ver', [
@@ -215,11 +192,8 @@ class AprovechamientoController extends Controller
                 ->with(['registradoPor:id,name', 'validadoPor:id,name'])
                 ->latest('created_at')
                 ->get()
-                /*
-                 * El trámite se le pone a mano: `admiteControl()` le pregunta al
-                 * `pagable`, y sin esto cada fila lo va a buscar a la base — es
-                 * el mismo cupo que ya está en la mano.
-                 */
+                // A mano: `admiteControl()` le pregunta al `pagable`, y sin esto
+                // cada fila lo va a buscar a la base.
                 ->each(fn (Pago $p) => $p->setRelation('pagable', $aprovechamiento))
                 ->map(fn (Pago $p): array => [
                     'id' => $p->id,
@@ -254,12 +228,8 @@ class AprovechamientoController extends Controller
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
             ] : null,
 
-            /*
-             * LAS CÉDULAS QUE SE APOYAN EN ESTE CUPO, de la más nueva a la más
-             * vieja. Son varias en teoría —el carnet se renueva a mitad de un
-             * cupo vigente, o se repone uno perdido— y desde la ficha del cupo
-             * es la pregunta natural: «¿a quién se le emitió con esto?».
-             */
+            // Las cédulas que se apoyan en este cupo. Son varias en teoría: el
+            // carnet se renueva a mitad de un cupo vigente, o se repone uno perdido.
             'carnets' => $aprovechamiento->carnets()
                 ->with('tipoCarnet:id,nombre')
                 ->latest('created_at')
@@ -280,11 +250,8 @@ class AprovechamientoController extends Controller
                 ])
                 ->all(),
 
-            /*
-             * Las faenas que colgaron de este cupo, de la más nueva a la más
-             * vieja. Es el detalle que explica el saldo: sin él, «le quedan 20
-             * kg» es un número que hay que creer.
-             */
+            // Las faenas de este cupo: es el detalle que explica el saldo. Sin
+            // él, «le quedan 20 kg» es un número que hay que creer.
             'faenas' => $aprovechamiento->faenas()
                 // Con `nro_registro` y `fecha_emision`: de esas dos columnas
                 // salen los accesores del número del carnet, y sin ellas
@@ -299,11 +266,8 @@ class AprovechamientoController extends Controller
                     // la pantalla, o cada tabla elige su propio relleno.
                     'numero_legible' => $f->numero_legible,
 
-                    /*
-                     * DE QUÉ CARNET CUELGA. Un cupo puede respaldar más de una
-                     * credencial, así que la columna hace falta para saber cuál
-                     * de ellas gastó esos kilos.
-                     */
+                    // De qué carnet cuelga: un cupo puede respaldar más de una
+                    // credencial, y hay que saber cuál gastó esos kilos.
                     'carnet_id' => $f->carnet_id,
                     'carnet_registro' => $f->carnet?->registro_legible,
                     'kilos_extraidos' => (float) $f->kilos_extraidos,
@@ -339,12 +303,8 @@ class AprovechamientoController extends Controller
         ]);
 
         return Inertia::render('panel/aprovechamientos/editar', [
-            /*
-             * La persona llega con la MISMA forma que usa el autocompletado, y
-             * el formulario la muestra fija: cambiar de titular no es corregir
-             * un cupo, es otorgar otro. Dejarlo elegible abriría la puerta a
-             * mover una autorización de una persona a otra sin ningún rastro.
-             */
+            // La persona llega FIJA: cambiar de titular no es corregir un cupo,
+            // es otorgar otro.
             'cupo' => [
                 'id' => $aprovechamiento->id,
                 'beneficiario_id' => $aprovechamiento->beneficiario_id,
@@ -416,11 +376,8 @@ class AprovechamientoController extends Controller
         $datos = $request->validated();
         $aprovechamiento->loadMissing('beneficiario');
 
-        /*
-         * SE COMPRUEBA EL ESTADO ANTES DE SUBIR NADA. Un cupo en revisión o ya
-         * aprobado no admite pagos, y descubrirlo después de escribir cinco
-         * archivos obligaría a borrarlos.
-         */
+        // EL ESTADO SE MIRA ANTES DE SUBIR NADA: descubrirlo después de escribir
+        // cinco archivos obligaría a borrarlos.
         if (! $aprovechamiento->admitePagos()) {
             return back()->withErrors([
                 'pagos' => CupoInvalidoException::noAdmitePagos(
@@ -429,13 +386,8 @@ class AprovechamientoController extends Controller
             ]);
         }
 
-        /*
-         * Y EL MONTO, TAMBIÉN ANTES DE SUBIR NADA. El servicio lo vuelve a
-         * comprobar con la fila bloqueada —ahí está el control de verdad, y es
-         * el que resiste dos ventanillas a la vez— pero descubrirlo recién
-         * adentro obliga a borrar los archivos ya escritos. El botón apagado de
-         * la pantalla no cuenta: se quita desde el inspector del navegador.
-         */
+        // Y el monto igual. El control de verdad lo hace el servicio con la fila
+        // bloqueada; esto solo evita subir archivos que habría que borrar.
         $suma = round(array_sum(array_map(
             static fn (array $p): float => round((float) $p['monto'], 2),
             $datos['pagos'],
@@ -646,11 +598,8 @@ class AprovechamientoController extends Controller
             'descripcion' => $cupo->categoria?->descripcion_kg,
 
             'volumen_total_kg' => (float) $cupo->volumen_total_kg,
-            /*
-             * Lo que el pescador declaró que navega. Va NULL y no una cadena
-             * vacía cuando no se declaró, para que la pantalla pueda decir «no
-             * declarada» en vez de imprimir un renglón en blanco.
-             */
+            // NULL y no cadena vacía: así la pantalla dice «no declarada» en vez
+            // de imprimir un renglón en blanco.
             'tipo_embarcacion' => $cupo->tipo_embarcacion,
             'kilos_consumidos' => $cupo->kilosConsumidos(),
             'saldo_kg' => $cupo->saldoKg(),
@@ -660,12 +609,8 @@ class AprovechamientoController extends Controller
             'modalidad_etiqueta' => $cupo->modalidad->etiqueta(),
             'modalidad_color' => $cupo->modalidad->color(),
 
-            /*
-             * CUÁNDO SE CARGÓ LA FILA, que no es lo mismo que la fecha de
-             * solicitud: esa la declara el operador y puede ser pasada. Es un
-             * MOMENTO, así que va con toIso8601String() y la pantalla lo
-             * muestra con la hora y el «hace…».
-             */
+            // Cuándo se cargó, que no es la fecha de solicitud. Es un MOMENTO:
+            // va con toIso8601String().
             'registrado_en' => $cupo->created_at?->toIso8601String(),
 
             'estado' => $cupo->estado->value,
@@ -673,12 +618,8 @@ class AprovechamientoController extends Controller
             'estado_color' => $cupo->estado->color(),
             'vigente' => $cupo->estaVigente(),
 
-            /*
-             * LOS KILOS QUE SE PASARON DEL CUPO. En modo estricto siempre es
-             * cero —la emisión no deja pasar una faena que no entre— y por eso
-             * el número solo aparece en las pantallas cuando hay algo que
-             * mostrar. `saldoKg()` no puede decirlo: se corta en cero.
-             */
+            // Los kilos que se pasaron del cupo. En modo estricto siempre es cero.
+            // `saldoKg()` no puede decirlo: se corta en cero.
             'kilos_excedidos' => $cupo->kilosExcedidos(),
             'excedido' => $cupo->estaExcedido(),
             // Se puede colgar una faena HOY: vigente, con saldo y sin agotar.

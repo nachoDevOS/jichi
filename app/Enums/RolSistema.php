@@ -27,6 +27,9 @@ enum RolSistema: string
     /**
      * Permisos asignados al rol durante el seeding.
      *
+     * El reparto, en una línea: VENTANILLA arma y presenta, SUPERVISIÓN firma y
+     * deshace. Son dos personas distintas a propósito. Ver docs/ARQUITECTURA.md.
+     *
      * @return array<int, string>
      */
     public function permisos(): array
@@ -43,157 +46,68 @@ enum RolSistema: string
             'reportes.ver',
         ];
 
+        // VENTANILLA: cargar, corregir el borrador, cobrar, presentar a
+        // revisión, cerrar lo que volvió y entregar los papeles.
         $operacion = [
             'beneficiarios.crear',
             'beneficiarios.editar',
 
-            /*
-             * OTORGAR LA BOLSA MADRE ES DE VENTANILLA.
-             *
-             * Es el paso 2 del flujo del pescador y va antes del carnet: sin
-             * cupo definido no se sabe qué imprimir en el plástico.
-             */
             'aprovechamientos.crear',
-
-            /*
-             * CORREGIR EL BORRADOR TAMBIÉN ES DE VENTANILLA.
-             */
             'aprovechamientos.editar',
-
-            /*
-             * ENVIAR A REVISIÓN es de ventanilla: quien cargó los depósitos
-             * declara que el expediente está completo. No es aprobarlo — eso
-             * está en supervisión, y son dos personas distintas a propósito.
-             */
             'aprovechamientos.enviar',
 
-            // Entregar la autorización de pesca en papel. Permiso propio, como
-            // `carnets.imprimir`: es un acto distinto de consultar la ficha.
-            'aprovechamientos.imprimir',
-
             'carnets.crear',
-            // Corregir el BORRADOR es de ventanilla: es el mismo mostrador el
-            // que lo está armando.
             'carnets.editar',
-            // Presentar el carnet a revisión: mismo circuito que el cupo, y el
-            // mismo reparto —presentar es de ventanilla, firmar no—.
             'carnets.enviar',
-            // Imprimir el plástico es un hecho con fecha propia
-            // (`fecha_generacion` en el modelo anterior): por eso es su propio
-            // permiso y no viene incluido en `carnets.crear`.
-            'carnets.imprimir',
 
-            /*
-             * EMITIR FAENAS Y GUÍAS ES DE VENTANILLA, no de supervisión.
-             */
             'faenas.crear',
-            'guias.crear',
-
-            // Entregar el «Permiso por Faena» y la «Guía Única de Transporte»
-            // en papel. Permiso propio, como `carnets.imprimir`: es un acto
-            // distinto de consultar la ficha.
-            'faenas.imprimir',
-            'guias.imprimir',
-
-            /*
-             * CERRAR un permiso también es de ventanilla, y es el otro medio
-             * circuito: la faena se completa cuando el pescador vuelve y
-             * descarga, y la guía cuando la carga llega a destino. Son hechos
-             * que se registran en el mostrador, no decisiones que alguien firme.
-             *
-             * Recién ahí los kilos de la faena quedan firmes contra el cupo.
-             */
+            'faenas.editar',
+            'faenas.enviar',
+            // Que el pescador volvió y que la carga llegó son HECHOS del
+            // mostrador, no decisiones que alguien firme.
             'faenas.completar',
+
+            'guias.crear',
+            'guias.editar',
+            'guias.enviar',
             'guias.cerrar',
 
-            // Corregir el BORRADOR es de ventanilla, igual que en el carnet y
-            // el cupo: es el mismo mostrador el que lo está armando.
-            'faenas.editar',
-            'guias.editar',
-
-            // Presentar a revisión: mismo reparto que en el carnet y el cupo
-            // —presentar es de ventanilla, firmar no—.
-            'faenas.enviar',
-            'guias.enviar',
-
-            // Cobrar y entregar el comprobante numerado: el mostrador entero.
-            'caja.cobrar',
+            // Entregar un papel es un acto distinto de consultar la ficha, así
+            // que cada documento lleva su propio permiso.
+            'aprovechamientos.imprimir',
+            'carnets.imprimir',
+            'faenas.imprimir',
+            'guias.imprimir',
             'recibos.imprimir',
 
-            /*
-             * CORREGIR UN DEPÓSITO ES DE VENTANILLA, y tiene que serlo.
-             */
+            'caja.cobrar',
+            // Corregir un depósito es lo único que levanta una observación.
             'pagos.corregir',
         ];
 
+        // SUPERVISIÓN: firmar, y deshacer lo que ya no se puede corregir.
         $supervision = [
-            /*
-             * REVOCAR un carnet es una medida sancionatoria, y no se revierte:
-             * el día que exista el rol de ventanilla, no la tendrá.
-             */
-            'carnets.revocar',
-
-            /*
-             * ANULAR UNA GUÍA quema un número del talonario para siempre —no se
-             * desanula— y deja un hueco que hay que poder explicar. Por eso no
-             * lo tiene quien emite.
-             */
-            'guias.anular',
-
-            /*
-             * ANULAR UN COBRO no es corregirlo.
-             */
-            'caja.anular',
-
-            /*
-             * APROBAR Y RECHAZAR un aprovechamiento presentado.
-             */
             'aprovechamientos.aprobar',
-
-            /*
-             * APROBAR Y RECHAZAR un carnet presentado. Va con el del cupo: es
-             * la misma firma sobre el mismo expediente.
-             */
             'carnets.aprobar',
-
-            /*
-             * Y LA FIRMA DE LA FAENA, que es la misma decisión sobre el mismo
-             * tipo de expediente: se miran las boletas y se habilita la salida.
-             */
             'faenas.aprobar',
-
-            /*
-             * Y LA DE LA GUÍA, por lo mismo: se miran las boletas y recién ahí
-             * el papel ampara el traslado.
-             */
             'guias.aprobar',
 
-            /*
-             * ELIMINAR un carnet cargado por error. De supervisión, igual que
-             * en el cupo: borrar la fila la hace desaparecer de los listados y
-             * lo único que queda es la línea de `auditorias` con el motivo.
-             */
-            'carnets.eliminar',
-
-            /*
-             * CONTROLAR LAS BOLETAS —validar u observar— es del mismo lado que
-             * aprobar, y por el mismo motivo.
-             */
+            // Controlar las boletas es del mismo lado que aprobar: sin eso, la
+            // validación sería decorativa.
             'pagos.controlar',
 
-            /*
-             * ELIMINAR UN CUPO ES DE SUPERVISIÓN, aunque solo se pueda sobre un
-             * borrador sin pagos ni faenas.
-             */
+            // Eliminar deja la fila fuera de los listados y solo queda la
+            // auditoría con el motivo. Solo sobre borradores sin plata encima.
             'aprovechamientos.eliminar',
-
-            /*
-             * Y ELIMINAR UNA FAENA cargada por error, con el mismo corte: solo
-             * el borrador sin un peso encima. El número del talonario queda
-             * quemado igual, y eso es lo que el motivo tiene que explicar.
-             */
+            'carnets.eliminar',
             'faenas.eliminar',
             'guias.eliminar',
+
+            // Revocar es una sanción y anular quema un número del talonario:
+            // ninguna de las dos se revierte.
+            'carnets.revocar',
+            'guias.anular',
+            'caja.anular',
 
             'reportes.exportar',
             'auditoria.ver',
@@ -202,13 +116,8 @@ enum RolSistema: string
         $administracion = [
             'beneficiarios.eliminar',
 
-            /*
-             * LOS TRES CATÁLOGOS VAN CON UN SOLO PERMISO —asociaciones, escala
-             * de aprovechamiento y tipos de carnet— porque los tres cambian por
-             * la MISMA vía: una resolución. Quien puede tocar la tarifa del
-             * carnet puede tocar la de la escala; separarlos daría tres
-             * permisos que en la práctica se otorgan siempre juntos.
-             */
+            // Los TRES catálogos con un solo permiso: cambian por la misma vía
+            // —una resolución— y se otorgarían siempre juntos.
             'catalogos.gestionar',
 
             'usuarios.gestionar',

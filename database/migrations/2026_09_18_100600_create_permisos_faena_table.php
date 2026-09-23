@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Permisos de faena — la autorización de UNA salida de pesca.
-|
 | Calca el talonario «PERMISO POR FAENA» del SEDAG. Ver docs/MER.md.
 */
 return new class extends Migration
@@ -17,32 +16,22 @@ return new class extends Migration
         Schema::create('permisos_faena', function (Blueprint $table) {
             $table->id();
 
-            /*
-             * LA FAENA CUELGA DEL CARNET Y DE NADA MÁS. El cupo se alcanza a
-             * través de él —`carnets.aprovechamiento_id`— y por eso acá NO hay
-             * una segunda FK: con las dos, un permiso podía quedar apuntando a
-             * un cupo distinto del que respalda su carnet, y nada lo impedía.
-             */
+            // SU ÚNICA CLAVE. El cupo se alcanza por `carnets.aprovechamiento_id`:
+            // con dos claves, un permiso podía apuntar a un cupo que no es el suyo.
             $table->foreignId('carnet_id')->constrained('carnets')->restrictOnDelete();
 
-            // CORRELATIVO GLOBAL Y CONTINUO, lo genera el sistema: el talonario
-            // de papel es uno solo para toda la unidad y no reinicia por año.
-            $table->unsignedInteger('numero_faena')->comment('Correlativo global del talonario: 000001');
+            // Correlativo global y continuo, lo genera el sistema. Único y no
+            // parcial: la hoja del talonario se gastó.
+            $table->unsignedInteger('numero_faena')->unique()->comment('Del talonario: 000001');
 
-            // Copia congelada del arancel. Ver `pagos`: una suba por resolución
-            // no puede mover lo que dice un papel ya entregado.
-            $table->decimal('monto', 10, 2)->default(15.00);
+            $table->decimal('monto', 10, 2)->default(15.00)->comment('Copia congelada del arancel');
 
-            // Decimal: con enteros, treinta faenas redondeando medio kilo cada
-            // una desajustan el cupo en quince.
+            // Decimal: treinta faenas redondeando medio kilo desajustan el cupo
+            // en quince.
             $table->decimal('kilos_extraidos', 12, 2)->default(0);
 
-            /*
-             * LOS RENGLONES DEL PAPEL. Nullable no es descuido: el formulario
-             * se llena a mano y llega incompleto. Texto libre porque no hay
-             * padrón de embarcaciones ni de comandantes, y un catálogo cerrado
-             * obligaría a dar de alta uno con el pescador esperando.
-             */
+            // LOS RENGLONES DEL PAPEL. Nullable y texto libre: el formulario se
+            // llena a mano y llega incompleto, y no hay padrón de embarcaciones.
             $table->string('embarcacion', 150)->nullable();
             $table->string('propietario', 150)->nullable();
             $table->string('comandante_barco', 150)->nullable();
@@ -51,43 +40,22 @@ return new class extends Migration
             $table->string('region_desde', 150)->nullable();
             $table->string('region_hasta', 150)->nullable();
 
-            // NACE PENDIENTE: la faena se cobra y se firma como el carnet y el
-            // aprovechamiento, así que no autoriza nada hasta que la aprueban.
             $table->string('estado', 20)->default(EstadoFaena::Pendiente->value);
 
-            // El día que el pescador la pidió en ventanilla. Puede ser pasada:
-            // sirve para poner al día lo que se tramitó en papel.
+            // Puede ser pasada: sirve para poner al día lo tramitado en papel.
             $table->date('fecha_solicitud');
-
             $table->date('fecha_salida');
+            $table->date('fecha_desembarque')->comment('La ventana real de ESTA salida');
 
-            // El renglón «Fecha de desembarque» del papel: la ventana real de
-            // ESTA salida, que el operador escribe y un control en el río mira.
-            $table->date('fecha_desembarque');
-
-            // Se guarda calculada en vez de derivarla al leer: si la resolución
-            // cambia el plazo, los permisos ya emitidos tienen que seguir
-            // venciendo cuando dice el papel que el pescador tiene en la mano.
-            $table->date('fecha_limite')->comment('Techo: 1 mes desde fecha_salida');
+            // Guardada y no derivada: si la resolución cambia el plazo, lo ya
+            // emitido tiene que seguir venciendo cuando dice el papel.
+            $table->date('fecha_limite')->index()->comment('Techo: 1 mes desde la salida');
 
             // La escribe la APROBACIÓN. En NULL mientras es una solicitud.
             $table->date('fecha_emision')->nullable();
 
-            /*
-             * ÚNICO GLOBAL y no parcial: la hoja del talonario se gastó. Dar de
-             * baja la fila no devuelve el número, que está impreso en un papel
-             * que el pescador se llevó.
-             */
-            $table->unique('numero_faena');
-
-            /*
-             * La consulta caliente del módulo: la suma de kilos consumidos del
-             * cupo, que hoy llega por `carnets`. Ver AprovechamientoPesq::faenas().
-             */
+            // La consulta caliente: los kilos consumidos del cupo.
             $table->index(['carnet_id', 'estado']);
-
-            // Para el comando diario que marca las vencidas.
-            $table->index('fecha_limite');
 
             $table->timestamps();
             $table->softDeletes();

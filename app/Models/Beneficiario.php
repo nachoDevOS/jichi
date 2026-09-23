@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Support\Archivos;
@@ -210,31 +209,6 @@ class Beneficiario extends Model
             ->whereDate('fecha_vencimiento', '>=', now()->toDateString())
             ->latest('fecha_emision')
             ->first();
-    }
-
-    /** ¿Tiene credencial vigente de esta actividad? */
-    public function tieneCarnetVigenteDe(TipoActor $tipo): bool
-    {
-        return $this->carnetVigenteDe($tipo) !== null;
-    }
-
-    /**
-     * Su bolsa madre utilizable HOY, o null.
-     */
-    public function aprovechamientoVigente(): ?AprovechamientoPesq
-    {
-        if ($this->relationLoaded('aprovechamientos')) {
-            return $this->aprovechamientos->first(
-                fn (AprovechamientoPesq $a): bool => $a->puedeEmitirFaena(),
-            );
-        }
-
-        return $this->aprovechamientos()
-            ->where('estado', EstadoAprovechamiento::Aprobado)
-            ->whereDate('fecha_vencimiento', '>=', now()->toDateString())
-            ->latest('fecha_emision')
-            ->get()
-            ->first(fn (AprovechamientoPesq $a): bool => $a->puedeEmitirFaena());
     }
 
     /**

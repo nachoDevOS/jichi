@@ -57,14 +57,6 @@ class TipoCarnet extends Model
         ));
     }
 
-    /**
-     * El precio de HOY, para armar un cobro nuevo.
-     */
-    public function precioVigente(): float
-    {
-        return (float) $this->precio_bs;
-    }
-
     //  Scopes
 
     public function scopeVigentes(Builder $query): Builder

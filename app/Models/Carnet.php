@@ -344,9 +344,4 @@ class Carnet extends Model
     {
         return $query->where($this->qualifyColumn('tipo_actor'), $tipo);
     }
-
-    public function scopeDeAsociacion(Builder $query, int $asociacionId): Builder
-    {
-        return $query->where($this->qualifyColumn('asociacion_id'), $asociacionId);
-    }
 }

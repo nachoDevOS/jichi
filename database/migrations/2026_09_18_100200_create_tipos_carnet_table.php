@@ -6,7 +6,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /*
-| Tipos de carnet — el catálogo de credenciales y su arancel.
+| Tipos de carnet — el catálogo de credenciales y su arancel. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -17,12 +17,8 @@ return new class extends Migration
 
             $table->string('nombre', 120);
 
-            /*
-             * PARA QUÉ ACTIVIDAD SIRVE ESTE TIPO. Sin la columna, la coherencia
-             * entre el tipo elegido y el `tipo_actor` del carnet no se podía
-             * comprobar más que leyendo el NOMBRE —que la unidad edita— y así
-             * se emitía un «Carnet Comercializador» marcado como pescador.
-             */
+            // Sin esta columna la coherencia con `carnets.tipo_actor` solo se
+            // podía mirar contra el NOMBRE, que la unidad edita.
             $table->string('tipo_actor', 20)->default(TipoActor::Pescador->value);
 
             $table->decimal('precio_bs', 10, 2)->default(0);
@@ -32,10 +28,7 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // SIN INDICE UNICO EN LA BASE, a propósito: era un índice PARCIAL
-        // —`WHERE deleted_at IS NULL`— que solo existe en PostgreSQL. La
-        // unicidad la exige el Request del catálogo, que alcanza: esto se edita
-        // desde el panel una vez cada tanto, sin dos ventanillas a la vez.
+        // El nombre único lo exige el Request, no la base. Ver docs/MER.md.
     }
 
     public function down(): void

@@ -303,26 +303,6 @@ class GuiaMovimiento extends Model
             : (int) floor(now()->diffInHours($this->fecha_vencimiento, false));
     }
 
-    /**
-     * Los kilos que declara el cuadro D.
-     *
-     * Se pregunta si la CLAVE EXISTE y no si el valor es null: `withSum()`
-     * devuelve NULL sobre un conjunto vacío, así que justamente la guía sin
-     * detalle se caería a la consulta suelta. Ver CLAUDE.md.
-     */
-    public function kilosDelDetalle(): float
-    {
-        if (array_key_exists('detalles_sum_cantidad_kg', $this->getAttributes())) {
-            return (float) $this->detalles_sum_cantidad_kg;
-        }
-
-        if ($this->relationLoaded('detalles')) {
-            return (float) $this->detalles->sum('cantidad_kg');
-        }
-
-        return (float) $this->detalles()->sum('cantidad_kg');
-    }
-
     //  Scopes
 
     /**
@@ -335,19 +315,5 @@ class GuiaMovimiento extends Model
         return $query
             ->where($this->qualifyColumn('estado'), EstadoGuia::Activa)
             ->where($this->qualifyColumn('fecha_vencimiento'), '>=', now());
-    }
-
-    public function scopeDePiscicultura(Builder $query, bool $si = true): Builder
-    {
-        return $query->where($this->qualifyColumn('es_piscicultura'), $si);
-    }
-
-    /** Las de una persona: se llega por el carnet, que es quien la conoce. */
-    public function scopeDeComercializador(Builder $query, int $beneficiarioId): Builder
-    {
-        return $query->whereHas(
-            'carnet',
-            fn (Builder $c) => $c->where('carnets.beneficiario_id', $beneficiarioId),
-        );
     }
 }

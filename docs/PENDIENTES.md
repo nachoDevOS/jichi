@@ -70,7 +70,7 @@ equivalente en el núcleo nuevo o porque hay que rehacerlos:
 > nuevo y volver a deducirlo cuesta días. Las plantillas Blade de
 > `views/documentos/` NO se borraron.
 
-Las migraciones del modelo anterior quedaron en `database/migrations-anterior/`
+Las migraciones del modelo anterior se borraron el 22/09/2026 (están en git)
 —Laravel no recorre esa carpeta— por si hace falta consultarlas.
 
 ### Cómo quedó el menú, y por qué

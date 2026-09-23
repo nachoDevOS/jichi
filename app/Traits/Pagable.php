@@ -56,12 +56,6 @@ trait Pagable
         return $this->saldoPendiente() <= 0.0;
     }
 
-    /** ¿Se entregó algo pero no todo? Lo que el listado muestra como «parcial». */
-    public function tienePagoParcial(): bool
-    {
-        return $this->montoPagado() > 0.0 && ! $this->estaPagado();
-    }
-
     /**
      * ¿Se pueden CONTROLAR sus depósitos? Solo donde hay circuito de revisión;
      * hoy el aprovechamiento, que lo sobreescribe.

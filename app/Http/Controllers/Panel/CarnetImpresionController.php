@@ -29,23 +29,13 @@ class CarnetImpresionController extends Controller
      */
     public function imprimir(Carnet $carnet): Response|RedirectResponse
     {
-        /*
-         * OJO CON PEDIR COLUMNAS SUELTAS EN EL with(): `aprovechamiento` va
-         * ENTERO porque `Carnet::cupoImpreso()` lee `volumen_total_kg`, y el
-         * beneficiario va completo porque se usan el nombre en cinco partes, el
-         * domicilio y la foto. Una columna que un método consulta y no está en
-         * el select vuelve null, y el método contesta cualquier cosa sin ningún
-         * error: el renglón CUPO saldría vacío en un carnet perfectamente
-         * válido.
-         */
+        // OJO CON PEDIR COLUMNAS SUELTAS: `aprovechamiento` va ENTERO porque
+        // `cupoImpreso()` lee `volumen_total_kg`. La que falte vuelve null sin
+        // error, y el renglón CUPO sale vacío en un carnet válido.
         $carnet->load(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
 
-        /*
-         * UN CARNET SIN FIRMAR NO SE IMPRIME. El plástico es el documento que
-         * la persona se lleva: si sale antes de la aprobación, queda en la
-         * calle una credencial que el sistema todavía no autorizó —y que puede
-         * terminar rechazada—.
-         */
+        // Sin firmar no se imprime: quedaría en la calle una credencial que el
+        // sistema no autorizó, y que puede terminar rechazada.
         if (! $carnet->yaFueAprobado()) {
             return back()->with(
                 'error',
@@ -78,11 +68,7 @@ class CarnetImpresionController extends Controller
              */
             'fondo' => $this->imagenEmbebida('image/carnet-fondo.png'),
 
-            /*
-             * El escudo del encabezado, recortado del lockup de la
-             * Gobernación: acá va SOLO el escudo porque el texto —GOBERNACIÓN,
-             * BENI— lo escribe la plantilla, como en el plástico de papel.
-             */
+            // Solo el escudo: el texto —GOBERNACIÓN, BENI— lo escribe la plantilla.
             'escudo' => $this->imagenEmbebida('image/carnet-escudo.png'),
 
             /*
@@ -97,11 +83,8 @@ class CarnetImpresionController extends Controller
         ])
             ->setPaper([0, 0, self::ANCHO, self::ALTO])
 
-            /*
-             * Solo los glifos que el documento dibuja. Sin esto DomPDF embebe
-             * las dos DejaVu Sans completas —unas 380 KB cada una— dentro de
-             * cada carnet. Ver el mismo comentario en ReciboController.
-             */
+            // Solo los glifos que se dibujan: sin esto DomPDF embebe las dos
+            // DejaVu completas, ~380 KB cada una, en cada carnet.
             ->setOption('enable_font_subsetting', true);
 
         // `stream` y no `download`: se abre en el visor del navegador, que es
@@ -143,14 +126,8 @@ class CarnetImpresionController extends Controller
      */
     private function reverso(Carnet $carnet): array
     {
-        /*
-         * EL QR Y EL CÓDIGO ESCRITO, los dos: el QR es lo rápido y el código es
-         * lo que funciona cuando la cámara no lo agarra —un plástico rayado,
-         * poca luz, un teléfono viejo—. La pantalla de verificación acepta las
-         * dos entradas por el mismo motivo.
-         *
-         * Se resuelve UNA vez: dibujar el PNG del QR no es gratis.
-         */
+        // LOS DOS: el QR es lo rápido y el código escrito es lo que funciona con
+        // el plástico rayado o poca luz. Se resuelve UNA vez: el PNG no es gratis.
         $verificacion = QrVerificacion::de($carnet);
 
         return [
@@ -160,12 +137,8 @@ class CarnetImpresionController extends Controller
             'qr' => $verificacion['qr'] ?? '',
             'codigo' => $verificacion['codigo'] ?? '',
 
-            /*
-             * Quién firma sale de `configuraciones` y no de una constante: es
-             * el Gobernador, y cambia con cada gestión. Vacío imprime el
-             * recuadro sin nombre, que es preferible a estampar el de quien ya
-             * no está en el cargo.
-             */
+            // De `configuraciones` y no de una constante: es el Gobernador y
+            // cambia con cada gestión. Vacío imprime el recuadro sin nombre.
             'firmante' => [
                 'nombre' => trim((string) Configuracion::obtener('carnet.firmante_nombre', '')),
 
@@ -231,12 +204,9 @@ class CarnetImpresionController extends Controller
     /**
      *  LA JERARQUIA TIPOGRAFICA
      */
-    /*
-     * 5,2 pt y no 6: es el tamaño al que venía saliendo la ASOCIACIÓN, que es
-     * el renglón más largo y el único que el encogido de `texto()` bajaba.
-     * Con 6 fijo, el nombre salía notoriamente más grande que el gremio y la
-     * tira se leía despareja; igualado, los seis renglones pesan lo mismo.
-     */
+    // 5,2 pt y no 6: es donde terminaba la ASOCIACIÓN, el renglón más largo y
+    // el único que el encogido de `texto()` bajaba. Con 6 la tira se leía
+    // despareja.
     private const CUERPO_VALOR = 5.2;
 
     /**
@@ -338,11 +308,8 @@ class CarnetImpresionController extends Controller
      */
     private function cupo(Carnet $carnet): ?array
     {
-        /*
-         * LO DECIDE EL ENUM, NUNCA EL NOMBRE DEL TIPO DE CARNET. La pesca se
-         * autoriza por volumen —tantos kilos, contrastables contra una guía de
-         * transporte—; la comercialización no.
-         */
+        // Lo decide el ENUM, nunca el nombre del tipo: la pesca se autoriza por
+        // volumen y la comercialización no.
         $kilos = $carnet->cupoImpreso();
 
         if ($kilos === null) {
@@ -369,24 +336,16 @@ class CarnetImpresionController extends Controller
         /*
          *  LA GESTIÓN YA NO SE IMPRIME, Y NO ES UN OLVIDO
          */
-        /*
-         * EL RÓTULO ES «REGISTRO» Y EL VALOR SU NÚMERO ANUAL —«00001»—, no el
-         * código de 16 caracteres: en el plástico entra un número que se puede
-         * dictar y buscar en el libro, y el código largo llenaba la tira sin
-         * que nadie lo pueda leer de un vistazo. El código sigue existiendo y
-         * es el que usa la verificación pública.
-         */
+        // «REGISTRO» con su número anual —«00001»— y no el código de 16: en el
+        // plástico entra un número que se dicta y se busca en el libro. El
+        // código sigue existiendo, y es el que usa la verificación pública.
         if ($cupo === null) {
             return $this->campo('REGISTRO', $carnet->registro_legible, '—', self::ANCHO_VALOR);
         }
 
-        /*
-         * Con cupo, el renglón se parte en dos pares. El CUPO no lleva rótulo
-         * propio —«800 KG» se lee solo, la unidad hace de etiqueta— pero acá sí
-         * lo lleva, y corto: el rótulo del SEGUNDO par tiene una caja de 32 pt y
-         * a 6,1 pt en negrita cada carácter mide ~3,7, así que «CUPO» entra con
-         * holgura y «APROVECHAMIENTO» se desbordaría en silencio.
-         */
+        // Con cupo el renglón se parte en dos pares, y el rótulo del SEGUNDO va
+        // CORTO: su caja mide 32 pt y a 6,1 pt en negrita cada carácter pesa
+        // ~3,7, así que «CUPO» entra y «APROVECHAMIENTO» se desborda en silencio.
         return $this->campo('REGISTRO', $carnet->registro_legible, '—', self::ANCHO_VALOR_ANGOSTO) + [
             'segundo' => ['rotulo' => 'CUPO', 'alto' => self::ALTO_UNA_LINEA] + $cupo,
         ];
@@ -401,12 +360,8 @@ class CarnetImpresionController extends Controller
     {
         $texto = $this->texto($valor, $molde, $disponible, self::CUERPO_VALOR);
 
-        /*
-         * EL ALTO DE LA TIRA LO MANDA EL CONTROLADOR, y no es un detalle: con un
-         * alto fijo de un renglón, el valor que pasó a dos líneas se dibujaba
-         * igual y la segunda quedaba cortada por la mitad — se veía peor que si
-         * nunca hubiera entrado.
-         */
+        // El alto lo manda el controlador: con alto fijo, el valor que pasa a dos
+        // líneas sale con la segunda cortada por la mitad.
         $alto = $texto['lineas'] > 1 ? self::ALTO_DOS_LINEAS : self::ALTO_UNA_LINEA;
 
         return ['rotulo' => $rotulo, 'alto' => $alto] + $texto;
@@ -451,12 +406,8 @@ class CarnetImpresionController extends Controller
             return null;
         }
 
-        /*
-         * El tipo sale de los BYTES y no de la extensión del nombre: el archivo
-         * se guardó con un nombre al azar —ver StorageController— y la extensión
-         * que mandó el navegador no es prueba de nada. Si lo guardado no resulta
-         * ser una imagen, el carnet sale sin foto en vez de con un recuadro roto.
-         */
+        // El tipo sale de los BYTES: el archivo se guardó con nombre al azar y la
+        // extensión del navegador no prueba nada. Si no es imagen, sale sin foto.
         $medidas = getimagesizefromstring($bytes);
         $tipo = (string) ($medidas['mime'] ?? '');
 

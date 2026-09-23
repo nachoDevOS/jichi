@@ -5,37 +5,26 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /*
-| Recibos — la CABECERA del comprobante oficial de caja.
+| Recibos — la cabecera del comprobante oficial de caja. Ver docs/MER.md.
 */
 return new class extends Migration
 {
     public function up(): void
     {
         Schema::create('recibos', function (Blueprint $table) {
+            // Por id y no copiando el nombre: un solo lugar donde corregir un
+            // apellido. RESTRICT porque el comprobante respalda plata cobrada.
             $table->id();
-
-            /*
-             * A NOMBRE DE QUIÉN SALE, por id y no copiando el nombre y la
-             * cédula: un solo lugar donde corregir un apellido mal tipeado.
-             * RESTRICT porque el comprobante respalda plata cobrada.
-             */
             $table->foreignId('beneficiario_id')->constrained('beneficiarios')->restrictOnDelete();
 
-            /*
-             * CORRELATIVO CONTINUO: «000001», sin prefijo ni gestión, y no
-             * reinicia en enero. String y no entero porque los ceros son parte
-             * del número impreso. Lo reserva CorrelativoService, que bloquea la
-             * fila del contador.
-             */
+            // Correlativo CONTINUO: «000001», sin prefijo ni gestión, no
+            // reinicia en enero. String porque los ceros son parte del número.
             $table->string('numero_recibo', 40)->unique();
 
-            $table->decimal('monto_total', 12, 2)->default(0)->comment('Suma congelada de los pagos que ampara');
+            $table->decimal('monto_total', 12, 2)->default(0)->comment('Suma congelada de sus pagos');
+            $table->text('concepto')->comment('Tal como se imprime');
 
-            $table->text('concepto')->comment('Descripción unificada del cobro, tal como se imprime');
-
-            /*
-             * ÍNDICE, no columna: `created_at` ya la creó timestamps().
-             */
+            // El arqueo del día. `created_at` la crea timestamps().
             $table->index('created_at');
 
             $table->timestamps();

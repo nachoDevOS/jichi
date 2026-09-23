@@ -6,7 +6,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /*
-| Asociaciones — el gremio al que pertenece la persona.
+| Asociaciones — el gremio al que pertenece la persona. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -16,36 +16,23 @@ return new class extends Migration
             $table->id();
 
             $table->string('nombre', 160);
-            // La sigla es lo que entra en el renglón angosto del carnet.
-            $table->string('sigla', 20)->nullable()->comment('ASOPESCA, APESCAT...');
+            $table->string('sigla', 20)->nullable()->comment('Lo que entra en el renglón del carnet: ASOPESCA');
 
-            /*
-             * EL RESTO DE LA FICHA DEL GREMIO, EN JSON.
-             *
-             * Va en una sola columna y no en ocho porque nada del sistema
-             * DECIDE con estos datos: son de contacto y de respaldo, se
-             * muestran y se imprimen. Una columna por dato obligaría a una
-             * migración cada vez que la unidad pide guardar uno más.
-             *
-             * Las claves las fija `Asociacion::CAMPOS`, que es lo que el
-             * formulario del catálogo dibuja: sin esa lista, un JSON abierto
-             * termina con «telefono», «teléfono» y «tel» en la misma tabla.
-             */
+            // Contacto y respaldo: nada del sistema DECIDE con estos datos. Las
+            // claves las fija Asociacion::CAMPOS.
             $table->json('datos')->nullable()->comment('Personería, representante, contacto…');
 
-            // String y no ENUM nativo: regla 7 del proyecto.
             $table->string('estado', 20)->default(EstadoAsociacion::Activo->value);
 
+            // Compuesto y no inline: ordena por nombre DENTRO de un estado.
             $table->index(['estado', 'nombre']);
 
             $table->timestamps();
             $table->softDeletes();
         });
 
-        // SIN INDICE UNICO EN LA BASE, a propósito: era un índice PARCIAL
-        // —`WHERE deleted_at IS NULL`— que solo existe en PostgreSQL. La
-        // unicidad la exige el Request del catálogo, que alcanza: esto se edita
-        // desde el panel una vez cada tanto, sin dos ventanillas a la vez.
+        // El nombre único lo exige el Request, no la base: sería un índice
+        // parcial, que solo existe en PostgreSQL. Ver docs/MER.md.
     }
 
     public function down(): void
