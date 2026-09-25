@@ -1,21 +1,25 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { LoaderCircle, Lock, Mail } from 'lucide-react';
-import type { FormEvent } from 'react';
+import { LoaderCircle, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { LogoJichi } from '@/components/comunes/logo-jichi';
 import { ToggleApariencia } from '@/components/comunes/toggle-apariencia';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
-export default function Login() {
-    const { institucion } = usePage<PageProps>().props;
+// `ibare` = IBARE_ACTIVO: el login local queda plegado como acceso de emergencia del administrador.
+export default function Login({ ibare }: { ibare: boolean }) {
+    const { institucion, errors: erroresPagina } = usePage<PageProps>().props;
 
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
         remember: false as boolean,
     });
+
+    const [loginLocal, setLoginLocal] = useState(!ibare || Boolean(errors.email || errors.password));
 
     function enviar(e: FormEvent) {
         e.preventDefault();
@@ -68,75 +72,105 @@ export default function Login() {
                         <div className="mb-6 space-y-1">
                             <h1 className="text-2xl font-semibold tracking-tight">Iniciar sesión</h1>
                             <p className="text-sm text-muted-foreground">
-                                Ingrese con su correo institucional.
+                                {ibare
+                                    ? 'Ingrese con su cuenta de funcionario del GAD Beni.'
+                                    : 'Ingrese con su correo institucional.'}
                             </p>
                         </div>
 
-                        <form onSubmit={enviar} className="space-y-4" noValidate>
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Correo institucional</Label>
-                                <div className="relative">
-                                    <Mail className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        name="email"
-                                        value={data.email}
-                                        onChange={(e) => setData('email', e.target.value)}
-                                        autoComplete="username"
-                                        autoFocus
-                                        required
-                                        aria-invalid={Boolean(errors.email)}
-                                        className="pl-9"
-                                        placeholder="admin@admin.com"
-                                    />
-                                </div>
-                                {errors.email && (
+                        {ibare && (
+                            <div className="mb-6 space-y-3">
+                                <a
+                                    href={route('ibare.redirigir')}
+                                    className={cn(buttonVariants({ size: 'lg' }), 'w-full')}
+                                >
+                                    <ShieldCheck className="size-4" />
+                                    Ingresar con Ibare
+                                </a>
+                                {erroresPagina.ibare && (
                                     <p className="text-sm text-destructive" role="alert">
-                                        {errors.email}
+                                        {erroresPagina.ibare}
                                     </p>
                                 )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="password">Contraseña</Label>
-                                <div className="relative">
-                                    <Lock className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        name="password"
-                                        value={data.password}
-                                        onChange={(e) => setData('password', e.target.value)}
-                                        autoComplete="current-password"
-                                        required
-                                        aria-invalid={Boolean(errors.password)}
-                                        className="pl-9"
-                                        placeholder="••••••••"
-                                    />
-                                </div>
-                                {errors.password && (
-                                    <p className="text-sm text-destructive" role="alert">
-                                        {errors.password}
-                                    </p>
+                                {!loginLocal && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setLoginLocal(true)}
+                                        className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
+                                    >
+                                        Acceso de emergencia (administrador)
+                                    </button>
                                 )}
                             </div>
+                        )}
 
-                            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <input
-                                    type="checkbox"
-                                    checked={data.remember}
-                                    onChange={(e) => setData('remember', e.target.checked)}
-                                    className="size-4 rounded border-input accent-primary"
-                                />
-                                Mantener la sesión iniciada
-                            </label>
+                        {loginLocal && (
+                            <form onSubmit={enviar} className="space-y-4" noValidate>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Correo institucional</Label>
+                                    <div className="relative">
+                                        <Mail className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            name="email"
+                                            value={data.email}
+                                            onChange={(e) => setData('email', e.target.value)}
+                                            autoComplete="username"
+                                            autoFocus
+                                            required
+                                            aria-invalid={Boolean(errors.email)}
+                                            className="pl-9"
+                                            placeholder="admin@admin.com"
+                                        />
+                                    </div>
+                                    {errors.email && (
+                                        <p className="text-sm text-destructive" role="alert">
+                                            {errors.email}
+                                        </p>
+                                    )}
+                                </div>
 
-                            <Button type="submit" className="w-full" disabled={processing}>
-                                {processing && <LoaderCircle className="size-4 animate-spin" />}
-                                Ingresar
-                            </Button>
-                        </form>
+                                <div className="space-y-2">
+                                    <Label htmlFor="password">Contraseña</Label>
+                                    <div className="relative">
+                                        <Lock className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            name="password"
+                                            value={data.password}
+                                            onChange={(e) => setData('password', e.target.value)}
+                                            autoComplete="current-password"
+                                            required
+                                            aria-invalid={Boolean(errors.password)}
+                                            className="pl-9"
+                                            placeholder="••••••••"
+                                        />
+                                    </div>
+                                    {errors.password && (
+                                        <p className="text-sm text-destructive" role="alert">
+                                            {errors.password}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.remember}
+                                        onChange={(e) => setData('remember', e.target.checked)}
+                                        className="size-4 rounded border-input accent-primary"
+                                    />
+                                    Mantener la sesión iniciada
+                                </label>
+
+                                <Button type="submit" className="w-full" disabled={processing}>
+                                    {processing && <LoaderCircle className="size-4 animate-spin" />}
+                                    Ingresar
+                                </Button>
+                            </form>
+                        )}
 
                         <p className="mt-8 text-center text-xs text-muted-foreground">
                             ¿Problemas para ingresar? Contacte a la Unidad de Sistemas de la Gobernación.

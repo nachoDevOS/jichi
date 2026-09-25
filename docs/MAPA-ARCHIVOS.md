@@ -119,6 +119,23 @@ decisiones que acá solo se nombran.
 | `CorregirPagoRequest.php` | 118 | Corregir una boleta ya cargada. La boleta es OPCIONAL y el `unique` del número **ignora la propia fila**, o guardar sin tocar el número se acusaría a sí mismo |
 | `GuardarRubroRequest.php` | 78 | |
 
+## `app/AuthIbare/` — login con Ibare, módulo cerrado
+
+Todo lo del login con Ibare vive en esta carpeta. Fuera de ella solo quedan la config
+(`jichi.ibare`, porque `env()` va en `config/`), la columna `users.mamore_id`, la
+restricción del login por correo en `LoginRequest` y el botón de `pages/auth/login.tsx`.
+
+| Archivo | Qué hace |
+| --- | --- |
+| `AuthIbareServiceProvider.php` | Carga `rutas.php` con `web` + `guest` y registra el comando. Sacarlo de `bootstrap/providers.php` desconecta el módulo |
+| `rutas.php` | `/auth/ibare` y `/auth/ibare/callback` (404 con `IBARE_ACTIVO=false`) |
+| `IbareController.php` | Redirige a Ibare y recibe la vuelta; registra en `accesos` |
+| `IbareService.php` | URL con PKCE, canje del código, validación del JWT contra el JWKS. Devuelve un `User` o lanza `IbareException` |
+| `IbareException.php` | Los mensajes que ve el funcionario |
+| `VincularIbareCommand.php` | `jichi:vincular-ibare` — carga `users.mamore_id` mientras no haya módulo de Usuarios |
+
+Ver [modulos/IBARE.md](modulos/IBARE.md).
+
 ## `app/Support/` y `app/Traits/`
 
 | Archivo | Ln | No obvio |
@@ -150,7 +167,7 @@ decisiones que acá solo se nombran.
 | `web.php` | **Solo incluye** a los otros tres. Laravel carga este. La raíz se mudó a `publico.php` el 22/09/2026 |
 | `panel.php` | `/panel/...` — con sesión y con `permiso:` en cada ruta |
 | `publico.php` | `/` (portada) y `/verificar/{codigo?}` — sin sesión, con `throttle` |
-| `auth.php` | `/login`, `/logout` |
+| `auth.php` | `/login`, `/logout`. Las rutas de Ibare NO están acá: ver `app/AuthIbare/rutas.php` |
 
 > **El orden importa:** `/beneficiarios/crear` y `/beneficiarios/buscar` van
 > ANTES de `/beneficiarios/{beneficiario}`, o esas palabras se toman como id.

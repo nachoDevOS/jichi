@@ -15,7 +15,9 @@ class AuthenticatedSessionController extends Controller
 {
     public function create(): Response
     {
-        return Inertia::render('auth/login');
+        return Inertia::render('auth/login', [
+            'ibare' => (bool) config('jichi.ibare.activo'),
+        ]);
     }
 
     public function store(LoginRequest $request): RedirectResponse

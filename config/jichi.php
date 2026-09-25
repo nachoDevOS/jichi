@@ -100,4 +100,14 @@ return [
         'estricto' => (bool) env('APROVECHAMIENTO_ESTRICTO', true),
     ],
 
+    // Login centralizado del GAD (OAuth2). Apagado = login propio por correo.
+    // Encendido, el login local queda solo para administradores. Ver docs/modulos/IBARE.md.
+    'ibare' => [
+        'activo' => (bool) env('IBARE_ACTIVO', false),
+        'url' => rtrim((string) env('IBARE_URL', 'http://localhost:8001'), '/'),
+        'client_id' => env('IBARE_CLIENT_ID', 'jichi'),
+        'client_secret' => env('IBARE_CLIENT_SECRET'),
+        'timeout' => (int) env('IBARE_TIMEOUT', 10),
+    ],
+
 ];

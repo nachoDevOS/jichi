@@ -10,6 +10,8 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->string('ci', 20)->nullable()->after('name');
+            // Vínculo con Ibare: el `sub` del token es este id de mamoré.
+            $table->string('mamore_id', 50)->nullable()->unique()->after('ci');
             $table->string('cargo')->nullable()->after('email');
             $table->string('telefono', 30)->nullable()->after('cargo');
             $table->boolean('activo')->default(true)->after('telefono');
@@ -22,7 +24,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->dropSoftDeletes();
-            $table->dropColumn(['ci', 'cargo', 'telefono', 'activo', 'ultimo_acceso_at']);
+            $table->dropColumn(['ci', 'mamore_id', 'cargo', 'telefono', 'activo', 'ultimo_acceso_at']);
         });
     }
 };

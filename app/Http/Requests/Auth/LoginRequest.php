@@ -69,6 +69,18 @@ class LoginRequest extends FormRequest
 
         RateLimiter::clear($this->throttleKey());
 
+        // Con Ibare encendido, el correo es solo el acceso de emergencia del administrador.
+        if (config('jichi.ibare.activo') && ! $this->user()->esAdministrador()) {
+            $userId = $this->user()->id;
+            Auth::guard('web')->logout();
+
+            $this->registrarAcceso('fallido', $userId);
+
+            throw ValidationException::withMessages([
+                'email' => 'Ingrese con «Ingresar con Ibare». El acceso con correo queda solo para administradores.',
+            ]);
+        }
+
         $this->user()->forceFill(['ultimo_acceso_at' => now()])->saveQuietly();
 
         $this->registrarAcceso('login', $this->user()->id);

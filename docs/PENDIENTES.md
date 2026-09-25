@@ -291,6 +291,17 @@ rasterizando la página hasta 150 dpi.
 
 ---
 
+## 🟠 Login con Ibare: hecho del lado de Jichi, falta cargar Ibare — 24/09/2026
+
+- **`users.mamore_id` es columna nueva** en la migración de campos institucionales:
+  la base de trabajo no la tiene hasta volver a migrar.
+- En Ibare falta registrar el cliente `jichi` y dar de alta los funcionarios.
+  Ver [modulos/IBARE.md](modulos/IBARE.md).
+- **Problemas de Ibare que Jichi no puede arreglar:** su login de funcionarios no
+  tiene `throttle`, y el refresh token no vuelve a consultar el contrato
+  (Jichi no usa refresh, así que no lo afecta).
+- No hay pantalla para vincular usuarios: se hace con `php artisan jichi:vincular-ibare`.
+
 ## 🔴 HAY QUE VOLVER A MIGRAR — 22/09/2026
 
 `carnets.codigo_carnet` **dejó de existir**: la llave de verificación se mudó a
