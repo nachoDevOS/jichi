@@ -35,7 +35,7 @@ class PermisoOperativoException extends RuntimeException
                 'antes de poder emitir este papel.',
             // El estado dice «activo» pero la fecha ya pasó: la columna la
             // escribe un comando diario y entre corrida y corrida miente.
-            EstadoCarnet::Activo => 'Pasó su fecha de vencimiento.',
+            EstadoCarnet::Aprobado => 'Pasó su fecha de vencimiento.',
         };
 
         return new self("El carnet no está vigente. {$detalle}");
@@ -93,17 +93,6 @@ class PermisoOperativoException extends RuntimeException
         return new self(
             "Ya existe {$permiso} con el número {$numero}. El número sale del talonario y no se ".
             'puede repetir: verifique la hoja que tiene en la mano.',
-        );
-    }
-
-    /**
-     * Solo se completa una faena que está EN CURSO.
-     */
-    public static function noSePuedeCompletar(string $estado): self
-    {
-        return new self(
-            "La faena está {$estado} y solo se completa una que esté en curso. ".
-            'Si el pescador volvió después del plazo, lo que corresponde es emitir una faena nueva.',
         );
     }
 

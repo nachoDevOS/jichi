@@ -43,7 +43,7 @@ beneficiario ──< carnet (Pescador, 2026)        ──< permiso_faena   (una
 propósito: el operador aprende uno solo.
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ ACTIVO/ACTIVA
+PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO/APROBADA
 (borrador)      │            │                          │
                 │            └──[rechazar]──────────────┘
                 └── acá sale el RECIBO, uno por trámite
@@ -79,9 +79,9 @@ los campos `puede_*` de la ficha.
 
 **Qué NO comparten:** la faena consume el cupo de la bolsa madre al firmarse y
 `RevisarFaenaService::aprobar()` vuelve a medir el saldo con la fila del cupo
-bloqueada; la guía no toca ningún cupo. Y el cierre es distinto: la faena se
-**completa** cuando el pescador vuelve y descarga, la guía se **cierra** cuando
-la carga llega a destino.
+bloqueada; la guía no toca ningún cupo. Y el cierre es distinto: la faena **no
+registra la vuelta** (retirado el 25/09/2026) y la guía se **cierra** cuando la
+carga llega a destino.
 
 **ANULAR NO ES ELIMINAR, y en la guía conviven las dos.** Eliminar es sobre el
 BORRADOR —nunca hubo papel—; anular es sobre una guía YA FIRMADA, cuyo papel
@@ -315,10 +315,10 @@ de lectura que escribe se dispara solo con que el navegador precargue el enlace.
   embarcación, propietario, comandante, matrícula naval, kardex y la región
   desde/hasta. Todos nullable y texto libre — el formulario se llena a mano y
   llega incompleto, y no hay padrón de embarcaciones ni de comandantes.
-- **`fecha_desembarque` NO es `fecha_limite`.** El desembarque es el renglón
-  del papel y lo escribe el operador; el límite es el techo de 30 días que
-  calcula el sistema. El formulario valida que el desembarque caiga entre los
-  dos.
+- **Salida y desembarque los escribe la APROBACIÓN** (desde el 25/09/2026): sale
+  el día de la firma y desembarca a los 30 días. El formulario no tiene fechas;
+  `fecha_limite` y `fecha_emision` se sacaron por ser copias. Ver
+  [MER.md](../MER.md).
 - **El PDF lo dibuja `PermisoFaenaImpresionController`**, con la plantilla
   `documentos/permiso-faena.blade.php`. Calca el talonario renglón por renglón y
   sale recién con la faena APROBADA. Su sello de agua es
@@ -353,9 +353,11 @@ de lectura que escribe se dispara solo con que el navegador precargue el enlace.
 - **El cupo del carnet y la cantidad de la faena son DOS topes distintos.** El
   primero es anual, el segundo es de ese viaje. Se controlan en momentos
   distintos y el formulario lo aclara, porque es la confusión más frecuente.
-- **`Faena::estaVigente()` mira TRES cosas**: el estado, la ventana de fechas y
-  el CARNET. La tercera es la que se olvida — un carnet suspendido en marzo no
-  deja vigentes las faenas de febrero.
+- **REVOCAR EL CARNET NO TOCA SUS FAENAS** —confirmado con el responsable el
+  25/09/2026—. `PermisoFaena::estaVigente()` mira solo su estado y su
+  `fecha_desembarque`: reponer un plástico perdido revoca el viejo, y la salida
+  ya aprobada y pagada sigue valiendo, también al escanear su QR. Solo el
+  carnet revocado da «NO vigente». Los kilos siguen descontando del mismo cupo.
 
 ---
 

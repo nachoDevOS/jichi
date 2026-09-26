@@ -158,11 +158,11 @@
         .qr-caja { background-color: #ffffff; }
         .qr-rotulo { font-size: 6pt; font-weight: bold; letter-spacing: 0.4pt; color: #1f3d13; }
         .qr-codigo {
-            /* Monoespaciada: en el código se confunden el 0 con la O. */
+            /* Chico y monoespaciado —el 0 y la O se confunden—; 19 caracteres a 5 pt = 57 pt, cabe bajo el QR. */
             font-family: 'DejaVu Sans Mono', monospace;
-            font-size: 8pt;
+            font-size: 5pt;
             font-weight: bold;
-            letter-spacing: 0.6pt;
+            letter-spacing: 0;
             padding-top: 1pt;
             color: #000000;
         }

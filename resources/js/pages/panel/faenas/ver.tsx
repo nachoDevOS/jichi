@@ -1,15 +1,14 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { BadgeCheck, CalendarX, Check, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Send, Trash2, Undo2, User, Waves } from 'lucide-react';
 import { useState } from 'react';
+import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { TarjetaPagos } from '@/components/panel/pagos/tarjeta-pagos';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
-import { Input } from '@/components/ui/input';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha } from '@/lib/utils';
@@ -27,18 +26,18 @@ export default function VerFaena({
     faena,
     pagos,
     recibo,
+    diasVigencia,
 }: {
     faena: FaenaFicha;
     pagos: PagoDelCupo[];
     recibo: ReciboDelCupo | null;
+    diasVigencia: number;
 }) {
     const { puede } = usePermisos();
-    const [cerrando, setCerrando] = useState(false);
     const [aprobando, setAprobando] = useState(false);
     const [rechazando, setRechazando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
 
-    const form = useForm({ kilos_extraidos: String(faena.kilos_extraidos) });
     const envio = useForm({});
     const rechazo = useForm({ motivo: '' });
     const borrado = useForm({ motivo: '' });
@@ -46,7 +45,6 @@ export default function VerFaena({
     return (
         <LayoutPanel
             titulo={faena.etiqueta}
-            descripcion={`${faena.beneficiario ?? '—'} · Carnet N° ${faena.carnet_registro ?? '—'}`}
             acciones={
                 <div className="flex flex-wrap gap-2">
                     {faena.beneficiario_id !== null && (
@@ -171,79 +169,39 @@ export default function VerFaena({
                             Imprimir recibo
                         </a>
                     )}
-
-                    {/*
-                        `puede_completarse` llega resuelto: exige que la faena
-                        esté EN CURSO. Sobre una vencida no se puede — al vencer
-                        ya devolvió los kilos, y completarla los volvería a
-                        descontar de un cupo que se repuso.
-                    */}
-                    {puede('faenas.completar') && faena.puede_completarse && (
-                        <Button onClick={() => setCerrando((v) => !v)}>
-                            <CheckCheck className="size-4" />
-                            Registrar la vuelta
-                        </Button>
-                    )}
                 </div>
             }
         >
             <Head title={faena.etiqueta} />
 
+            {/* EL TITULAR, CON SU FOTO: mismo bloque que la autorización de pesca. */}
+            <Card className="mb-6 min-w-0">
+                <CardContent className="flex flex-wrap items-center gap-4 p-4">
+                    <Retrato url={faena.foto_url} nombre={faena.beneficiario ?? 'Sin nombre'} className="size-16" />
+
+                    <div className="min-w-0">
+                        {faena.beneficiario_id !== null ? (
+                            <Link
+                                href={route('beneficiarios.show', faena.beneficiario_id)}
+                                className="text-lg font-semibold text-primary hover:underline"
+                            >
+                                {faena.beneficiario ?? '—'}
+                            </Link>
+                        ) : (
+                            <p className="text-lg font-semibold">{faena.beneficiario ?? '—'}</p>
+                        )}
+
+                        <p className="tabular-nums text-sm text-muted-foreground">C.I. {faena.documento ?? '—'}</p>
+
+                        <p className="text-sm text-muted-foreground">
+                            Carnet de pescador N° {faena.carnet_registro ?? '—'}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="space-y-6 lg:col-span-2">
-                    {cerrando && faena.puede_completarse && (
-                        <Card className="border-emerald-300 bg-emerald-50/50 dark:border-emerald-500/40 dark:bg-emerald-500/5">
-                            <CardHeader>
-                                <CardTitle>Registrar la vuelta</CardTitle>
-                            </CardHeader>
-
-                            <CardContent>
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        form.patch(route('faenas.completar', faena.id), {
-                                            preserveScroll: true,
-                                            onSuccess: () => setCerrando(false),
-                                        });
-                                    }}
-                                    className="space-y-4"
-                                >
-                                    <Campo
-                                        etiqueta="Kilos descargados"
-                                        htmlFor="kilos_extraidos"
-                                        error={form.errors.kilos_extraidos}
-                                        ayuda="Viene con lo declarado al salir. Corríjalo solo si la balanza dijo otra cosa; hacia arriba se vuelve a comprobar el cupo."
-                                        className="max-w-xs"
-                                    >
-                                        <Input
-                                            id="kilos_extraidos"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={form.data.kilos_extraidos}
-                                            onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.kilos_extraidos)}
-                                        />
-                                    </Campo>
-
-                                    <div className="flex gap-2">
-                                        <Button type="submit" disabled={form.processing}>
-                                            Completar faena
-                                        </Button>
-
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => setCerrando(false)}
-                                        >
-                                            Cancelar
-                                        </Button>
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     <Card>
                         <CardHeader>
                             <CardTitle>La salida</CardTitle>
@@ -255,14 +213,9 @@ export default function VerFaena({
                             <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                                 <Dato etiqueta="Kilos" valor={`${faena.kilos_extraidos} kg`} />
                                 <Dato etiqueta="Solicitada" valor={fecha(faena.fecha_solicitud)} />
+                                {/* Las dos las escribe la aprobación: en «—» hasta la firma. */}
                                 <Dato etiqueta="Salida" valor={fecha(faena.fecha_salida)} />
-                                {/* La del papel: cuándo vuelve. El límite es el
-                                    techo que calcula el sistema. */}
                                 <Dato etiqueta="Desembarque" valor={fecha(faena.fecha_desembarque)} />
-                                <Dato etiqueta="Límite" valor={fecha(faena.fecha_limite)} />
-                                {/* La emisión la escribe la aprobación: hasta
-                                    entonces esto es una solicitud. */}
-                                <Dato etiqueta="Aprobada" valor={fecha(faena.fecha_emision)} />
                                 <Dato etiqueta="Arancel" valor={bs(faena.monto)} />
                                 <Dato etiqueta="Asociación" valor={faena.asociacion ?? '—'} />
                                 {/* DE QUÉ CARNET CUELGA. El número del libro es
@@ -312,50 +265,65 @@ export default function VerFaena({
                             </dl>
                         </CardContent>
                     </Card>
-
-                    {/* LA MISMA TARJETA que el carnet y el cupo: se cobra igual. */}
-                    <TarjetaPagos
-                        pagos={pagos}
-                        recibo={recibo}
-                        saldoPendiente={faena.saldo_pendiente}
-                        titular={faena.beneficiario ?? 'el titular'}
-                        admitePagos={faena.admite_pagos}
-                        rutaPagar={route('faenas.pagar', faena.id)}
-                        permisoEnviar="faenas.enviar"
-                        textoAlEnviar="La faena pasa a EN REVISIÓN y se emite el recibo con el total; autoriza la salida recién cuando esté aprobada."
-                    />
                 </div>
 
-                <Card className="h-fit">
-                    <CardHeader>
-                        <CardTitle>Cupo del que salió</CardTitle>
-                    </CardHeader>
+                <div className="space-y-6">
+                    {/* EL CÓDIGO DE LA FAENA: es la llave del QR del permiso impreso. */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Código de la faena</CardTitle>
+                        </CardHeader>
 
-                    <CardContent className="space-y-3 text-sm">
-                        {faena.cupo === null ? (
-                            <p className="text-muted-foreground">Sin cupo asociado.</p>
-                        ) : (
-                            <>
-                                <Dato etiqueta="Escala" valor={String(faena.cupo.escala ?? '—')} />
-                                <BarraSaldo cupo={faena.cupo} />
+                        <CardContent className="space-y-1 text-sm">
+                            <p className="font-mono text-lg font-semibold tracking-wide">{faena.codigo ?? '—'}</p>
+                            <p className="text-xs text-muted-foreground">
+                                Es el que va en el QR del permiso impreso y con el que se verifica.
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                                {/*
-                                    Se dice explícitamente si ESTA faena está
-                                    pesando sobre ese saldo: una vencida no, y sin
-                                    la aclaración el número de arriba parece no
-                                    cuadrar con la lista de faenas.
-                                */}
-                                <p className="text-xs text-muted-foreground">
-                                    {faena.consume_cupo
-                                        ? 'Esta faena está descontando sus kilos del saldo.'
-                                        : faena.estado === 'vencido'
-                                          ? 'Esta faena venció: sus kilos volvieron al cupo.'
-                                          : 'Todavía no descuenta: la bolsa se mueve recién cuando se aprueba.'}
-                                </p>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Cupo del que salió</CardTitle>
+                        </CardHeader>
+
+                        <CardContent className="space-y-3 text-sm">
+                            {faena.cupo === null ? (
+                                <p className="text-muted-foreground">Sin cupo asociado.</p>
+                            ) : (
+                                <>
+                                    <BarraSaldo cupo={faena.cupo} />
+
+                                    {/*
+                                        Se dice explícitamente si ESTA faena está
+                                        pesando sobre ese saldo: una vencida no, y sin
+                                        la aclaración el número de arriba parece no
+                                        cuadrar con la lista de faenas.
+                                    */}
+                                    <p className="text-xs text-muted-foreground">
+                                        {faena.consume_cupo
+                                            ? 'Esta faena está descontando sus kilos del saldo.'
+                                            : faena.estado === 'vencido'
+                                              ? 'Esta faena venció: sus kilos volvieron al cupo.'
+                                              : 'Todavía no descuenta: la bolsa se mueve recién cuando se aprueba.'}
+                                    </p>
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* LA MISMA TARJETA que el carnet y el cupo, y a lo ancho como en ellos. */}
+                <TarjetaPagos
+                    pagos={pagos}
+                    recibo={recibo}
+                    saldoPendiente={faena.saldo_pendiente}
+                    titular={faena.beneficiario ?? 'el titular'}
+                    admitePagos={faena.admite_pagos}
+                    rutaPagar={route('faenas.pagar', faena.id)}
+                    permisoEnviar="faenas.enviar"
+                    textoAlEnviar="La faena pasa a EN REVISIÓN y se emite el recibo con el total; autoriza la salida recién cuando esté aprobada."
+                />
             </div>
 
             {/* APROBAR PIDE CASILLA: es la FIRMA. Desde acá la faena autoriza. */}
@@ -368,7 +336,8 @@ export default function VerFaena({
                         <p>
                             La <strong>{faena.etiqueta}</strong> de{' '}
                             <strong>{faena.beneficiario ?? 'el titular'}</strong> queda APROBADA y
-                            autoriza la salida hasta el <strong>{fecha(faena.fecha_limite)}</strong>.
+                            autoriza la salida desde <strong>hoy</strong> por {diasVigencia} días.
+                            Las fechas de salida y desembarque se fijan al aprobar.
                         </p>
                         <p>
                             <strong>No se puede deshacer.</strong>
@@ -508,7 +477,7 @@ function Situacion({ faena }: { faena: FaenaFicha }) {
                 clase="bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200"
                 icono={<BadgeCheck className="mt-0.5 size-5 shrink-0" />}
                 titulo="En curso"
-                texto={`Autoriza a pescar hasta el ${fecha(faena.fecha_limite)}. Sus kilos ya están descontados del cupo.`}
+                texto={`Autoriza a pescar hasta el ${fecha(faena.fecha_desembarque)}. Sus kilos ya están descontados del cupo.`}
             />
         );
     }

@@ -134,7 +134,7 @@ class GuiaController extends Controller
                     ->vigentes()
                     ->with(['codigo', 'tipoCarnet:id,nombre'])
                     ->get()
-                    ->map($this->resumirCarnetParaEmitir(...))
+                    ->map(fn (Carnet $c): array => $c->resumenParaEmitir())
                     ->values()
                     ->all(),
             ] : null,
@@ -544,25 +544,6 @@ class GuiaController extends Controller
     }
 
     /**
-     * Un carnet como lo necesita el formulario de emisión.
-     *
-     * @return array<string, mixed>
-     */
-    private function resumirCarnetParaEmitir(Carnet $carnet): array
-    {
-        return [
-            'id' => $carnet->id,
-            'codigo' => $carnet->codigo_legible,
-            'tipo' => $carnet->tipoCarnet?->nombre,
-            'tipo_actor' => $carnet->tipo_actor->value,
-            'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
-            'puede_emitir_faenas' => $carnet->puedeEmitirFaenas(),
-            'puede_emitir_guias' => $carnet->puedeEmitirGuias(),
-            'saldo_kg' => null,
-        ];
-    }
-
-    /**
      * El recibo del trámite, sin una consulta por fila.
      *
      * `Pagable::recibos()` es una CONSULTA y no una relación, así que en un
@@ -677,8 +658,8 @@ class GuiaController extends Controller
             // Se resuelven acá para que la pantalla no las recalcule.
             'puede_editarse' => $guia->puedeEditarse(),
             'puede_eliminarse' => $guia->puedeEliminarse(),
-            'puede_cerrarse' => $guia->estado === EstadoGuia::Activa,
-            'puede_anularse' => $guia->estado === EstadoGuia::Activa,
+            'puede_cerrarse' => $guia->estado === EstadoGuia::Aprobada,
+            'puede_anularse' => $guia->estado === EstadoGuia::Aprobada,
             'ya_fue_aprobada' => $guia->yaFueAprobada(),
             'admite_pagos' => $guia->admitePagos(),
             // Por qué todavía no ampara. Se resuelve en el servidor: React no

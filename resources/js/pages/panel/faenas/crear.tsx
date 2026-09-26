@@ -8,7 +8,7 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
-import { fecha, fechaInput } from '@/lib/utils';
+import { fecha } from '@/lib/utils';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 
 /**
@@ -16,11 +16,14 @@ import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/benefi
  */
 export default function CrearFaena({
     beneficiario,
+    carnetElegido,
     diasVigencia,
     tarifa,
     modoEstricto,
 }: {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
+    /** `?carnet=`: llega desde la ficha del cupo con el carnet ya elegido. */
+    carnetElegido: number | null;
     /** El plazo de la resolución. Llega del servidor para que no haya dos copias. */
     diasVigencia: number;
     /** El arancel de hoy. Se copia congelado en la fila al emitir. */
@@ -32,15 +35,14 @@ export default function CrearFaena({
     modoEstricto: boolean;
 }) {
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
-    const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(null);
-
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Solo si está entre los vigentes y puede emitir: si no, se elige a mano.
+    const inicial =
+        beneficiario?.carnets_vigentes.find((c) => c.id === carnetElegido && c.puede_emitir_faenas) ?? null;
+    const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(inicial);
 
     const form = useForm({
-        carnet_id: null as number | null,
-        kilos_extraidos: '',
-        fecha_salida: hoy,
-        fecha_desembarque: hoy,
+        carnet_id: inicial?.id ?? (null as number | null),
+        kilos_extraidos: inicial?.saldo_kg ? String(inicial.saldo_kg) : '',
         embarcacion: '',
         propietario: '',
         comandante_barco: '',
@@ -53,13 +55,18 @@ export default function CrearFaena({
     function elegirPersona(elegida: BeneficiarioSugerido | null) {
         setPersona(elegida);
         setCarnet(null);
-        form.setData('carnet_id', null);
+        form.setData((d) => ({ ...d, carnet_id: null, kilos_extraidos: '' }));
         form.clearErrors('carnet_id');
     }
 
+    // Arranca con todo el saldo del cupo: es lo que casi siempre se pide, y se baja a mano.
     function elegirCarnet(c: CarnetVigenteSugerido) {
         setCarnet(c);
-        form.setData('carnet_id', c.id);
+        form.setData((d) => ({
+            ...d,
+            carnet_id: c.id,
+            kilos_extraidos: c.saldo_kg !== null && c.saldo_kg > 0 ? String(c.saldo_kg) : '',
+        }));
         form.clearErrors('carnet_id');
     }
 
@@ -70,15 +77,6 @@ export default function CrearFaena({
 
     const saldo = carnet?.saldo_kg ?? null;
     const kilos = Number(form.data.kilos_extraidos || 0);
-
-    /*
-     * El techo de la ventana: hasta cuándo puede desembarcar. Se recalcula
-     * sobre la salida elegida y solo alimenta el texto de ayuda — quien
-     * rechaza de verdad es la validación del servidor.
-     */
-    const techo = fechaInput(
-        new Date(new Date(`${form.data.fecha_salida}T00:00:00`).getTime() + diasVigencia * 86400000),
-    );
 
     /*
      * `excede` es el HECHO —no entra en el saldo— y `bloquea` es la
@@ -123,64 +121,6 @@ export default function CrearFaena({
 
                         {carnet && (
                             <>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Campo
-                                        etiqueta="Kilos autorizados"
-                                        htmlFor="kilos_extraidos"
-                                        error={form.errors.kilos_extraidos}
-                                        ayuda={
-                                            saldo !== null
-                                                ? `Quedan ${saldo} kg en la bolsa madre.`
-                                                : undefined
-                                        }
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="kilos_extraidos"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={form.data.kilos_extraidos}
-                                            onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
-                                        />
-                                    </Campo>
-
-                                    <Campo
-                                        etiqueta="Fecha de salida"
-                                        htmlFor="fecha_salida"
-                                        error={form.errors.fecha_salida}
-                                        ayuda="Puede ser pasada. Futura no: el permiso empezaría a valer antes de existir."
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="fecha_salida"
-                                            type="date"
-                                            value={form.data.fecha_salida}
-                                            onChange={(e) => form.setData('fecha_salida', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.fecha_salida)}
-                                        />
-                                    </Campo>
-
-                                    <Campo
-                                        etiqueta="Fecha de desembarque"
-                                        htmlFor="fecha_desembarque"
-                                        error={form.errors.fecha_desembarque}
-                                        ayuda={`Cuándo vuelve. Como máximo el ${fecha(techo)}.`}
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="fecha_desembarque"
-                                            type="date"
-                                            value={form.data.fecha_desembarque}
-                                            onChange={(e) =>
-                                                form.setData('fecha_desembarque', e.target.value)
-                                            }
-                                            aria-invalid={Boolean(form.errors.fecha_desembarque)}
-                                        />
-                                    </Campo>
-                                </div>
-
                                 {/*
                                     LOS RENGLONES DEL TALONARIO. Ninguno es obligatorio: el
                                     papel se llena a mano y llega incompleto, y frenar por
@@ -189,7 +129,7 @@ export default function CrearFaena({
                                 */}
                                 <div className="space-y-4 border-t border-border pt-5">
                                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Datos del talonario
+                                        El Área de Fiscalización y Control de la Actividad Pesquera autoriza a
                                     </p>
 
                                     <div className="grid gap-4 sm:grid-cols-2">
@@ -293,6 +233,32 @@ export default function CrearFaena({
                                             />
                                         </Campo>
                                     </div>
+
+                                    <Campo
+                                        etiqueta="Cantidad autorizada de pescado extraído (kg)"
+                                        htmlFor="kilos_extraidos"
+                                        error={form.errors.kilos_extraidos}
+                                        ayuda={saldo !== null ? `Quedan ${saldo} kg en la bolsa madre.` : undefined}
+                                        obligatorio
+                                    >
+                                        <Input
+                                            id="kilos_extraidos"
+                                            type="number"
+                                            step="0.01"
+                                            min={0}
+                                            value={form.data.kilos_extraidos}
+                                            onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
+                                            aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
+                                            className="sm:max-w-xs"
+                                        />
+                                    </Campo>
+
+                                    {/* Las fechas no se tipean: las fija la aprobación. */}
+                                    <p className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                                        <Info className="mt-0.5 size-4 shrink-0" />
+                                        La fecha de salida es el día en que se aprueba el permiso, y la de
+                                        desembarque, {diasVigencia} días después. Las pone el sistema.
+                                    </p>
                                 </div>
                             </>
                         )}
@@ -386,8 +352,8 @@ export default function CrearFaena({
                                 </div>
 
                                 <p className="text-xs text-muted-foreground">
-                                    La faena vale {diasVigencia} días desde la salida. Si no se cierra
-                                    antes, vence y su volumen vuelve al cupo.
+                                    Sale el día que se aprueba y vale {diasVigencia} días. Si no se
+                                    cierra antes, vence y su volumen vuelve al cupo.
                                 </p>
                             </>
                         )}
@@ -397,7 +363,6 @@ export default function CrearFaena({
                             disabled={
                                 form.processing ||
                                 carnet === null ||
-                                form.data.fecha_desembarque === '' ||
                                 kilos <= 0 ||
                                 bloquea
                             }
@@ -455,15 +420,28 @@ function ListaDeCarnets({
                         >
                             <Ship className="size-4 shrink-0 text-muted-foreground" />
 
-                            <span className="min-w-0 flex-1">
-                                <span className="block font-mono text-sm font-medium">{c.codigo}</span>
+                            <span className="min-w-0 flex-1 space-y-0.5">
+                                <span className="block text-sm font-medium">
+                                    {c.registro ? `Carnet N° ${c.registro}` : (c.tipo ?? c.tipo_actor_etiqueta)}
+                                    <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                                        {c.codigo}
+                                    </span>
+                                </span>
                                 <span className="block text-xs text-muted-foreground">
                                     {c.tipo ?? c.tipo_actor_etiqueta}
+                                    {c.fecha_vencimiento && ` · vence ${fecha(c.fecha_vencimiento)}`}
                                 </span>
+                                {c.volumen_total_kg !== null && (
+                                    <span className="block text-xs text-muted-foreground">
+                                        Capacidad {c.capacidad ?? '—'} · otorgado{' '}
+                                        <span className="tabular-nums">{c.volumen_total_kg} kg</span> · disponible{' '}
+                                        <span className="font-medium tabular-nums text-foreground">{c.saldo_kg} kg</span>
+                                    </span>
+                                )}
                             </span>
 
                             {c.puede_emitir_faenas ? (
-                                <Badge color="emerald">{c.saldo_kg} kg</Badge>
+                                <Badge color="emerald">{c.saldo_kg} kg disponibles</Badge>
                             ) : (
                                 <span className="text-xs text-muted-foreground">
                                     {c.tipo_actor === 'comercializador'

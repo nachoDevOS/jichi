@@ -193,7 +193,7 @@ class EmitirGuiaService
      */
     public function cerrar(GuiaMovimiento $guia, ?float $pesoReal = null): GuiaMovimiento
     {
-        if ($guia->estado !== EstadoGuia::Activa) {
+        if ($guia->estado !== EstadoGuia::Aprobada) {
             throw PermisoOperativoException::noSePuedeCerrar(mb_strtolower($guia->estado->etiqueta()));
         }
 

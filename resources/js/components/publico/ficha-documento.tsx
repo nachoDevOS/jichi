@@ -1,17 +1,39 @@
-import { BadgeCheck, CalendarX } from 'lucide-react';
+import {
+    Anchor,
+    BadgeCheck,
+    CalendarClock,
+    CalendarX,
+    Fish,
+    IdCard,
+    QrCode,
+    Receipt,
+    Truck,
+    type LucideIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { HojaOficial } from '@/components/publico/hoja-oficial';
-import { fechaHora } from '@/lib/utils';
-import type { DocumentoPublico, InstitucionPublica } from '@/types/publico';
+import { cn, fechaHora, iniciales } from '@/lib/utils';
+import type {
+    DocumentoPublico,
+    InstitucionPublica,
+    RenglonPublico,
+    VigenciaPublica,
+} from '@/types/publico';
 
 /**
  *  EL ACTA DE VERIFICACIÓN DE CUALQUIER DOCUMENTO
  *
- *  Era `ficha-carnet.tsx` y solo sabía de carnets. Desde el 22/09/2026 el
- *  servidor manda RENGLONES ya resueltos —etiqueta, valor y si va en
- *  monoespaciada— así que sumar un tipo de documento nuevo no toca este
- *  archivo. Ver VerificacionController::renglones().
+ *  El servidor manda renglones ya resueltos, así que sumar un tipo de documento
+ *  no toca este archivo. Ver VerificacionController::datosPublicos().
  */
+const ICONOS: Record<DocumentoPublico['tipo'], LucideIcon> = {
+    carnet: IdCard,
+    aprovechamiento: Fish,
+    faena: Anchor,
+    guia: Truck,
+    recibo: Receipt,
+};
+
 export function FichaDocumento({
     documento,
     institucion,
@@ -19,6 +41,8 @@ export function FichaDocumento({
     documento: DocumentoPublico;
     institucion: InstitucionPublica;
 }) {
+    const Icono = ICONOS[documento.tipo] ?? IdCard;
+
     return (
         <HojaOficial
             institucion={institucion}
@@ -32,99 +56,174 @@ export function FichaDocumento({
                 Constancia de verificación
             </h1>
 
-            {/* QUÉ documento es. Va antes del sello porque «vigente» sin saber
-                de qué no dice nada: el acta puede ser de un carnet, de un cupo,
-                de una faena, de una guía o de un recibo. */}
-            <p className="mt-1.5 text-center font-serif text-[12px] tracking-[0.1em] text-slate-500 uppercase">
+            {/* Qué documento es va antes del sello: «vigente» sin saber de qué no dice nada. */}
+            <p className="mt-2 flex items-center justify-center gap-1.5 font-serif text-[12px] tracking-[0.1em] text-slate-500 uppercase">
+                <Icono className="size-4 text-emerald-800" />
                 {documento.tipo_etiqueta}
             </p>
 
             <Sello documento={documento} />
 
-            <div className="mt-6 space-y-3 font-serif text-[13px] leading-relaxed text-slate-700">
-                <p className="text-justify">{documento.mensaje}</p>
-            </div>
+            <p className="mt-4 text-center font-serif text-[13px] leading-relaxed text-slate-700">
+                {documento.mensaje}
+            </p>
 
-            <dl className="mt-6 divide-y divide-slate-200 border-y border-slate-200">
-                {/*
-                    EL CÓDIGO va primero porque es el único dato de esta pantalla
-                    que también está impreso en el papel: es lo que el inspector
-                    cruza para confirmar que el acta corresponde al documento que
-                    tiene en la mano, y no a otro.
-                */}
-                <Renglon etiqueta="Código" valor={documento.codigo ?? '—'} mono />
-                <Renglon etiqueta="Titular" valor={documento.titular ?? '—'} />
-                {/*
-                    La cédula llega ENMASCARADA desde PHP: solo los últimos tres
-                    dígitos. Alcanza para que el inspector confirme contra el
-                    documento que la persona le muestra, y no alcanza para que
-                    alguien que encuentre un papel tirado se haga con el número.
-                */}
-                <Renglon etiqueta="Documento" valor={documento.documento_titular} mono />
+            <Titular documento={documento} />
 
-                {documento.renglones.map((r) => (
-                    <Renglon key={r.etiqueta} etiqueta={r.etiqueta} valor={r.valor} mono={r.mono} />
-                ))}
-            </dl>
+            {documento.vigencia && (
+                <Vigencia vigencia={documento.vigencia} vigente={documento.vigente} />
+            )}
+
+            {documento.renglones.length > 0 && <Datos renglones={documento.renglones} />}
+
+            <Codigo codigo={documento.codigo} />
         </HojaOficial>
     );
 }
 
-/**
- * El sello de estado. No distingue por tipo: el servidor ya resolvió si el
- * documento habilita algo hoy.
- */
+/** El sello de estado: el servidor ya resolvió si el documento habilita algo hoy. */
 function Sello({ documento }: { documento: DocumentoPublico }) {
-    if (documento.vigente) {
-        return (
-            <Marco
-                clase="border-emerald-700/40 bg-emerald-50 text-emerald-800"
-                icono={<BadgeCheck className="size-7" />}
-                texto="Vigente"
-            />
-        );
-    }
+    const vigente = documento.vigente;
 
     return (
-        <Marco
-            clase="border-amber-700/40 bg-amber-50 text-amber-800"
-            icono={<CalendarX className="size-7" />}
-            texto={documento.estado_etiqueta}
-        />
-    );
-}
-
-function Marco({ clase, icono, texto }: { clase: string; icono: ReactNode; texto: string }) {
-    return (
-        <div className={`mt-5 flex items-center justify-center gap-3 border-2 py-4 ${clase}`}>
-            {icono}
-            <span className="font-serif text-2xl font-bold tracking-[0.12em] uppercase">{texto}</span>
+        <div
+            className={cn(
+                'mt-4 flex items-center justify-center gap-1.5 rounded-sm border px-3 py-1.5',
+                vigente
+                    ? 'border-emerald-700/30 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-700/30 bg-amber-50 text-amber-800',
+            )}
+        >
+            {vigente ? <BadgeCheck className="size-4" /> : <CalendarX className="size-4" />}
+            <span className="text-[12px] font-bold tracking-[0.1em] uppercase">
+                {vigente ? 'Vigente' : documento.estado_etiqueta}
+            </span>
         </div>
     );
 }
 
-function Renglon({
-    etiqueta,
-    valor,
-    mono = false,
-}: {
-    etiqueta: string;
-    valor: string;
-    mono?: boolean;
-}) {
+// La cédula llega ENMASCARADA desde PHP: alcanza para cotejar con el documento, no para copiarla.
+function Titular({ documento }: { documento: DocumentoPublico }) {
+    if (!documento.titular) {
+        return null;
+    }
+
     return (
-        <div className="flex items-baseline justify-between gap-4 py-2">
-            <dt className="shrink-0 font-serif text-[11px] tracking-[0.12em] text-slate-500 uppercase">
-                {etiqueta}
-            </dt>
-            <dd
-                className={
-                    mono
-                        ? 'text-right font-mono text-[12px] font-semibold tracking-wider break-all text-slate-900'
-                        : 'text-right font-serif text-[13px] font-semibold text-slate-900'
-                }
+        <section className="mt-4 flex items-center gap-2.5 rounded-sm border border-slate-200 px-3 py-2">
+            <span
+                aria-hidden
+                className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-[11px] font-bold text-white"
             >
-                {valor}
+                {iniciales(documento.titular)}
+            </span>
+            <div className="min-w-0 leading-tight">
+                                <p className="font-serif text-[13px] font-bold text-slate-900">
+                    {documento.titular}
+                </p>
+                <p className="font-mono text-[10px] text-slate-600">C.I. {documento.documento_titular}</p>
+            </div>
+        </section>
+    );
+}
+
+// Es el único dato que también está impreso en el papel: con él se confirma que el acta es de ESE documento.
+function Codigo({ codigo }: { codigo: string | null }) {
+    return (
+        <section className="mt-4 rounded-sm border border-dashed border-emerald-900/30 px-4 py-3 text-center">
+            <p className="flex items-center justify-center gap-1.5 text-[10px] tracking-[0.14em] text-slate-500 uppercase">
+                <QrCode className="size-3.5" />
+                Código de verificación
+            </p>
+            <p className="mt-1 font-mono text-[17px] font-bold tracking-[0.12em] break-all text-slate-900">
+                {codigo ?? '—'}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+                Debe coincidir con el impreso debajo del QR del documento.
+            </p>
+        </section>
+    );
+}
+
+function Vigencia({ vigencia, vigente }: { vigencia: VigenciaPublica; vigente: boolean }) {
+    const dias = vigencia.dias_restantes;
+    // Sin vigencia —en revisión, anulado— contar días que «quedan» engañaría.
+    const leyenda = !vigente && dias >= 0
+        ? 'No habilitado'
+        : dias > 1
+            ? `Quedan ${dias} días`
+            : dias === 1
+              ? 'Queda 1 día'
+              : dias === 0
+                ? 'Vence hoy'
+                : `Venció hace ${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'día' : 'días'}`;
+
+    return (
+        <section className="mt-4 rounded-sm border border-slate-200 p-4">
+            <div className="flex items-center justify-between gap-3">
+                <p className="flex items-center gap-1.5 text-[10px] tracking-[0.14em] text-slate-500 uppercase">
+                    <CalendarClock className="size-3.5" />
+                    Vigencia
+                </p>
+                <span
+                    className={cn(
+                        'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                        vigente && dias >= 0
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800',
+                    )}
+                >
+                    {leyenda}
+                </span>
+            </div>
+
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div
+                    className={cn('h-full rounded-full', vigente ? 'bg-emerald-700' : 'bg-amber-600')}
+                    style={{ width: `${Math.max(vigencia.avance, 2)}%` }}
+                />
+            </div>
+
+            <div className="mt-2 flex justify-between gap-4">
+                <Fecha etiqueta={vigencia.desde_etiqueta} valor={vigencia.desde} />
+                <Fecha etiqueta={vigencia.hasta_etiqueta} valor={vigencia.hasta} derecha />
+            </div>
+        </section>
+    );
+}
+
+function Fecha({ etiqueta, valor, derecha = false }: { etiqueta: string; valor: string; derecha?: boolean }) {
+    return (
+        <div className={derecha ? 'text-right' : ''}>
+            <p className="text-[10px] tracking-[0.12em] text-slate-500 uppercase">{etiqueta}</p>
+            <p className="font-serif text-[14px] font-bold text-slate-900">{valor}</p>
+        </div>
+    );
+}
+
+// Recuadros de dos columnas; un valor largo —un concepto, un destino— ocupa la fila entera.
+function Datos({ renglones }: { renglones: RenglonPublico[] }) {
+    return (
+        <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-slate-200 bg-slate-200">
+            {renglones.map((r) => (
+                <Recuadro key={r.etiqueta} renglon={r} />
+            ))}
+        </dl>
+    );
+}
+
+function Recuadro({ renglon }: { renglon: RenglonPublico }): ReactNode {
+    return (
+        <div className={cn('bg-white px-3.5 py-3', renglon.valor.length > 18 && 'col-span-2')}>
+            <dt className="text-[10px] tracking-[0.12em] text-slate-500 uppercase">{renglon.etiqueta}</dt>
+            <dd
+                className={cn(
+                    'mt-0.5 font-bold break-words text-slate-900',
+                    renglon.mono
+                        ? 'font-mono text-[14px] tracking-wider'
+                        : 'font-serif text-[15px]',
+                )}
+            >
+                {renglon.valor}
             </dd>
         </div>
     );

@@ -13,6 +13,8 @@ export interface FaenaFila {
     numero_legible: string;
     /** «Faena N° 002190», armado por el servidor. */
     etiqueta: string;
+    /** El código de verificación de la faena, en grupos de cuatro. */
+    codigo: string | null;
 
     carnet_id: number;
     /** En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». */
@@ -53,7 +55,6 @@ export interface FaenaFila {
     consume_cupo: boolean;
     /** Se pasó de fecha y sigue activa: trabajo sin cerrar, no una previsión. */
     caducada: boolean;
-    puede_completarse: boolean;
     puede_editarse: boolean;
     puede_eliminarse: boolean;
     /** Por qué todavía no autoriza a salir. `null` cuando sí autoriza. */
@@ -77,13 +78,9 @@ export interface FaenaFila {
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     fecha_solicitud: string | null;
+    /** Las dos las escribe la aprobación: sale el día de la firma, vuelve a los 30 días. */
     fecha_salida: string | null;
-    /** La del papel: cuándo vuelve. La escribe el operador. */
     fecha_desembarque: string | null;
-    /** El techo que calcula el sistema: salida + DIAS_VIGENCIA. */
-    fecha_limite: string | null;
-    /** La escribe la aprobación. Null mientras es una solicitud. */
-    fecha_emision: string | null;
 }
 
 /** La faena con el detalle que solo pinta la ficha. */
@@ -119,8 +116,6 @@ export interface FaenaFicha extends FaenaFila {
 export interface FormularioFaena {
     carnet_id: number | null;
     kilos_extraidos: number | string;
-    fecha_salida: string;
-    fecha_desembarque: string;
 
     /** Los renglones del talonario: opcionales, el papel llega incompleto. */
     embarcacion: string;
@@ -148,8 +143,6 @@ export type FaenaEnCorreccion = {
     /** Con los kilos propios sumados de vuelta solo si esta faena descontaba. */
     saldo_kg: number | null;
     kilos_extraidos: number;
-    fecha_salida: string | null;
-    fecha_desembarque: string | null;
     embarcacion: string | null;
     propietario: string | null;
     comandante_barco: string | null;

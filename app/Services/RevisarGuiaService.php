@@ -79,7 +79,7 @@ class RevisarGuiaService
 
             $bloqueada->motivoAuditoria = 'Depósitos verificados: la guía queda habilitada.';
             $bloqueada->update([
-                'estado' => EstadoGuia::Activa,
+                'estado' => EstadoGuia::Aprobada,
                 'fecha_emision' => $emision,
                 'fecha_vencimiento' => GuiaMovimiento::vencimientoDesde($emision),
             ]);

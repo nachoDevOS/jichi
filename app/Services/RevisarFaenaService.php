@@ -88,6 +88,11 @@ class RevisarFaenaService
                 ->lockForUpdate()
                 ->first();
 
+            // La salida es HOY: un cupo que ya venció no puede respaldarla.
+            if ($cupo !== null && ! $cupo->estaEnFecha()) {
+                throw PermisoOperativoException::sinCupoVigente();
+            }
+
             if ($cupo !== null && AprovechamientoPesq::modoEstricto()) {
                 $saldo = $cupo->saldoKg();
 
@@ -99,12 +104,12 @@ class RevisarFaenaService
                 }
             }
 
-            // La emisión se escribe ACÁ. Las de salida y límite NO se recalculan:
-            // son el permiso que el pescador pidió y se le va a imprimir.
+            // La firma fija las dos fechas del papel: sale hoy y desembarca al techo.
             $bloqueada->motivoAuditoria = 'Depósitos verificados: el permiso queda habilitado.';
             $bloqueada->update([
-                'estado' => EstadoFaena::Activo,
-                'fecha_emision' => now()->toDateString(),
+                'estado' => EstadoFaena::Aprobado,
+                'fecha_salida' => now()->toDateString(),
+                'fecha_desembarque' => PermisoFaena::desembarqueDesde(now())->toDateString(),
             ]);
 
             // Si esta firma dejó la bolsa en cero, el cupo pasa a `agotado`.

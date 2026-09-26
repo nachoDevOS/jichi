@@ -148,7 +148,7 @@ export default function IndiceFaenas({
                                             <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
                                             <th className="px-5 py-2.5 font-medium">Estado</th>
                                             <th className="px-5 py-2.5 font-medium">Salida</th>
-                                            <th className="px-5 py-2.5 font-medium">Límite</th>
+                                            <th className="px-5 py-2.5 font-medium">Desembarque</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
                                             <th className="px-5 py-2.5 font-medium">Registrado</th>
                                             <th className="px-5 py-2.5" />
@@ -231,7 +231,7 @@ export default function IndiceFaenas({
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
-                                                    {fecha(f.fecha_limite)}
+                                                    {fecha(f.fecha_desembarque)}
                                                 </td>
 
                                                 {/* Lo cobrado, no solo la tarifa: es lo que dice

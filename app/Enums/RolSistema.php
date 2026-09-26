@@ -63,9 +63,6 @@ enum RolSistema: string
             'faenas.crear',
             'faenas.editar',
             'faenas.enviar',
-            // Que el pescador volvió y que la carga llegó son HECHOS del
-            // mostrador, no decisiones que alguien firme.
-            'faenas.completar',
 
             'guias.crear',
             'guias.editar',

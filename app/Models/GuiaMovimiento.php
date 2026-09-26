@@ -290,7 +290,7 @@ class GuiaMovimiento extends Model
     /** ¿Se pasó de fecha sin cerrarse? Es lo que busca el comando diario. */
     public function estaCaducada(): bool
     {
-        return $this->estado === EstadoGuia::Activa
+        return $this->estado === EstadoGuia::Aprobada
             && $this->fecha_vencimiento !== null
             && $this->fecha_vencimiento->isPast();
     }
@@ -313,7 +313,7 @@ class GuiaMovimiento extends Model
     public function scopeVigentes(Builder $query): Builder
     {
         return $query
-            ->where($this->qualifyColumn('estado'), EstadoGuia::Activa)
+            ->where($this->qualifyColumn('estado'), EstadoGuia::Aprobada)
             ->where($this->qualifyColumn('fecha_vencimiento'), '>=', now());
     }
 }

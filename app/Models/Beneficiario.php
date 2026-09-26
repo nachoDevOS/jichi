@@ -205,7 +205,7 @@ class Beneficiario extends Model
 
         return $this->carnets()
             ->where('tipo_actor', $tipo)
-            ->where('estado', EstadoCarnet::Activo)
+            ->where('estado', EstadoCarnet::Aprobado)
             ->whereDate('fecha_vencimiento', '>=', now()->toDateString())
             ->latest('fecha_emision')
             ->first();

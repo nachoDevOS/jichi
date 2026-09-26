@@ -90,6 +90,8 @@ export interface CupoFila {
 
 /** El cupo con el detalle que solo pinta la ficha. */
 export interface CupoFicha extends CupoFila {
+    /** El código de verificación, en grupos de cuatro. */
+    codigo: string | null;
     escala_descripcion: string | null;
     /** [piso, techo] del tramo, para contrastarlo con lo otorgado. */
     escala_rango: [number, number] | null;
@@ -163,6 +165,10 @@ export interface CarnetDelCupo {
     estado_etiqueta: string;
     estado_color: string;
     ya_fue_aprobado: boolean;
+    /** Firmado y no revocado: el mismo corte que la impresión. */
+    puede_imprimirse: boolean;
+    /** Solo el aprobado: reponer empieza por revocarlo. */
+    puede_reponerse: boolean;
     fecha_solicitud: string | null;
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
@@ -185,8 +191,10 @@ export interface FaenaDelCupo {
      * Si sus kilos pesan contra el saldo.
      */
     consume_cupo: boolean;
+    /** Solo la que pasó por la firma. */
+    puede_imprimirse: boolean;
     fecha_salida: string | null;
-    fecha_limite: string | null;
+    fecha_desembarque: string | null;
 }
 
 /** Un tramo elegible en el formulario de otorgamiento. */

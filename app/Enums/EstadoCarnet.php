@@ -16,8 +16,8 @@ enum EstadoCarnet: string
     /** Los depósitos cubren el arancel; falta que alguien firme. */
     case EnRevision = 'en_revision';
 
-    /** Vale. Recién acá el carnet habilita a trabajar. */
-    case Activo = 'activo';
+    /** Firmado: recién acá el carnet habilita a trabajar. Se llamaba `activo` hasta el 25/09/2026. */
+    case Aprobado = 'aprobado';
 
     /**
      * Dado de baja por decisión de la unidad, antes de su vencimiento.
@@ -32,7 +32,7 @@ enum EstadoCarnet: string
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::EnRevision => 'En revisión',
-            self::Activo => 'Activo',
+            self::Aprobado => 'Aprobado',
             self::Revocado => 'Revocado',
             self::Vencido => 'Vencido',
         };
@@ -49,7 +49,7 @@ enum EstadoCarnet: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::EnRevision => 'indigo',
-            self::Activo => 'emerald',
+            self::Aprobado => 'emerald',
             self::Revocado => 'rose',
             self::Vencido => 'slate',
         };
@@ -63,7 +63,7 @@ enum EstadoCarnet: string
      */
     public function habilita(): bool
     {
-        return $this === self::Activo;
+        return $this === self::Aprobado;
     }
 
     /**
@@ -92,6 +92,15 @@ enum EstadoCarnet: string
         return $this === self::Pendiente;
     }
 
+    /**
+     * ¿Se puede revocar? Solo el APROBADO: el pendiente se elimina, el que está en
+     * revisión se rechaza, y el vencido o revocado ya no habilita nada.
+     */
+    public function permiteRevocacion(): bool
+    {
+        return $this === self::Aprobado;
+    }
+
     /** ¿Se le pueden cargar depósitos? Solo mientras nadie lo firmó. */
     public function permitePagos(): bool
     {
@@ -114,7 +123,7 @@ enum EstadoCarnet: string
      * Pendiente + en revisión: nadie lo firmó todavía.
      *
      * ⚠️ NO ES PERMISO DE ESCRITURA ni de trabajo. Para lo segundo está
-     * `habilita()`, que solo deja pasar ACTIVO.
+     * `habilita()`, que solo deja pasar APROBADO.
      */
     public function estaAbierto(): bool
     {

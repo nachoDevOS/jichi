@@ -55,7 +55,7 @@ class RevisarCarnetService
     }
 
     /**
-     * EN REVISIÓN ──▶ ACTIVO. Recién acá el carnet habilita a trabajar.
+     * EN REVISIÓN ──▶ APROBADO. Recién acá el carnet habilita a trabajar.
      */
     public function aprobar(Carnet $carnet): Carnet
     {
@@ -94,7 +94,7 @@ class RevisarCarnetService
 
             $bloqueado->motivoAuditoria = 'Depósitos verificados: la credencial queda habilitada.';
             $bloqueado->update([
-                'estado' => EstadoCarnet::Activo,
+                'estado' => EstadoCarnet::Aprobado,
                 'nro_registro' => $registro,
                 'fecha_emision' => $emision->toDateString(),
                 'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),

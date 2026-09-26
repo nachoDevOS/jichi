@@ -210,7 +210,7 @@ class Carnet extends Model
     public function yaFueAprobado(): bool
     {
         return in_array($this->estado, [
-            EstadoCarnet::Activo,
+            EstadoCarnet::Aprobado,
             EstadoCarnet::Revocado,
             EstadoCarnet::Vencido,
         ], true);
@@ -288,6 +288,35 @@ class Carnet extends Model
     }
 
     /**
+     * El carnet como lo muestran el buscador y los formularios de faena y guía.
+     * Un solo lugar: con tres copias, una se queda vieja. Precargar `codigo`,
+     * `tipoCarnet` y `aprovechamiento.categoria` con el `withSum` del saldo.
+     *
+     * @return array<string, mixed>
+     */
+    public function resumenParaEmitir(): array
+    {
+        $cupo = $this->aprovechamiento;
+
+        return [
+            'id' => $this->id,
+            'codigo' => $this->codigo_legible,
+            'registro' => $this->registro_legible,
+            'tipo' => $this->tipoCarnet?->nombre,
+            'tipo_actor' => $this->tipo_actor->value,
+            'tipo_actor_etiqueta' => $this->tipo_actor->etiqueta(),
+            'puede_emitir_faenas' => $this->puedeEmitirFaenas(),
+            'puede_emitir_guias' => $this->puedeEmitirGuias(),
+            'fecha_vencimiento' => $this->fecha_vencimiento?->toDateString(),
+
+            // El cupo que respalda al pescador. Null en el comercializador.
+            'capacidad' => $cupo?->categoria?->descripcion_kg,
+            'volumen_total_kg' => $cupo !== null ? (float) $cupo->volumen_total_kg : null,
+            'saldo_kg' => $cupo?->saldoKg(),
+        ];
+    }
+
+    /**
      * ¿Puede emitir permisos de faena?
      */
     public function puedeEmitirFaenas(): bool
@@ -336,7 +365,7 @@ class Carnet extends Model
     public function scopeVigentes(Builder $query): Builder
     {
         return $query
-            ->where($this->qualifyColumn('estado'), EstadoCarnet::Activo)
+            ->where($this->qualifyColumn('estado'), EstadoCarnet::Aprobado)
             ->whereDate($this->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString());
     }
 

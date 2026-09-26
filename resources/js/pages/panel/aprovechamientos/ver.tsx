@@ -10,6 +10,7 @@ import {
     Plus,
     Printer,
     Receipt,
+    RefreshCw,
     Send,
     Ship,
     Trash2,
@@ -53,6 +54,7 @@ export default function VerCupo({
     pagos,
     recibo,
     modoEstricto,
+    carnetParaFaena,
 }: {
     cupo: CupoFicha;
     carnets: CarnetDelCupo[];
@@ -66,11 +68,15 @@ export default function VerCupo({
     recibo: ReciboDelCupo | null;
     /** Lo que dice APROVECHAMIENTO_ESTRICTO: cambia qué significa un saldo en cero. */
     modoEstricto: boolean;
+    /** El carnet aprobado con el que se emite la próxima faena; null si ninguno puede. */
+    carnetParaFaena: number | null;
 }) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
 
     const [eliminando, setEliminando] = useState(false);
+    const [reponiendo, setReponiendo] = useState<CarnetDelCupo | null>(null);
+    const reposicion = useForm({ motivo: '' });
     const [rechazando, setRechazando] = useState(false);
     const [aprobando, setAprobando] = useState(false);
     const [confirmandoPago, setConfirmandoPago] = useState(false);
@@ -361,13 +367,6 @@ export default function VerCupo({
                         <p className="tabular-nums text-sm text-muted-foreground">
                             C.I. {cupo.documento ?? '—'}
                         </p>
-
-                        {/* El TRAMO sin su número: «Escala 3» es un dato del
-                            catálogo interno, y el rango en kilos es lo que
-                            dice de verdad cuánto se autorizó. */}
-                        <p className="text-sm text-muted-foreground">
-                            {cupo.descripcion ?? '—'}
-                        </p>
                     </div>
                 </CardContent>
             </Card>
@@ -377,6 +376,8 @@ export default function VerCupo({
                 <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Volumen</CardTitle>
+                        {/* El TRAMO sin su número: el rango en kilos es lo que dice cuánto se autorizó. */}
+                        <p className="text-sm text-muted-foreground">Capacidad: {cupo.descripcion ?? '—'}</p>
                     </CardHeader>
 
                     <CardContent className="space-y-5">
@@ -488,6 +489,12 @@ export default function VerCupo({
                         <div className="flex items-center justify-between gap-2">
                             <span className="text-muted-foreground">Estado</span>
                             <Badge color={cupo.estado_color}>{cupo.estado_etiqueta}</Badge>
+                        </div>
+
+                        {/* La llave del QR de la autorización impresa. */}
+                        <div className="flex justify-between gap-3">
+                            <span className="text-muted-foreground">Código</span>
+                            <span className="text-right font-mono font-medium">{cupo.codigo ?? '—'}</span>
                         </div>
 
                         {/*
@@ -1098,7 +1105,30 @@ export default function VerCupo({
                                                         volver y buscar el cupo de nuevo.
                                                     */}
                                                     <td className="px-5 py-2.5">
-                                                        <div className="flex justify-end">
+                                                        <div className="flex justify-end gap-2">
+                                                            {puede('carnets.revocar') &&
+                                                                puede('carnets.crear') &&
+                                                                c.puede_reponerse && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="eliminar"
+                                                                        onClick={() => setReponiendo(c)}
+                                                                    >
+                                                                        <RefreshCw className="size-4" />
+                                                                        Reponer
+                                                                    </Button>
+                                                                )}
+                                                            {puede('carnets.imprimir') && c.puede_imprimirse && (
+                                                                <a
+                                                                    href={route('carnets.imprimir', c.id)}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                                                                >
+                                                                    <Printer className="size-4" />
+                                                                    Imprimir
+                                                                </a>
+                                                            )}
                                                             <a
                                                                 href={route('carnets.show', c.id)}
                                                                 target="_blank"
@@ -1136,8 +1166,19 @@ export default function VerCupo({
                 */}
                 {(cupo.ya_fue_aprobado || faenas.length > 0) && (
                     <Card className="min-w-0 lg:col-span-3">
-                        <CardHeader>
+                        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
                             <CardTitle>Faenas emitidas</CardTitle>
+
+                            {/* Llega con el carnet aprobado de este cupo ya elegido. */}
+                            {puede('faenas.crear') && carnetParaFaena !== null && (
+                                <Button
+                                    size="sm"
+                                    onClick={() => router.visit(route('faenas.create', { carnet: carnetParaFaena }))}
+                                >
+                                    <Plus className="size-4" />
+                                    Emitir faena
+                                </Button>
+                            )}
                         </CardHeader>
 
                         <CardContent className="p-0">
@@ -1157,7 +1198,8 @@ export default function VerCupo({
                                                 <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
                                                 <th className="px-5 py-2.5 font-medium">Estado</th>
                                                 <th className="px-5 py-2.5 font-medium">Salida</th>
-                                                <th className="px-5 py-2.5 font-medium">Límite</th>
+                                                <th className="px-5 py-2.5 font-medium">Desembarque</th>
+                                                <th className="px-5 py-2.5" />
                                             </tr>
                                         </thead>
 
@@ -1222,7 +1264,32 @@ export default function VerCupo({
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-muted-foreground">
-                                                        {fecha(f.fecha_limite)}
+                                                        {fecha(f.fecha_desembarque)}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5">
+                                                        <div className="flex justify-end gap-2">
+                                                            {puede('faenas.imprimir') && f.puede_imprimirse && (
+                                                                <a
+                                                                    href={route('faenas.imprimir', f.id)}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                                                                >
+                                                                    <Printer className="size-4" />
+                                                                    Imprimir
+                                                                </a>
+                                                            )}
+                                                            <a
+                                                                href={route('faenas.show', f.id)}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
+                                                            >
+                                                                <ExternalLink className="size-4" />
+                                                                Ver
+                                                            </a>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1331,6 +1398,41 @@ export default function VerCupo({
                 vuelve a presentar igual— y la casilla iguala el peso de las dos
                 mitades de la firma: aprobar y rechazar se confirman igual.
             */}
+            {/* REPONER: el mismo modal que revocar; después abre el formulario del nuevo. */}
+            <ConfirmarConMotivo
+                abierto={reponiendo !== null}
+                titulo={`Reponer el carnet N° ${reponiendo?.registro ?? ''}`}
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            El carnet <strong>{reponiendo?.codigo}</strong> de{' '}
+                            <strong>{cupo.beneficiario ?? 'el titular'}</strong> deja de valer, y al
+                            escanearlo figura como revocado. <strong>No se revierte.</strong>
+                        </p>
+                        <p>
+                            Las faenas ya emitidas con él <strong>siguen vigentes</strong>. Después se abre
+                            el formulario del carnet nuevo con esta misma autorización de pesca.
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo de la reposición"
+                ayuda="Queda en la auditoría con su nombre."
+                placeholder="Extravío del carnet: el titular tramita la reposición."
+                confirmacion="Entiendo que el carnet deja de valer y que la revocación no se revierte."
+                textoConfirmar="Reponer carnet"
+                valor={reposicion.data.motivo}
+                onCambiar={(v) => reposicion.setData('motivo', v)}
+                error={reposicion.errors.motivo}
+                procesando={reposicion.processing}
+                onCancelar={() => {
+                    setReponiendo(null);
+                    reposicion.reset();
+                }}
+                onConfirmar={() =>
+                    reponiendo && reposicion.patch(route('carnets.reponer', reponiendo.id))
+                }
+            />
+
             <ConfirmarConMotivo
                 abierto={rechazando}
                 titulo="Rechazar y devolver a ventanilla"

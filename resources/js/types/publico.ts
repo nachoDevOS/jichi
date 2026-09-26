@@ -18,7 +18,20 @@ export interface RenglonPublico {
  * VerificacionController::renglones(). Sumar un tipo nuevo no toca este
  * archivo.
  */
+/** El tramo de validez, ya calculado por el servidor: el navegador no parsea fechas. */
+export interface VigenciaPublica {
+    desde_etiqueta: string;
+    desde: string;
+    hasta_etiqueta: string;
+    hasta: string;
+    /** Negativo si ya venció. */
+    dias_restantes: number;
+    /** 0 a 100: cuánto del tramo ya pasó. */
+    avance: number;
+}
+
 export interface DocumentoPublico {
+    tipo: 'carnet' | 'aprovechamiento' | 'faena' | 'guia' | 'recibo';
     /** «Carnet de Pescador», «Permiso de Faena»… */
     tipo_etiqueta: string;
     /** En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». */
@@ -36,6 +49,8 @@ export interface DocumentoPublico {
     /** Frase para el inspector: «Documento auténtico y vigente…». */
     mensaje: string;
     renglones: RenglonPublico[];
+    /** Null en la guía y el recibo: sus fechas van como renglones. */
+    vigencia: VigenciaPublica | null;
 }
 
 /** Datos institucionales que se muestran en el encabezado y el pie. */

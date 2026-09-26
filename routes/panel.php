@@ -180,6 +180,11 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:carnets.revocar')
         ->name('carnets.revocar');
 
+    // Reponer = revocar + abrir el formulario del nuevo: pide los dos permisos.
+    Route::patch('/carnets/{carnet}/reponer', [CarnetController::class, 'reponer'])
+        ->middleware(['permiso:carnets.revocar', 'permiso:carnets.crear'])
+        ->name('carnets.reponer');
+
     // El plástico. Permiso propio, como el resto de las impresiones.
     Route::get('/carnets/{carnet}/imprimir', [CarnetImpresionController::class, 'imprimir'])
         ->middleware('permiso:carnets.imprimir')
@@ -221,12 +226,6 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         Route::patch('/faenas/{faena}/rechazar', [FaenaController::class, 'rechazar'])
             ->name('faenas.rechazar');
     });
-
-    // Completar es de VENTANILLA: que el pescador volvió es un hecho, no una
-    // decisión. Recién ahí los kilos quedan firmes contra el cupo.
-    Route::patch('/faenas/{faena}/completar', [FaenaController::class, 'completar'])
-        ->middleware('permiso:faenas.completar')
-        ->name('faenas.completar');
 
     // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
     // PENDIENTE y sin peso cargado: lo decide PermisoFaena::puedeEditarse().

@@ -115,7 +115,7 @@ export type TipoTramite = 'emision_inicial' | 'actualizacion';
 export type EstadoCarnet =
     | 'pendiente'
     | 'en_revision'
-    | 'activo'
+    | 'aprobado'
     | 'revocado'
     | 'vencido';
 
@@ -140,10 +140,10 @@ export type EstadoAprovechamiento =
 export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 
 /** Espejo de App\Enums\EstadoFaena. */
-export type EstadoFaena = 'pendiente' | 'en_revision' | 'activo' | 'completado' | 'vencido';
+export type EstadoFaena = 'pendiente' | 'en_revision' | 'aprobado' | 'completado' | 'vencido';
 
 /** Espejo de App\Enums\EstadoGuia. */
-export type EstadoGuia = 'pendiente' | 'en_revision' | 'activa' | 'cerrada' | 'anulada';
+export type EstadoGuia = 'pendiente' | 'en_revision' | 'aprobado' | 'cerrada' | 'anulada';
 
 /**
  * Espejo de App\Enums\EstadoAsociacion.

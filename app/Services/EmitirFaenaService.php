@@ -8,7 +8,6 @@ use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -30,13 +29,8 @@ class EmitirFaenaService
     public function emitir(
         Carnet $carnet,
         float $kilos,
-        ?Carbon $salida = null,
-        ?Carbon $desembarque = null,
         array $papel = [],
     ): PermisoFaena {
-        $salida ??= now();
-        // Sin fecha del papel, la ventana es el plazo entero de la resolución.
-        $desembarque ??= PermisoFaena::limiteDesde($salida);
 
         // El carnet se comprueba ANTES de la transacción y el cupo adentro: el
         // carnet no se revoca en el medio, el saldo sí puede moverlo otro.
@@ -52,7 +46,7 @@ class EmitirFaenaService
             throw PermisoOperativoException::sinCupoVigente();
         }
 
-        return DB::transaction(function () use ($carnet, $kilos, $salida, $desembarque, $papel): PermisoFaena {
+        return DB::transaction(function () use ($carnet, $kilos, $papel): PermisoFaena {
             // La fila del cupo es la que contiene el recurso escaso: es la que
             // se bloquea. Releerla devuelve OTRA instancia, y acá se usa esa a
             // propósito — es la que tiene el saldo al día.
@@ -105,14 +99,8 @@ class EmitirFaenaService
                 // PENDIENTE, como el carnet y el cupo: la emisión la escribe
                 // la aprobación, y hasta entonces esto es una solicitud.
                 'estado' => EstadoFaena::Pendiente,
+                // Salida y desembarque quedan en NULL: los escribe la aprobación.
                 'fecha_solicitud' => now()->toDateString(),
-                'fecha_salida' => $salida->toDateString(),
-                'fecha_desembarque' => $desembarque->toDateString(),
-                // Se GUARDA la fecha calculada en vez de derivarla al leer: si
-                // mañana la resolución baja el plazo, los permisos ya emitidos
-                // tienen que seguir venciendo cuando dice el papel que el
-                // pescador tiene en la mano.
-                'fecha_limite' => PermisoFaena::limiteDesde($salida)->toDateString(),
             ]);
 
             // Su llave pública, en la misma transacción: sin código, el documento
@@ -138,11 +126,9 @@ class EmitirFaenaService
     public function editar(
         PermisoFaena $faena,
         float $kilos,
-        Carbon $salida,
-        Carbon $desembarque,
         array $papel = [],
     ): PermisoFaena {
-        return DB::transaction(function () use ($faena, $kilos, $salida, $desembarque, $papel): PermisoFaena {
+        return DB::transaction(function () use ($faena, $kilos, $papel): PermisoFaena {
             $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
 
             // Se comprueba con la copia bloqueada, no con la que llegó: entre
@@ -180,11 +166,6 @@ class EmitirFaenaService
             $bloqueada->update([
                 'kilos_extraidos' => $kilos,
                 ...$this->renglonesDelPapel($papel),
-                'fecha_salida' => $salida->toDateString(),
-                'fecha_desembarque' => $desembarque->toDateString(),
-                // El límite se recalcula: cuelga de la salida, y si la salida
-                // se corrigió el papel vence otro día.
-                'fecha_limite' => PermisoFaena::limiteDesde($salida)->toDateString(),
             ]);
 
             // La corrección pudo agotar el cupo o destrabarlo.
@@ -234,56 +215,6 @@ class EmitirFaenaService
             if ($cupo !== null) {
                 $this->sincronizarEstadoDelCupo($cupo->fresh());
             }
-        });
-    }
-
-    /**
-     * Registra que el pescador volvió y descargó.
-     */
-    public function completar(PermisoFaena $faena, ?float $kilosReales = null): PermisoFaena
-    {
-        if ($faena->estado !== EstadoFaena::Activo) {
-            throw PermisoOperativoException::noSePuedeCompletar(
-                mb_strtolower($faena->estado->etiqueta()),
-            );
-        }
-
-        return DB::transaction(function () use ($faena, $kilosReales): PermisoFaena {
-            // El cupo se alcanza por el carnet: la faena ya no lo guarda.
-            $faena->loadMissing('carnet');
-
-            $cupo = AprovechamientoPesq::query()
-                ->whereKey($faena->carnet?->aprovechamiento_id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
-
-            $cambios = ['estado' => EstadoFaena::Completado];
-
-            if ($kilosReales !== null && abs($kilosReales - (float) $bloqueada->kilos_extraidos) > 0.001) {
-                // El saldo se mide SIN esta faena: ya está descontada, y comparar
-                // contra el saldo pelado rechazaría hasta una corrección hacia abajo.
-                $disponible = $cupo->saldoKg()
-                    + ($bloqueada->consumeCupo() ? (float) $bloqueada->kilos_extraidos : 0.0);
-
-                if ($kilosReales > $disponible) {
-                    throw PermisoOperativoException::excedeCupo($kilosReales, $disponible);
-                }
-
-                $cambios['kilos_extraidos'] = $kilosReales;
-            }
-
-            $bloqueada->update($cambios);
-
-            // El cupo puede haber quedado agotado —o haberse destrabado, si la
-            // corrección fue hacia abajo—, así que se recalcula el estado.
-            $this->sincronizarEstadoDelCupo($cupo->fresh());
-
-            // Se devuelve la instancia ORIGINAL refrescada: quien llamó tiene
-            // esa en la mano, y darle la copia bloqueada lo deja con el estado
-            // viejo en memoria.
-            return $faena->refresh();
         });
     }
 

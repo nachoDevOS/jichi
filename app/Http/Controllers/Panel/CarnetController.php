@@ -13,12 +13,14 @@ use App\Http\Requests\Panel\EliminarCarnetRequest;
 use App\Http\Requests\Panel\EmitirCarnetRequest;
 use App\Http\Requests\Panel\RechazarCarnetRequest;
 use App\Http\Requests\Panel\RegistrarDepositosRequest;
+use App\Http\Requests\Panel\ReponerCarnetRequest;
 use App\Http\Requests\Panel\RevocarCarnetRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\Pago;
+use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use App\Models\TipoCarnet;
 use App\Services\CobrarService;
@@ -109,8 +111,15 @@ class CarnetController extends Controller
      */
     public function create(Request $request): Response
     {
-        $beneficiario = $request->integer('beneficiario')
-            ? Beneficiario::query()->find($request->integer('beneficiario'))
+        // `?reemplaza=` llega de «Reponer»: solo vale sobre un carnet ya revocado.
+        $reemplaza = $request->integer('reemplaza')
+            ? Carnet::query()->where('estado', EstadoCarnet::Revocado)->find($request->integer('reemplaza'))
+            : null;
+
+        $beneficiarioId = $reemplaza?->beneficiario_id ?? $request->integer('beneficiario');
+
+        $beneficiario = $beneficiarioId
+            ? Beneficiario::query()->find($beneficiarioId)
             : null;
 
         return Inertia::render('panel/carnets/crear', [
@@ -123,6 +132,15 @@ class CarnetController extends Controller
                 // Sus bolsas madre, con la MISMA forma que devuelve el buscador:
                 // la pantalla tiene que decir lo mismo venga preseleccionada o no.
                 'cupos_elegibles' => BeneficiarioController::cuposElegibles($beneficiario),
+            ] : null,
+
+            // Los datos del carnet que se repone, para no volver a elegirlos.
+            'reposicion' => $reemplaza ? [
+                'registro' => $reemplaza->registro_legible,
+                'codigo' => $reemplaza->codigo_legible,
+                'asociacion_id' => $reemplaza->asociacion_id,
+                'tipo_carnet_id' => $reemplaza->tipo_carnet_id,
+                'aprovechamiento_id' => $reemplaza->aprovechamiento_id,
             ] : null,
 
             'asociaciones' => Asociacion::query()
@@ -293,6 +311,25 @@ class CarnetController extends Controller
                 ])
                 ->all(),
 
+            // Las salidas emitidas con ESTE carnet. Al revocarlo siguen valiendo.
+            'faenas' => $carnet->faenas()
+                ->latest('numero_faena')
+                ->get()
+                ->map(fn (PermisoFaena $f): array => [
+                    'id' => $f->id,
+                    'numero_legible' => $f->numero_legible,
+                    'kilos_extraidos' => (float) $f->kilos_extraidos,
+                    'estado_etiqueta' => $f->estado->etiqueta(),
+                    'estado_color' => $f->estado->color(),
+                    'vigente' => $f->estaVigente(),
+                    'region_desde' => $f->region_desde,
+                    'region_hasta' => $f->region_hasta,
+                    'fecha_solicitud' => $f->fecha_solicitud?->toDateString(),
+                    'fecha_salida' => $f->fecha_salida?->toDateString(),
+                    'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
+                ])
+                ->all(),
+
             // El recibo del trámite: uno solo, emitido al enviar a revisión.
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
@@ -318,6 +355,24 @@ class CarnetController extends Controller
         return redirect()
             ->route('carnets.show', $carnet)
             ->with('exito', 'Carnet revocado. La verificación pública ya lo informa como revocado.');
+    }
+
+    /**
+     * REPONER — PATCH /panel/carnets/{carnet}/reponer
+     *
+     * Revoca el actual y abre el formulario con los datos del anterior.
+     */
+    public function reponer(ReponerCarnetRequest $request, Carnet $carnet): RedirectResponse
+    {
+        try {
+            $this->servicio->reponer($carnet, $request->validated()['motivo']);
+        } catch (CarnetInvalidoException $e) {
+            return back()->withErrors(['motivo' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('carnets.create', ['reemplaza' => $carnet->id])
+            ->with('exito', "Carnet N° {$carnet->registro_legible} revocado. Registre el nuevo: ya tiene los datos del anterior.");
     }
 
     /**
@@ -682,6 +737,7 @@ class CarnetController extends Controller
             // en React: las dos miran además si entró plata.
             'puede_editarse' => $carnet->puedeEditarse(),
             'puede_eliminarse' => $carnet->puedeEliminarse(),
+            'puede_revocarse' => $carnet->estado->permiteRevocacion(),
 
             'monto' => $carnet->montoACobrar(),
             'saldo_pendiente' => $carnet->saldoPendiente(),

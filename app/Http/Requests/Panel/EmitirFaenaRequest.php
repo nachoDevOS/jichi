@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests\Panel;
 
-use App\Models\PermisoFaena;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,22 +31,7 @@ class EmitirFaenaRequest extends FormRequest
             // `gt:0`: una faena de cero kilos no autoriza nada y gastaría una hoja.
             'kilos_extraidos' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
 
-            // Futura no: daría un permiso que empieza a valer antes de que el papel
-            // exista. Pasada sí, para poner al día lo emitido en papel.
-            // Ni tan vieja que nazca vencido. El tope sale de la constante del
-            // modelo, no escrito acá.
-            'fecha_salida' => [
-                'required', 'date', 'before_or_equal:today',
-                'after:'.now()->subDays(PermisoFaena::DIAS_VIGENCIA)->toDateString(),
-            ],
-
-            /*
-             * LA VENTANA DE ESTA SALIDA. No puede cerrar antes de abrir, ni
-             * pasarse del techo de la resolución: la faena vence a los
-             * DIAS_VIGENCIA de la salida y un desembarque posterior prometería
-             * un permiso que ya caducó.
-             */
-            'fecha_desembarque' => ['required', 'date', 'after_or_equal:fecha_salida'],
+            // Las fechas NO vienen del formulario: las escribe la aprobación.
 
             /*
              * LOS RENGLONES DEL PAPEL. Nullable porque el formulario se llena a
@@ -76,45 +59,6 @@ class EmitirFaenaRequest extends FormRequest
             'kilos_extraidos.required' => 'Indique cuántos kilos autoriza la faena.',
             'kilos_extraidos.gt' => 'La faena tiene que autorizar kilos: escriba un número mayor que cero.',
             'kilos_extraidos.decimal' => 'Los kilos llevan como máximo dos decimales.',
-            'fecha_salida.required' => 'Indique la fecha de salida.',
-            'fecha_salida.before_or_equal' => 'La fecha de salida no puede ser futura.',
-            'fecha_salida.after' => 'La faena vence a los '.PermisoFaena::DIAS_VIGENCIA
-                .' días de la salida: con esa fecha nacería vencida.',
-            'fecha_desembarque.required' => 'Indique la fecha de desembarque.',
-            'fecha_desembarque.after_or_equal' => 'El desembarque no puede ser anterior a la salida.',
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        $this->merge([
-            'fecha_salida' => $this->input('fecha_salida') ?: now()->toDateString(),
-        ]);
-    }
-
-    /**
-     * El techo de la ventana se valida acá y no en `rules()`: depende de
-     * `fecha_salida`, que recién existe cuando la petición ya llegó.
-     */
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $v): void {
-            $salida = $this->date('fecha_salida');
-            $desembarque = $this->date('fecha_desembarque');
-
-            if ($salida === null || $desembarque === null) {
-                return;
-            }
-
-            $techo = PermisoFaena::limiteDesde($salida);
-
-            if ($desembarque->gt($techo)) {
-                $v->errors()->add('fecha_desembarque', sprintf(
-                    'El permiso vale %d días desde la salida: el desembarque no puede pasar del %s.',
-                    PermisoFaena::DIAS_VIGENCIA,
-                    $techo->format('d/m/Y'),
-                ));
-            }
-        });
     }
 }

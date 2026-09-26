@@ -13,17 +13,20 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fecha } from '@/lib/utils';
 import type { PageProps, TipoActor } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
-import type { AsociacionElegible, CupoVigente, TipoElegible } from '@/types/carnets';
+import type { AsociacionElegible, CupoVigente, ReposicionDeCarnet, TipoElegible } from '@/types/carnets';
 
 /**
  *  EMITIR UNA CREDENCIAL — paso 3 del flujo
  */
 export default function CrearCarnet({
     beneficiario,
+    reposicion,
     asociaciones,
     tipos,
 }: {
     beneficiario: BeneficiarioSugerido | null;
+    /** Llega de «Reponer»: los datos del carnet revocado, para no volver a elegirlos. */
+    reposicion: ReposicionDeCarnet | null;
     asociaciones: AsociacionElegible[];
     tipos: TipoElegible[];
 }) {
@@ -32,11 +35,13 @@ export default function CrearCarnet({
 
     const form = useForm({
         beneficiario_id: beneficiario?.id ?? null,
-        asociacion_id: '',
-        tipo_carnet_id: '',
+        asociacion_id: reposicion ? String(reposicion.asociacion_id) : '',
+        tipo_carnet_id: reposicion ? String(reposicion.tipo_carnet_id) : '',
         // De qué bolsa madre cuelga. Se manda explícito en vez de dejar que el
         // servidor adivine: así la pantalla y lo guardado dicen lo mismo.
-        aprovechamiento_id: (beneficiario?.cupos_elegibles?.[0]?.id ?? null) as number | null,
+        aprovechamiento_id: (reposicion?.aprovechamiento_id ??
+            beneficiario?.cupos_elegibles?.[0]?.id ??
+            null) as number | null,
         fecha_solicitud: new Date().toISOString().slice(0, 10),
 
         // LOS DOS PAPELES QUE RESPALDAN LA EMISIÓN. Suben con el formulario,
@@ -111,6 +116,17 @@ export default function CrearCarnet({
             // descripcion="Paso 3 del flujo: queda PENDIENTE de cobro. Se imprime recién cuando esté aprobado."
         >
             <Head title="Registrar carnet" />
+
+            {reposicion && (
+                <p className="mb-6 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                    <Info className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                        <strong>Reposición del carnet N° {reposicion.registro ?? '—'}</strong> ({reposicion.codigo}),
+                        ya revocado. Tipo, asociación y autorización de pesca vienen del anterior; falta
+                        adjuntar los documentos y registrar.
+                    </span>
+                </p>
+            )}
 
             <form onSubmit={enviar} className="grid gap-6 lg:grid-cols-3">
                 <Card className="lg:col-span-2">

@@ -279,6 +279,7 @@ class BeneficiarioController extends Controller
                     'codigo',
                     'tipoCarnet:id,nombre',
                     'aprovechamiento' => fn ($a) => $a
+                        ->with('categoria')
                         ->withSum('faenasQueConsumen', 'kilos_extraidos'),
                 ]),
             ])
@@ -301,19 +302,7 @@ class BeneficiarioController extends Controller
                 /*
                  * QUÉ PUEDE EMITIR ESTA PERSONA HOY, ya resuelto.
                  */
-                'carnets_vigentes' => $b->carnets->map(fn (Carnet $c): array => [
-                    'id' => $c->id,
-                    'codigo' => $c->codigo_legible,
-                    'tipo' => $c->tipoCarnet?->nombre,
-                    'tipo_actor' => $c->tipo_actor->value,
-                    'tipo_actor_etiqueta' => $c->tipo_actor->etiqueta(),
-                    'puede_emitir_faenas' => $c->puedeEmitirFaenas(),
-                    'puede_emitir_guias' => $c->puedeEmitirGuias(),
-
-                    // Lo que el formulario de faena necesita para abrir con el
-                    // campo difícil ya resuelto: cuántos kilos quedan.
-                    'saldo_kg' => $c->aprovechamiento?->saldoKg(),
-                ])->values()->all(),
+                'carnets_vigentes' => $b->carnets->map(fn (Carnet $c): array => $c->resumenParaEmitir())->values()->all(),
 
                 'cupos_elegibles' => self::cuposElegibles($b),
             ])

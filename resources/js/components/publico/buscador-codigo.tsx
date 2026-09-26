@@ -4,12 +4,25 @@ import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+// 16 caracteres en grupos de cuatro, igual que va impreso: «EFGT-96R4-CJ42-AHYJ».
+const LARGO_CODIGO = 16;
+
+/** Deja solo letras y números, en mayúsculas, y pone el guion cada cuatro. Sirve también al pegar. */
+function formatearCodigo(valor: string): string {
+    const limpio = valor
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, LARGO_CODIGO);
+
+    return limpio.match(/.{1,4}/g)?.join('-') ?? '';
+}
+
 /**
  * Caja para escribir a mano el código de un documento.
  */
 export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | null }) {
     const { data, setData, post, processing, errors } = useForm({
-        codigo: codigoInicial ?? '',
+        codigo: formatearCodigo(codigoInicial ?? ''),
     });
 
     function enviar(e: FormEvent) {
@@ -23,26 +36,20 @@ export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | nul
                 Este buscador vive en dos sitios muy distintos —dentro de la hoja
                 blanca y sobre el fondo verde, debajo del acta— y un margen fijo
                 acá dejaba un hueco raro en uno de los dos. */}
-            <form onSubmit={enviar} className="mx-auto flex max-w-md gap-2">
+            <form onSubmit={enviar} className="mx-auto flex justify-center gap-2">
                 <Input
                     value={data.codigo}
-                    // Se guarda en mayúsculas: se convierte mientras se escribe
-                    // para que no falle por tipearlo en minúscula, que es como
-                    // arranca el teclado del teléfono.
-                    onChange={(e) => setData('codigo', e.target.value.toUpperCase())}
-                    placeholder="Código del documento — ej. EFGT-96R4-CJ42-AHYJ"
-                    /*
-                     * El tope es generoso a propósito: el código se imprime en
-                     * grupos de cuatro para poder leerlo, y quien lo copia
-                     * escribe los guiones. Cortarle la mano al
-                     * llegar al largo exacto le comería el final sin decirle por
-                     * qué; el servidor limpia los separadores antes de validar.
-                     */
-                    maxLength={50}
+                    // Los guiones los pone la caja: quien copia escribe solo los 16 caracteres.
+                    onChange={(e) => setData('codigo', formatearCodigo(e.target.value))}
+                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                    // Sin maxLength: cortaría un código pegado con espacios antes de limpiarlo.
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
                     aria-label="Código del documento"
                     aria-invalid={Boolean(errors.codigo)}
-                    // font-mono: en monoespaciado no se confunden 0 con O ni 1 con l.
-                    className="font-mono tracking-wider"
+                    // font-mono: no se confunden 0 con O. 26ch = los 19 caracteres con guiones, el espaciado y el relleno.
+                    className="w-[26ch] flex-none text-center font-mono tracking-wider"
                 />
 
                 <Button type="submit" disabled={processing}>

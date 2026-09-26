@@ -42,17 +42,12 @@ return new class extends Migration
 
             $table->string('estado', 20)->default(EstadoFaena::Pendiente->value);
 
-            // Puede ser pasada: sirve para poner al día lo tramitado en papel.
             $table->date('fecha_solicitud');
-            $table->date('fecha_salida');
-            $table->date('fecha_desembarque')->comment('La ventana real de ESTA salida');
 
-            // Guardada y no derivada: si la resolución cambia el plazo, lo ya
-            // emitido tiene que seguir venciendo cuando dice el papel.
-            $table->date('fecha_limite')->index()->comment('Techo: 1 mes desde la salida');
-
-            // La escribe la APROBACIÓN. En NULL mientras es una solicitud.
-            $table->date('fecha_emision')->nullable();
+            // LAS DOS LAS ESCRIBE LA APROBACIÓN: la salida es el día de la firma y
+            // el desembarque, salida + 30 días. En NULL mientras es una solicitud.
+            $table->date('fecha_salida')->nullable();
+            $table->date('fecha_desembarque')->nullable()->index()->comment('Techo: salida + 30 días');
 
             // La consulta caliente: los kilos consumidos del cupo.
             $table->index(['carnet_id', 'estado']);

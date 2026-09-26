@@ -331,12 +331,12 @@ class DashboardController extends Controller
                 ->count(),
 
             'faenas_vencidas' => PermisoFaena::query()
-                ->where('estado', EstadoFaena::Activo)
-                ->whereDate('fecha_limite', '<', $hoy)
+                ->where('estado', EstadoFaena::Aprobado)
+                ->whereDate('fecha_desembarque', '<', $hoy)
                 ->count(),
 
             'guias_vencidas' => GuiaMovimiento::query()
-                ->where('estado', EstadoGuia::Activa)
+                ->where('estado', EstadoGuia::Aprobada)
                 ->where('fecha_vencimiento', '<', now())
                 ->count(),
         ];

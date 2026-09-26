@@ -33,8 +33,6 @@ use Illuminate\Support\Carbon;
     'fecha_solicitud',
     'fecha_salida',
     'fecha_desembarque',
-    'fecha_limite',
-    'fecha_emision',
     'estado',
 ])]
 class PermisoFaena extends Model
@@ -67,8 +65,6 @@ class PermisoFaena extends Model
             'fecha_solicitud' => 'date',
             'fecha_salida' => 'date',
             'fecha_desembarque' => 'date',
-            'fecha_limite' => 'date',
-            'fecha_emision' => 'date',
             'estado' => EstadoFaena::class,
         ];
     }
@@ -213,17 +209,15 @@ class PermisoFaena extends Model
                 'firma de quien la aprueba.',
             $this->estado === EstadoFaena::Completado => 'La salida ya se cerró: los kilos quedaron '.
                 'firmes contra el cupo.',
-            $this->estado === EstadoFaena::Vencido => 'Se pasó su fecha límite sin cerrarse.',
-            default => 'Pasó su fecha límite.',
+            $this->estado === EstadoFaena::Vencido => 'Pasó su fecha de desembarque sin cerrarse.',
+            default => 'Pasó su fecha de desembarque.',
         };
     }
 
     //  Reglas de negocio
 
-    /**
-     * La fecha límite que corresponde a una salida.
-     */
-    public static function limiteDesde(Carbon|string $salida): Carbon
+    /** El desembarque que corresponde a una salida: el techo de la resolución. */
+    public static function desembarqueDesde(Carbon|string $salida): Carbon
     {
         return Carbon::parse($salida)->addDays(self::DIAS_VIGENCIA)->startOfDay();
     }
@@ -237,16 +231,16 @@ class PermisoFaena extends Model
     public function estaVigente(): bool
     {
         return $this->estado->habilita()
-            && $this->fecha_limite !== null
-            && $this->fecha_limite->endOfDay()->isFuture();
+            && $this->fecha_desembarque !== null
+            && $this->fecha_desembarque->endOfDay()->isFuture();
     }
 
     /** ¿Se pasó de fecha sin cerrarse? Es lo que busca el comando diario. */
     public function estaCaducada(): bool
     {
-        return $this->estado === EstadoFaena::Activo
-            && $this->fecha_limite !== null
-            && $this->fecha_limite->endOfDay()->isPast();
+        return $this->estado === EstadoFaena::Aprobado
+            && $this->fecha_desembarque !== null
+            && $this->fecha_desembarque->endOfDay()->isPast();
     }
 
     /** ¿Sus kilos pesan contra el cupo de la bolsa madre? */
@@ -265,7 +259,7 @@ class PermisoFaena extends Model
     public function scopeVigentes(Builder $query): Builder
     {
         return $query
-            ->where($this->qualifyColumn('estado'), EstadoFaena::Activo)
-            ->whereDate($this->qualifyColumn('fecha_limite'), '>=', now()->toDateString());
+            ->where($this->qualifyColumn('estado'), EstadoFaena::Aprobado)
+            ->whereDate($this->qualifyColumn('fecha_desembarque'), '>=', now()->toDateString());
     }
 }

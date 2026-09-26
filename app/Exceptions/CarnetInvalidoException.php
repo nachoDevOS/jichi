@@ -168,6 +168,14 @@ class CarnetInvalidoException extends RuntimeException
     /**
      * No se revoca dos veces.
      */
+    public static function noSePuedeRevocar(string $estado): self
+    {
+        return new self(
+            "El carnet está {$estado}: solo se revoca uno APROBADO. ".
+            'Un pendiente se elimina y uno en revisión se rechaza.',
+        );
+    }
+
     public static function yaRevocado(): self
     {
         return new self(

@@ -10,7 +10,7 @@ const PREGUNTAS = [
     },
     {
         p: '¿Cuánto dura el carnet?',
-        r: 'Una gestión. Vence al cerrar el año y hay que tramitar el de la gestión siguiente. La fecha de vencimiento va impresa en el plástico.',
+        r: 'Una gestión. Vence al cerrar el año y hay que tramitar el de la gestión siguiente. La fecha de vencimiento va impresa en el carnet.',
     },
     {
         p: '¿Qué es el cupo de aprovechamiento?',
@@ -30,7 +30,7 @@ const PREGUNTAS = [
     },
     {
         p: '¿Cómo sé si un carnet es auténtico?',
-        r: 'Escaneando el código QR del plástico, o escribiendo su código en esta misma página. El sistema responde si el carnet existe, si está vigente y qué actividad autoriza.',
+        r: 'Escaneando el código QR del carnet, o escribiendo su código en esta misma página. El sistema responde si el carnet existe, si está vigente y qué actividad autoriza.',
     },
     {
         p: 'Perdí mi carnet, ¿qué hago?',

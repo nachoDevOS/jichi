@@ -13,8 +13,8 @@ enum EstadoFaena: string
     /** Los depósitos cubren el arancel; falta que alguien firme. */
     case EnRevision = 'en_revision';
 
-    /** Aprobada y en curso: el pescador está afuera. */
-    case Activo = 'activo';
+    /** Firmada y en curso: el pescador está afuera. Se llamaba `activo` hasta el 25/09/2026. */
+    case Aprobado = 'aprobado';
 
     /** Volvió y descargó. Los kilos quedaron firmes contra el cupo. */
     case Completado = 'completado';
@@ -27,7 +27,7 @@ enum EstadoFaena: string
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::EnRevision => 'En revisión',
-            self::Activo => 'Aprobado',
+            self::Aprobado => 'Aprobado',
             self::Completado => 'Completado',
             self::Vencido => 'Vencido',
         };
@@ -38,7 +38,7 @@ enum EstadoFaena: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::EnRevision => 'indigo',
-            self::Activo => 'emerald',
+            self::Aprobado => 'emerald',
             self::Completado => 'teal',
             self::Vencido => 'slate',
         };
@@ -59,13 +59,13 @@ enum EstadoFaena: string
      */
     public function consumeCupo(): bool
     {
-        return $this === self::Activo || $this === self::Completado;
+        return $this === self::Aprobado || $this === self::Completado;
     }
 
     /** ¿Autoriza a estar pescando hoy? Solo la aprobada. */
     public function habilita(): bool
     {
-        return $this === self::Activo;
+        return $this === self::Aprobado;
     }
 
     /**

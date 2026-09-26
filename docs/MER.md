@@ -423,6 +423,15 @@ que va impreso, y eso ya está decidido al otorgarlo; el carnet también nace si
 pagar y los dos se cobran juntos en el mismo recibo. Por eso `EmitirCarnetService`
 usa el scope `enCurso()` —pendiente o aprobado, en fecha— y no `vigentes()`.
 
+**El estado firmado se llama `aprobado`, no `activo`** —cambiado el 25/09/2026,
+igual que el cupo el 20/09—: lo que dice la columna es que ALGUIEN LO FIRMÓ.
+
+**REVOCAR: solo el APROBADO, y sus faenas siguen** (25/09/2026). Es el camino de
+la reposición por extravío: se revoca con motivo desde la ficha, el QR pasa a
+«no vigente», y con el mismo cupo se emite el nuevo. Las faenas ya emitidas no
+se tocan. Un pendiente se elimina y uno en revisión se rechaza — ver
+`EstadoCarnet::permiteRevocacion()`.
+
 ---
 
 ### `permisos_faena` — una salida
@@ -436,11 +445,9 @@ usa el scope `enCurso()` —pendiente o aprobado, en fecha— y no `vigentes()`.
 | `embarcacion`, `propietario`, `comandante_barco` | string, **null** | Renglones del papel |
 | `matricula_naval`, `nro_kardex` | string, **null** | Renglones del papel |
 | `region_desde` / `region_hasta` | string(150), **null** | La región amparada |
-| `fecha_solicitud` | date | El día que se pidió; puede ser pasada |
-| `fecha_salida` | date | |
-| `fecha_desembarque` | date | El renglón del papel: cuándo vuelve |
-| `fecha_limite` | date | El TECHO que calcula el sistema: salida + 1 mes |
-| `fecha_emision` | date, null | La escribe la APROBACIÓN |
+| `fecha_solicitud` | date | El día que se pidió |
+| `fecha_salida` | date, null | La escribe la APROBACIÓN: el día de la firma |
+| `fecha_desembarque` | date, null, index | La escribe la APROBACIÓN: salida + 30 días. Es el techo |
 | `estado` | string(20) | `EstadoFaena`; nace `pendiente` |
 
 **LA TABLA CALCA EL TALONARIO «PERMISO POR FAENA»** —completado el 21/09/2026—.
@@ -451,11 +458,14 @@ formulario se llena a mano y llega incompleto, y no hay padrón de embarcaciones
 ni de comandantes —un catálogo cerrado obligaría a dar de alta uno con el
 pescador esperando en la ventanilla—.
 
-**`fecha_desembarque` y `fecha_limite` NO son lo mismo.** El desembarque es el
-renglón del papel y lo escribe el operador: la ventana real de ESTA salida,
-contra la que compara un control en el río. `fecha_limite` es el techo que pone
-la resolución —30 días— y lo calcula el sistema. El formulario valida que el
-desembarque no sea anterior a la salida ni pase del techo.
+**LAS FECHAS NO SE TIPEAN: LAS ESCRIBE LA APROBACIÓN** —25/09/2026, a pedido
+del responsable—. La salida es el día de la firma y el desembarque, salida +
+`PermisoFaena::DIAS_VIGENCIA` (30). Antes el operador tipeaba salida y
+desembarque, y había además `fecha_limite` (el techo) y `fecha_emision` (la
+firma): con las fechas fijadas por la aprobación, esas dos eran copias de las
+otras y se sacaron. El desembarque ES el techo, y de él leen `estaVigente()`,
+`estaCaducada()` y `scopeVigentes()`. Aprobar además exige que el cupo siga en
+fecha, porque la salida es ese mismo día.
 
 **`monto` es una COPIA CONGELADA**, como en `recibos`: una suba por resolución
 no puede mover lo que dice un papel ya entregado. `PermisoFaena::montoACobrar()`
@@ -467,10 +477,17 @@ Antes nacía ACTIVA y autorizaba en el acto: se emitía el papel sin que hubiera
 entrado un peso. Hoy recorre el mismo circuito que los otros dos trámites:
 
 ```
-PENDIENTE ──[depósitos]──▶ [enviar] ──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ COMPLETADO
+PENDIENTE ──[depósitos]──▶ [enviar] ──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO
    ▲                                         │          (autoriza la salida)
    └──────────────[rechazar, con motivo]─────┘
 ```
+
+**El estado firmado se guarda como `aprobado`, no `activo`** —25/09/2026, igual
+que el carnet y el cupo—.
+
+**NO SE REGISTRA LA VUELTA** —retirado el 25/09/2026 a pedido—. La faena
+aprobada queda así: los kilos autorizados cuentan como consumidos desde la firma.
+`EstadoFaena::Completado` sigue en el enum, pero hoy nada lleva a ese estado.
 
 `PermisoFaena` usa el trait `Pagable`, el arancel sale de
 `config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`, **15 Bs** por
@@ -530,15 +547,15 @@ el año 0**, que ninguna gestión real ocupa: la tabla `correlativos` lleva
 `Carnet::siguienteNumeroFaena()` fue eliminado, y con él los
 `withMax('faenas', 'numero_faena')` que lo alimentaban.
 
-**`fecha_limite` se guarda calculada** en vez de derivarla al leer: si mañana la
-resolución cambia el plazo a quince días, los permisos ya emitidos tienen que
-seguir venciendo cuando dice el papel que el pescador tiene en la mano.
+**`fecha_desembarque` se guarda calculada** en vez de derivarla al leer: si
+mañana la resolución cambia el plazo a quince días, los permisos ya emitidos
+tienen que seguir venciendo cuando dice el papel que el pescador tiene en la mano.
 
 **No se edita ni se borra: se vence o se completa.** El número sale de un talonario
 de papel que el pescador se llevó. Borrar la fila deja un hueco en la serie que
 nadie puede explicar y libera un número que el índice único volvería a aceptar.
 
-**Una faena ACTIVA ya consume cupo**, aunque no se haya descargado nada. Es lo
+**Una faena APROBADA ya consume cupo**, aunque no se haya descargado nada. Es lo
 contrario de lo intuitivo y es el punto del cupo: si solo contaran las
 completadas, un pescador podría tener diez faenas abiertas por el volumen entero
 cada una. Lo que libera el volumen es que la faena VENZA sin cerrarse — ahí la
@@ -621,7 +638,8 @@ o se le quitaría al transportista casi un día.
 **EL CIRCUITO ES EL MISMO DEL CARNET, EL CUPO Y LA FAENA** —desde el 22/09/2026—:
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ ACTIVA ──[cerrar]──▶ CERRADA
+PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADA ──[cerrar]──▶ CERRADA
+(en la base: `aprobado`, igual que carnet, cupo y faena — antes `activa`)
 (borrador)       │           │                        │
                  │           └──[rechazar]────────────┘  └──[anular]──▶ ANULADA
                  └── acá sale el RECIBO

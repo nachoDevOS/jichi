@@ -16,8 +16,8 @@ enum EstadoGuia: string
     /** Los depósitos cubren el arancel; falta que alguien firme. */
     case EnRevision = 'en_revision';
 
-    /** Firmada y vigente: la carga está en camino. */
-    case Activa = 'activa';
+    /** Firmada y vigente: la carga está en camino. Se llamaba `activa` hasta el 25/09/2026. */
+    case Aprobada = 'aprobado';
 
     /** Llegó a destino y se descargó. */
     case Cerrada = 'cerrada';
@@ -30,7 +30,7 @@ enum EstadoGuia: string
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::EnRevision => 'En revisión',
-            self::Activa => 'Activa',
+            self::Aprobada => 'Aprobada',
             self::Cerrada => 'Cerrada',
             self::Anulada => 'Anulada',
         };
@@ -41,7 +41,7 @@ enum EstadoGuia: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::EnRevision => 'indigo',
-            self::Activa => 'emerald',
+            self::Aprobada => 'emerald',
             self::Cerrada => 'teal',
             self::Anulada => 'rose',
         };
@@ -50,7 +50,7 @@ enum EstadoGuia: string
     /** ¿Ampara un traslado en curso? Solo la firmada. */
     public function habilita(): bool
     {
-        return $this === self::Activa;
+        return $this === self::Aprobada;
     }
 
     /**

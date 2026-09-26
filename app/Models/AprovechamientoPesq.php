@@ -145,7 +145,7 @@ class AprovechamientoPesq extends Model
     {
         // Calificada: `carnets` entra en el join y también tiene `estado`.
         return $this->faenas()->whereIn('permisos_faena.estado', [
-            EstadoFaena::Activo,
+            EstadoFaena::Aprobado,
             EstadoFaena::Completado,
         ]);
     }

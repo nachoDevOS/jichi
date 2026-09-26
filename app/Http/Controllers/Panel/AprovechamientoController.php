@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Enums\EstadoAprovechamiento;
+use App\Enums\EstadoCarnet;
 use App\Exceptions\CobroInvalidoException;
 use App\Exceptions\CupoInvalidoException;
 use App\Http\Controllers\Controller;
@@ -155,6 +156,7 @@ class AprovechamientoController extends Controller
         $aprovechamiento->load([
             'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'categoria',
+            'codigo',
         ]);
 
         // El recibo del trámite: uno solo, emitido al enviar a revisión. NULL
@@ -168,6 +170,9 @@ class AprovechamientoController extends Controller
         return Inertia::render('panel/aprovechamientos/ver', [
             'cupo' => [
                 ...$this->resumir($aprovechamiento),
+
+                // La llave del QR de la autorización impresa.
+                'codigo' => $aprovechamiento->codigo_legible,
 
                 // La ficha sí muestra el detalle del tramo: es donde alguien va
                 // a mirar bajo qué resolución se otorgó.
@@ -244,11 +249,22 @@ class AprovechamientoController extends Controller
                     'estado_etiqueta' => $c->estado->etiqueta(),
                     'estado_color' => $c->estado->color(),
                     'ya_fue_aprobado' => $c->yaFueAprobado(),
+                    // Mismo corte que CarnetImpresionController: firmado y no revocado.
+                    'puede_imprimirse' => $c->yaFueAprobado() && $c->estado !== EstadoCarnet::Revocado,
+                    'puede_reponerse' => $c->estado->permiteRevocacion(),
                     'fecha_solicitud' => $c->fecha_solicitud?->toDateString(),
                     'fecha_emision' => $c->fecha_emision?->toDateString(),
                     'fecha_vencimiento' => $c->fecha_vencimiento?->toDateString(),
                 ])
                 ->all(),
+
+            // El carnet con el que se emite la próxima faena: aprobado, vigente y con saldo.
+            'carnetParaFaena' => $aprovechamiento->carnets()
+                ->vigentes()
+                ->with('aprovechamiento')
+                ->latest('fecha_emision')
+                ->get()
+                ->first(fn (Carnet $c): bool => $c->puedeEmitirFaenas())?->id,
 
             // Las faenas de este cupo: es el detalle que explica el saldo. Sin
             // él, «le quedan 20 kg» es un número que hay que creer.
@@ -277,8 +293,9 @@ class AprovechamientoController extends Controller
                     // Una faena vencida LIBERA su volumen: la pantalla lo marca
                     // para que el saldo cuadre a la vista.
                     'consume_cupo' => $f->consumeCupo(),
+                    'puede_imprimirse' => $f->yaFueAprobada(),
                     'fecha_salida' => $f->fecha_salida?->toDateString(),
-                    'fecha_limite' => $f->fecha_limite?->toDateString(),
+                    'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
                 ])
                 ->all(),
         ]);

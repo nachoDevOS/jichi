@@ -7,7 +7,6 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
-import { fecha, fechaInput } from '@/lib/utils';
 import type { FaenaEnCorreccion } from '@/types/faenas';
 
 /**
@@ -30,8 +29,6 @@ export default function EditarFaena({
 }) {
     const form = useForm({
         kilos_extraidos: String(faena.kilos_extraidos ?? ''),
-        fecha_salida: faena.fecha_salida ?? '',
-        fecha_desembarque: faena.fecha_desembarque ?? '',
         embarcacion: faena.embarcacion ?? '',
         propietario: faena.propietario ?? '',
         comandante_barco: faena.comandante_barco ?? '',
@@ -53,11 +50,6 @@ export default function EditarFaena({
      * vuelta SOLO si esta faena estaba descontando. Una pendiente no descuenta.
      */
     const saldo = faena.saldo_kg;
-
-    /* Hasta cuándo puede desembarcar, recalculado sobre la salida elegida. */
-    const techo = fechaInput(
-        new Date(new Date(`${form.data.fecha_salida}T00:00:00`).getTime() + diasVigencia * 86400000),
-    );
 
     /* El HECHO y la CONSECUENCIA, separados: ver faenas/crear.tsx. */
     const excede = saldo !== null && kilos > saldo;
@@ -93,63 +85,11 @@ export default function EditarFaena({
                             </div>
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Campo
-                                etiqueta="Kilos autorizados"
-                                htmlFor="kilos_extraidos"
-                                error={form.errors.kilos_extraidos}
-                                ayuda={saldo !== null ? `Quedan ${saldo} kg en la bolsa madre.` : undefined}
-                                obligatorio
-                            >
-                                <Input
-                                    id="kilos_extraidos"
-                                    type="number"
-                                    step="0.01"
-                                    min={0}
-                                    value={form.data.kilos_extraidos}
-                                    onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
-                                    aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
-                                />
-                            </Campo>
-
-                            <Campo
-                                etiqueta="Fecha de salida"
-                                htmlFor="fecha_salida"
-                                error={form.errors.fecha_salida}
-                                ayuda="Puede ser pasada. Futura no: el permiso empezaría a valer antes de existir."
-                                obligatorio
-                            >
-                                <Input
-                                    id="fecha_salida"
-                                    type="date"
-                                    value={form.data.fecha_salida}
-                                    onChange={(e) => form.setData('fecha_salida', e.target.value)}
-                                    aria-invalid={Boolean(form.errors.fecha_salida)}
-                                />
-                            </Campo>
-
-                            <Campo
-                                etiqueta="Fecha de desembarque"
-                                htmlFor="fecha_desembarque"
-                                error={form.errors.fecha_desembarque}
-                                ayuda={`Cuándo vuelve. Como máximo el ${fecha(techo)}.`}
-                                obligatorio
-                            >
-                                <Input
-                                    id="fecha_desembarque"
-                                    type="date"
-                                    value={form.data.fecha_desembarque}
-                                    onChange={(e) => form.setData('fecha_desembarque', e.target.value)}
-                                    aria-invalid={Boolean(form.errors.fecha_desembarque)}
-                                />
-                            </Campo>
-                        </div>
-
                         {/* LOS RENGLONES DEL TALONARIO. Ninguno obligatorio: el papel
                             llega incompleto, y corregir es justamente completarlo. */}
                         <div className="space-y-4 border-t border-border pt-5">
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                Datos del talonario
+                                El Área de Fiscalización y Control de la Actividad Pesquera autoriza a
                             </p>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -249,6 +189,25 @@ export default function EditarFaena({
                                     />
                                 </Campo>
                             </div>
+
+                            <Campo
+                                etiqueta="Cantidad autorizada de pescado extraído (kg)"
+                                htmlFor="kilos_extraidos"
+                                error={form.errors.kilos_extraidos}
+                                ayuda={saldo !== null ? `Quedan ${saldo} kg en la bolsa madre.` : undefined}
+                                obligatorio
+                            >
+                                <Input
+                                    id="kilos_extraidos"
+                                    type="number"
+                                    step="0.01"
+                                    min={0}
+                                    value={form.data.kilos_extraidos}
+                                    onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
+                                    aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
+                                    className="sm:max-w-xs"
+                                />
+                            </Campo>
                         </div>
                     </CardContent>
                 </Card>
@@ -309,15 +268,14 @@ export default function EditarFaena({
 
                         <p className="flex items-start gap-2 text-xs text-muted-foreground">
                             <Info className="mt-0.5 size-4 shrink-0" />
-                            El número del talonario no cambia, y la fecha límite se recalcula sobre la
-                            salida: la faena vale {diasVigencia} días desde ahí.
+                            El número del talonario no cambia. La salida y el desembarque los fija
+                            la aprobación: sale ese día y vale {diasVigencia} días.
                         </p>
 
                         <Button
                             type="submit"
                             disabled={
                                 form.processing ||
-                                form.data.fecha_desembarque === '' ||
                                 kilos <= 0 ||
                                 bloquea
                             }

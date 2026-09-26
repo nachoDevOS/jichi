@@ -222,11 +222,13 @@
             padding-top: 2pt;
         }
         .qr-codigo {
-            /* Monoespaciada: en el código se confunden el 0 con la O. */
+            /* Chico y monoespaciado —el 0 y la O se confunden—; 19 caracteres a 5 pt = 57 pt, cabe bajo el QR. */
             font-family: 'DejaVu Sans Mono', monospace;
-            font-size: 6.5pt;
+            font-size: 5pt;
             font-weight: bold;
-            letter-spacing: 0.3pt;
+            letter-spacing: 0;
+            padding-top: 1pt;
+            color: #000000;
         }
 
     </style>
@@ -454,7 +456,7 @@
          que para dejarlo centrado en el bolsillo de 97 arranca en y=24 — o sea
          `top: 13` más los 11 del desfase. --}}
     <div class="bloque" style="top: 13pt; left: 465pt; width: 126pt;">
-        @include('documentos.partes.qr-verificacion', ['lado' => 60, 'vertical' => true, 'codigo' => false])
+        @include('documentos.partes.qr-verificacion', ['lado' => 60, 'vertical' => true])
     </div>
 
     {{-- ==============================================================

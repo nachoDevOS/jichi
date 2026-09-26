@@ -8,7 +8,6 @@ use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\ActualizarFaenaRequest;
-use App\Http\Requests\Panel\CompletarFaenaRequest;
 use App\Http\Requests\Panel\EliminarFaenaRequest;
 use App\Http\Requests\Panel\EmitirFaenaRequest;
 use App\Http\Requests\Panel\RechazarFaenaRequest;
@@ -52,6 +51,7 @@ class FaenaController extends Controller
             // porque `nombreCompleto` las lee todas. La que falte vuelve null y
             // el método contesta cualquier cosa, sin error.
             ->with([
+                'codigo',
                 'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision',
                 'carnet.codigo',
                 'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
@@ -91,8 +91,15 @@ class FaenaController extends Controller
      */
     public function create(Request $request): Response
     {
-        $beneficiario = $request->integer('beneficiario')
-            ? Beneficiario::query()->find($request->integer('beneficiario'))
+        // `?carnet=` llega desde la ficha del cupo: resuelve también a la persona.
+        $carnetElegido = $request->integer('carnet')
+            ? Carnet::query()->find($request->integer('carnet'))
+            : null;
+
+        $beneficiarioId = $carnetElegido?->beneficiario_id ?? $request->integer('beneficiario');
+
+        $beneficiario = $beneficiarioId
+            ? Beneficiario::query()->find($beneficiarioId)
             : null;
 
         return Inertia::render('panel/faenas/crear', [
@@ -107,15 +114,20 @@ class FaenaController extends Controller
                 'carnets_vigentes' => $beneficiario->carnets()
                     ->vigentes()
                     ->with([
+                        'codigo',
                         'tipoCarnet:id,nombre',
                         'aprovechamiento' => fn ($a) => $a
+                            ->with('categoria')
                             ->withSum('faenasQueConsumen', 'kilos_extraidos'),
                     ])
                     ->get()
-                    ->map($this->resumirCarnetParaEmitir(...))
+                    ->map(fn (Carnet $c): array => $c->resumenParaEmitir())
                     ->values()
                     ->all(),
             ] : null,
+
+            // Se preelige solo si figura entre los vigentes: el formulario no lo valida.
+            'carnetElegido' => $carnetElegido?->id,
 
             'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
 
@@ -138,8 +150,6 @@ class FaenaController extends Controller
             $faena = $this->servicio->emitir(
                 Carnet::query()->findOrFail($datos['carnet_id']),
                 (float) $datos['kilos_extraidos'],
-                now()->parse($datos['fecha_salida']),
-                now()->parse($datos['fecha_desembarque']),
                 // `validated()` devuelve SOLO lo que vino: un nullable que el
                 // formulario no mandó no existe en el arreglo.
                 $datos,
@@ -204,8 +214,6 @@ class FaenaController extends Controller
                     : null,
 
                 'kilos_extraidos' => (float) $faena->kilos_extraidos,
-                'fecha_salida' => $faena->fecha_salida?->toDateString(),
-                'fecha_desembarque' => $faena->fecha_desembarque?->toDateString(),
                 'embarcacion' => $faena->embarcacion,
                 'propietario' => $faena->propietario,
                 'comandante_barco' => $faena->comandante_barco,
@@ -231,8 +239,6 @@ class FaenaController extends Controller
             $this->servicio->editar(
                 $faena,
                 (float) $datos['kilos_extraidos'],
-                now()->parse($datos['fecha_salida']),
-                now()->parse($datos['fecha_desembarque']),
                 // `validated()` devuelve SOLO lo que vino: ver store().
                 $datos,
             );
@@ -272,6 +278,7 @@ class FaenaController extends Controller
     public function show(PermisoFaena $faena): Response
     {
         $faena->load([
+            'codigo',
             'carnet:id,beneficiario_id,tipo_actor,asociacion_id,aprovechamiento_id,nro_registro,fecha_emision',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
@@ -344,25 +351,9 @@ class FaenaController extends Controller
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
                 'pagos_count' => $recibo->pagos()->count(),
             ] : null,
+
+            'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
         ]);
-    }
-
-    /**
-     * COMPLETAR — PATCH /panel/faenas/{faena}/completar
-     */
-    public function completar(CompletarFaenaRequest $request, PermisoFaena $faena): RedirectResponse
-    {
-        $kilos = $request->validated()['kilos_extraidos'] ?? null;
-
-        try {
-            $this->servicio->completar($faena, $kilos !== null ? (float) $kilos : null);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['kilos_extraidos' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('faenas.show', $faena)
-            ->with('exito', 'Faena completada. El volumen quedó firme contra el cupo.');
     }
 
     /**
@@ -543,25 +534,6 @@ class FaenaController extends Controller
     }
 
     /**
-     * Un carnet como lo necesita el formulario de emisión.
-     *
-     * @return array<string, mixed>
-     */
-    private function resumirCarnetParaEmitir(Carnet $carnet): array
-    {
-        return [
-            'id' => $carnet->id,
-            'codigo' => $carnet->codigo_legible,
-            'tipo' => $carnet->tipoCarnet?->nombre,
-            'tipo_actor' => $carnet->tipo_actor->value,
-            'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
-            'puede_emitir_faenas' => $carnet->puedeEmitirFaenas(),
-            'puede_emitir_guias' => $carnet->puedeEmitirGuias(),
-            'saldo_kg' => $carnet->aprovechamiento?->saldoKg(),
-        ];
-    }
-
-    /**
      * Los datos de una faena que pintan el listado y la ficha.
      *
      * @return array<string, mixed>
@@ -576,6 +548,8 @@ class FaenaController extends Controller
             // Con los seis ceros del talonario: «002190».
             'numero_legible' => $faena->numero_legible,
             'etiqueta' => $faena->etiqueta,
+            // La llave del QR del permiso impreso. Necesita `with('codigo')`.
+            'codigo' => $faena->codigo_legible,
 
             'carnet_id' => $faena->carnet_id,
             'carnet_codigo' => $faena->carnet?->codigo_legible,
@@ -605,7 +579,6 @@ class FaenaController extends Controller
             // Una faena vencida LIBERA su volumen: la salida no ocurrió.
             'consume_cupo' => $faena->consumeCupo(),
             'caducada' => $faena->estaCaducada(),
-            'puede_completarse' => $faena->estado === EstadoFaena::Activo,
             // Las dos puertas del borrador: estado PENDIENTE y sin un peso
             // cargado. Se resuelven acá para que la pantalla no las recalcule.
             'puede_editarse' => $faena->puedeEditarse(),
@@ -632,8 +605,6 @@ class FaenaController extends Controller
             'fecha_solicitud' => $faena->fecha_solicitud?->toDateString(),
             'fecha_salida' => $faena->fecha_salida?->toDateString(),
             'fecha_desembarque' => $faena->fecha_desembarque?->toDateString(),
-            'fecha_limite' => $faena->fecha_limite?->toDateString(),
-            'fecha_emision' => $faena->fecha_emision?->toDateString(),
         ];
     }
 }

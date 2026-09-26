@@ -150,7 +150,14 @@ export interface CupoResumen {
 export interface CarnetVigenteSugerido {
     id: number;
     codigo: string;
+    /** El número del libro, «00003». */
+    registro: string | null;
     tipo: string | null;
+    fecha_vencimiento: string | null;
+    /** El tramo del cupo, «301 Kg Hasta 500 Kg». Null si no lleva cupo. */
+    capacidad: string | null;
+    /** Lo otorgado en el cupo. Null si no lleva cupo. */
+    volumen_total_kg: number | null;
     tipo_actor: TipoActor;
     tipo_actor_etiqueta: string;
     /** Exige además una bolsa madre con saldo, no solo que sea de pescador. */

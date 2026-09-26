@@ -75,11 +75,11 @@ class PermisoFaenaImpresionController extends Controller
     private function datos(PermisoFaena $faena): array
     {
         /*
-         * LA FECHA DEL PIE SALE DE `fecha_emision` Y NO DE HOY: una
+         * LA FECHA DEL PIE SALE DE `fecha_salida` —el día de la firma— Y NO DE HOY: una
          * reimpresión del mes que viene tiene que decir lo mismo que el papel
          * que el pescador ya tiene en la mano.
          */
-        $fecha = $faena->fecha_emision ?? $faena->created_at;
+        $fecha = $faena->fecha_salida ?? $faena->created_at;
 
         return [
             'numero' => $faena->numero_legible,

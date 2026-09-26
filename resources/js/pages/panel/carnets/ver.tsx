@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
+    Ban,
     Check,
     ExternalLink,
     Paperclip,
@@ -28,7 +29,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
-import type { CarnetFicha } from '@/types/carnets';
+import type { CarnetFicha, FaenaDelCarnet } from '@/types/carnets';
 
 /**
  *  LA FICHA DE UN CARNET
@@ -37,18 +38,22 @@ export default function VerCarnet({
     carnet,
     pagos,
     recibo,
+    faenas,
 }: {
     carnet: CarnetFicha;
     pagos: PagoDelCupo[];
     recibo: ReciboDelCupo | null;
+    faenas: FaenaDelCarnet[];
 }) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
     const [rechazando, setRechazando] = useState(false);
     const [aprobando, setAprobando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
+    const [revocando, setRevocando] = useState(false);
 
     const borrado = useForm({ motivo: '' });
+    const revocacion = useForm({ motivo: '' });
     const rechazo = useForm({ motivo: '' });
     const envio = useForm({});
 
@@ -89,6 +94,13 @@ export default function VerCarnet({
                         >
                             <Pencil className="size-4" />
                             Editar
+                        </Button>
+                    )}
+
+                    {puede('carnets.revocar') && carnet.puede_revocarse && (
+                        <Button variant="eliminar" onClick={() => setRevocando(true)}>
+                            <Ban className="size-4" />
+                            Revocar
                         </Button>
                     )}
 
@@ -500,9 +512,66 @@ export default function VerCarnet({
                     admitePagos={carnet.admite_pagos}
                     rutaPagar={route('carnets.pagar', carnet.id)}
                     permisoEnviar="carnets.enviar"
-                    textoAlEnviar="El carnet pasa a EN REVISIÓN y se emite el recibo con el total; el plástico se imprime recién cuando esté aprobado."
+                    textoAlEnviar="El carnet pasa a EN REVISIÓN y se emite el recibo con el total; el carnet se imprime recién cuando esté aprobado."
                 />
             </div>
+
+            {/* LAS SALIDAS DE ESTE CARNET, recién desde la aprobación. Revocarlo no las anula. */}
+            {carnet.tipo_actor === 'pescador' && carnet.ya_fue_aprobado && (
+                <Card className="mt-6 min-w-0">
+                    <CardHeader>
+                        <CardTitle>Faenas emitidas</CardTitle>
+                    </CardHeader>
+
+                    {faenas.length === 0 ? (
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">Todavía no se emitió ninguna faena con este carnet.</p>
+                        </CardContent>
+                    ) : (
+                        <CardContent className="overflow-x-auto p-0">
+                            <table className="w-full text-sm">
+                                <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                    <tr>
+                                        <th className="px-5 py-2.5 font-medium">N°</th>
+                                        <th className="px-5 py-2.5 font-medium">Estado</th>
+                                        <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
+                                        <th className="px-5 py-2.5 font-medium">Región</th>
+                                        <th className="px-5 py-2.5 font-medium">Salida</th>
+                                        <th className="px-5 py-2.5 font-medium">Desembarque</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {faenas.map((f) => (
+                                        <tr key={f.id} className="border-b border-border last:border-0">
+                                            <td className="px-5 py-2.5">
+                                                <Link
+                                                    href={route('faenas.show', f.id)}
+                                                    className="font-mono text-primary hover:underline"
+                                                >
+                                                    {f.numero_legible}
+                                                </Link>
+                                            </td>
+                                            <td className="px-5 py-2.5">
+                                                <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
+                                            </td>
+                                            <td className="px-5 py-2.5 text-right tabular-nums">{f.kilos_extraidos} kg</td>
+                                            <td className="px-5 py-2.5 text-muted-foreground">
+                                                {f.region_desde || f.region_hasta
+                                                    ? `${f.region_desde ?? '—'} → ${f.region_hasta ?? '—'}`
+                                                    : '—'}
+                                            </td>
+                                            <td className="px-5 py-2.5 text-muted-foreground">{fecha(f.fecha_salida)}</td>
+                                            <td className="px-5 py-2.5 text-muted-foreground">
+                                                {fecha(f.fecha_desembarque)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </CardContent>
+                    )}
+                </Card>
+            )}
 
             {/*
                 APROBAR PIDE CASILLA: es la FIRMA. Desde acá el carnet habilita
@@ -615,6 +684,46 @@ export default function VerCarnet({
                     borrado.reset();
                 }}
                 onConfirmar={() => borrado.delete(route('carnets.destroy', carnet.id))}
+            />
+
+            {/* REVOCAR: el carnet deja de valer, también al escanearlo. Sus faenas siguen. */}
+            <ConfirmarConMotivo
+                abierto={revocando}
+                titulo="Revocar este carnet"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            El carnet <strong>{carnet.codigo}</strong> de{' '}
+                            <strong>{carnet.beneficiario ?? 'el titular'}</strong> deja de valer, y al
+                            escanearlo figura como revocado. <strong>No se revierte.</strong>
+                        </p>
+                        <p>
+                            Las faenas ya emitidas con él <strong>siguen vigentes</strong>. Con la misma
+                            autorización de pesca se le puede emitir un carnet nuevo.
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo de la revocación"
+                ayuda="Queda en la auditoría con su nombre."
+                placeholder="Extravío del carnet: el titular tramita la reposición."
+                confirmacion="Entiendo que el carnet deja de valer y que la revocación no se revierte."
+                textoConfirmar="Revocar carnet"
+                valor={revocacion.data.motivo}
+                onCambiar={(v) => revocacion.setData('motivo', v)}
+                error={revocacion.errors.motivo}
+                procesando={revocacion.processing}
+                onCancelar={() => {
+                    setRevocando(false);
+                    revocacion.reset();
+                }}
+                onConfirmar={() =>
+                    revocacion.patch(route('carnets.revocar', carnet.id), {
+                        onSuccess: () => {
+                            setRevocando(false);
+                            revocacion.reset();
+                        },
+                    })
+                }
             />
 
         </LayoutPanel>

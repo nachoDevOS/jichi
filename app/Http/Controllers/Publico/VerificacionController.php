@@ -110,6 +110,7 @@ class VerificacionController extends Controller
         $beneficiario = $this->titularDe($documento);
 
         return [
+            'tipo' => $this->tipoDe($documento),
             'tipo_etiqueta' => $this->etiquetaDe($documento),
 
             // En grupos de cuatro, igual que va impreso: es lo que se compara
@@ -127,6 +128,52 @@ class VerificacionController extends Controller
             'vigente' => $this->estaVigente($documento),
             'mensaje' => $this->mensaje($documento),
             'renglones' => $this->renglones($documento),
+            'vigencia' => $this->vigencia($documento),
+        ];
+    }
+
+    // Clave corta para que la pantalla elija el ícono; no expone nada interno.
+    private function tipoDe(Model $documento): string
+    {
+        return match (true) {
+            $documento instanceof Carnet => 'carnet',
+            $documento instanceof AprovechamientoPesq => 'aprovechamiento',
+            $documento instanceof PermisoFaena => 'faena',
+            $documento instanceof GuiaMovimiento => 'guia',
+            default => 'recibo',
+        };
+    }
+
+    /**
+     * El tramo de validez para la barra de la pantalla. Los días se cuentan acá y no en
+     * React: una fecha suelta parseada en el navegador corre un día en UTC-4.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function vigencia(Model $documento): ?array
+    {
+        [$desdeEtiqueta, $desde, $hastaEtiqueta, $hasta] = match (true) {
+            $documento instanceof Carnet,
+            $documento instanceof AprovechamientoPesq => ['Emitido', $documento->fecha_emision, 'Vence', $documento->fecha_vencimiento],
+            $documento instanceof PermisoFaena => ['Salida', $documento->fecha_salida, 'Desembarque', $documento->fecha_desembarque],
+            default => [null, null, null, null],
+        };
+
+        if ($desde === null || $hasta === null) {
+            return null;
+        }
+
+        $hoy = today();
+        $total = max(1, $desde->copy()->startOfDay()->diffInDays($hasta->copy()->startOfDay()));
+        $transcurrido = $desde->copy()->startOfDay()->diffInDays($hoy, false);
+
+        return [
+            'desde_etiqueta' => $desdeEtiqueta,
+            'desde' => $desde->format('d/m/Y'),
+            'hasta_etiqueta' => $hastaEtiqueta,
+            'hasta' => $hasta->format('d/m/Y'),
+            'dias_restantes' => (int) $hoy->diffInDays($hasta->copy()->startOfDay(), false),
+            'avance' => (int) round(min(100, max(0, $transcurrido / $total * 100))),
         ];
     }
 
@@ -214,8 +261,6 @@ class VerificacionController extends Controller
                 $this->renglon('Actividad', $vigente ? $documento->tipo_actor->etiqueta() : null),
                 $this->renglon('Registro', $documento->registro_legible),
                 $this->renglon('Gestión', $documento->gestion),
-                $this->renglon('Emitido', $documento->fecha_emision?->format('d/m/Y')),
-                $this->renglon('Vence', $documento->fecha_vencimiento?->format('d/m/Y')),
                 $this->renglon('Cupo autorizado', $vigente && $documento->cupoImpreso()
                     ? $documento->cupoImpreso().' kg' : null),
             ])),
@@ -223,15 +268,11 @@ class VerificacionController extends Controller
             $documento instanceof AprovechamientoPesq => array_values(array_filter([
                 $this->renglon('Volumen autorizado', $documento->volumen_total_kg.' kg'),
                 $this->renglon('Modalidad', $documento->modalidad?->etiqueta()),
-                $this->renglon('Emitido', $documento->fecha_emision?->format('d/m/Y')),
-                $this->renglon('Vence', $documento->fecha_vencimiento?->format('d/m/Y')),
             ])),
 
             $documento instanceof PermisoFaena => array_values(array_filter([
                 $this->renglon('Nº de faena', str_pad((string) $documento->numero_faena, 6, '0', STR_PAD_LEFT), true),
                 $this->renglon('Kilos autorizados', $documento->kilos_extraidos.' kg'),
-                $this->renglon('Salida', $documento->fecha_salida?->format('d/m/Y')),
-                $this->renglon('Válido hasta', $documento->fecha_limite?->format('d/m/Y')),
             ])),
 
             $documento instanceof GuiaMovimiento => array_values(array_filter([

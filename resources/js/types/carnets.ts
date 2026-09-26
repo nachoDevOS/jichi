@@ -75,7 +75,24 @@ export interface CarnetFila {
 }
 
 /** El carnet con el detalle que solo pinta la ficha. */
+/** Una faena emitida con el carnet, para la lista de la ficha. */
+export interface FaenaDelCarnet {
+    id: number;
+    numero_legible: string;
+    kilos_extraidos: number;
+    estado_etiqueta: string;
+    estado_color: string;
+    vigente: boolean;
+    region_desde: string | null;
+    region_hasta: string | null;
+    fecha_solicitud: string | null;
+    fecha_salida: string | null;
+    fecha_desembarque: string | null;
+}
+
 export interface CarnetFicha extends CarnetFila {
+    /** Solo el APROBADO: ver EstadoCarnet::permiteRevocacion(). */
+    puede_revocarse: boolean;
     /**
      * LAS DEL CIRCUITO DE REVISIÓN, resueltas en el servidor. React no vuelve
      * a evaluar el estado: pregunta por estas.
@@ -143,6 +160,15 @@ export interface CarnetEnCorreccion {
 }
 
 /** Una asociación elegible en el formulario de emisión. */
+/** El carnet revocado que se repone, para precargar el formulario. */
+export interface ReposicionDeCarnet {
+    registro: string | null;
+    codigo: string | null;
+    asociacion_id: number;
+    tipo_carnet_id: number;
+    aprovechamiento_id: number | null;
+}
+
 export interface AsociacionElegible {
     id: number;
     nombre: string;

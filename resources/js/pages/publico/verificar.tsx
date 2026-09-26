@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { Printer, ScanLine } from 'lucide-react';
+import { ScanLine, ShieldX } from 'lucide-react';
 import { BuscadorCodigo } from '@/components/publico/buscador-codigo';
 import { FichaDocumento } from '@/components/publico/ficha-documento';
 import { HojaOficial } from '@/components/publico/hoja-oficial';
@@ -74,18 +74,7 @@ export default function Verificar({ codigo, documento, encontrado, institucion }
                 `solo-pantalla`, la clase que lo saca de la impresión. */}
             {seVerifico && (
                 <div className="solo-pantalla mt-6">
-                    <div className="flex justify-center">
-                        <button
-                            type="button"
-                            onClick={() => window.print()}
-                            className="flex items-center gap-2 rounded-full border border-white/25 px-4 py-2 text-[12px] font-semibold text-white/85 transition hover:bg-white/10"
-                        >
-                            <Printer className="size-4" />
-                            Imprimir o guardar en PDF
-                        </button>
-                    </div>
-
-                    <div className="mt-5 rounded-xl bg-white/10 p-4 backdrop-blur-sm">
+                    <div className="rounded-xl bg-white/10 p-4 backdrop-blur-sm">
                         <p className="mb-3 text-center text-[11px] font-semibold tracking-wide text-white/70 uppercase">
                             Verificar otro documento
                         </p>
@@ -120,18 +109,24 @@ function NoEncontrado({
                 Constancia de consulta
             </h1>
 
-            <div className="mt-4">
-                <p className="text-justify font-serif text-[13px] leading-relaxed text-slate-700">
-                    Se deja constancia de que, consultado el registro electrónico de carnets
-                    emitidos por esta institución, el código{' '}
-                    <b className="font-mono text-[12px] font-bold tracking-wider break-all text-slate-900">
-                        {codigo}
-                    </b>{' '}
-                    NO corresponde a ningún documento emitido.
+            {/* «No registrado» y no «falso»: el código puede estar mal escrito. Ver el aviso de abajo. */}
+            <div className="mt-4 flex items-center justify-center gap-1.5 rounded-sm border border-red-700/30 bg-red-50 px-3 py-1.5 text-red-800">
+                <ShieldX className="size-4" />
+                <span className="text-[12px] font-bold tracking-[0.1em] uppercase">No registrado</span>
+            </div>
+
+            <div className="mt-4 rounded-sm border border-dashed border-red-700/40 px-4 py-3 text-center">
+                <p className="text-[10px] tracking-[0.14em] text-slate-500 uppercase">Código consultado</p>
+                <p className="mt-1 font-mono text-[17px] font-bold tracking-[0.12em] break-all text-red-800 line-through decoration-red-700/50">
+                    {codigo?.match(/.{1,4}/g)?.join('-') ?? codigo}
                 </p>
             </div>
 
-            <div className="mt-6 border-l-4 border-slate-400/50 bg-slate-50 py-2.5 pr-3 pl-3.5">
+            <p className="mt-4 text-center font-serif text-[13px] leading-relaxed text-slate-700">
+                Este código <b>NO corresponde</b> a ningún documento emitido por esta institución.
+            </p>
+
+            <div className="mt-5 border-l-4 border-red-700/40 bg-red-50/50 py-2.5 pr-3 pl-3.5">
                 <p className="text-[12px] leading-snug text-slate-700">
                     <b className="block font-semibold">Antes de dar por falso el documento</b>
                     Revise que el código esté bien escrito —es fácil confundir el 0 con la O y el 1

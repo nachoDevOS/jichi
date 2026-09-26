@@ -242,12 +242,18 @@ class EmitirCarnetService
             throw CarnetInvalidoException::motivoObligatorio();
         }
 
-        if ($carnet->estado === EstadoCarnet::Revocado) {
-            throw CarnetInvalidoException::yaRevocado();
-        }
-
         return DB::transaction(function () use ($carnet, $motivo): Carnet {
             $bloqueado = Carnet::query()->whereKey($carnet->id)->lockForUpdate()->firstOrFail();
+
+            // Con la copia bloqueada: otra ventanilla pudo revocarlo recién.
+            // Las faenas NO se tocan: la salida aprobada sigue valiendo.
+            if ($bloqueado->estado === EstadoCarnet::Revocado) {
+                throw CarnetInvalidoException::yaRevocado();
+            }
+
+            if (! $bloqueado->estado->permiteRevocacion()) {
+                throw CarnetInvalidoException::noSePuedeRevocar(mb_strtolower($bloqueado->estado->etiqueta()));
+            }
 
             // El motivo se deja ANTES de guardar: el trait Auditable lo lee en el
             // evento `updated`. Sin él la auditoría diría QUÉ cambió pero no POR
@@ -259,6 +265,15 @@ class EmitirCarnetService
             // en la mano, y darle la copia bloqueada lo deja con el estado viejo.
             return $carnet->refresh();
         });
+    }
+
+    /**
+     * REPONER: revoca el carnet con el motivo de la reposición. El nuevo se emite
+     * después con el formulario de siempre, sobre la misma autorización de pesca.
+     */
+    public function reponer(Carnet $carnet, string $motivo): Carnet
+    {
+        return $this->revocar($carnet, 'Reposición: '.trim($motivo));
     }
 
     //  Auxiliares
