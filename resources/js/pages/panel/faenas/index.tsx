@@ -146,11 +146,12 @@ export default function IndiceFaenas({
                                             <th className="px-5 py-2.5 font-medium">N°</th>
                                             <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
-                                            <th className="px-5 py-2.5 font-medium">Estado</th>
                                             <th className="px-5 py-2.5 font-medium">Salida</th>
                                             <th className="px-5 py-2.5 font-medium">Desembarque</th>
                                             <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
+                                            {/* Registrado y Estado pegados a los botones, como en carnets y cupos. */}
                                             <th className="px-5 py-2.5 font-medium">Registrado</th>
+                                            <th className="px-5 py-2.5 font-medium">Estado</th>
                                             <th className="px-5 py-2.5" />
                                         </tr>
                                     </thead>
@@ -217,15 +218,6 @@ export default function IndiceFaenas({
                                                     </span>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
-                                                    <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
-                                                    {f.caducada && (
-                                                        <Badge color="amber" className="ml-1">
-                                                            sin cerrar
-                                                        </Badge>
-                                                    )}
-                                                </td>
-
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fecha(f.fecha_salida)}
                                                 </td>
@@ -245,9 +237,18 @@ export default function IndiceFaenas({
                                                     )}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
-                                                    <p className="tabular-nums">{fechaHora(f.registrado_en)}</p>
-                                                    <p className="text-xs">{hace(f.registrado_en)}</p>
+                                                <td className="px-5 py-2.5 text-xs text-muted-foreground">
+                                                    {fechaHora(f.registrado_en)}
+                                                    <span className="block">{hace(f.registrado_en)}</span>
+                                                </td>
+
+                                                <td className="px-5 py-2.5">
+                                                    <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
+                                                    {f.caducada && (
+                                                        <Badge color="amber" className="ml-1">
+                                                            sin cerrar
+                                                        </Badge>
+                                                    )}
                                                 </td>
 
                                                 <td className="px-5 py-2.5">
@@ -279,7 +280,7 @@ export default function IndiceFaenas({
                                                             faena aprobada: hasta la firma no hay
                                                             nada que autorizar. Abre pestaña porque
                                                             lo que vuelve es un PDF. */}
-                                                        {puede('faenas.imprimir') && f.ya_fue_aprobada && (
+                                                        {puede('faenas.imprimir') && f.puede_imprimirse && (
                                                             <a
                                                                 href={route('faenas.imprimir', f.id)}
                                                                 target="_blank"

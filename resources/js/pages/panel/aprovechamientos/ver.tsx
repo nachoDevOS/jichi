@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
+    Ban,
     Banknote,
     BadgeCheck,
     Check,
@@ -98,6 +99,8 @@ export default function VerCupo({
      */
     const rechazo = useForm({ motivo: '' });
     const envio = useForm({});
+    const [revocando, setRevocando] = useState(false);
+    const revocacion = useForm({ motivo: '' });
 
     const borrado = useForm({ motivo: '' });
 
@@ -221,7 +224,7 @@ export default function VerCupo({
                     {/* LA AUTORIZACIÓN DE PESCA, en PDF. Sale recién con el cupo
                         firmado, y abre una pestaña porque lo que vuelve es un
                         archivo: el visor del navegador es desde donde se imprime. */}
-                    {puede('aprovechamientos.imprimir') && cupo.ya_fue_aprobado && (
+                    {puede('aprovechamientos.imprimir') && cupo.puede_imprimirse && (
                         <a
                             href={route('aprovechamientos.autorizacion', cupo.id)}
                             target="_blank"
@@ -229,7 +232,7 @@ export default function VerCupo({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Printer className="size-4" />
-                            Autorización de pesca
+                            Autorización de Pesca para Aprovechamiento Pesquero
                         </a>
                     )}
 
@@ -325,6 +328,14 @@ export default function VerCupo({
                         </>
                     )}
 
+                    {/* Revocar es una sanción: motivo obligatorio y no se deshace. */}
+                    {puede('aprovechamientos.revocar') && cupo.puede_revocarse && (
+                        <Button variant="eliminar" onClick={() => setRevocando(true)}>
+                            <Ban className="size-4" />
+                            Revocar
+                        </Button>
+                    )}
+
                     {/*
                         NO HAY BOTÓN «COBRAR» ACÁ, y es deliberado: los depósitos
                         se cargan más abajo, en la tarjeta de Pagos, con una
@@ -335,7 +346,7 @@ export default function VerCupo({
                 </div>
             }
         >
-            <Head title={`Autorización de pesca · ${cupo.beneficiario ?? ''}`} />
+            <Head title={`Autorización de Pesca para Aprovechamiento Pesquero · ${cupo.beneficiario ?? ''}`} />
 
             {/*
                 EL TITULAR, CON SU FOTO. El encabezado del layout solo admite
@@ -1023,8 +1034,21 @@ export default function VerCupo({
                 */}
                 {(cupo.ya_fue_aprobado || carnets.length > 0) && (
                     <Card className="min-w-0 lg:col-span-3">
-                        <CardHeader>
+                        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
                             <CardTitle>Cédulas emitidas con este autorización</CardTitle>
+
+                            {/* Llega con la persona y este cupo ya elegidos. */}
+                            {puede('carnets.crear') && cupo.puede_emitir_carnet && (
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        router.visit(route('carnets.create', { aprovechamiento: cupo.id }))
+                                    }
+                                >
+                                    <Plus className="size-4" />
+                                    Emitir cédula
+                                </Button>
+                            )}
                         </CardHeader>
 
                         <CardContent className="p-0">
@@ -1248,7 +1272,7 @@ export default function VerCupo({
                                                         </span>
                                                         {!f.consume_cupo && (
                                                             <span className="ml-2 text-xs text-muted-foreground">
-                                                                {f.estado === 'vencido'
+                                                                {f.estado === 'vencido' || f.estado === 'revocado'
                                                                     ? 'liberados'
                                                                     : 'sin descontar'}
                                                             </span>
@@ -1411,7 +1435,7 @@ export default function VerCupo({
                         </p>
                         <p>
                             Las faenas ya emitidas con él <strong>siguen vigentes</strong>. Después se abre
-                            el formulario del carnet nuevo con esta misma autorización de pesca.
+                            el formulario del carnet nuevo con esta misma Autorización de Pesca para Aprovechamiento Pesquero.
                         </p>
                     </div>
                 }
@@ -1430,6 +1454,55 @@ export default function VerCupo({
                 }}
                 onConfirmar={() =>
                     reponiendo && reposicion.patch(route('carnets.reponer', reponiendo.id))
+                }
+            />
+
+            <ConfirmarConMotivo
+                abierto={revocando}
+                titulo="Revocar la Autorización de Pesca para Aprovechamiento Pesquero"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            La autorización de <strong>{cupo.beneficiario ?? 'el pescador'}</strong> queda
+                            REVOCADA aunque siga en fecha.
+                        </p>
+                        <ul className="list-disc space-y-1 pl-5">
+                            <li>No se emiten más carnets ni faenas con ella.</li>
+                            <li>
+                                Sus carnets <strong>aprobados y vigentes</strong> se revocan con ella.
+                            </li>
+                            <li>
+                                Sus faenas <strong>aprobadas y vigentes</strong> se revocan: la salida se corta.
+                            </li>
+                            <li>Lo ya vencido o cerrado queda como está.</li>
+                            <li>La persona puede tramitar una autorización nueva.</li>
+                        </ul>
+                        <p>
+                            <strong>No se puede deshacer.</strong>
+                        </p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo de la revocación"
+                ayuda="Queda en la auditoría con su nombre. Es lo que explica la sanción más adelante."
+                placeholder="Resolución SEDAG N° 045/2026: pesca en época de veda."
+                confirmacion="Entiendo que la autorización deja de valer y que esto no se deshace desde el panel."
+                textoConfirmar="Revocar"
+                valor={revocacion.data.motivo}
+                onCambiar={(v) => revocacion.setData('motivo', v)}
+                error={revocacion.errors.motivo}
+                procesando={revocacion.processing}
+                onCancelar={() => {
+                    setRevocando(false);
+                    revocacion.reset();
+                }}
+                onConfirmar={() =>
+                    revocacion.patch(route('aprovechamientos.revocar', cupo.id), {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            setRevocando(false);
+                            revocacion.reset();
+                        },
+                    })
                 }
             />
 
@@ -1480,8 +1553,8 @@ export default function VerCupo({
                     <div className="space-y-2">
                         <p>
                             Se da de baja el cupo de{' '}
-                            <strong>{cupo.beneficiario ?? 'el pescador'}</strong>: escala{' '}
-                            {cupo.escala ?? '—'}, {cupo.volumen_total_kg} kg.
+                            <strong>{cupo.beneficiario ?? 'el pescador'}</strong>:{' '}
+                            {cupo.volumen_total_kg} kg.
                         </p>
                         <p>
                             Solo se puede porque está <strong>pendiente de pago</strong>, sin ningún

@@ -288,14 +288,21 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 
 ```
 PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ AGOTADO | VENCIDO
-(borrador)   ▲               │
-             └──[rechazar]───┘
+(borrador)   ▲               │                        │            │
+             └──[rechazar]───┘                        └─[revocar]──┴──▶ REVOCADO
 
-  editar     ✔               ✘                     ✘          ✘        ✘
-  eliminar   ✔               ✘                     ✘          ✘        ✘
-  pagos      ✔               ✘                     ✘          ✘        ✘
-  faenas     ✘               ✘                     ✔          ✘        ✘
+  editar     ✔               ✘                     ✘          ✘        ✘        ✘
+  eliminar   ✔               ✘                     ✘          ✘        ✘        ✘
+  pagos      ✔               ✘                     ✘          ✘        ✘        ✘
+  faenas     ✘               ✘                     ✔          ✘        ✘        ✘
+  revocar    ✘               ✘                     ✔          ✔        ✘        ✘
+  imprimir   ✘               ✘                     ✔          ✔        ✔        ✘
 ```
+
+**`revocado` (27/09/2026)** no agrega columnas: el motivo va a `auditorias`, como
+en el carnet revocado. No autoriza carnets ni faenas, libera el lugar para
+otorgar otra y arrastra sus carnets y faenas aprobados y vigentes. Las reglas completas están en
+[REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#una-autorización-vigente-por-persona-y-la-revocación--27092026).
 
 **Se llamaba `activo` y pasó a `aprobado` el 20/09/2026**, a pedido: en este
 circuito el estado no dice «está andando» sino que ALGUIEN LO FIRMÓ, y eso es lo
@@ -488,6 +495,11 @@ que el carnet y el cupo—.
 **NO SE REGISTRA LA VUELTA** —retirado el 25/09/2026 a pedido—. La faena
 aprobada queda así: los kilos autorizados cuentan como consumidos desde la firma.
 `EstadoFaena::Completado` sigue en el enum, pero hoy nada lleva a ese estado.
+
+**`revocado` (27/09/2026)** lo escribe solo la revocación de su autorización,
+sobre una faena `aprobado` con el desembarque de hoy en adelante. No consume
+cupo ni se imprime; el motivo va a `auditorias`. Ver
+[REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#una-autorización-vigente-por-persona-y-la-revocación--27092026).
 
 `PermisoFaena` usa el trait `Pagable`, el arancel sale de
 `config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`, **15 Bs** por

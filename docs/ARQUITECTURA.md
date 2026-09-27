@@ -76,6 +76,14 @@ polimórfica. Ver §3.
 
 ### La regla que ordena todo
 
+> **Al día (27/09/2026), con el núcleo nuevo:** una persona tiene a la vez como
+> máximo **una Autorización de Pesca para Aprovechamiento Pesquero** que la ocupe
+> (pendiente, en revisión o aprobada, en fecha) y **un carnet vigente por
+> actividad**. Revocar la autorización libera el lugar y la deja sin carnets ni
+> faenas nuevos. El detalle, con ejemplos, está en
+> [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#una-autorización-vigente-por-persona-y-la-revocación--27092026).
+> Lo que sigue en esta sección describe el modelo ANTERIOR (rubros).
+
 > **Una persona tiene como máximo UN carnet por RUBRO y por gestión.**
 
 Está escrita como índice único en la base

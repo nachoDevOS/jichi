@@ -183,7 +183,7 @@ class CajaController extends Controller
 
         foreach ($beneficiario->aprovechamientos()->with('categoria')->withSum('pagos', 'monto_parcial')->get() as $a) {
             if ($a->saldoPendiente() > 0) {
-                $deudas[] = $this->linea('cupo', $a->id, 'Aprovechamiento escala '.($a->categoria?->nro_escala ?? '—'),
+                $deudas[] = $this->linea('cupo', $a->id, 'Autorización de Pesca para Aprovechamiento Pesquero',
                     $a->categoria?->descripcion_kg ?? '', $a->montoACobrar(), $a->saldoPendiente());
             }
         }

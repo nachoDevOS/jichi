@@ -20,6 +20,12 @@ enum EstadoAprovechamiento: string
     case Vencido = 'vencido';
     case Agotado = 'agotado';
 
+    /**
+     * Dado de baja por la unidad, con motivo, aunque siga en fecha. No autoriza
+     * faenas ni carnets nuevos, y libera el lugar para otorgar otro. Ver REGLAS-NEGOCIO.
+     */
+    case Revocado = 'revocado';
+
     public function etiqueta(): string
     {
         return match ($this) {
@@ -28,6 +34,7 @@ enum EstadoAprovechamiento: string
             self::Aprobado => 'Aprobado',
             self::Vencido => 'Vencido',
             self::Agotado => 'Agotado',
+            self::Revocado => 'Revocado',
         };
     }
 
@@ -39,6 +46,7 @@ enum EstadoAprovechamiento: string
             self::Aprobado => 'emerald',
             self::Vencido => 'slate',
             self::Agotado => 'amber',
+            self::Revocado => 'rose',
         };
     }
 
@@ -48,6 +56,15 @@ enum EstadoAprovechamiento: string
     public function habilita(): bool
     {
         return $this === self::Aprobado;
+    }
+
+    /**
+     * ¿Se puede revocar? Solo lo firmado que todavía cuenta: aprobado o agotado.
+     * El borrador se elimina, el presentado se rechaza, el vencido ya no autoriza.
+     */
+    public function permiteRevocacion(): bool
+    {
+        return $this === self::Aprobado || $this === self::Agotado;
     }
 
     /**

@@ -69,6 +69,11 @@ class AutorizacionPescaController extends Controller
             );
         }
 
+        // Revocada no se imprime: el papel diría que autoriza algo que ya no autoriza.
+        if (! $aprovechamiento->puedeImprimirse()) {
+            return back()->with('error', 'La autorización está revocada: no se imprime.');
+        }
+
         $aprovechamiento->loadMissing(['codigo', 'beneficiario', 'categoria']);
 
         $pdf = Pdf::loadView('documentos.autorizacion-pesca', [
@@ -96,7 +101,7 @@ class AutorizacionPescaController extends Controller
             // cada una— en cada documento.
             ->setOption('enable_font_subsetting', true);
 
-        return $pdf->stream("autorizacion-{$this->numeroDe($aprovechamiento)}.pdf");
+        return $pdf->stream("autorizacion-{$aprovechamiento->numeroLegible()}.pdf");
     }
 
     /**
@@ -115,7 +120,7 @@ class AutorizacionPescaController extends Controller
         $fecha = $cupo->fecha_emision ?? $cupo->created_at;
 
         return [
-            'numero' => $this->numeroDe($cupo),
+            'numero' => $cupo->numeroLegible(),
             'beneficiario' => $b?->nombreCompleto ?? '—',
             'domicilio' => $this->domicilioDe($cupo),
             // El accesor ya arma «1234567-1A BN»: acá se armaba a mano y el
@@ -138,19 +143,6 @@ class AutorizacionPescaController extends Controller
                 'anio' => $fecha?->format('y') ?? '',
             ],
         ];
-    }
-
-    /**
-     * El número del documento.
-     *
-     * Es el id del cupo con ceros a la izquierda, y no un correlativo propio: el
-     * talonario de papel ya trae el suyo impreso, y un contador aparte se
-     * gastaría en cada reimpresión o pediría una columna más. Así una
-     * reimpresión sale siempre con el mismo número.
-     */
-    private function numeroDe(AprovechamientoPesq $cupo): string
-    {
-        return str_pad((string) $cupo->id, 6, '0', STR_PAD_LEFT);
     }
 
     /** Dirección, ciudad y provincia en un renglón, sin separadores vacíos. */

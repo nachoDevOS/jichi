@@ -775,6 +775,13 @@ Los cuatro tienen que pasar.
   podían otorgar cinco y quedarse con el mejor. **Al sumar un estado, buscar
   todos los scopes y helpers que enumeran estados y decidir uno por uno de qué
   lado cae el nuevo.**
+
+  **Cuarta vez, con `revocado` (27/09/2026), y los dos agujeros estaban donde no
+  se mira el estado:** `puedeEmitirFaena()` en modo FLEXIBLE devuelve true sin
+  preguntar el estado —una revocada seguía emitiendo faenas— y
+  `sincronizarEstadoPorSaldo()` la habría REVIVIDO a `aprobado` al anular una
+  faena. Además de los scopes, revisar **todo método que salte el estado a
+  propósito** y todo `update` a un estado fijo.
 - **Un método que «revive» un registro puede activar lo que nunca se autorizó.**
   El viejo `ampliar()` —retirado el 19/09/2026— escribía `estado = Activo` a
   secas para revivir un cupo agotado; cuando apareció `pendiente`, ampliar pasó a

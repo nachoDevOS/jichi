@@ -62,6 +62,11 @@ class EmitirFaenaService
                 throw PermisoOperativoException::sinCupoVigente();
             }
 
+            // Revocada: el carnet puede seguir aprobado, pero su autorización ya no respalda nada.
+            if ($cupo->estado === EstadoAprovechamiento::Revocado) {
+                throw PermisoOperativoException::cupoRevocado();
+            }
+
             /*
              * EL CUPO SIN COBRAR TIENE SU PROPIO MENSAJE, y hace falta.
              */

@@ -21,12 +21,15 @@ import type { AsociacionElegible, CupoVigente, ReposicionDeCarnet, TipoElegible 
 export default function CrearCarnet({
     beneficiario,
     reposicion,
+    aprovechamientoId,
     asociaciones,
     tipos,
 }: {
     beneficiario: BeneficiarioSugerido | null;
     /** Llega de «Reponer»: los datos del carnet revocado, para no volver a elegirlos. */
     reposicion: ReposicionDeCarnet | null;
+    /** Llega de la ficha del cupo: la bolsa que se preselecciona. */
+    aprovechamientoId: number | null;
     asociaciones: AsociacionElegible[];
     tipos: TipoElegible[];
 }) {
@@ -40,6 +43,7 @@ export default function CrearCarnet({
         // De qué bolsa madre cuelga. Se manda explícito en vez de dejar que el
         // servidor adivine: así la pantalla y lo guardado dicen lo mismo.
         aprovechamiento_id: (reposicion?.aprovechamiento_id ??
+            beneficiario?.cupos_elegibles?.find((c) => c.id === aprovechamientoId)?.id ??
             beneficiario?.cupos_elegibles?.[0]?.id ??
             null) as number | null,
         fecha_solicitud: new Date().toISOString().slice(0, 10),
@@ -122,7 +126,7 @@ export default function CrearCarnet({
                     <Info className="mt-0.5 size-4 shrink-0" />
                     <span>
                         <strong>Reposición del carnet N° {reposicion.registro ?? '—'}</strong> ({reposicion.codigo}),
-                        ya revocado. Tipo, asociación y autorización de pesca vienen del anterior; falta
+                        ya revocado. Tipo, asociación y Autorización de Pesca para Aprovechamiento Pesquero vienen del anterior; falta
                         adjuntar los documentos y registrar.
                     </span>
                 </p>
@@ -216,7 +220,7 @@ export default function CrearCarnet({
                         */}
                         {esPescador && cupos.length > 0 && (
                             <Campo
-                                etiqueta="Autorización de Pesca que respalda el carnet"
+                                etiqueta="Autorización de Pesca para Aprovechamiento Pesquero que respalda el carnet"
                                 htmlFor="aprovechamiento_id"
                                 error={form.errors.aprovechamiento_id}
                                 ayuda={
@@ -300,7 +304,7 @@ export default function CrearCarnet({
                             <p className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
                                 <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                                 <span>
-                                    Esta persona <strong>no tiene una Autorización de Pesca en
+                                    Esta persona <strong>no tiene una Autorización de Pesca para Aprovechamiento Pesquero en
                                     curso</strong>. El carnet de pescador imprime el volumen
                                     autorizado, así que hay que registrarla antes. El servidor va a
                                     rechazar la emisión.
@@ -419,7 +423,7 @@ export default function CrearCarnet({
                                     {esPescador
                                         ? cupo
                                             ? `Autoriza ${cupo.volumen_total_kg} kg${cupo.descripcion ? ` (${cupo.descripcion})` : ''}.`
-                                            : 'Necesita una Autorización de Pesca vigente: de ahí salen los kilos de cada faena.'
+                                            : 'Necesita una Autorización de Pesca para Aprovechamiento Pesquero vigente: de ahí salen los kilos de cada faena.'
                                         : 'No lleva volumen: la comercialización no se autoriza por kilos.'}
                                 </p>
                             </div>

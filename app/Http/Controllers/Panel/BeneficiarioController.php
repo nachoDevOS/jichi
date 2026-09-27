@@ -9,6 +9,9 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\Departamento;
+use App\Models\GuiaMovimiento;
+use App\Models\PermisoFaena;
+use App\Models\Recibo;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -68,6 +71,9 @@ class BeneficiarioController extends Controller
                  * React la calcule.
                  */
                 'edad' => $b->edad,
+
+                // Cuándo se cargó: un MOMENTO, va con toIso8601String().
+                'registrado_en' => $b->created_at?->toIso8601String(),
             ]);
 
         return Inertia::render('panel/beneficiarios/index', [
@@ -143,11 +149,95 @@ class BeneficiarioController extends Controller
              *  SUS CREDENCIALES — el paso 3 del flujo
              */
             'carnets' => $beneficiario->carnets()
-                ->with(['asociacion:id,nombre,sigla', 'tipoCarnet', 'aprovechamiento'])
+                // El cupo con su saldo precargado: `motivoSinPermisos()` y
+                // `puedeEmitirFaenas()` lo leen, y sin esto son dos consultas por carnet.
+                ->with([
+                    'codigo',
+                    'asociacion:id,nombre,sigla',
+                    'tipoCarnet',
+                    'aprovechamiento' => fn ($a) => $a
+                        ->with('categoria')
+                        ->withSum('faenasQueConsumen', 'kilos_extraidos'),
+                ])
                 ->withSum('pagos', 'monto_parcial')
-                ->orderByDesc('fecha_emision')
+                // Por id y no por emisión: la emisión es NULL hasta la firma, y
+                // cada motor ordena los NULL en otra punta.
+                ->orderByDesc('id')
                 ->get()
                 ->map($this->resumirCarnet(...))
+                ->all(),
+
+            // Lo que cuelga de cada carnet: las salidas del pescador y los
+            // traslados del comercializador. Ver la pestaña de cada actividad.
+            'faenas' => $beneficiario->faenas()
+                ->withSum('pagos', 'monto_parcial')
+                ->orderByDesc('permisos_faena.numero_faena')
+                ->get()
+                ->map(fn (PermisoFaena $f): array => [
+                    'id' => $f->id,
+                    'carnet_id' => $f->carnet_id,
+                    'numero_legible' => $f->numero_legible,
+                    'kilos_extraidos' => (float) $f->kilos_extraidos,
+                    'estado' => $f->estado->value,
+                    'estado_etiqueta' => $f->estado->etiqueta(),
+                    'estado_color' => $f->estado->color(),
+                    'vigente' => $f->estaVigente(),
+                    'caducada' => $f->estaCaducada(),
+                    'monto' => $f->montoACobrar(),
+                    // Mismo corte que Caja: solo se debe lo que todavía admite depósitos.
+                    'debe' => $f->admitePagos() ? $f->saldoPendiente() : 0.0,
+                    'fecha_solicitud' => $f->fecha_solicitud?->toDateString(),
+                    'fecha_salida' => $f->fecha_salida?->toDateString(),
+                    'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
+                    // Los renglones del talonario: con ellos la lista dice QUÉ salida fue.
+                    'embarcacion' => $f->embarcacion,
+                    'propietario' => $f->propietario,
+                    'comandante_barco' => $f->comandante_barco,
+                    'matricula_naval' => $f->matricula_naval,
+                    'region_desde' => $f->region_desde,
+                    'region_hasta' => $f->region_hasta,
+                    'ya_fue_aprobada' => $f->yaFueAprobada(),
+                    'puede_imprimirse' => $f->puedeImprimirse(),
+                ])
+                ->all(),
+
+            'guias' => $beneficiario->guias()
+                ->withSum('pagos', 'monto_parcial')
+                ->orderByDesc('guias_movimiento.numero_guia')
+                ->get()
+                ->map(fn (GuiaMovimiento $g): array => [
+                    'id' => $g->id,
+                    'carnet_id' => $g->carnet_id,
+                    'numero_legible' => $g->numero_legible,
+                    'ruta' => $g->ruta,
+                    'peso_total_kg' => (float) $g->peso_total_kg,
+                    'estado' => $g->estado->value,
+                    'estado_etiqueta' => $g->estado->etiqueta(),
+                    'estado_color' => $g->estado->color(),
+                    'vigente' => $g->estaVigente(),
+                    'caducada' => $g->estaCaducada(),
+                    'monto' => $g->montoACobrar(),
+                    'debe' => $g->admitePagos() ? $g->saldoPendiente() : 0.0,
+                    'fecha_solicitud' => $g->fecha_solicitud?->toDateString(),
+                    // Un MOMENTO: la guía vale por horas, no por días.
+                    'fecha_vencimiento' => $g->fecha_vencimiento?->toIso8601String(),
+                ])
+                ->all(),
+
+            // Los comprobantes que se llevó, del más nuevo al más viejo.
+            'recibos' => Recibo::query()
+                ->where('beneficiario_id', $beneficiario->id)
+                ->withCount('pagos')
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn (Recibo $r): array => [
+                    'id' => $r->id,
+                    'numero' => $r->numero_recibo,
+                    'concepto' => $r->concepto,
+                    'monto_total' => (float) $r->monto_total,
+                    'depositos' => $r->pagos_count,
+                    'emitido_en' => $r->created_at?->toIso8601String(),
+                ])
                 ->all(),
 
             /*
@@ -376,6 +466,15 @@ class BeneficiarioController extends Controller
             // Lo decide TipoActor::requiereAprovechamiento(), nunca el nombre
             // del tipo de carnet. Ver Carnet::cupoImpreso().
             'cupo_kg' => $carnet->cupoImpreso(),
+            'registro' => $carnet->registro_legible,
+            'aprovechamiento_id' => $carnet->aprovechamiento_id,
+            // Qué permisos cuelga hoy y, si no puede, por qué: lo resuelve el modelo.
+            'puede_emitir' => $carnet->tipo_actor->emiteFaenas()
+                ? $carnet->puedeEmitirFaenas()
+                : $carnet->puedeEmitirGuias(),
+            'motivo_sin_permisos' => $carnet->motivoSinPermisos(),
+            'dias_para_vencer' => $carnet->diasParaVencer(),
+            'fecha_solicitud' => $carnet->fecha_solicitud?->toDateString(),
             'estado' => $carnet->estado->value,
             'estado_etiqueta' => $carnet->estado->etiqueta(),
             'estado_color' => $carnet->estado->color(),

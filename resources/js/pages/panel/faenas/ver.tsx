@@ -145,7 +145,7 @@ export default function VerFaena({
                         hasta la firma no hay nada que autorizar. `ya_fue_aprobada`
                         llega resuelto del servidor.
                     */}
-                    {puede('faenas.imprimir') && faena.ya_fue_aprobada && (
+                    {puede('faenas.imprimir') && faena.puede_imprimirse && (
                         <a
                             href={route('faenas.imprimir', faena.id)}
                             target="_blank"
@@ -192,10 +192,6 @@ export default function VerFaena({
                         )}
 
                         <p className="tabular-nums text-sm text-muted-foreground">C.I. {faena.documento ?? '—'}</p>
-
-                        <p className="text-sm text-muted-foreground">
-                            Carnet de pescador N° {faena.carnet_registro ?? '—'}
-                        </p>
                     </div>
                 </CardContent>
             </Card>
@@ -212,11 +208,6 @@ export default function VerFaena({
 
                             <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                                 <Dato etiqueta="Kilos" valor={`${faena.kilos_extraidos} kg`} />
-                                <Dato etiqueta="Solicitada" valor={fecha(faena.fecha_solicitud)} />
-                                {/* Las dos las escribe la aprobación: en «—» hasta la firma. */}
-                                <Dato etiqueta="Salida" valor={fecha(faena.fecha_salida)} />
-                                <Dato etiqueta="Desembarque" valor={fecha(faena.fecha_desembarque)} />
-                                <Dato etiqueta="Arancel" valor={bs(faena.monto)} />
                                 <Dato etiqueta="Asociación" valor={faena.asociacion ?? '—'} />
                                 {/* DE QUÉ CARNET CUELGA. El número del libro es
                                     cómo se lo nombra; el código de 16 caracteres
@@ -268,17 +259,41 @@ export default function VerFaena({
                 </div>
 
                 <div className="space-y-6">
-                    {/* EL CÓDIGO DE LA FAENA: es la llave del QR del permiso impreso. */}
+                    {/* Mismo bloque lateral que la ficha del carnet y la del cupo. */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Código de la faena</CardTitle>
+                            <CardTitle>Situación</CardTitle>
                         </CardHeader>
 
-                        <CardContent className="space-y-1 text-sm">
-                            <p className="font-mono text-lg font-semibold tracking-wide">{faena.codigo ?? '—'}</p>
-                            <p className="text-xs text-muted-foreground">
-                                Es el que va en el QR del permiso impreso y con el que se verifica.
-                            </p>
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-muted-foreground">Estado</span>
+                                <Badge color={faena.estado_color}>{faena.estado_etiqueta}</Badge>
+                            </div>
+
+                            {/* La llave del QR del permiso impreso. */}
+                            <div className="flex justify-between gap-3">
+                                <span className="text-muted-foreground">Código</span>
+                                <span className="text-right font-mono font-medium">{faena.codigo ?? '—'}</span>
+                            </div>
+
+                            <Renglon etiqueta="N° de faena" valor={faena.numero_legible} />
+                            <Renglon etiqueta="Solicitada el" valor={fecha(faena.fecha_solicitud)} />
+                            {/* Las dos las escribe la aprobación: en «—» hasta la firma. */}
+                            <Renglon etiqueta="Salida el" valor={fecha(faena.fecha_salida)} />
+                            <Renglon etiqueta="Desembarque el" valor={fecha(faena.fecha_desembarque)} />
+                            <Renglon etiqueta="Arancel" valor={bs(faena.monto)} />
+
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-muted-foreground">Cobro</span>
+                                {faena.pagado ? (
+                                    <span className="font-medium text-emerald-700 dark:text-emerald-400">Pagado</span>
+                                ) : (
+                                    <span className="font-medium text-amber-700 dark:text-amber-400">
+                                        debe {bs(faena.saldo_pendiente)}
+                                    </span>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -294,6 +309,17 @@ export default function VerFaena({
                                 <>
                                     <BarraSaldo cupo={faena.cupo} />
 
+                                    <Renglon etiqueta="Otorgado" valor={`${faena.cupo.volumen_total_kg} kg`} />
+                                    <Renglon etiqueta="Disponible hoy" valor={`${faena.cupo.saldo_kg} kg`} />
+                                    <Renglon etiqueta="Esta faena" valor={`${faena.kilos_extraidos} kg`} />
+                                    {/* Sin firmar todavía: cuánto quedaría si se aprueba. */}
+                                    {(faena.estado === 'pendiente' || faena.estado === 'en_revision') && (
+                                        <Renglon
+                                            etiqueta="Queda al aprobar"
+                                            valor={`${Math.max(0, Math.round((faena.cupo.saldo_kg - faena.kilos_extraidos) * 100) / 100)} kg`}
+                                        />
+                                    )}
+
                                     {/*
                                         Se dice explícitamente si ESTA faena está
                                         pesando sobre ese saldo: una vencida no, y sin
@@ -303,8 +329,8 @@ export default function VerFaena({
                                     <p className="text-xs text-muted-foreground">
                                         {faena.consume_cupo
                                             ? 'Esta faena está descontando sus kilos del saldo.'
-                                            : faena.estado === 'vencido'
-                                              ? 'Esta faena venció: sus kilos volvieron al cupo.'
+                                            : faena.estado === 'vencido' || faena.estado === 'revocado'
+                                              ? `Esta faena ${faena.estado === 'vencido' ? 'venció' : 'fue revocada'}: sus kilos volvieron al cupo.`
                                               : 'Todavía no descuenta: la bolsa se mueve recién cuando se aprueba.'}
                                     </p>
                                 </>
@@ -482,6 +508,17 @@ function Situacion({ faena }: { faena: FaenaFicha }) {
         );
     }
 
+    if (faena.estado === 'revocado') {
+        return (
+            <Marco
+                clase="bg-rose-50 text-rose-900 dark:bg-rose-500/10 dark:text-rose-200"
+                icono={<CalendarX className="mt-0.5 size-5 shrink-0" />}
+                titulo="Revocada"
+                texto={faena.motivo_sin_autorizar ?? 'Ya no autoriza la salida.'}
+            />
+        );
+    }
+
     return (
         <Marco
             clase="bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
@@ -514,6 +551,16 @@ function Marco({
                 <p className="font-medium">{titulo}</p>
                 <p className="opacity-80">{texto}</p>
             </div>
+        </div>
+    );
+}
+
+/** Renglón «etiqueta ····· valor» de la columna lateral. */
+function Renglon({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+    return (
+        <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">{etiqueta}</span>
+            <span className="text-right font-medium tabular-nums">{valor}</span>
         </div>
     );
 }

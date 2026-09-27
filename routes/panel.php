@@ -114,6 +114,11 @@ Route::middleware('auth')->prefix('panel')->group(function () {
             ->name('aprovechamientos.rechazar');
     });
 
+    // Revocar es una sanción, como en el carnet: permiso propio y motivo obligatorio.
+    Route::patch('/aprovechamientos/{aprovechamiento}/revocar', [AprovechamientoController::class, 'revocar'])
+        ->middleware('permiso:aprovechamientos.revocar')
+        ->name('aprovechamientos.revocar');
+
     // Eliminar es de SUPERVISIÓN: lo único que queda es la auditoría.
     Route::delete('/aprovechamientos/{aprovechamiento}', [AprovechamientoController::class, 'destroy'])
         ->middleware('permiso:aprovechamientos.eliminar')

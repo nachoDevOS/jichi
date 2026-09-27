@@ -587,6 +587,7 @@ class FaenaController extends Controller
             // no vuelve a evaluar el estado.
             'motivo_sin_autorizar' => $faena->motivoSinAutorizar(),
             'ya_fue_aprobada' => $faena->yaFueAprobada(),
+            'puede_imprimirse' => $faena->puedeImprimirse(),
             'admite_pagos' => $faena->admitePagos(),
 
             // El arancel de la salida y cómo va cobrado.

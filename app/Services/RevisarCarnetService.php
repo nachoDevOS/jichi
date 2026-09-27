@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Exceptions\CarnetInvalidoException;
 use App\Models\Carnet;
@@ -70,6 +71,11 @@ class RevisarCarnetService
             // de baja un depósito.
             if ($bloqueado->saldoPendiente() > 0.0) {
                 throw CarnetInvalidoException::faltaCubrirElArancel($bloqueado->saldoPendiente());
+            }
+
+            // Un carnet no se emite sobre una autorización revocada mientras esperaba la firma.
+            if ($bloqueado->aprovechamiento?->estado === EstadoAprovechamiento::Revocado) {
+                throw CarnetInvalidoException::cupoRevocado();
             }
 
             // Y que ninguna boleta quede sin controlar: `sinValidar()` cuenta

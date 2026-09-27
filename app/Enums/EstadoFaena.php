@@ -22,6 +22,12 @@ enum EstadoFaena: string
     /** Se le pasó la fecha límite sin cerrarse. Libera el volumen reservado. */
     case Vencido = 'vencido';
 
+    /**
+     * Cortada por la unidad al revocar su Autorización de Pesca para Aprovechamiento
+     * Pesquero, estando aprobada y en fecha. Ya no autoriza la salida.
+     */
+    case Revocado = 'revocado';
+
     public function etiqueta(): string
     {
         return match ($this) {
@@ -30,6 +36,7 @@ enum EstadoFaena: string
             self::Aprobado => 'Aprobado',
             self::Completado => 'Completado',
             self::Vencido => 'Vencido',
+            self::Revocado => 'Revocado',
         };
     }
 
@@ -41,6 +48,7 @@ enum EstadoFaena: string
             self::Aprobado => 'emerald',
             self::Completado => 'teal',
             self::Vencido => 'slate',
+            self::Revocado => 'rose',
         };
     }
 

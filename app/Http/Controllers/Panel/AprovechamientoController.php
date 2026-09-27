@@ -12,6 +12,7 @@ use App\Http\Requests\Panel\EliminarCupoRequest;
 use App\Http\Requests\Panel\OtorgarCupoRequest;
 use App\Http\Requests\Panel\RechazarCupoRequest;
 use App\Http\Requests\Panel\RegistrarDepositosRequest;
+use App\Http\Requests\Panel\RevocarCupoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
@@ -185,6 +186,15 @@ class AprovechamientoController extends Controller
                 // ninguna boleta por validar. El número va para decir cuántas.
                 'pagos_sin_validar' => $sinValidar,
                 'puede_aprobarse' => $aprovechamiento->puedeRevisarse() && $sinValidar === 0,
+
+                // Firmado, en fecha y sin cédula viva: una vigente o en trámite ya lo cubre.
+                // Revocada o vencida no cuenta, así se puede emitir la que la reemplaza.
+                'puede_emitir_carnet' => $aprovechamiento->estado->habilita()
+                    && $aprovechamiento->estaEnFecha()
+                    && ! $aprovechamiento->carnets()
+                        ->where(fn ($q) => $q->vigentes()
+                            ->orWhereIn('estado', [EstadoCarnet::Pendiente, EstadoCarnet::EnRevision]))
+                        ->exists(),
             ],
 
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
@@ -293,7 +303,7 @@ class AprovechamientoController extends Controller
                     // Una faena vencida LIBERA su volumen: la pantalla lo marca
                     // para que el saldo cuadre a la vista.
                     'consume_cupo' => $f->consumeCupo(),
-                    'puede_imprimirse' => $f->yaFueAprobada(),
+                    'puede_imprimirse' => $f->puedeImprimirse(),
                     'fecha_salida' => $f->fecha_salida?->toDateString(),
                     'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
                 ])
@@ -548,6 +558,22 @@ class AprovechamientoController extends Controller
             ->with('exito', 'Rechazado y devuelto a ventanilla. El motivo quedó en la auditoría.');
     }
 
+    /**
+     * REVOCAR — PATCH /panel/aprovechamientos/{id}/revocar
+     */
+    public function revocar(RevocarCupoRequest $request, AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
+    {
+        try {
+            $revision->revocar($aprovechamiento, $request->validated()['motivo']);
+        } catch (CupoInvalidoException $e) {
+            return back()->withErrors(['motivo' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('aprovechamientos.show', $aprovechamiento)
+            ->with('exito', 'Autorización revocada, junto con sus carnets y faenas vigentes. La persona puede tramitar otra.');
+    }
+
     //  Auxiliares
 
     /**
@@ -603,6 +629,8 @@ class AprovechamientoController extends Controller
 
         return [
             'id' => $cupo->id,
+            // El mismo N° que lleva la autorización impresa.
+            'numero' => $cupo->numeroLegible(),
             'beneficiario_id' => $cupo->beneficiario_id,
             'beneficiario' => $cupo->beneficiario?->nombreCompleto,
             'documento' => $cupo->beneficiario?->documento_identidad,
@@ -658,6 +686,9 @@ class AprovechamientoController extends Controller
             'puede_revisarse' => $cupo->puedeRevisarse(),
             // La autorización en papel sale recién con el cupo firmado.
             'ya_fue_aprobado' => $cupo->yaFueAprobado(),
+            // Revocada: firmada, pero sin papel y sin poder revocarse de nuevo.
+            'puede_imprimirse' => $cupo->puedeImprimirse(),
+            'puede_revocarse' => $cupo->puedeRevocarse(),
 
             /*
              * EL RECIBO, para poder imprimirlo sin entrar a la ficha. Existe

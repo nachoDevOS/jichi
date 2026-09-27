@@ -1,5 +1,5 @@
 import type { CupoVigente } from '@/types/carnets';
-import type { EstadoAprovechamiento, EstadoCarnet, TipoActor } from '@/types';
+import type { EstadoAprovechamiento, EstadoCarnet, EstadoFaena, EstadoGuia, TipoActor } from '@/types';
 
 /**
  * Tipos del módulo Beneficiarios.
@@ -25,6 +25,8 @@ export interface BeneficiarioFila {
      * Años CUMPLIDOS, calculados por el servidor.
      */
     edad: number | null;
+    /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
+    registrado_en: string | null;
 }
 
 /**
@@ -106,6 +108,16 @@ export interface CarnetResumen {
      * Los kilos impresos en el plástico, o null si es comercializador.
      */
     cupo_kg: number | null;
+    /** El número del libro, «00001». Null hasta la firma. */
+    registro: string | null;
+    aprovechamiento_id: number | null;
+    /** Si hoy puede colgar faenas (pescador) o guías (comercializador). */
+    puede_emitir: boolean;
+    /** Por qué no puede emitir. `null` cuando sí puede. */
+    motivo_sin_permisos: string | null;
+    /** Negativo si ya venció; null sin fecha. */
+    dias_para_vencer: number | null;
+    fecha_solicitud: string | null;
     estado: EstadoCarnet;
     estado_etiqueta: string;
     estado_color: string;
@@ -142,6 +154,66 @@ export interface CupoResumen {
     /** El día que lo firmaron. `null` mientras no esté aprobado. */
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
+}
+
+/** Una salida del pescador, en su ficha. */
+export interface FaenaDelBeneficiario {
+    id: number;
+    carnet_id: number;
+    numero_legible: string;
+    kilos_extraidos: number;
+    estado: EstadoFaena;
+    estado_etiqueta: string;
+    estado_color: string;
+    vigente: boolean;
+    caducada: boolean;
+    monto: number;
+    /** Lo que falta cobrar, solo si todavía admite depósitos. */
+    debe: number;
+    fecha_solicitud: string | null;
+    fecha_salida: string | null;
+    fecha_desembarque: string | null;
+    embarcacion: string | null;
+    propietario: string | null;
+    comandante_barco: string | null;
+    matricula_naval: string | null;
+    region_desde: string | null;
+    region_hasta: string | null;
+    /** Firmada: recién ahí se imprime el permiso. */
+    ya_fue_aprobada: boolean;
+    /** Firmada y no revocada: recién ahí se imprime el permiso. */
+    puede_imprimirse: boolean;
+}
+
+/** Un traslado del comercializador, en su ficha. */
+export interface GuiaDelBeneficiario {
+    id: number;
+    carnet_id: number;
+    numero_legible: string;
+    /** «Trinidad → Santa Cruz». */
+    ruta: string;
+    peso_total_kg: number;
+    estado: EstadoGuia;
+    estado_etiqueta: string;
+    estado_color: string;
+    vigente: boolean;
+    caducada: boolean;
+    monto: number;
+    debe: number;
+    fecha_solicitud: string | null;
+    /** Un MOMENTO: la guía vale por horas. Se muestra con fechaHora(). */
+    fecha_vencimiento: string | null;
+}
+
+/** Un recibo que se llevó la persona. */
+export interface ReciboDelBeneficiario {
+    id: number;
+    numero: string;
+    concepto: string | null;
+    monto_total: number;
+    depositos: number;
+    /** Un MOMENTO. */
+    emitido_en: string | null;
 }
 
 /**

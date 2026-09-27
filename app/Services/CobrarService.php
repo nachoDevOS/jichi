@@ -298,9 +298,9 @@ class CobrarService
         return match (true) {
             // «Cédula» y no «Carnet»: es como lo llama el talonario. Sin el
             // código —16 caracteres que nadie contrasta en el mostrador— y con la
-            // capacidad, que es lo que distingue una cédula de otra.
+            // volumen —«- 300 Kg», no el tramo entero—, que distingue una cédula de otra.
             $tramite instanceof Carnet => 'Cédula de '.$tramite->tipo_actor->etiqueta()
-                .$this->tramoDe($tramite->aprovechamiento),
+                .$this->volumenDe($tramite->aprovechamiento),
             // El nombre y la capacidad. El número del tramo es del catálogo
             // interno y no le dice nada a quien recibe el papel.
             $tramite instanceof AprovechamientoPesq => 'Autorización de Pesca para Aprovechamiento '
@@ -327,6 +327,19 @@ class CobrarService
         $tramo = $cupo?->categoria?->descripcion_kg;
 
         return $tramo ? ' - '.$tramo : '';
+    }
+
+    /**
+     * El volumen otorgado —el techo del tramo, copiado al otorgar—: « - 300 Kg».
+     * Vacío sin cupo, igual que `tramoDe()`.
+     */
+    private function volumenDe(?AprovechamientoPesq $cupo): string
+    {
+        if ($cupo === null) {
+            return '';
+        }
+
+        return ' - '.rtrim(rtrim(number_format((float) $cupo->volumen_total_kg, 2, '.', ''), '0'), '.').' Kg';
     }
 
     /**

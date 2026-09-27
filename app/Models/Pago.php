@@ -104,10 +104,9 @@ class Pago extends Model
             // casilla CÉDULAS del talonario. Decía «Credencial», que no es
             // como se la nombra en el mostrador.
             $this->pagable instanceof Carnet => 'Cédula de '.$this->pagable->tipo_actor->etiqueta(),
-            // Con la capacidad: en el cuadro de importes es lo que distingue
-            // un cobro de otro. El renglón es angosto, así que va el nombre
-            // corto del documento y los kilos.
-            $this->pagable instanceof AprovechamientoPesq => 'Autorización de Pesca · '
+            // Nombre completo y kilos: el renglón es angosto pero el alto crece
+            // solo; medido en el PDF, ocupa tres líneas y no mueve el TOTAL.
+            $this->pagable instanceof AprovechamientoPesq => 'Autorización de Pesca para Aprovechamiento Pesquero · '
                 .number_format((float) $this->pagable->volumen_total_kg, 0, ',', '.').' kg',
             $this->pagable instanceof GuiaMovimiento => 'Guía de movimiento',
             default => 'Trámite',

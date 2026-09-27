@@ -7,6 +7,7 @@ use App\Models\Configuracion;
 use App\Models\PermisoFaena;
 use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
@@ -34,6 +35,11 @@ class PermisoFaenaImpresionController extends Controller
         // esconderlo en React es comodidad, la dirección se escribe a mano.
         if (! $faena->yaFueAprobada()) {
             return back()->with('error', 'El permiso sale recién con la faena aprobada.');
+        }
+
+        // Revocada no se imprime: el papel diría que autoriza una salida cortada.
+        if (! $faena->puedeImprimirse()) {
+            return back()->with('error', 'La faena está revocada: el permiso no se imprime.');
         }
 
         $faena->loadMissing(['codigo', 'carnet.beneficiario']);
@@ -98,8 +104,8 @@ class PermisoFaenaImpresionController extends Controller
             'regionDesde' => $faena->region_desde ?: '',
             'regionHasta' => $faena->region_hasta ?: '',
 
-            'fechaSalida' => $faena->fecha_salida?->format('d/m/Y') ?? '',
-            'fechaDesembarque' => $faena->fecha_desembarque?->format('d/m/Y') ?? '',
+            'fechaSalida' => $this->fechaEnLetras($faena->fecha_salida),
+            'fechaDesembarque' => $this->fechaEnLetras($faena->fecha_desembarque),
             'kilos' => number_format((float) $faena->kilos_extraidos, 2, ',', '.'),
 
             'lugar' => $this->lugar(),
@@ -109,6 +115,12 @@ class PermisoFaenaImpresionController extends Controller
                 'anio' => $fecha?->format('y') ?? '',
             ],
         ];
+    }
+
+    /** «27 de Septiembre de 2026», con el mes en mayúscula como el pie del papel. */
+    private function fechaEnLetras(?CarbonInterface $fecha): string
+    {
+        return $fecha ? $fecha->format('j').' de '.ucfirst($fecha->translatedFormat('F')).' de '.$fecha->format('Y') : '';
     }
 
     private function lugar(): string

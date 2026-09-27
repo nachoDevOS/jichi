@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Traits\Auditable;
@@ -277,11 +278,13 @@ class Carnet extends Model
 
         // El carnet vale; entonces lo que falta es del lado del cupo.
         return match (true) {
-            $this->aprovechamiento === null => 'No tiene una Autorización de Pesca asociada.',
-            ! $this->aprovechamiento->estado->habilita() => 'La Autorización de Pesca está '
+            $this->aprovechamiento === null => 'No tiene una Autorización de Pesca para Aprovechamiento Pesquero asociada.',
+            $this->aprovechamiento->estado === EstadoAprovechamiento::Revocado => 'La Autorización de Pesca para Aprovechamiento Pesquero '
+                .'fue revocada: no autoriza faenas.',
+            ! $this->aprovechamiento->estado->habilita() => 'La Autorización de Pesca para Aprovechamiento Pesquero está '
                 .mb_strtolower($this->aprovechamiento->estado->etiqueta()).': todavía no autoriza faenas.',
-            ! $this->aprovechamiento->estaEnFecha() => 'La Autorización de Pesca venció.',
-            $this->aprovechamiento->saldoKg() <= 0.0 => 'La Autorización de Pesca se quedó sin '
+            ! $this->aprovechamiento->estaEnFecha() => 'La Autorización de Pesca para Aprovechamiento Pesquero venció.',
+            $this->aprovechamiento->saldoKg() <= 0.0 => 'La Autorización de Pesca para Aprovechamiento Pesquero se quedó sin '
                 .'kilos. Hay que tramitar otra.',
             default => 'No autoriza a emitir.',
         };

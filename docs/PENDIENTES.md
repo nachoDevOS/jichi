@@ -291,6 +291,16 @@ rasterizando la página hasta 150 dpi.
 
 ---
 
+## 🟠 En el celular, los botones del encabezado se salen de la pantalla — 27/09/2026
+
+En la ficha del beneficiario, a 390 px la página mide 613 de ancho: la fila de
+acciones del `LayoutPanel` («Registrar aprovechamiento», «Emitir carnet»,
+«Editar», «Dar de baja») no se parte en renglones. Es del layout, así que
+probablemente pasa en toda ficha con varias acciones. En la ficha del
+beneficiario dejó de pasar al quitar «Registrar aprovechamiento» y «Emitir
+carnet» (27/09/2026); falta revisar las otras fichas. Se midió con
+`document.documentElement.scrollWidth` en Chrome sin cabeza.
+
 ## 🟠 Login con Ibare: hecho del lado de Jichi, falta cargar Ibare — 24/09/2026
 
 - **`users.mamore_id` es columna nueva** en la migración de campos institucionales:

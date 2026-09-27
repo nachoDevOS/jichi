@@ -131,7 +131,7 @@ export default function CrearCupo({
                             etiqueta="Tipo de embarcación"
                             htmlFor="tipo_embarcacion"
                             error={form.errors.tipo_embarcacion}
-                            ayuda="Como figura en el talonario. Va impreso en la autorización de pesca."
+                            ayuda="Como figura en el talonario. Va impreso en la Autorización de Pesca para Aprovechamiento Pesquero."
                             obligatorio
                             className="max-w-sm"
                         >

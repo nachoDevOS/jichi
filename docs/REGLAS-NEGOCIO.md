@@ -32,7 +32,97 @@
   **`aprovechamientos_pesq`** que **hereda** la modalidad y el volumen total de
   kilos de la escala elegida.
 - Su ciclo de vida pasa por los estados `pendiente`, `en_revision`, `aprobado`,
-  `vencido` o `agotado`, dependiendo de la vigencia de la gestión.
+  `vencido`, `agotado` o `revocado`, dependiendo de la vigencia de la gestión.
+
+### Una autorización vigente por persona, y la revocación — 27/09/2026
+
+El documento se llama siempre **Autorización de Pesca para Aprovechamiento
+Pesquero** (nunca «autorización de pesca» a secas).
+
+**Regla 1 — Una sola a la vez.** Una persona no puede tener dos autorizaciones
+que la ocupen al mismo tiempo. Ocupa el lugar la que está `pendiente`,
+`en_revision` o `aprobado` **y** todavía en fecha. Mientras exista una así, no
+se otorga otra.
+
+**Regla 2 — Qué libera el lugar.** Se puede otorgar una nueva cuando la
+anterior está:
+
+| Estado de la anterior | ¿Se otorga otra? | Por qué |
+| --- | :-: | --- |
+| `pendiente` / `en_revision` en fecha | ✘ | Es un trámite en curso: se corrige o se rechaza, no se duplica |
+| `aprobado` en fecha | ✘ | Está vigente |
+| `aprobado` con la fecha pasada / `vencido` | ✔ | Ya no está vigente, aunque diga «aprobado» en el historial |
+| `agotado` (pescó todos los kilos) | ✔ | No le queda nada que autorizar |
+| `revocado` (aunque siga en fecha) | ✔ | La unidad la dio de baja |
+
+**Regla 3 — Revocar.** La unidad puede **revocar** una autorización `aprobado`
+o `agotado` antes de su vencimiento. Pide permiso `aprovechamientos.revocar`
+(supervisión), motivo escrito de al menos 10 caracteres y la casilla de
+confirmación; el motivo queda en `auditorias`. **No se revierte.** Una
+`pendiente` se elimina, una `en_revision` se rechaza y una vencida ya no
+autoriza nada: ninguna de las tres se revoca.
+
+**Regla 4 — Qué deja de poder hacerse con una autorización revocada:**
+
+- **No se emiten carnets con ella.** Deja de aparecer para elegir en el
+  formulario del carnet, y si la revocan mientras un carnet espera la firma,
+  ese carnet ya no se aprueba.
+- **No se emiten faenas** con ella, ni siquiera en modo flexible
+  (`APROVECHAMIENTO_ESTRICTO=false`): ese modo afloja el tope de kilos, no una
+  baja. Si una faena esperaba la firma, ya no se aprueba.
+- **No se imprime** la autorización (mismo criterio que el carnet revocado).
+- La verificación pública la muestra como **no vigente: revocada**.
+
+**Regla 5 — Revocar arrastra lo que todavía vale** *(decidido el 27/09/2026)*.
+En la misma operación, con el mismo motivo, se revocan:
+
+- sus **carnets `aprobado` y vigentes** (fecha de vencimiento de hoy en
+  adelante) → pasan a `revocado`;
+- sus **faenas `aprobado` y vigentes** (desembarque de hoy en adelante), de
+  cualquier carnet de esa autorización, también de uno repuesto antes → pasan a
+  `revocado` y la salida se corta.
+
+**Lo que NO se toca**, porque ya no autoriza nada: carnets o faenas vencidos,
+cerrados o ya revocados. Revocar lo vencido no tendría sentido. Los carnets
+`pendiente` / `en_revision` de esa autorización tampoco se revocan (revocar es
+solo para lo firmado), pero **ya no se pueden aprobar**: ventanilla los elimina
+o los rechaza. Las faenas `pendiente` / `en_revision`, igual.
+
+La auditoría de cada fila arrastrada dice «Revocado junto con su Autorización
+de Pesca para Aprovechamiento Pesquero: *motivo*». Los kilos de una faena
+revocada vuelven al saldo, como los de una vencida (`consumeCupo()` no la
+cuenta); sobre una autorización revocada ese saldo ya no se puede usar. Los
+pagos quedan como estaban. Ni la faena ni el carnet revocados se imprimen.
+
+**Regla 6 — Volver a pescar.** Hace falta una autorización **nueva** y un
+carnet **nuevo** colgado de ella. Como el carnet viejo ya quedó revocado, no
+traba la regla de «un carnet vigente por actividad».
+
+**Ejemplos (Olga Acevedo):**
+
+1. Tiene la de 300 kg aprobada, vence el 31/12/2026. El 15/10 pide otra →
+   **rechazada**: «ya tiene un aprovechamiento vigente… hay que esperar a que
+   venza o revocarlo».
+2. La de 2026 venció el 31/12. El 10/01/2027 pide la de 2027 → **se otorga**.
+3. El 20/10/2026 revocan la de 300 kg (vigente hasta el 31/12). En ese momento
+   tiene el carnet N° 00001 aprobado y la faena 000001 en el agua hasta el
+   27/10 → los **tres** quedan revocados. Una faena 000000 que desembarcó el
+   30/09 queda **aprobado** como estaba: ya había terminado.
+4. Con la revocada, ventanilla intenta emitir un carnet o una faena →
+   **rechazado**.
+5. Ese mismo día pide una autorización **nueva** → se otorga; la paga, la
+   firman, y emite un carnet nuevo sobre ella → se permite.
+
+**Dónde vive:** `EstadoAprovechamiento::Revocado` y `permiteRevocacion()`,
+`RevisarCupoService::revocar()`, `RevocarCupoRequest`, la ruta
+`PATCH /panel/aprovechamientos/{id}/revocar`, y los controles en
+`RevisarCupoService::revocarLoQueCuelga()` (la cascada), `EstadoFaena::Revocado`,
+los controles en `OtorgarCupoService` (scope `enCurso()`),
+`EmitirCarnetService::cupoUtilizable()`, `RevisarCarnetService::aprobar()`,
+`EmitirFaenaService`, `RevisarFaenaService::aprobar()`,
+`AprovechamientoPesq::puedeEmitirFaena()` / `puedeImprimirse()`,
+`PermisoFaena::puedeImprimirse()` y `Carnet::motivoSinPermisos()`. Probado el 27/09/2026 contra los servicios reales
+dentro de una transacción deshecha con `rollBack()`.
 
 ## Paso 3 — La identificación oficial (Carnets)
 
@@ -234,6 +324,10 @@ el formulario solo si ese carnet ya está revocado.
 | Cada actor emite solo lo suyo | `TipoActor::emiteFaenas()` / `emiteGuias()`, en los dos servicios |
 | Fechas de la faena al aprobar | `RevisarFaenaService::aprobar()` + `PermisoFaena::desembarqueDesde()` |
 | Solo se revoca un carnet aprobado | `EstadoCarnet::permiteRevocacion()` + `EmitirCarnetService::revocar()` |
+| Una autorización vigente por persona | `OtorgarCupoService` con el scope `enCurso()` (pendiente, en revisión o aprobada, en fecha) |
+| Solo se revoca una autorización aprobada o agotada | `EstadoAprovechamiento::permiteRevocacion()` + `RevisarCupoService::revocar()` |
+| Autorización revocada: ni carnets ni faenas | `enCurso()` / `habilita()`, `EmitirFaenaService`, `RevisarFaenaService::aprobar()`, `RevisarCarnetService::aprobar()`, `puedeEmitirFaena()` |
+| Revocar la autorización revoca sus carnets y faenas aprobados y vigentes | `RevisarCupoService::revocarLoQueCuelga()` |
 | Revocar no toca las faenas | `PermisoFaena::estaVigente()` mira su estado y su fecha, no el carnet |
 | Código de verificación | `CodigoService` (generación) + `VerificacionController` (lo que se muestra) |
 | Qué carnet emite la próxima faena desde el cupo | `AprovechamientoController::show()` → `carnetParaFaena` |

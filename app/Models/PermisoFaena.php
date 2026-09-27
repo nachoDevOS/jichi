@@ -178,6 +178,12 @@ class PermisoFaena extends Model
         return ! $this->estado->estaAbierto();
     }
 
+    /** ¿Se imprime el permiso? Firmado y no revocado, como el carnet y la autorización. */
+    public function puedeImprimirse(): bool
+    {
+        return $this->yaFueAprobada() && $this->estado !== EstadoFaena::Revocado;
+    }
+
     /** ¿Se pueden CONTROLAR sus boletas? Solo con la faena presentada. */
     public function admiteControlDePagos(): bool
     {
@@ -210,6 +216,8 @@ class PermisoFaena extends Model
             $this->estado === EstadoFaena::Completado => 'La salida ya se cerró: los kilos quedaron '.
                 'firmes contra el cupo.',
             $this->estado === EstadoFaena::Vencido => 'Pasó su fecha de desembarque sin cerrarse.',
+            $this->estado === EstadoFaena::Revocado => 'Fue revocada junto con su Autorización de Pesca '.
+                'para Aprovechamiento Pesquero: ya no autoriza la salida.',
             default => 'Pasó su fecha de desembarque.',
         };
     }

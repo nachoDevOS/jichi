@@ -37,13 +37,14 @@ export function BarraSaldo({
      * SIN NADA CONSUMIDO NO HAY SALDO QUE DIBUJAR. Un cupo recién firmado, sin
      * una sola faena, mostraba «300 / 300 kg» con la barra vacía de punta a
      * punta: se lee como un cupo gastado, que es justo lo contrario. Mientras
-     * nadie haya pescado, lo único cierto es cuánto se otorgó.
+     * nadie haya pescado, lo único cierto es cuánto se otorgó. No dice «sin
+     * faenas»: una faena en revisión existe y todavía no descuenta.
      */
     if (cupo.porcentaje_usado <= 0) {
         return (
             <p className="text-sm tabular-nums">
                 <strong>{cupo.volumen_total_kg}</strong>
-                <span className="text-muted-foreground"> kg otorgados · sin faenas emitidas</span>
+                <span className="text-muted-foreground"> kg otorgados · nada descontado todavía</span>
             </p>
         );
     }

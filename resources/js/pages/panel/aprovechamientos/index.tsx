@@ -173,8 +173,9 @@ export default function IndiceCupos({
                                 <table className="w-full text-sm">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
+                                            <th className="px-5 py-2.5 font-medium">N°</th>
                                             <th className="px-5 py-2.5 font-medium">Beneficiario</th>
-                                            <th className="px-5 py-2.5 font-medium">Escala</th>
+                                            <th className="px-5 py-2.5 font-medium">Capacidad</th>
                                             <th className="px-5 py-2.5 font-medium">Saldo</th>
                                             {/* <th className="px-5 py-2.5 text-right font-medium">Cobro</th> */}
                                             <th className="px-5 py-2.5 font-medium">Solicitado</th>
@@ -200,6 +201,15 @@ export default function IndiceCupos({
                                     <tbody className="divide-y divide-border">
                                         {cupos.data.map((c) => (
                                             <tr key={c.id} className="hover:bg-secondary/50">
+                                                <td className="px-5 py-2.5">
+                                                    <Link
+                                                        href={route('aprovechamientos.show', c.id)}
+                                                        className="font-mono font-medium tabular-nums text-primary hover:underline"
+                                                    >
+                                                        {c.numero}
+                                                    </Link>
+                                                </td>
+
                                                 {/* --- Foto, nombre y cédula, juntos.
                                                     Mismo bloque que el padrón de beneficiarios: el
                                                     hueco de la silueta se dibuja igual cuando no hay
@@ -312,7 +322,7 @@ export default function IndiceCupos({
                                                             a buscar. Sale con el cupo firmado, y
                                                             abre pestaña porque vuelve un archivo. */}
                                                         {puede('aprovechamientos.imprimir') &&
-                                                            c.ya_fue_aprobado && (
+                                                            c.puede_imprimirse && (
                                                                 <a
                                                                     href={route(
                                                                         'aprovechamientos.autorizacion',
@@ -320,7 +330,7 @@ export default function IndiceCupos({
                                                                     )}
                                                                     target="_blank"
                                                                     rel="noreferrer"
-                                                                    title="Autorización de pesca"
+                                                                    title="Autorización de Pesca para Aprovechamiento Pesquero"
                                                                     aria-label={`Imprimir la autorización de ${c.beneficiario ?? 'la persona'}`}
                                                                     className={cn(
                                                                         buttonVariants({
@@ -404,8 +414,8 @@ export default function IndiceCupos({
                     <div className="space-y-2">
                         <p>
                             Se da de baja el cupo de{' '}
-                            <strong>{eliminando?.beneficiario ?? 'el pescador'}</strong>: escala{' '}
-                            {eliminando?.escala ?? '—'}, {eliminando?.volumen_total_kg ?? 0} kg.
+                            <strong>{eliminando?.beneficiario ?? 'el pescador'}</strong>:{' '}
+                            {eliminando?.volumen_total_kg ?? 0} kg.
                         </p>
                         <p>
                             Solo se puede porque está <strong>pendiente</strong>, sin ningún cobro ni

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
@@ -91,6 +92,11 @@ class RevisarFaenaService
             // La salida es HOY: un cupo que ya venció no puede respaldarla.
             if ($cupo !== null && ! $cupo->estaEnFecha()) {
                 throw PermisoOperativoException::sinCupoVigente();
+            }
+
+            // Si la revocaron mientras la faena esperaba la firma, ya no se aprueba.
+            if ($cupo !== null && $cupo->estado === EstadoAprovechamiento::Revocado) {
+                throw PermisoOperativoException::cupoRevocado();
             }
 
             if ($cupo !== null && AprovechamientoPesq::modoEstricto()) {

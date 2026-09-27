@@ -17,7 +17,7 @@ class CupoInvalidoException extends RuntimeException
         return new self(sprintf(
             '%s ya tiene un aprovechamiento vigente hasta el %s, con %s kg sin usar. '.
             'No se otorga un segundo cupo. Si el que tiene todavía está pendiente de pago, '.
-            'corríjalo al tramo que corresponda; si ya se cobró, hay que esperar a que venza.',
+            'corríjalo al tramo que corresponda; si ya se cobró, hay que esperar a que venza o revocarlo.',
             $persona,
             $vence,
             number_format($saldo, 2, ',', '.'),
@@ -136,4 +136,25 @@ class CupoInvalidoException extends RuntimeException
     /**
      * No se amplía un cupo que ya no corre.
      */
+
+    /** Se quiso revocar sin escribir por qué. */
+    public static function motivoObligatorio(): self
+    {
+        return new self('Escriba el motivo de la revocación.');
+    }
+
+    /** Otra ventanilla lo revocó recién. */
+    public static function yaRevocado(): self
+    {
+        return new self('Esta Autorización de Pesca para Aprovechamiento Pesquero ya está revocada.');
+    }
+
+    /** Solo se revoca lo aprobado o agotado. */
+    public static function noSePuedeRevocar(string $estado): self
+    {
+        return new self(
+            "No se puede revocar una autorización {$estado}: el borrador se elimina, ".
+            'lo presentado se rechaza y lo vencido ya no autoriza nada.',
+        );
+    }
 }

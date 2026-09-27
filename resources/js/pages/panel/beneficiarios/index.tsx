@@ -10,7 +10,7 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { fecha } from '@/lib/utils';
+import { fecha, fechaHora, hace } from '@/lib/utils';
 import type { Paginado } from '@/types';
 import type { BeneficiarioFila } from '@/types/beneficiarios';
 
@@ -128,6 +128,7 @@ export default function IndiceBeneficiarios({
                                     <th className="px-5 py-3 font-medium">Género</th>
                                     <th className="px-5 py-3 font-medium">Celular</th>
                                     <th className="px-5 py-3 font-medium">Nacimiento</th>
+                                    <th className="px-5 py-3 font-medium">Registrado</th>
                                     <th className="px-5 py-3 text-right font-medium">Acciones</th>
                                 </tr>
                             </thead>
@@ -192,6 +193,12 @@ export default function IndiceBeneficiarios({
                                                     {b.edad} años
                                                 </p>
                                             )}
+                                        </td>
+
+                                        {/* --- Registrado: mismo formato que carnets y cupos */}
+                                        <td className="px-5 py-3 text-xs text-muted-foreground">
+                                            {fechaHora(b.registrado_en)}
+                                            <span className="block">{hace(b.registrado_en)}</span>
                                         </td>
 
                                         {/* --- Ver y editar */}

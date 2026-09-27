@@ -116,7 +116,12 @@ class CarnetController extends Controller
             ? Carnet::query()->where('estado', EstadoCarnet::Revocado)->find($request->integer('reemplaza'))
             : null;
 
-        $beneficiarioId = $reemplaza?->beneficiario_id ?? $request->integer('beneficiario');
+        // `?aprovechamiento=` llega de la ficha del cupo: trae la persona y la bolsa.
+        $cupo = $request->integer('aprovechamiento')
+            ? AprovechamientoPesq::query()->find($request->integer('aprovechamiento'))
+            : null;
+
+        $beneficiarioId = $reemplaza?->beneficiario_id ?? $cupo?->beneficiario_id ?? $request->integer('beneficiario');
 
         $beneficiario = $beneficiarioId
             ? Beneficiario::query()->find($beneficiarioId)
@@ -142,6 +147,8 @@ class CarnetController extends Controller
                 'tipo_carnet_id' => $reemplaza->tipo_carnet_id,
                 'aprovechamiento_id' => $reemplaza->aprovechamiento_id,
             ] : null,
+
+            'aprovechamientoId' => $cupo?->id,
 
             'asociaciones' => Asociacion::query()
                 ->activas()

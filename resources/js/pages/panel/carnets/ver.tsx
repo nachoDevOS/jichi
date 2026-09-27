@@ -182,26 +182,6 @@ export default function VerCarnet({
                         </a>
                     )}
 
-                    {/*
-                        El atajo al paso 4. Solo aparece cuando el carnet
-                        REALMENTE habilita: `puede_emitir_faenas` exige carnet
-                        vigente, de pescador y con cupo con saldo. Ofrecerlo
-                        igual mandaría al operador a un formulario que el
-                        servidor va a rechazar.
-                    */}
-                    {puede('faenas.crear') && carnet.puede_emitir_faenas && (
-                        <Button
-                            onClick={() =>
-                                router.visit(
-                                    route('faenas.create', { beneficiario: carnet.beneficiario_id }),
-                                )
-                            }
-                        >
-                            <Ship className="size-4" />
-                            Emitir faena
-                        </Button>
-                    )}
-
                     {puede('guias.crear') && carnet.puede_emitir_guias && (
                         <Button
                             onClick={() =>
@@ -241,11 +221,6 @@ export default function VerCarnet({
                         <p className="tabular-nums text-sm text-muted-foreground">
                             C.I. {carnet.documento_identidad ?? '—'}
                         </p>
-
-                        {/* Solo el código: el estado y la actividad ya están
-                            en la tarjeta «Situación», y repetirlos hace dudar
-                            de cuál de los dos manda. */}
-                        <p className="font-mono text-sm text-muted-foreground">{carnet.codigo}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -519,8 +494,24 @@ export default function VerCarnet({
             {/* LAS SALIDAS DE ESTE CARNET, recién desde la aprobación. Revocarlo no las anula. */}
             {carnet.tipo_actor === 'pescador' && carnet.ya_fue_aprobado && (
                 <Card className="mt-6 min-w-0">
-                    <CardHeader>
+                    <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
                         <CardTitle>Faenas emitidas</CardTitle>
+
+                        {/* `puede_emitir_faenas` exige carnet vigente y cupo con saldo:
+                            sin eso el formulario lo rechazaría. */}
+                        {puede('faenas.crear') && carnet.puede_emitir_faenas && (
+                            <Button
+                                size="sm"
+                                onClick={() =>
+                                    router.visit(
+                                        route('faenas.create', { beneficiario: carnet.beneficiario_id }),
+                                    )
+                                }
+                            >
+                                <Ship className="size-4" />
+                                Emitir faena
+                            </Button>
+                        )}
                     </CardHeader>
 
                     {faenas.length === 0 ? (
@@ -699,7 +690,7 @@ export default function VerCarnet({
                         </p>
                         <p>
                             Las faenas ya emitidas con él <strong>siguen vigentes</strong>. Con la misma
-                            autorización de pesca se le puede emitir un carnet nuevo.
+                            Autorización de Pesca para Aprovechamiento Pesquero se le puede emitir un carnet nuevo.
                         </p>
                     </div>
                 }

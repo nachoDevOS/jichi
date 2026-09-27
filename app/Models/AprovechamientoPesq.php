@@ -161,7 +161,9 @@ class AprovechamientoPesq extends Model
     {
         // Un cupo VENCIDO no se toca: su problema es la fecha, no los kilos, y
         // devolverlo a `aprobado` porque le sobró volumen sería mentir.
-        if ($this->estado === EstadoAprovechamiento::Vencido) {
+        // Tampoco uno REVOCADO: anular una faena lo devolvería a `aprobado` y
+        // reviviría una autorización dada de baja.
+        if ($this->estado === EstadoAprovechamiento::Vencido || $this->estado === EstadoAprovechamiento::Revocado) {
             return;
         }
 
@@ -172,6 +174,15 @@ class AprovechamientoPesq extends Model
         if ($this->estado !== $deberiaEstar) {
             $this->update(['estado' => $deberiaEstar]);
         }
+    }
+
+    /**
+     * El N° de la autorización impresa: el id con seis ceros, «000001». Ver
+     * `AutorizacionPescaController`: no hay correlativo propio.
+     */
+    public function numeroLegible(): string
+    {
+        return str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -253,7 +264,21 @@ class AprovechamientoPesq extends Model
             EstadoAprovechamiento::Aprobado,
             EstadoAprovechamiento::Vencido,
             EstadoAprovechamiento::Agotado,
+            // Revocado también pasó por la firma; lo que pierde es la impresión.
+            EstadoAprovechamiento::Revocado,
         ], true);
+    }
+
+    /** ¿Se imprime la autorización? Firmada y no revocada, como el carnet. */
+    public function puedeImprimirse(): bool
+    {
+        return $this->yaFueAprobado() && $this->estado !== EstadoAprovechamiento::Revocado;
+    }
+
+    /** ¿Se puede revocar hoy? Lo decide el estado; ver `permiteRevocacion()`. */
+    public function puedeRevocarse(): bool
+    {
+        return $this->estado->permiteRevocacion();
     }
 
     /**
@@ -324,6 +349,11 @@ class AprovechamientoPesq extends Model
             return false;
         }
 
+        // Revocada no autoriza en NINGÚN modo: el flexible afloja los kilos, no una baja.
+        if ($this->estado === EstadoAprovechamiento::Revocado) {
+            return false;
+        }
+
         /*
          * EN MODO FLEXIBLE NO SE MIRA EL SALDO, y por eso tampoco se mira el
          * ESTADO: un cupo `agotado` sigue emitiendo, que es exactamente lo que
@@ -357,6 +387,7 @@ class AprovechamientoPesq extends Model
         // El orden importa: el primer motivo que aparece es el que el operador
         // tiene que resolver antes que los demás.
         return match (true) {
+            $this->estado === EstadoAprovechamiento::Revocado => 'No autoriza faenas: la autorización fue revocada.',
             $this->estado === EstadoAprovechamiento::Pendiente => 'Todavía no autoriza faenas: falta cubrir el monto y enviarlo a revisión.',
             $this->estado === EstadoAprovechamiento::EnRevision => 'Todavía no autoriza faenas: está presentado y esperando la firma.',
             ! $this->estaEnFecha() => 'No autoriza faenas: el cupo venció.',

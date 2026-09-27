@@ -121,7 +121,7 @@ export default function EditarCarnet({
 
                         {esPescador && cupos.length > 0 && (
                             <Campo
-                                etiqueta="Autorización de Pesca que respalda el carnet"
+                                etiqueta="Autorización de Pesca para Aprovechamiento Pesquero que respalda el carnet"
                                 htmlFor="aprovechamiento_id"
                                 error={form.errors.aprovechamiento_id}
                                 ayuda={
@@ -175,7 +175,7 @@ export default function EditarCarnet({
                             <p className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
                                 <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                                 <span>
-                                    Esta persona ya <strong>no tiene una Autorización de Pesca en
+                                    Esta persona ya <strong>no tiene una Autorización de Pesca para Aprovechamiento Pesquero en
                                     curso</strong>. El
                                     servidor va a rechazar la corrección: hay que otorgarle el
                                     aprovechamiento antes.

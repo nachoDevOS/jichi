@@ -7,6 +7,8 @@ import type { EstadoAprovechamiento, EstadoFaena, ModalidadAprovechamiento } fro
 /** Un cupo, tal como lo pintan el listado y la ficha. */
 export interface CupoFila {
     id: number;
+    /** El N° de la autorización impresa, «000001». */
+    numero: string;
     beneficiario_id: number;
     beneficiario: string | null;
     documento: string | null;
@@ -70,8 +72,12 @@ export interface CupoFila {
     admite_pagos: boolean;
     puede_enviarse: boolean;
     puede_revisarse: boolean;
-    /** Si pasó por la firma: es lo que habilita la autorización en papel. */
+    /** Si pasó por la firma. Revocado también cuenta: se firmó, después se dio de baja. */
     ya_fue_aprobado: boolean;
+    /** Firmada y no revocada: el mismo corte que la impresión del carnet. */
+    puede_imprimirse: boolean;
+    /** Aprobada o agotada: lo único que se revoca. */
+    puede_revocarse: boolean;
 
     /** El recibo del trámite. Existe desde el ENVÍO; null mientras es borrador. */
     recibo_id: number | null;
@@ -101,6 +107,8 @@ export interface CupoFicha extends CupoFila {
      */
     pagos_sin_validar: number;
     puede_aprobarse: boolean;
+    /** Firmado y en fecha: puede respaldar una cédula nueva. */
+    puede_emitir_carnet: boolean;
 }
 
 /**

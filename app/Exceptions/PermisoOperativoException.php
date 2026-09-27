@@ -280,4 +280,13 @@ class PermisoOperativoException extends RuntimeException
     {
         return new self('Hay que escribir el motivo de la anulación: queda un hueco en el talonario que alguien va a tener que explicar.');
     }
+
+    /** La autorización del carnet fue revocada: el carnet vale, pero no autoriza faenas. */
+    public static function cupoRevocado(): self
+    {
+        return new self(
+            'La Autorización de Pesca para Aprovechamiento Pesquero de este carnet fue revocada: '.
+            'no autoriza faenas. Hace falta una autorización nueva y un carnet colgado de ella.',
+        );
+    }
 }

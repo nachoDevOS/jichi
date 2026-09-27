@@ -153,7 +153,8 @@ class ReciboController extends Controller
 
         return match (true) {
             $x instanceof Carnet => $x->codigo_legible.' · '.($x->beneficiario?->nombreCompleto ?? '—'),
-            $x instanceof AprovechamientoPesq => 'Escala '.($x->categoria?->nro_escala ?? '—').' · '.($x->beneficiario?->nombreCompleto ?? '—'),
+            // La capacidad y no el N° de escala, que es del catálogo interno.
+            $x instanceof AprovechamientoPesq => ($x->categoria?->descripcion_kg ?? (float) $x->volumen_total_kg.' kg').' · '.($x->beneficiario?->nombreCompleto ?? '—'),
             $x instanceof GuiaMovimiento => $x->numero_legible.' · '.$x->ruta,
             default => null,
         };

@@ -12,7 +12,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <title>Autorización de pesca {{ $numero }}</title>
+    <title>Autorización de Pesca para Aprovechamiento Pesquero {{ $numero }}</title>
 
     <style>
         * { margin: 0; padding: 0; }

@@ -3,8 +3,12 @@
 namespace App\Services;
 
 use App\Enums\EstadoAprovechamiento;
+use App\Enums\EstadoCarnet;
+use App\Enums\EstadoFaena;
 use App\Exceptions\CupoInvalidoException;
 use App\Models\AprovechamientoPesq;
+use App\Models\Carnet;
+use App\Models\PermisoFaena;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -107,5 +111,78 @@ class RevisarCupoService
 
             return $cupo->refresh();
         });
+    }
+
+    /**
+     * APROBADO | AGOTADO ──▶ REVOCADO, con el motivo escrito.
+     *
+     * Aunque siga en fecha deja de autorizar faenas y carnets nuevos, y libera el
+     * lugar para otorgar otra. Arrastra sus carnets y faenas aprobados y vigentes.
+     * Ver REGLAS-NEGOCIO, «Una autorización vigente por persona».
+     */
+    public function revocar(AprovechamientoPesq $cupo, string $motivo): AprovechamientoPesq
+    {
+        if (trim($motivo) === '') {
+            throw CupoInvalidoException::motivoObligatorio();
+        }
+
+        return DB::transaction(function () use ($cupo, $motivo): AprovechamientoPesq {
+            $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
+
+            // Con la copia bloqueada: otra ventanilla pudo revocarlo recién.
+            if ($bloqueado->estado === EstadoAprovechamiento::Revocado) {
+                throw CupoInvalidoException::yaRevocado();
+            }
+
+            if (! $bloqueado->estado->permiteRevocacion()) {
+                throw CupoInvalidoException::noSePuedeRevocar(mb_strtolower($bloqueado->estado->etiqueta()));
+            }
+
+            // El motivo antes de guardar: `Auditable` lo lee en el evento `updated`.
+            $bloqueado->motivoAuditoria = $motivo;
+            $bloqueado->update(['estado' => EstadoAprovechamiento::Revocado]);
+
+            $this->revocarLoQueCuelga($bloqueado, $motivo);
+
+            return $cupo->refresh();
+        });
+    }
+
+    /**
+     * Revoca, con la autorización, sus carnets y faenas APROBADOS Y VIGENTES.
+     *
+     * Solo lo que todavía vale: lo vencido, cerrado o ya revocado no autoriza
+     * nada y se deja como está. Una fila por vez para que `Auditable` deje el motivo.
+     */
+    private function revocarLoQueCuelga(AprovechamientoPesq $cupo, string $motivo): void
+    {
+        $porque = 'Revocado junto con su Autorización de Pesca para Aprovechamiento Pesquero: '.$motivo;
+        $hoy = now()->toDateString();
+
+        $carnets = Carnet::query()
+            ->where('aprovechamiento_id', $cupo->id)
+            ->where('estado', EstadoCarnet::Aprobado)
+            ->whereDate('fecha_vencimiento', '>=', $hoy)
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($carnets as $carnet) {
+            $carnet->motivoAuditoria = $porque;
+            $carnet->update(['estado' => EstadoCarnet::Revocado]);
+        }
+
+        // Las faenas de TODOS los carnets de la autorización, también de uno ya
+        // revocado antes —una reposición— que dejó una salida en curso.
+        $faenas = PermisoFaena::query()
+            ->whereIn('carnet_id', Carnet::query()->where('aprovechamiento_id', $cupo->id)->select('id'))
+            ->where('estado', EstadoFaena::Aprobado)
+            ->whereDate('fecha_desembarque', '>=', $hoy)
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($faenas as $faena) {
+            $faena->motivoAuditoria = $porque;
+            $faena->update(['estado' => EstadoFaena::Revocado]);
+        }
     }
 }

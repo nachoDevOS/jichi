@@ -61,6 +61,8 @@ export interface FaenaFila {
     motivo_sin_autorizar: string | null;
     /** Si pasó por la firma. Hasta entonces el permiso no vale. */
     ya_fue_aprobada: boolean;
+    /** Firmada y no revocada: recién ahí se imprime el permiso. */
+    puede_imprimirse: boolean;
     /** Si se le pueden cargar depósitos hoy. Solo mientras está pendiente. */
     admite_pagos: boolean;
 

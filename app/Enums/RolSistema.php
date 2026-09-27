@@ -103,6 +103,7 @@ enum RolSistema: string
             // Revocar es una sanción y anular quema un número del talonario:
             // ninguna de las dos se revierte.
             'carnets.revocar',
+            'aprovechamientos.revocar',
             'guias.anular',
             'caja.anular',
 

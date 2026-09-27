@@ -223,7 +223,10 @@ class Beneficiario extends Model
         return round(
             $pendiente($this->carnets()->with('tipoCarnet')->withSum('pagos', 'monto_parcial')->get())
             + $pendiente($this->aprovechamientos()->with('categoria')->withSum('pagos', 'monto_parcial')->get())
-            + $pendiente($this->guias()->withSum('pagos', 'monto_parcial')->get()),
+            // Guías y faenas con el mismo corte que Caja: solo lo que todavía admite
+            // depósitos. Las faenas faltaban, y la ficha decía menos que Caja.
+            + $pendiente($this->guias()->withSum('pagos', 'monto_parcial')->get()->filter->admitePagos())
+            + $pendiente($this->faenas()->withSum('pagos', 'monto_parcial')->get()->filter->admitePagos()),
             2,
         );
     }

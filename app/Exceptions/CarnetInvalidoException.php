@@ -183,4 +183,13 @@ class CarnetInvalidoException extends RuntimeException
             'Si la persona vuelve a estar en regla, emítale uno nuevo.',
         );
     }
+
+    /** Se quiso firmar un carnet cuya autorización revocaron mientras esperaba. */
+    public static function cupoRevocado(): self
+    {
+        return new self(
+            'La Autorización de Pesca para Aprovechamiento Pesquero de este carnet fue revocada: '.
+            'no se puede emitir un carnet con ella. Rechácelo y emítalo sobre una autorización vigente.',
+        );
+    }
 }
