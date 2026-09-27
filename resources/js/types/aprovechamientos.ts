@@ -31,6 +31,10 @@ export interface CupoFila {
     /** Lo comprometido por las faenas que consumen cupo (todas menos las vencidas). */
     kilos_consumidos: number;
     saldo_kg: number;
+    /** Apartado por faenas pendientes o en revisión: no descuenta, pero no está libre. */
+    kilos_reservados: number;
+    /** Lo que una faena nueva puede pedir: saldo menos reservado. */
+    libre_kg: number;
     porcentaje_usado: number;
 
     /**

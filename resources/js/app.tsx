@@ -5,6 +5,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import type { ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { inicializarApariencia } from '@/hooks/use-apariencia';
+import { bloquearRuedaEnNumericos } from '@/lib/rueda-numerica';
 
 /**
  *  PUNTO DE ENTRADA DE TODO EL FRONTEND
@@ -42,3 +43,6 @@ createInertiaApp({
 
 // Aplica el tema claro/oscuro guardado antes de que se vea la pantalla.
 inicializarApariencia();
+
+// La rueda del mouse no cambia los números de los formularios.
+bloquearRuedaEnNumericos();

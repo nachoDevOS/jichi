@@ -46,10 +46,10 @@ export default function EditarFaena({
     const kilos = Number(form.data.kilos_extraidos || 0);
 
     /*
-     * El saldo llega resuelto del servidor, con los kilos propios sumados de
-     * vuelta SOLO si esta faena estaba descontando. Una pendiente no descuenta.
+     * Llega resuelto del servidor. En estricto manda lo LIBRE —con lo que esta
+     * faena ya reservaba sumado de vuelta—; en flexible, el saldo.
      */
-    const saldo = faena.saldo_kg;
+    const saldo = modoEstricto ? faena.libre_kg : faena.saldo_kg;
 
     /* El HECHO y la CONSECUENCIA, separados: ver faenas/crear.tsx. */
     const excede = saldo !== null && kilos > saldo;

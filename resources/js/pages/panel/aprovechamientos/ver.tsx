@@ -421,7 +421,7 @@ export default function VerCupo({
                         <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                             {! cupo.ya_fue_aprobado ? (
                                 <Dato etiqueta="Solicitado" valor={`${cupo.volumen_total_kg} kg`} />
-                            ) : cupo.kilos_consumidos <= 0 ? (
+                            ) : cupo.kilos_consumidos <= 0 && cupo.kilos_reservados <= 0 ? (
                                 <Dato etiqueta="Otorgado" valor={`${cupo.volumen_total_kg} kg`} />
                             ) : (
                                 <>
@@ -429,6 +429,13 @@ export default function VerCupo({
                                     <Dato etiqueta="Consumido" valor={`${cupo.kilos_consumidos} kg`} />
                                     <Dato etiqueta="Disponible" valor={`${cupo.saldo_kg} kg`} />
                                     <Dato etiqueta="Usado" valor={`${cupo.porcentaje_usado}%`} />
+                                    {/* Reservar no descuenta: aparta kilos de faenas pendientes o en revisión. */}
+                                    {cupo.kilos_reservados > 0 && (
+                                        <>
+                                            <Dato etiqueta="Reservado" valor={`${cupo.kilos_reservados} kg`} />
+                                            <Dato etiqueta="Libre para faena" valor={`${cupo.libre_kg} kg`} />
+                                        </>
+                                    )}
                                 </>
                             )}
                         </dl>

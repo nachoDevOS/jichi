@@ -144,6 +144,8 @@ export type FaenaEnCorreccion = {
     carnet_registro: string | null;
     /** Con los kilos propios sumados de vuelta solo si esta faena descontaba. */
     saldo_kg: number | null;
+    /** Lo libre más lo que esta faena ya reservaba: lo que puede pedir en modo estricto. */
+    libre_kg: number | null;
     kilos_extraidos: number;
     embarcacion: string | null;
     propietario: string | null;

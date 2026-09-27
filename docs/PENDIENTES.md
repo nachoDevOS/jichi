@@ -166,9 +166,10 @@ fijo del formulario: van en la plantilla, no en la base.
 
 ### 🟠 Una faena PENDIENTE reserva kilos y nada la caduca
 
-**Desde el 20/09/2026 la faena nace PENDIENTE** y sus kilos ya pesan contra el
-cupo —`EstadoFaena::consumeCupo()` solo deja afuera a la vencida—, que es lo que
-impide que tres solicitudes por el cupo entero pasen las tres.
+**Desde el 27/09/2026 la faena pendiente o en revisión RESERVA sus kilos**
+—`EstadoFaena::reservaCupo()`— sin descontarlos, que es lo que impide que tres
+solicitudes por el cupo entero pasen las tres. Ver
+[REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md), paso 4.
 
 El costo: una solicitud que nadie cobra ni rechaza **se queda reservando esos
 kilos para siempre**. El comando diario que pasa las faenas a `vencido` todavía
@@ -179,6 +180,20 @@ eliminarla a mano.
 **Al escribir ese comando hay que decidir de qué lado cae la pendiente**: lo
 razonable es caducar también las que pasaron su `fecha_limite` sin firmarse,
 porque la salida que amparaban ya no puede ocurrir.
+
+### 🟠 Anular una guía: la pantalla y el servicio no dicen lo mismo
+
+Encontrado el 27/09/2026 al revisar la documentación. La ficha ofrece «Anular»
+solo sobre una guía `aprobado` (`GuiaController`, `puede_anularse`), pero
+`EmitirGuiaService::anular()` acepta también una `pendiente` o `en_revision`:
+solo rechaza la anulada y la cerrada. Hoy no se nota porque el botón no aparece,
+pero una llamada directa a la ruta anularía un borrador —que debería
+eliminarse— o un trámite presentado —que debería rechazarse—.
+
+Además `puede_anularse` y `puede_cerrarse` se calculan con un `===` en el
+controlador, contra la regla 6 de CLAUDE.md. **Arreglo:** un
+`EstadoGuia::permiteAnulacion()` que devuelva `true` solo en `Aprobada`, usado
+por el servicio y por el controlador.
 
 ### 🟢 RESUELTO — el arancel de la faena sale del talonario
 
@@ -199,7 +214,7 @@ Desde el **18/09/2026** el sistema tiene un interruptor,
 
 | Valor | Qué hace al emitir una faena |
 |---|---|
-| `true` (**hoy**) | La faena que no entra en el saldo se RECHAZA. Al llegar a 0 kg el cupo queda `agotado` y no emite más |
+| `true` (**hoy**) | La faena que no entra en lo LIBRE —saldo menos lo reservado por pendientes y en revisión— se RECHAZA. Al llegar a 0 kg consumidos el cupo queda `agotado` y no emite más |
 | `false` | La comprobación del tope se OMITE: la faena se emite igual y el exceso queda registrado |
 
 **Existe porque los catálogos siguen siendo plantilla** (ver el punto de
@@ -929,7 +944,20 @@ rubro convivan en la misma gestión.
 `rubros.costo`, igual que una emisión inicial, así que corregir un cupo cuesta lo
 mismo que emitir el carnet. Puede ser lo querido o no; hoy nadie lo definió.
 
-### 10. NO HAY PRUEBAS AUTOMÁTICAS — de nada
+### 10. CASI NO HAY PRUEBAS AUTOMÁTICAS
+
+> **27/09/2026 — volvió la primera:** `tests/Feature/Aprovechamientos/RevocacionTest.php`,
+> 19 pruebas sobre una autorización vigente por persona y la revocación con lo
+> que arrastra (carnets, faenas, impresión, modo flexible, permiso de la ruta).
+> Se comprobó que detectan fallas: quitando tres protecciones a propósito,
+> fallaron 6. Se corren con `php artisan test` (SQLite en memoria, ~4 s). Se
+> creó `tests/Unit/` vacía: `phpunit.xml` la declara y sin ella el comando
+> fallaba. **El resto de la tabla de abajo sigue sin cubrir.**
+>
+> **27/09/2026 — la segunda:** `tests/Feature/Aprovechamientos/ReservaFaenaTest.php`,
+> 6 pruebas de la reserva de kilos de la faena pendiente o en revisión. Con la
+> reserva apagada a propósito fallan 5 (la sexta es el modo flexible, que no
+> depende de ella).
 
 El **14 de septiembre de 2026** se vació `tests/Feature/` por pedido del
 responsable del proyecto. Eran **143 pruebas** y cubrían el backend entero.

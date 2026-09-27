@@ -39,10 +39,11 @@ export default function CrearFaena({
     const inicial =
         beneficiario?.carnets_vigentes.find((c) => c.id === carnetElegido && c.puede_emitir_faenas) ?? null;
     const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(inicial);
+    const disponibleInicial = inicial ? disponibleDe(inicial, modoEstricto) : null;
 
     const form = useForm({
         carnet_id: inicial?.id ?? (null as number | null),
-        kilos_extraidos: inicial?.saldo_kg ? String(inicial.saldo_kg) : '',
+        kilos_extraidos: disponibleInicial ? String(disponibleInicial) : '',
         embarcacion: '',
         propietario: '',
         comandante_barco: '',
@@ -61,11 +62,12 @@ export default function CrearFaena({
 
     // Arranca con todo el saldo del cupo: es lo que casi siempre se pide, y se baja a mano.
     function elegirCarnet(c: CarnetVigenteSugerido) {
+        const disponible = disponibleDe(c, modoEstricto);
         setCarnet(c);
         form.setData((d) => ({
             ...d,
             carnet_id: c.id,
-            kilos_extraidos: c.saldo_kg !== null && c.saldo_kg > 0 ? String(c.saldo_kg) : '',
+            kilos_extraidos: disponible !== null && disponible > 0 ? String(disponible) : '',
         }));
         form.clearErrors('carnet_id');
     }
@@ -75,7 +77,8 @@ export default function CrearFaena({
         form.post(route('faenas.store'));
     }
 
-    const saldo = carnet?.saldo_kg ?? null;
+    const saldo = carnet ? disponibleDe(carnet, modoEstricto) : null;
+    const reservado = carnet?.reservado_kg ?? 0;
     const kilos = Number(form.data.kilos_extraidos || 0);
 
     /*
@@ -115,6 +118,7 @@ export default function CrearFaena({
                                     carnets={persona.carnets_vigentes}
                                     elegido={carnet}
                                     onElegir={elegirCarnet}
+                                    modoEstricto={modoEstricto}
                                 />
                             </Campo>
                         )}
@@ -290,6 +294,11 @@ export default function CrearFaena({
                                             kg
                                         </span>
                                     </p>
+                                    {modoEstricto && reservado > 0 && (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {reservado} kg reservados por faenas pendientes o en revisión.
+                                        </p>
+                                    )}
                                 </div>
 
                                 {kilos > 0 && (
@@ -380,14 +389,24 @@ export default function CrearFaena({
 /**
  * Los carnets vigentes de la persona, con el que no sirve deshabilitado.
  */
+/**
+ * En modo estricto una faena nueva solo puede pedir lo LIBRE: lo reservado por
+ * otra solicitud abierta no está. En flexible la reserva no frena nada.
+ */
+function disponibleDe(c: CarnetVigenteSugerido, modoEstricto: boolean): number | null {
+    return modoEstricto ? c.libre_kg : c.saldo_kg;
+}
+
 function ListaDeCarnets({
     carnets,
     elegido,
     onElegir,
+    modoEstricto,
 }: {
     carnets: CarnetVigenteSugerido[];
     elegido: CarnetVigenteSugerido | null;
     onElegir: (c: CarnetVigenteSugerido) => void;
+    modoEstricto: boolean;
 }) {
     if (carnets.length === 0) {
         return (
@@ -403,6 +422,9 @@ function ListaDeCarnets({
         <ul className="space-y-2">
             {carnets.map((c) => {
                 const activo = elegido?.id === c.id;
+                const disponible = disponibleDe(c, modoEstricto);
+                // Hay saldo pero está todo apartado: el motivo es otro que «sin cupo».
+                const todoReservado = modoEstricto && (c.saldo_kg ?? 0) > 0 && (c.libre_kg ?? 0) <= 0;
 
                 return (
                     <li key={c.id}>
@@ -435,18 +457,20 @@ function ListaDeCarnets({
                                     <span className="block text-xs text-muted-foreground">
                                         Capacidad {c.capacidad ?? '—'} · otorgado{' '}
                                         <span className="tabular-nums">{c.volumen_total_kg} kg</span> · disponible{' '}
-                                        <span className="font-medium tabular-nums text-foreground">{c.saldo_kg} kg</span>
+                                        <span className="font-medium tabular-nums text-foreground">{disponible} kg</span>
                                     </span>
                                 )}
                             </span>
 
                             {c.puede_emitir_faenas ? (
-                                <Badge color="emerald">{c.saldo_kg} kg disponibles</Badge>
+                                <Badge color="emerald">{disponible} kg disponibles</Badge>
                             ) : (
                                 <span className="text-xs text-muted-foreground">
                                     {c.tipo_actor === 'comercializador'
                                         ? 'no emite faenas'
-                                        : 'sin cupo con saldo'}
+                                        : todoReservado
+                                          ? `${c.reservado_kg} kg reservados`
+                                          : 'sin cupo con saldo'}
                                 </span>
                             )}
                         </button>

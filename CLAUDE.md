@@ -501,7 +501,7 @@ resources/js/types/beneficiarios.ts
 ```
 
 Si el módulo tiene reglas de negocio de verdad —no solo un CRUD—, copiar además
-el par `SolicitudCarnetService` + `SolicitudInvalidaException`.
+el par `EmitirFaenaService` + `PermisoOperativoException`.
 
 El procedimiento detallado está en
 [docs/GUIA-INERTIA.md](docs/GUIA-INERTIA.md#7-agregar-un-módulo-nuevo-paso-a-paso).
@@ -516,8 +516,11 @@ npx tsc --noEmit        # tipos de TypeScript
 npm run build           # que el frontend compile
 ```
 
-> ⚠️ **YA NO HAY PRUEBAS AUTOMÁTICAS.** `tests/Feature/` se vació el 14/09/2026
+> ⚠️ **CASI NO HAY PRUEBAS AUTOMÁTICAS.** `tests/Feature/` se vació el 14/09/2026
 > por pedido del responsable del proyecto. Eran 143 y cubrían el backend entero.
+> Desde el 27/09/2026 hay dos: `RevocacionTest` (19 casos de la revocación de la
+> autorización) y `ReservaFaenaTest` (6 casos de la reserva de kilos de la faena
+> pendiente). Correr `php artisan test` antes de tocar esas reglas.
 >
 > **Consecuencia práctica, y hay que tenerla presente en cada cambio:** nada
 > avisa si se rompe una regla de negocio. Que se apruebe un trámite sin cobrar,

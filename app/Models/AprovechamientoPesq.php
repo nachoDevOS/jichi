@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * LA BOLSA MADRE del pescador: el cupo anual en kilos, con fecha.
  *
  * @property-read string|null $faenas_que_consumen_sum_kilos_extraidos columna virtual que agrega withSum()
+ * @property-read string|null $faenas_que_reservan_sum_kilos_extraidos columna virtual que agrega withSum()
  */
 #[Fillable([
     'beneficiario_id',
@@ -150,6 +151,31 @@ class AprovechamientoPesq extends Model
         ]);
     }
 
+    /** Las solicitudes abiertas: apartan kilos sin descontarlos. Ver `EstadoFaena::reservaCupo()`. */
+    public function faenasQueReservan(): HasManyThrough
+    {
+        return $this->faenas()->whereIn('permisos_faena.estado', [
+            EstadoFaena::Pendiente,
+            EstadoFaena::EnRevision,
+        ]);
+    }
+
+    /** Kilos apartados por faenas pendientes o en revisión. Mismo patrón que `kilosConsumidos()`. */
+    public function kilosReservados(): float
+    {
+        if (array_key_exists('faenas_que_reservan_sum_kilos_extraidos', $this->getAttributes())) {
+            return (float) $this->faenas_que_reservan_sum_kilos_extraidos;
+        }
+
+        if ($this->relationLoaded('faenas')) {
+            return (float) $this->faenas
+                ->filter(fn (PermisoFaena $f): bool => $f->estado->reservaCupo())
+                ->sum('kilos_extraidos');
+        }
+
+        return (float) $this->faenasQueReservan()->sum('kilos_extraidos');
+    }
+
     /**
      * Pone el cupo en `agotado` o lo devuelve a `aprobado` según su saldo real.
      *
@@ -195,6 +221,15 @@ class AprovechamientoPesq extends Model
     }
 
     /**
+     * Kilos que una faena NUEVA puede pedir: el saldo menos lo reservado. No
+     * mueve el estado: una reserva se elimina y no agota el cupo.
+     */
+    public function libreKg(): float
+    {
+        return max(0.0, round($this->saldoKg() - $this->kilosReservados(), 2));
+    }
+
+    /**
      *  LOS KILOS QUE SE PASARON DEL CUPO
      */
     public function kilosExcedidos(): float
@@ -208,9 +243,6 @@ class AprovechamientoPesq extends Model
         return $this->kilosExcedidos() > 0.0;
     }
 
-    /**
-     *  ¿EL TOPE DE LA BOLSA MADRE SE HACE CUMPLIR?
-     */
     /**
      * ¿Se pueden corregir sus datos HOY?
      */
@@ -299,6 +331,7 @@ class AprovechamientoPesq extends Model
         return $this->estado->estaAbierto();
     }
 
+    /** ¿El tope de la bolsa madre se hace cumplir? Ver `config/jichi.php`. */
     public static function modoEstricto(): bool
     {
         return (bool) config('jichi.aprovechamiento.estricto', true);
@@ -364,11 +397,12 @@ class AprovechamientoPesq extends Model
             return true;
         }
 
-        if (! $this->estado->habilita() || $this->saldoKg() <= 0.0) {
+        // Se mide contra lo LIBRE: lo reservado por otra solicitud ya no está.
+        if (! $this->estado->habilita() || $this->libreKg() <= 0.0) {
             return false;
         }
 
-        return $kilos === null || $kilos <= $this->saldoKg();
+        return $kilos === null || $kilos <= $this->libreKg();
     }
 
     /**
@@ -392,8 +426,19 @@ class AprovechamientoPesq extends Model
             $this->estado === EstadoAprovechamiento::EnRevision => 'Todavía no autoriza faenas: está presentado y esperando la firma.',
             ! $this->estaEnFecha() => 'No autoriza faenas: el cupo venció.',
             $this->estaAgotado() => 'No autoriza faenas: el cupo se quedó sin kilos.',
+            $this->libreKg() <= 0.0 => $this->motivoReservado(),
             default => 'No autoriza faenas.',
         };
+    }
+
+    /** Lo que se dice cuando el saldo existe pero está todo apartado. */
+    public function motivoReservado(): string
+    {
+        return sprintf(
+            'Sin kilos libres: %s kg están reservados por faenas pendientes o en revisión. '
+            .'Hay que eliminar la que no vaya a salir para registrar otra.',
+            number_format($this->kilosReservados(), 2, ',', '.'),
+        );
     }
 
     /** ¿Se le acabaron los kilos, aunque la fecha no haya llegado? */

@@ -59,6 +59,7 @@ class AprovechamientoController extends Controller
             // Los DOS withSum evitan dos agregados POR FILA: con 30 cupos en
             // pantalla son 61 consultas sin ellos, y el listado se ve igual.
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
+            ->withSum('faenasQueReservan', 'kilos_extraidos')
             ->withSum('pagos', 'monto_parcial')
             // `recibos()` del trait NO es una relación sino una consulta, así
             // que llamarla por fila serían treinta. Se precargan los pagos.
@@ -648,6 +649,9 @@ class AprovechamientoController extends Controller
             'tipo_embarcacion' => $cupo->tipo_embarcacion,
             'kilos_consumidos' => $cupo->kilosConsumidos(),
             'saldo_kg' => $cupo->saldoKg(),
+            // Apartado por faenas pendientes o en revisión: no descuenta, pero no está libre.
+            'kilos_reservados' => $cupo->kilosReservados(),
+            'libre_kg' => $cupo->libreKg(),
             'porcentaje_usado' => $cupo->porcentajeUsado(),
 
             'modalidad' => $cupo->modalidad->value,

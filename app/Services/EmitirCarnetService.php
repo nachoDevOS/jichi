@@ -62,7 +62,8 @@ class EmitirCarnetService
                 throw CarnetInvalidoException::yaTieneCarnetVigente(
                     $beneficiario->nombreCompleto,
                     $actor,
-                    $vigente->codigo_legible,
+                    // Sin código —un carnet cargado a mano— el aviso sale igual, sin un 500.
+                    $vigente->codigo_legible ?? 'sin código',
                     $vigente->fecha_vencimiento->format('d/m/Y'),
                 );
             }

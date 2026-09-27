@@ -1,0 +1,400 @@
+<title>Flujo del comercializador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+    --bg: #f3f5f9;
+    --surface: #ffffff;
+    --ink: #15233a;
+    --muted: #5a6679;
+    --line: #d3dae5;
+    --edge: #3b4a61;
+    --navy: #243d5c;
+    --on-navy: #f5f7fb;
+    --navy-soft: #e5ebf3;
+    --gold: #b8962f;
+    --gold-soft: #f4ecd2;
+    --gold-ink: #7d6315;
+    --free: #dfe5ee;
+    --ok: #2d7a57;
+    --ok-soft: #e1f1e8;
+    --bad: #ad3b35;
+    --bad-soft: #f6e3e1;
+    --grey-soft: #eceff3;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --bg: #0f1319;
+        --surface: #171d25;
+        --ink: #e5e9ef;
+        --muted: #9aa4b3;
+        --line: #2b3440;
+        --edge: #b5c0cf;
+        --navy: #6f95c6;
+        --on-navy: #0d1520;
+        --navy-soft: #1c2735;
+        --gold: #d8b95c;
+        --gold-soft: #2d2715;
+        --gold-ink: #e3c877;
+        --free: #26303d;
+        --ok: #6cc59b;
+        --ok-soft: #16291f;
+        --bad: #e58a83;
+        --bad-soft: #321b1a;
+        --grey-soft: #1f2630;
+    }
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1319;
+    --surface: #171d25;
+    --ink: #e5e9ef;
+    --muted: #9aa4b3;
+    --line: #2b3440;
+    --edge: #b5c0cf;
+    --navy: #6f95c6;
+    --on-navy: #0d1520;
+    --navy-soft: #1c2735;
+    --gold: #d8b95c;
+    --gold-soft: #2d2715;
+    --gold-ink: #e3c877;
+    --free: #26303d;
+    --ok: #6cc59b;
+    --ok-soft: #16291f;
+    --bad: #e58a83;
+    --bad-soft: #321b1a;
+    --grey-soft: #1f2630;
+}
+
+* { box-sizing: border-box; }
+body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    padding-inline: 16px;
+    padding-block: 32px 64px;
+}
+.hoja { max-width: 1040px; margin-inline: auto; display: grid; gap: 48px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; font-weight: 650; }
+h3 { font-size: 1rem; font-weight: 650; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 0.86em; }
+.eyebrow {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gold-ink);
+}
+header { display: grid; gap: 10px; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+header p { color: var(--muted); }
+section { display: grid; gap: 16px; }
+.intro { display: grid; gap: 6px; }
+.intro p { color: var(--muted); }
+
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.lienzo { overflow-x: auto; padding: 16px; }
+.lienzo svg { display: block; width: 100%; height: auto; min-width: 760px; }
+.lienzo.chico svg { min-width: 560px; max-width: 680px; }
+figcaption { border-top: 1px solid var(--line); padding: 12px 16px; font-size: 0.88rem; color: var(--muted); }
+
+/* SVG: todo sale de los tokens, así sirve en claro y oscuro */
+.nd { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.nd-clave { fill: var(--gold-soft); stroke: var(--gold); stroke-width: 1.5; }
+.nd-hub { fill: var(--navy-soft); stroke: var(--navy); stroke-width: 1.5; }
+.nd-on { fill: var(--navy); stroke: var(--navy); }
+.nd-fin { fill: var(--grey-soft); stroke: var(--line); stroke-width: 1.5; }
+.nd-mal { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.5; }
+.nd-bien { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5; }
+.t { fill: var(--ink); font-size: 14px; font-weight: 650; font-family: 'Instrument Sans', system-ui, sans-serif; }
+.t-sm { fill: var(--ink); font-size: 13px; font-weight: 650; font-family: 'Instrument Sans', system-ui, sans-serif; }
+.t-on { fill: var(--on-navy); font-size: 14px; font-weight: 650; font-family: 'Instrument Sans', system-ui, sans-serif; }
+.s { fill: var(--muted); font-size: 11.5px; font-family: 'Instrument Sans', system-ui, sans-serif; }
+.lab { fill: var(--edge); font-size: 12px; font-weight: 500; font-family: 'Instrument Sans', system-ui, sans-serif; }
+.lab-oro { fill: var(--gold-ink); font-size: 12px; font-weight: 600; font-family: 'Instrument Sans', system-ui, sans-serif; }
+.e { stroke: var(--edge); stroke-width: 1.5; fill: none; }
+.e-oro { stroke: var(--gold); stroke-width: 1.75; fill: none; stroke-dasharray: 6 4; }
+.e-pago { stroke: var(--navy); stroke-width: 1.25; fill: none; stroke-dasharray: 3 4; }
+.e-mal { stroke: var(--bad); stroke-width: 1.5; fill: none; }
+.ah { fill: var(--edge); }
+.ah-oro { fill: var(--gold); }
+.ah-mal { fill: var(--bad); }
+
+/* Tarjetas de reglas */
+.grilla { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+.regla { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+.regla p { font-size: 0.92rem; color: var(--muted); }
+.dato { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--navy-soft); color: var(--navy); font-variant-numeric: tabular-nums; }
+
+/* Kilos */
+.kilos { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); font-size: 0.85rem; color: var(--muted); }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.mu { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.mu.c, .b .c { background: var(--navy); }
+.mu.r, .b .r { background: repeating-linear-gradient(135deg, var(--gold) 0 5px, var(--gold-soft) 5px 9px); }
+.mu.l, .b .l { background: var(--free); }
+.pasos { list-style: none; margin: 0; padding: 0; }
+.paso { display: grid; grid-template-columns: minmax(170px, 1.1fr) 2fr minmax(210px, 1.2fr); gap: 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.paso:last-child { border-bottom: 0; }
+.paso .que { font-weight: 600; font-size: 0.92rem; }
+.b { display: flex; height: 14px; border-radius: 3px; overflow: hidden; }
+.cifras { font-size: 0.78rem; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.res { font-size: 0.88rem; display: flex; gap: 8px; align-items: baseline; }
+.res.si::before { content: "✔"; color: var(--ok); font-weight: 700; }
+.res.no::before { content: "✘"; color: var(--bad); font-weight: 700; }
+.res.nada::before { content: "·"; color: var(--muted); font-weight: 700; }
+@media (max-width: 720px) {
+    .paso { grid-template-columns: 1fr; gap: 6px; }
+}
+
+/* Comparación de modos */
+.modos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.modo { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; }
+.modo.activo { border-color: var(--navy); box-shadow: inset 0 3px 0 var(--navy); }
+.modo ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.92rem; }
+.modo .env { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 0.8rem; color: var(--muted); }
+
+/* Cascada de revocación */
+.cascada { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.caja { border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; border: 1px solid var(--line); background: var(--surface); }
+.caja.mal { border-color: var(--bad); background: var(--bad-soft); }
+.caja.gris { background: var(--grey-soft); }
+.caja h3 { font-size: 0.95rem; }
+.caja p { font-size: 0.88rem; color: var(--muted); }
+.caja.mal p { color: var(--ink); }
+
+footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<main class="hoja">
+    <header>
+        <span class="eyebrow">Jichi · GAD-Beni · SEDAG · Módulo 2 de 2</span>
+        <h1>Flujo del comercializador</h1>
+        <p>La rama de comercialización: de la persona registrada a su carnet de comercializador y cada guía única de transporte que ampara un traslado de pescado. Cómo se cobra, qué estados recorre y qué lleva la guía. Actualizado al 27/09/2026.</p>
+    </header>
+
+    <!-- 1. La cadena -->
+    <section>
+        <div class="intro">
+            <span class="eyebrow">La cadena</span>
+            <h2>De la persona al traslado de la carga</h2>
+            <p>El comercializador no pesca, así que no lleva Autorización de Pesca para Aprovechamiento Pesquero ni controla kilos contra un cupo. Saca su carnet y, con él vigente, pide una guía por cada traslado.</p>
+        </div>
+        <figure>
+            <div class="lienzo">
+                <svg viewBox="0 64 980 246" role="img" aria-label="El beneficiario comercializador solicita un carnet de comercializador, que emite guías únicas de transporte; cada guía lleva el detalle de la carga especie por especie. Carnet y guía se cobran con la misma tabla de pagos.">
+                    <defs>
+                        <marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+                    </defs>
+
+                    <rect class="nd" x="20" y="88" width="150" height="80" rx="10"/>
+                    <text class="t" x="95" y="122" text-anchor="middle">Beneficiario</text>
+                    <text class="s" x="95" y="142" text-anchor="middle">Persona · C.I. único</text>
+
+                    <path class="e" d="M170 128 H246" marker-end="url(#f)"/>
+                    <text class="lab" x="208" y="120" text-anchor="middle">solicita</text>
+
+                    <rect class="nd-clave" x="250" y="80" width="200" height="96" rx="10"/>
+                    <text class="t-sm" x="350" y="112" text-anchor="middle">Carnet comercializador</text>
+                    <text class="s" x="350" y="134" text-anchor="middle">Anual · aval de asociación</text>
+                    <text class="s" x="350" y="150" text-anchor="middle">Sin autorización de pesca</text>
+
+                    <path class="e" d="M450 128 H526" marker-end="url(#f)"/>
+                    <text class="lab" x="488" y="120" text-anchor="middle">emite</text>
+
+                    <rect class="nd" x="530" y="80" width="200" height="96" rx="10"/>
+                    <text class="t-sm" x="630" y="112" text-anchor="middle">Guía única de transporte</text>
+                    <text class="s" x="630" y="134" text-anchor="middle">Una por traslado</text>
+                    <text class="s" x="630" y="150" text-anchor="middle">5 días · 50 Bs</text>
+
+                    <path class="e" d="M730 128 H806" marker-end="url(#f)"/>
+                    <text class="lab" x="768" y="120" text-anchor="middle">lleva</text>
+
+                    <rect class="nd" x="810" y="80" width="150" height="96" rx="10"/>
+                    <text class="t-sm" x="885" y="112" text-anchor="middle">Detalle de carga</text>
+                    <text class="s" x="885" y="134" text-anchor="middle">Una fila por especie</text>
+                    <text class="s" x="885" y="150" text-anchor="middle">Condición y kilos</text>
+
+                    <path class="e-pago" d="M350 176 V216"/>
+                    <path class="e-pago" d="M630 176 V216"/>
+                    <rect class="nd-hub" x="250" y="216" width="480" height="80" rx="10"/>
+                    <text class="t" x="490" y="245" text-anchor="middle">Pagos y recibo</text>
+                    <text class="s" x="490" y="265" text-anchor="middle">Una tabla de depósitos cobra el carnet y cada guía</text>
+                    <text class="s" x="490" y="282" text-anchor="middle">Un recibo por trámite, al enviar a revisión</text>
+                </svg>
+            </div>
+            <figcaption>La guía de pescado de piscicultura paga la mitad del arancel, porque no sale del río. Carnet, guía y recibo llevan un código de 16 caracteres y su QR para verificarlos en <code>/verificar</code>.</figcaption>
+        </figure>
+    </section>
+
+    <!-- 2. El circuito -->
+    <section>
+        <div class="intro">
+            <span class="eyebrow">El circuito</span>
+            <h2>Los mismos pasos para el carnet y la guía</h2>
+            <p>Los dos nacen pendientes, se cobran, se presentan y alguien los firma. Recién aprobados valen y se imprimen. Lo que cambia es cómo terminan.</p>
+        </div>
+        <figure>
+            <div class="lienzo">
+                <svg viewBox="0 0 980 300" role="img" aria-label="Circuito de estados: pendiente, se envía con el monto cubierto y sale el recibo, en revisión, se aprueba con las boletas validadas, aprobado. Desde pendiente se elimina; desde en revisión se rechaza y vuelve a pendiente. La guía aprobada se cierra al llegar la carga o se anula; el carnet aprobado vence o se revoca.">
+                    <defs>
+                        <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+                        <marker id="gm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-mal" d="M0 0 L10 5 L0 10 z"/></marker>
+                    </defs>
+
+                    <rect class="nd" x="30" y="100" width="150" height="44" rx="22"/>
+                    <text class="t" x="105" y="127" text-anchor="middle">Pendiente</text>
+
+                    <path class="e" d="M180 122 H326" marker-end="url(#g)"/>
+                    <text class="lab" x="253" y="112" text-anchor="middle">enviar</text>
+                    <text class="s" x="253" y="140" text-anchor="middle">monto cubierto</text>
+                    <text class="lab-oro" x="253" y="156" text-anchor="middle">sale el recibo</text>
+
+                    <rect class="nd" x="330" y="100" width="150" height="44" rx="22"/>
+                    <text class="t" x="405" y="127" text-anchor="middle">En revisión</text>
+
+                    <path class="e" d="M480 122 H626" marker-end="url(#g)"/>
+                    <text class="lab" x="553" y="112" text-anchor="middle">aprobar (firma)</text>
+                    <text class="s" x="553" y="140" text-anchor="middle">boletas validadas</text>
+
+                    <rect class="nd-on" x="630" y="100" width="150" height="44" rx="22"/>
+                    <text class="t-on" x="705" y="127" text-anchor="middle">Aprobado</text>
+
+                    <path class="e-mal" d="M400 144 C400 215, 160 215, 160 148" marker-end="url(#gm)"/>
+                    <text class="lab" x="280" y="226" text-anchor="middle">rechazar · con motivo</text>
+
+                    <path class="e" d="M105 144 V236" marker-end="url(#g)"/>
+                    <text class="lab" x="97" y="186" text-anchor="end">eliminar</text>
+                    <text class="s" x="97" y="201" text-anchor="end">con motivo</text>
+                    <rect class="nd-fin" x="30" y="240" width="150" height="44" rx="22"/>
+                    <text class="t" x="105" y="267" text-anchor="middle">Eliminado</text>
+
+                    <path class="e" d="M780 116 L826 62" marker-end="url(#g)"/>
+                    <path class="e" d="M780 122 H826" marker-end="url(#g)"/>
+                    <path class="e" d="M780 128 L826 182" marker-end="url(#g)"/>
+
+                    <rect class="nd-bien" x="830" y="40" width="140" height="44" rx="12"/>
+                    <text class="t-sm" x="900" y="58" text-anchor="middle">Cerrada · guía</text>
+                    <text class="s" x="900" y="74" text-anchor="middle">llegó la carga</text>
+
+                    <rect class="nd-mal" x="830" y="100" width="140" height="44" rx="12"/>
+                    <text class="t-sm" x="900" y="118" text-anchor="middle">Anulada · guía</text>
+                    <text class="s" x="900" y="134" text-anchor="middle">con motivo · sin vuelta</text>
+
+                    <rect class="nd-fin" x="830" y="160" width="140" height="44" rx="12"/>
+                    <text class="t-sm" x="900" y="178" text-anchor="middle">Vencido / revocado</text>
+                    <text class="s" x="900" y="194" text-anchor="middle">carnet</text>
+                </svg>
+            </div>
+            <figcaption>Pendiente es un borrador: se edita y se elimina, siempre que no tenga depósitos cargados. Eliminar es sobre el borrador, donde nunca hubo papel; anular es sobre una guía ya firmada, cuyo papel está en la calle. Las dos queman el número del talonario.</figcaption>
+        </figure>
+
+        <figure>
+            <div class="lienzo chico">
+                <svg viewBox="0 0 640 170" role="img" aria-label="Control de cada depósito: pendiente pasa a validado si la boleta cuadra con el banco, o a observado si no; un observado se corrige y vuelve a pendiente.">
+                    <defs>
+                        <marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+                        <marker id="hm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-mal" d="M0 0 L10 5 L0 10 z"/></marker>
+                    </defs>
+                    <text class="lab" x="20" y="24">Control de cada depósito (en revisión)</text>
+                    <rect class="nd" x="20" y="64" width="140" height="40" rx="20"/>
+                    <text class="t" x="90" y="89" text-anchor="middle">Pendiente</text>
+                    <path class="e" d="M160 76 L326 50" marker-end="url(#h)"/>
+                    <text class="s" x="236" y="50" text-anchor="middle">cuadra con el banco</text>
+                    <path class="e" d="M160 92 L326 118" marker-end="url(#h)"/>
+                    <text class="s" x="236" y="128" text-anchor="middle">no cuadra</text>
+                    <rect class="nd-bien" x="330" y="28" width="140" height="40" rx="20"/>
+                    <text class="t" x="400" y="53" text-anchor="middle">Validado</text>
+                    <rect class="nd-mal" x="330" y="98" width="140" height="40" rx="20"/>
+                    <text class="t" x="400" y="123" text-anchor="middle">Observado</text>
+                    <path class="e-mal" d="M400 138 C400 168, 90 168, 90 108" marker-end="url(#hm)"/>
+                    <text class="lab" x="500" y="123">corregir</text>
+                    <text class="s" x="500" y="139">vuelve a pendiente</text>
+                </svg>
+            </div>
+            <figcaption>Sin todas las boletas validadas no se aprueba. Un observado no se valida directo: primero se corrige. Quién cargó y quién validó quedan registrados.</figcaption>
+        </figure>
+    </section>
+
+    <!-- 3. La guía por dentro -->
+    <section>
+        <div class="intro">
+            <span class="eyebrow">La guía por dentro</span>
+            <h2>Lo que ampara cada traslado</h2>
+            <p>La guía calca el talonario del SEDAG bloque por bloque. Todo lo carga ventanilla, menos el número y las fechas, que los pone el sistema.</p>
+        </div>
+        <div class="grilla">
+            <div class="regla">
+                <h3>Ruta</h3>
+                <p>Origen y destino, cada uno con departamento, provincia y distrito o cuenca.</p>
+            </div>
+            <div class="regla">
+                <h3>Transporte</h3>
+                <p>El medio (fluvial, aéreo o terrestre), el vehículo con su placa y la capacidad máxima.</p>
+            </div>
+            <div class="regla">
+                <h3>Carga</h3>
+                <p>Una fila por especie, con su condición (fresco, congelado, seco, sal preso, vivos…) y los kilos. El peso total de la guía es la suma de esas filas.</p>
+            </div>
+            <div class="regla">
+                <h3>Piscicultura</h3>
+                <p>Si el pescado viene de criadero, el arancel se cobra al 50%. El monto queda copiado en la guía: una suba posterior no cambia lo que se cobró.</p>
+                <div class="dato"><span class="chip">50 Bs</span><span class="chip">25 Bs piscicultura</span></div>
+            </div>
+            <div class="regla">
+                <h3>Vigencia</h3>
+                <p>La firma escribe las fechas: vale 5 días contados con hora. Firmada el lunes a las 18:00, vence el sábado a las 18:00.</p>
+                <div class="dato"><span class="chip">5 días</span></div>
+            </div>
+            <div class="regla">
+                <h3>Cierre</h3>
+                <p>Cuando la carga llega a destino, la guía se cierra. Al cerrarla se puede corregir el peso con el de la balanza.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Reglas -->
+    <section>
+        <div class="intro">
+            <span class="eyebrow">Reglas que no se cruzan</span>
+            <h2>Lo que el sistema hace cumplir</h2>
+        </div>
+        <div class="grilla">
+            <div class="regla">
+                <h3>Beneficiario</h3>
+                <p>Se identifica por su C.I., con complemento y lugar de expedición. La misma persona puede ser además pescador: son dos carnets distintos.</p>
+            </div>
+            <div class="regla">
+                <h3>Carnet de comercializador</h3>
+                <p>Nunca lleva autorización de pesca. Uno vigente por actividad, con el aval de una asociación. Vence el 31/12 de la gestión.</p>
+                <div class="dato"><span class="chip">anual</span><span class="chip">precio del tipo de carnet</span></div>
+            </div>
+            <div class="regla">
+                <h3>Guía única de transporte</h3>
+                <p>Solo desde un carnet de comercializador vigente. El número lo pone el sistema, continuo como el talonario. No controla kilos contra ningún cupo.</p>
+                <div class="dato"><span class="chip">N° correlativo</span></div>
+            </div>
+            <div class="regla">
+                <h3>Revocar el carnet</h3>
+                <p>Da de baja la credencial, con motivo. Las guías ya aprobadas siguen valiendo hasta su fecha. Para reponer un carnet perdido se revoca y se emite otro.</p>
+            </div>
+            <div class="regla">
+                <h3>Recibo</h3>
+                <p>Uno por trámite, con número correlativo continuo que Contabilidad audita. Monto y concepto quedan congelados al emitirse.</p>
+                <div class="dato"><span class="chip">talonario continuo</span></div>
+            </div>
+            <div class="regla">
+                <h3>Verificación pública</h3>
+                <p>Carnet, guía y recibo se consultan sin sesión con su código. Muestra la cédula enmascarada y el estado de hoy.</p>
+                <div class="dato"><span class="chip">/verificar</span></div>
+            </div>
+        </div>
+    </section>
+
+    <footer>Fuente: <code>docs/REGLAS-NEGOCIO.md</code> del proyecto Jichi, pasos 1, 3, 5, 6 y 7. La rama del pescador está en su propio diagrama.</footer>
+</main>

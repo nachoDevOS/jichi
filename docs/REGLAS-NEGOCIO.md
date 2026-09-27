@@ -160,7 +160,8 @@ dentro de una transacción deshecha con `rollBack()`.
   raíz al que está asociado el carnet.
 - Vigencia **máxima de 30 días** por salida: al aprobarla, `fecha_salida` es
   ese día y `fecha_desembarque` salida + 30. Estados `pendiente`,
-  `en_revision`, `aprobado`, `completado` o `vencido`.
+  `en_revision`, `aprobado`, `completado`, `vencido` o `revocado` (este último
+  solo lo escribe la revocación de su autorización; ver Regla 5).
 - **Calca el talonario «PERMISO POR FAENA».** El Área de Fiscalización y
   Control de la Actividad Pesquera autoriza a: la embarcación, de propiedad de,
   comandante de barco, matrícula naval N°, N° kardex, la región desde / hasta y
@@ -171,12 +172,45 @@ dentro de una transacción deshecha con `rollBack()`.
   el plazo empieza a correr cuando el permiso realmente vale, no cuando se
   cargó. Aprobar exige además que la autorización de pesca siga en fecha.
   *(25/09/2026)*
-- **Los kilos proponen todo el saldo disponible** de la autorización de pesca;
-  ventanilla los baja si la salida autoriza menos. *(25/09/2026)*
-- **Los kilos se descuentan desde la firma.** Una faena pendiente o en revisión
-  es una solicitud y no resta. Con `APROVECHAMIENTO_ESTRICTO=true` una faena que
-  no entra en el saldo se rechaza al crearla y, de nuevo, al aprobarla; con
-  `false` se emite igual, se sigue sumando y el exceso queda registrado.
+- **Los kilos proponen todo lo LIBRE** de la autorización de pesca; ventanilla
+  los baja si la salida autoriza menos. *(25/09/2026; «libre» desde el 27/09/2026)*
+- **Los kilos se DESCUENTAN desde la firma, pero se RESERVAN desde el registro**
+  *(27/09/2026)*. Son dos cosas distintas:
+
+  | Estado de la faena | ¿Descuenta? | ¿Reserva? |
+  | --- | :-: | :-: |
+  | `pendiente` | ✘ | ✔ |
+  | `en_revision` | ✘ | ✔ |
+  | `aprobado` | ✔ | — |
+  | `vencido`, `revocado` | ✘ | ✘ |
+
+  - **Descontar** mueve los kilos a «consumido». Solo la aprobada descuenta, y
+    solo lo consumido puede dejar la autorización `agotado`.
+  - **Reservar** aparta los kilos: nadie más puede pedirlos para otra faena,
+    pero no cuentan como consumidos ni agotan la autorización, porque la
+    solicitud todavía puede eliminarse.
+  - **Libre para una faena nueva = otorgado − consumido − reservado.**
+
+  Con `APROVECHAMIENTO_ESTRICTO=true` una faena que pide más que lo LIBRE **no
+  se registra** —el mensaje dice cuántos kilos están reservados— y se vuelve a
+  medir al aprobarla. Para pedir kilos reservados hay que **eliminar** la faena
+  que los aparta; si está en revisión, primero se **rechaza** (vuelve a
+  pendiente) y después se elimina. Al corregir una pendiente, sus propios kilos
+  cuentan como libres: puede quedarse igual o bajar, pero no pasar lo libre.
+
+  **Ejemplo** — autorización de 750 kg con 600 aprobados:
+
+  | Paso | Consumido | Reservado | Libre | Resultado |
+  | --- | --: | --: | --: | --- |
+  | Situación inicial | 600 | 0 | 150 | — |
+  | Registrar faena A de 150 kg | 600 | 150 | 0 | ✔ queda pendiente y reserva |
+  | Registrar faena B de 100 kg | 600 | 150 | 0 | ✘ «150 kg reservados por faenas pendientes o en revisión» |
+  | Eliminar A | 600 | 0 | 150 | ✔ se liberan los 150 |
+  | Registrar B de 100 kg | 600 | 100 | 50 | ✔ solo quedan 50 para reservar |
+  | Aprobar B | 700 | 0 | 50 | ✔ recién ahí descuenta |
+
+  Con `false` la reserva se calcula y se muestra, pero **no frena**: la faena se
+  emite igual, se sigue sumando al aprobarse y el exceso queda registrado.
 - **No se registra la vuelta.** La faena termina en `aprobado`: los kilos
   autorizados cuentan como consumidos. *(25/09/2026)*
 - **Circuito:** pendiente → se cobra el arancel (15 Bs) → en revisión → firma →
@@ -201,8 +235,8 @@ dentro de una transacción deshecha con `rollBack()`.
   total y el concepto tarifario al momento de generarse.
 - **Pagos polimórficos.** La tabla `pagos` usa una estructura polimórfica
   (`pagable_type` + `pagable_id`) que permite amortizar o cancelar los costos
-  asociados indistintamente a un **Aprovechamiento**, a un **Carnet** o a una
-  **Guía de Movimiento**.
+  asociados indistintamente a un **Aprovechamiento**, a un **Carnet**, a un
+  **Permiso de Faena** o a una **Guía de Movimiento**.
 - **Validación en ventanilla.** Cada transacción financiera registra el
   comprobante de depósito, la fecha, el número de transacción **único a nivel
   global**, el usuario de ventanilla que registró (`registrado_por`), el
@@ -295,19 +329,20 @@ el formulario solo si ese carnet ya está revocado.
                           ▼
                   PERMISO DE FAENA
               (máx. 30 días, por salida;
-               descuenta kilos del cupo
-               a través del carnet)
+               reserva kilos del cupo al
+               registrarse y los descuenta
+               al aprobarse, a través del carnet)
 
-   Los tres documentos se cobran con la MISMA tabla `pagos`, y el papel que
-   se entrega es el RECIBO.
+   Los cuatro documentos —autorización, carnet, faena y guía— se cobran con la
+   MISMA tabla `pagos`, y el papel que se entrega es el RECIBO.
 ```
 
 ---
 
 ## Estado de la implementación
 
-**Los seis pasos están implementados tal como se describen arriba** (al
-20/09/2026). Dónde se hace cumplir cada regla que no se ve en el esquema:
+**Los siete pasos están implementados tal como se describen arriba** (al
+27/09/2026). Dónde se hace cumplir cada regla que no se ve en el esquema:
 
 | Regla | Dónde se hace cumplir |
 | --- | --- |
@@ -318,6 +353,7 @@ el formulario solo si ese carnet ya está revocado.
 | Comercializador NUNCA lleva cupo | `EmitirCarnetService` + `EmitirCarnetRequest` (`prohibitedIf`) |
 | La faena solo cuelga del carnet | `permisos_faena.carnet_id` es la única FK; el cupo llega por `hasManyThrough` |
 | Los kilos descuentan del cupo raíz | `AprovechamientoPesq::kilosConsumidos()` / `saldoKg()` |
+| La faena pendiente o en revisión reserva sus kilos | `EstadoFaena::reservaCupo()`, `AprovechamientoPesq::libreKg()`, `EmitirFaenaService` |
 | Faena: máximo 30 días | `PermisoFaena::DIAS_VIGENCIA` + `EmitirFaenaRequest` |
 | La guía solo cuelga del carnet | `guias_movimiento.carnet_id` es la única FK hacia la persona |
 | Guía: máximo 5 días | `GuiaMovimiento::DIAS_VIGENCIA` + `EmitirGuiaRequest` |

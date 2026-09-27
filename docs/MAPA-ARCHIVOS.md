@@ -74,7 +74,7 @@ decisiones que acá solo se nombran.
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `FaenaController.php` | 400 | Listado, alta, ficha, cobro y circuito de revisión, más **corregir y eliminar el BORRADOR** (21/09/2026): solo en PENDIENTE y sin un peso cargado, porque el número lo pone el sistema y el papel sale recién al aprobar. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario. `edit()` manda el saldo del cupo **con los kilos de esta faena sumados de vuelta**, o el formulario diría que no entra lo que ya entró |
+| `FaenaController.php` | 400 | Listado, alta, ficha, cobro y circuito de revisión, más **corregir y eliminar el BORRADOR** (21/09/2026): solo en PENDIENTE y sin un peso cargado, porque el número lo pone el sistema y el papel sale recién al aprobar. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario. `edit()` manda el saldo del cupo **con los kilos de esta faena sumados de vuelta**, o el formulario diría que no entra lo que ya entró; y `libre_kg`, lo libre más lo que ella misma reservaba (27/09/2026) |
 | `GuiaController.php` | 745 | Listado, alta, ficha, corrección del borrador, cobro y circuito de revisión, más cerrar y anular. `resumir()` usa el `withSum` del listado para no calcular el saldo por fila, y `reciboDe()` lo resuelve desde los pagos ya precargados. El buscador OMITE la condición del número cuando el término no trae dígitos: un `like '%%'` traería la tabla entera |
 | `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario. Suma faenas y guías con el mismo corte que Caja (`admitePagos()`); antes olvidaba las faenas |
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
@@ -191,11 +191,14 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `hooks/use-permisos.ts` | `puede('x.y')` | **Comodidad, no seguridad** |
 | `ui/confirmar-accion.tsx` · `ui/confirmar-con-motivo.tsx` | Las ventanas de confirmación | La prop `confirmacion` agrega una CASILLA que hay que marcar, y apaga el botón hasta entonces. Se usa solo en lo irreversible y en lo que es una declaración: marcada sin leer no protege nada. Se limpia al cerrar |
 | `lib/utils.ts` | `bs()`, `fecha()`, `fechaInput()`, `hora()`, `fechaHora()`, `hace()`, `cn()` | `aFechaLocal()` resuelve el bug de UTC-4. `fechaInput()` es su inversa —AAAA-MM-DD para un `<input type="date">`— y **no es `slice(0,10)`**: cortar un instante UTC da el día siguiente en Bolivia. `hace()` usa DOS `RelativeTimeFormat`: `auto` hasta días —para que salga «ayer»— y `always` de meses para arriba, o 40 días dirían «el mes pasado». **Sin pruebas** |
+| `lib/rueda-numerica.ts` | `bloquearRuedaEnNumericos()` | Se llama una vez en `app.tsx`. Quita el foco al `<input type="number">` cuando le giran la rueda encima: sin foco el navegador no cambia el valor y la página se desplaza igual |
 | `types/` | La forma de lo que manda Laravel | Hay que actualizarlos al cambiar un controlador |
 
-## `tests/` — VACÍO
+## `tests/` — CASI VACÍO
 
-Solo queda `TestCase.php`, la clase base. `tests/Feature/` se vació el
+Desde el 27/09/2026 hay dos: `Feature/Aprovechamientos/RevocacionTest.php` (19
+casos) y `Feature/Aprovechamientos/ReservaFaenaTest.php` (6 casos: la faena
+pendiente o en revisión reserva sus kilos). Además de `TestCase.php`, la clase base. `tests/Feature/` se vació el
 **14/09/2026** por pedido del responsable del proyecto.
 
 Eran 143 pruebas y cubrían el backend entero. Lo que comprobaban, y que hoy **no

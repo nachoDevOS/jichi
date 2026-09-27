@@ -1,17 +1,9 @@
-> # ⚠️ LA MITAD DE ABAJO DESCRIBE EL MODELO ANTERIOR
->
-> Los dos módulos ya están portados al núcleo del 18/09/2026: **faenas** el
-> 21/09 y **guías** el 22/09. Lo que sigue vale entero hasta el final de la
-> sección «El circuito, punto por punto»; **desde «1. Las tres reglas» en
-> adelante el texto es del modelo VIEJO** —habla de `rubros`, `faenas`,
-> `guias` y `guia_detalles` colgando de `guias`— y sirve para leer código
-> histórico, no para entender el esquema.
->
-> El esquema vigente está en [docs/MER.md](../MER.md), que está al día.
-
----
-
 # Faenas y guías — los permisos operativos
+
+> **Al día con el núcleo del 18/09/2026** (reescrito el 27/09/2026). El QUÉ lo
+> manda [REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md), pasos 4 y 5; las columnas y el
+> porqué de cada una están en [MER.md](../MER.md). Acá va el CÓMO: dónde vive
+> cada regla y qué hay que saber antes de tocar el módulo.
 
 > **El carnet es la llave anual; con él solo no se sale a trabajar.**
 
@@ -19,347 +11,282 @@ De cada carnet cuelgan los papeles con los que la persona trabaja de verdad, y
 son muchos por gestión:
 
 ```
-beneficiario ──< carnet (Pescador, 2026)        ──< permiso_faena   (una por salida)
-             ──< carnet (Comercializador, 2026) ──< guia_movimiento (una por traslado)
-                                                        └──< guia_detalle (una por especie)
+beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
+             ──< carnet (pescador)        ──< permiso_faena    (una por salida)
+             ──< carnet (comercializador) ──< guia_movimiento  (una por traslado)
+                                                  └──< guia_detalle (una por especie)
 ```
 
 | | PERMISO DE FAENA | GUÍA ÚNICA DE TRANSPORTE |
 | --- | --- | --- |
 | Autoriza | UNA salida de pesca | UN traslado de carga |
-| Dice | Embarcación, comandante, de tal día a tal día, tantos kilos | De dónde a dónde, en qué vehículo, con qué carga |
+| Dice | Embarcación, propietario, comandante, matrícula, kardex, región y kilos | Origen y destino, medio y vehículo, y la carga especie por especie |
 | Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
-| Se cobra | Tarifa fija por salida — `permisos_faena.monto`, hoy 15 Bs | Tarifa fija por traslado — `guias_movimiento.monto`, hoy 50 Bs, **la mitad si es piscicultura** |
+| Además exige | Autorización de pesca **aprobada**, en fecha y con kilos libres | Nada más que el carnet vigente |
+| Arancel | 15 Bs — `JICHI_FAENA_TARIFA_BASE`, copiado en `permisos_faena.monto` | 50 Bs — `JICHI_GUIA_TARIFA_BASE`, **la mitad si es piscicultura**, copiado en `guias_movimiento.monto` |
+| Número | `numero_faena`, correlativo continuo del sistema | `numero_guia`, correlativo continuo del sistema |
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por especie |
-| Consume cupo | **Sí**, al firmarla | No |
-| Vale | 30 días desde la salida | **5 días desde la firma** |
+| Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |
+| Vale | 30 días desde la firma | 5 días desde la firma (se cuentan con hora) |
+| Termina en | `aprobado` (no se registra la vuelta) | `cerrada` al llegar la carga, o `anulada` |
 | Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
 
 ---
 
-## El circuito, punto por punto — vigente desde el 22/09/2026
+## 1. El circuito
 
-**LOS DOS PAPELES SIGUEN EL MISMO CIRCUITO QUE EL CARNET Y EL CUPO**, y es a
-propósito: el operador aprende uno solo.
+**Los dos papeles siguen el mismo circuito que el carnet y la autorización**, y
+es a propósito: el operador aprende uno solo.
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO/APROBADA
-(borrador)      │            │                          │
-                │            └──[rechazar]──────────────┘
-                └── acá sale el RECIBO, uno por trámite
+PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (faena: vencido / revocado)
+(borrador)  ▲                │                        │
+   │        └──[rechazar]────┘                        └──▶ (guía: cerrada / anulada)
+   │                 └── al enviar sale el RECIBO, uno por trámite
+   └──[eliminar, con motivo]──▶ baja lógica
 ```
 
-| | Editar | Eliminar | Pagar | Enviar | Aprobar/Rechazar | Imprimir |
+| | Editar | Eliminar | Pagar | Enviar | Aprobar / Rechazar | Imprimir |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: |
 | **Pendiente** | ✔ | ✔ | ✔ | ✔ | ✘ | ✘ |
 | **En revisión** | ✘ | ✘ | ✘ | ✘ | ✔ | ✘ |
-| Activo / Activa | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
-| Completado / Cerrada | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
+| **Aprobado** | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
+| Cerrada (guía) | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
 
 Lo dictan los enums —`EstadoFaena` y `EstadoGuia`— y **nada más**: el servicio
 pregunta, el controlador no decide y React recibe la respuesta ya resuelta en
 los campos `puede_*` de la ficha.
 
-> **EDITAR Y ELIMINAR PIDEN DOS COSAS, NO UNA.** El estado PENDIENTE y que
-> **no haya ningún depósito cargado** — lo suma `puedeEditarse()` en los dos
-> modelos. Un depósito significa que la persona pagó por ESTE papel, y mover
-> los kilos o la piscicultura después cambiaría lo que se cobró. Primero se da
-> de baja el depósito.
+- **Rechazar devuelve a PENDIENTE**, con el motivo en `auditorias`. Los pagos y
+  el recibo quedan como estaban: el papel ya está en manos de la persona, y un
+  reenvío no emite un segundo recibo.
+- **EDITAR Y ELIMINAR PIDEN DOS COSAS:** estado PENDIENTE y **ningún depósito
+  cargado** —lo suman `puedeEditarse()` y `puedeEliminarse()` en los dos
+  modelos—. Un depósito significa que la persona pagó por ESTE papel, y mover
+  los kilos o la piscicultura después cambiaría lo que se cobró. Primero se da
+  de baja el depósito.
+- **El CARNET no se edita.** Cambiar de titular no es corregir una salida, es
+  emitir otra: el formulario muestra a la persona fija.
+- **EL RECIBO SALE AL ENVIAR, y es UNO por trámite**, no uno por boleta.
+  `CobrarService::emitirRecibo()` solo toma los pagos que quedaron sueltos, así
+  que un reenvío no emite otro. Ver [PAGOS.md](PAGOS.md) y [RECIBOS.md](RECIBOS.md).
+- **Aprobar exige** el arancel cubierto y **todas las boletas validadas**
+  (`sinValidar()` cuenta también las observadas).
+- **LAS FECHAS DE VIGENCIA LAS ESCRIBE LA APROBACIÓN.** Mientras es borrador
+  están en NULL: el plazo corre desde la firma, no desde que se cargó. La faena
+  sale ese día y desembarca 30 días después (`PermisoFaena::desembarqueDesde()`);
+  la guía vale 5 días contados con hora (`dateTime`).
+- **Eliminar no devuelve el número.** La baja es lógica y el correlativo sigue
+  donde estaba: la serie queda con un hueco, y eso es lo que el motivo
+  obligatorio explica.
 
-> **EL RECIBO SALE AL ENVIAR, y es UNO por trámite**, no uno por boleta. La
-> persona entrega sus depósitos —uno o cinco— y se lleva un papel con el total.
-> Un REENVÍO no emite un segundo: `CobrarService::emitirRecibo()` solo toma los
-> pagos que quedaron sueltos.
+### Lo que solo tiene la guía: cerrar y anular
 
-> **LAS FECHAS DE VIGENCIA LAS ESCRIBE LA APROBACIÓN.** En la guía las dos
-> —`fecha_emision` y `fecha_vencimiento`— están en NULL mientras es un borrador:
-> los cinco días empiezan a correr con la firma, no cuando se cargó. Contarlos
-> desde antes le comería al camión los días que el expediente estuvo esperando
-> en ventanilla.
+- **Cerrar** (`EmitirGuiaService::cerrar()`) registra que la carga llegó. Solo
+  sobre una guía aprobada; puede corregir el peso con el de la balanza.
+- **Anular** (`EmitirGuiaService::anular()`) da de baja una guía **ya firmada**,
+  cuyo papel está en la calle, con motivo obligatorio. Es de supervisión
+  (`guias.anular`) y no se revierte. **Anular no es eliminar**: eliminar es
+  sobre el borrador, donde nunca hubo papel. Las dos queman el número.
 
-**Qué NO comparten:** la faena consume el cupo de la bolsa madre al firmarse y
-`RevisarFaenaService::aprobar()` vuelve a medir el saldo con la fila del cupo
-bloqueada; la guía no toca ningún cupo. Y el cierre es distinto: la faena **no
-registra la vuelta** (retirado el 25/09/2026) y la guía se **cierra** cuando la
-carga llega a destino.
+> ⚠️ **Inconsistencia abierta:** la ficha solo ofrece anular una guía
+> `aprobado` (`GuiaController`, `puede_anularse`), pero el servicio acepta
+> anular también una pendiente o en revisión —solo rechaza la anulada y la
+> cerrada—. Además esa bandera se calcula con un `===` en el controlador en vez
+> de un método del enum. Anotado en [PENDIENTES.md](../PENDIENTES.md).
 
-**ANULAR NO ES ELIMINAR, y en la guía conviven las dos.** Eliminar es sobre el
-BORRADOR —nunca hubo papel—; anular es sobre una guía YA FIRMADA, cuyo papel
-está en la calle. Las dos queman el número del talonario igual, y las dos piden
-motivo por escrito.
-
-**Los archivos del circuito de guías:**
-
-| Archivo | Qué hace |
-| --- | --- |
-| `app/Enums/EstadoGuia.php` | El circuito: quién puede qué en cada estado |
-| `app/Enums/CondicionProducto.php` | Las DIEZ columnas de tilde del cuadro D |
-| `app/Enums/MedioTransporte.php` / `TipoTransporte.php` | El casillero 10 y los renglones a/b/c |
-| `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar, cerrar, anular |
-| `app/Services/RevisarGuiaService.php` | Enviar, aprobar, rechazar |
-| `app/Http/Controllers/Panel/GuiaImpresionController.php` | El PDF |
-| `resources/views/documentos/guia-transporte.blade.php` | La maqueta, calco del talonario |
-
----
-
-## 1. Las tres reglas, y dónde vive cada una
-
-| Regla | Quién la hace cumplir |
-| --- | --- |
-| El rubro del carnet emite ESE papel | `FaenaService` / `GuiaService` |
-| El carnet está VIGENTE | Ídem (`Carnet::estaVigente()`, que mira estado **y** fecha) |
-| El número del talonario no se repite | El índice único de la tabla. En la faena ya no puede fallar: lo genera el correlativo |
-
-**Ninguna está en el controlador ni en React.** Los modelos contestan
-`Carnet::puedeEmitirFaenas()` —sí o no, para mostrar u ocultar el botón—; los
-servicios IMPIDEN y además explican cuál de las condiciones falló, porque del
-otro lado del mostrador hay alguien esperando un papel.
-
-> **El error más probable del módulo es elegir el carnet equivocado.** La misma
-> persona tiene normalmente los DOS carnets. Por eso el buscador
-> (`GET /panel/carnets/buscar?permiso=faenas`) **filtra en el servidor**: la
-> lista solo trae carnets vigentes que puedan emitir ese papel, así que elegir
-> mal no es posible. El servicio igual lo vuelve a comprobar — el filtro es
-> comodidad, no seguridad.
+**La faena no se anula**: no tiene ese estado. Una faena aprobada solo deja de
+valer por fecha (`vencido`) o porque revocaron su autorización (`revocado`).
 
 ---
 
-## 2. El número
+## 2. Los kilos de la faena contra la autorización
 
-**EN LA FAENA LO GENERA EL SISTEMA** —desde el 21/09/2026—: un correlativo
-**global y continuo** que arranca en `000001`, no reinicia por gestión y se
-reserva con `CorrelativoService::siguienteContinuo()` dentro de la transacción
-del servicio. El operador no lo ve al cargar; lo lee del PDF que imprime
-después y lo copia a la hoja de papel.
+**Descuenta** solo la faena APROBADA (y la completada): recién firmada autoriza
+a pescar, y recién ahí sus kilos pasan a «consumido». Lo dice
+`EstadoFaena::consumeCupo()`.
 
-Lo tipeaba el operador y era correlativo DENTRO DEL CARNET. Las dos cosas
-estaban mal: el talonario de papel es **uno solo para toda la unidad** —la hoja
-real dice `N° 002190`—, así que numerar por carnet daba una faena `000001` por
-cada pescador y el número dejaba de identificar nada; y tipearlo abría la
-puerta a dos ventanillas cargando el mismo, o a un dígito de más que emite el
-`000001` en lugar del `000010`.
-
-**En la guía sigue saliendo del papel**, tipeado: ahí el talonario es otro y no
-se tocó.
-
-Es **único en todo el sistema**: dos permisos con el mismo número serían dos
-papeles que dicen ser el mismo, y en un control nadie sabría cuál vale.
-
-De ahí salen las dos ausencias del módulo:
-
-- **NO SE EDITA.** El papel ya está en manos de la persona. Cambiar el sistema
-  sin poder cambiar el papel deja a los dos diciendo cosas distintas, y nadie lo
-  nota hasta un control.
-- **NO SE BORRA.** El número ya se gastó, un hueco en la serie no se puede
-  explicar después, y borrar lo dejaría libre para que el índice único lo
-  aceptara de nuevo.
-
-Lo que sí hay es **ANULAR**, con motivo obligatorio. El motivo se antepone a
-`observaciones` —«ANULADA: …»— y es lo único que va a explicar después por qué
-ese número dejó de valer. Anular no se revierte: se emite otro papel.
-
-**La única excepción es el DETALLE de la guía**, que sí se corrige mientras la
-guía valga. El peso real se conoce recién en la balanza, y ajustar la grilla
-antes de que la carga salga es parte del trabajo normal. La cabecera —quién,
-desde dónde, hasta dónde— no cambia nunca.
-
----
-
-## 3. La carga de la guía
-
-Vive en `guia_detalles`, una fila por especie, y va en tabla aparte por un
-motivo concreto: es lo que permite preguntarle a la base **cuántos kilos de
-surubí salieron del Beni este año**. Con un `jsonb` o con columnas numeradas
-—especie_1, especie_2…— ese reporte se vuelve imposible.
-
-| Columna | Qué guarda |
-| --- | --- |
-| `especie` | **Texto libre.** No hay padrón escrito de las especies del Beni, y una lista cerrada incompleta impediría emitir la guía |
-| `condicion` | Lista CERRADA: fresco, congelado, seco, salado. Cambia el control sanitario y el valor |
-| `cantidad_kg` | Los kilos de esa línea |
-| `precio_unitario` | Opcional: hay guías que solo declaran volumen |
-| `imponible` | **Lo que dice el papel. NO se recalcula** |
-
-> **`imponible` parece redundante —cantidad × precio— y no lo es.** Es la base de
-> cálculo que la unidad escribió en el papel, y cuando aplicó una rebaja o
-> redondeó, no coincide con la multiplicación. Si el sistema lo recalculara,
-> estaría contradiciendo una guía firmada. Por eso `GuiaDetalle::importe()`
-> prefiere `imponible` y solo cae a la multiplicación cuando no está — y el
-> formulario muestra el cálculo como **placeholder**, nunca como valor.
-
-Es además **la única tabla del módulo que se borra en cascada**: el formulario
-reescribe la grilla entera, así que borrar es parte de su uso normal.
-
----
-
-## 4. El cobro
-
-Los tres —trámite, faena y guía— se pagan con la **misma tabla `pagos`**, que
-por eso es polimórfica (`pagable_type` + `pagable_id`). El motivo de fondo es el
-índice único de `nro_transaccion`: partido en tres tablas dejaría de ser único, y
-la misma boleta podría pagar un trámite y una faena.
-
-El libro de caja (`/panel/pagos`) los lista juntos con una columna **Concepto**
-que dice de cuál viene cada fila. Tiene que ser así: lo que se cuadra contra el
-extracto del banco es todo lo que entró, no una parte.
-
-> **El ALTA de pagos de faenas y guías todavía no tiene pantalla.**
-> `PagoTramiteService` solo sabe de trámites, y su nombre lo dice. Las fichas
-> muestran «Sin depósitos registrados» en vez de un botón que no existe. Ver
-> [PENDIENTES.md](../PENDIENTES.md).
-
----
-
-## 5. Pantallas y rutas
-
-| Ruta | Permiso | Qué hace |
-| --- | --- | --- |
-| `GET /panel/faenas` | `faenas.ver` | Listado, con filtro por estado y por fechas de salida |
-| `GET /panel/faenas/crear` | `faenas.crear` | Formulario. Acepta `?carnet=` para llegar con el carnet elegido |
-| `POST /panel/faenas` | `faenas.crear` | Alta |
-| `GET /panel/faenas/{faena}` | `faenas.ver` | Ficha |
-| `GET /panel/faenas/{faena}/imprimir` | `faenas.imprimir` | El «Permiso por Faena» en PDF. Solo aprobada |
-| `GET /panel/faenas/{faena}/editar` | `faenas.editar` | Corregir el borrador. Va ANTES de `/{faena}` o «editar» se toma como id |
-| `PATCH /panel/faenas/{faena}` | `faenas.editar` | Guardar la corrección |
-| `DELETE /panel/faenas/{faena}` | `faenas.eliminar` | Baja con motivo |
-| `GET /panel/guias` … | `guias.*` | Lo mismo para guías |
-| `PUT /panel/guias/{guia}/detalle` | `guias.crear` | Reemplaza la grilla de carga |
-| `GET /panel/carnets/buscar` | `carnets.ver` | Autocompletado de los dos formularios. Devuelve JSON |
-
-En el menú los tres trámites van juntos, bajo un mismo grupo:
+**Reserva** la faena PENDIENTE y la EN REVISIÓN: no resta del saldo ni agota la
+autorización, pero aparta sus kilos. Lo dice `EstadoFaena::reservaCupo()`.
 
 ```
-TRÁMITES
-  De carnet     → /panel/tramites
-  De faena      → /panel/faenas
-  De guía       → /panel/guias
+libre para una faena nueva = otorgado − consumido − reservado
+                             └── saldoKg() ──┘
+                             └────────── libreKg() ─────────┘
 ```
 
-«Trámites» es el título del GRUPO y no el de una opción, porque nombra el acto y
-el acto es el mismo en los tres. Cada ítem lleva además un `tituloCompleto`
-—«Trámites de faena»— para las migas de pan y el globito de la barra angosta,
-donde el rótulo del grupo no se ve.
+**En modo estricto una faena nueva solo puede pedir lo libre.** Con 150 kg de
+saldo y una pendiente de 150, lo libre es 0 y la siguiente no se registra hasta
+que se elimine la pendiente (una en revisión se rechaza primero, y vuelve a
+pendiente). El mensaje dice cuántos kilos están reservados:
+`PermisoOperativoException::excedeLibre()`. En modo flexible la reserva se
+muestra y no frena. El ejemplo completo está en
+[REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md), paso 4.
 
-### Cuándo se descuenta el cupo — cambiado el 21/09/2026
+Una reserva **no agota** la autorización —todavía se puede eliminar—: `agotado`
+lo decide solo lo consumido, en `sincronizarEstadoPorSaldo()`.
 
-**Solo la faena APROBADA y la COMPLETADA pesan contra la bolsa madre.** Una
-pendiente o en revisión es una solicitud: todavía no autoriza a pescar, así que
-no le resta kilos a nadie. Lo dice `EstadoFaena::consumeCupo()`.
+**Dónde se aplica** —los tres con la fila de la autorización bloqueada—:
 
-Antes reservaba desde el pedido, y el motivo era evitar que se otorgara de más.
-Al sacar la reserva ese riesgo vuelve: **tres solicitudes por el volumen entero
-se aceptan las tres**, porque ninguna ve a las otras. El control se movió al
-único momento en que el volumen sale de verdad — `RevisarFaenaService::aprobar()`
-bloquea la fila del cupo, vuelve a medir el saldo y rechaza la firma que no
-entra, con el mensaje de cuántos kilos quedan.
+| Momento | Qué se mide |
+| --- | --- |
+| `EmitirFaenaService::emitir()` | kilos ≤ libre |
+| `EmitirFaenaService::editar()` | kilos ≤ libre + lo que esta misma faena reservaba |
+| `RevisarFaenaService::aprobar()` | kilos ≤ saldo. Con la reserva no puede fallar en estricto; queda por las faenas nacidas en flexible |
 
-Consecuencia para el mostrador: **un choque de cupo ya no aparece al cargar la
-faena sino al firmarla.** El aviso del formulario sigue estando —es un aviso
-temprano— pero deja de ser una garantía.
+**La pantalla recibe los números resueltos**: `saldo_kg`, `reservado_kg` y
+`libre_kg` en `Carnet::resumenParaEmitir()` (formulario de faena), `libre_kg` en
+`FaenaController::edit()`, y `kilos_reservados` / `libre_kg` en la ficha de la
+autorización, que muestra «Reservado» y «Libre para faena» cuando hay reservas.
+El formulario usa `libre_kg` en estricto y `saldo_kg` en flexible, y propone
+como kilos todo lo disponible.
 
-Los tres lugares que enumeran los estados que consumen, y que tienen que decir
-lo mismo:
+Los lugares que enumeran los estados, y que tienen que decir lo mismo:
 
 | Dónde | Para qué |
 | --- | --- |
-| `EstadoFaena::consumeCupo()` | El filtro en memoria, cuando las faenas ya están cargadas |
-| `AprovechamientoPesq::faenasQueConsumen()` | El mismo filtro en SQL, para el `withSum` de los listados |
-| `PermisoFaena::scopeQueConsumenCupo()` | El scope suelto |
+| `EstadoFaena::consumeCupo()` / `reservaCupo()` | El filtro en memoria, cuando las faenas ya están cargadas |
+| `AprovechamientoPesq::faenasQueConsumen()` / `faenasQueReservan()` | El mismo filtro en SQL, para el `withSum` de los listados |
+
+⚠️ **Toda consulta que precarga `withSum('faenasQueConsumen', …)` lleva también
+`withSum('faenasQueReservan', …)`**, o `kilosReservados()` hace una consulta por
+fila en silencio.
+
+**Historia:** hasta el 21/09/2026 la pendiente descontaba; entre el 21 y el 27
+no reservaba nada, y tres solicitudes por el volumen entero pasaban las tres y
+chocaban al firmar la segunda, con el arancel ya cobrado. Desde el 27/09/2026
+reserva sin descontar.
 
 ---
 
-### Corregir y eliminar, agregados el 21/09/2026
+## 3. Dónde vive cada regla
 
-La faena ya no se emite y se entrega en el acto: **nace PENDIENTE** y recorre el
-mismo circuito que el carnet y el cupo —cobrar, presentar, firmar—, y el número
-lo pone el sistema. Mientras es un BORRADOR no hay ningún papel afuera, así que
-se corrige y se elimina, con el mismo corte que en los otros dos módulos:
+| Regla | Quién la hace cumplir |
+| --- | --- |
+| Cada actor emite solo lo suyo | `TipoActor::emiteFaenas()` / `emiteGuias()`, en `EmitirFaenaService` / `EmitirGuiaService` |
+| El carnet está VIGENTE | Los mismos servicios, con `Carnet::estaVigente()` (estado **y** fecha) |
+| La faena exige autorización aprobada, en fecha y no revocada | `EmitirFaenaService::emitir()` y otra vez en `RevisarFaenaService::aprobar()` |
+| Los kilos entran en lo libre | `EmitirFaenaService::exigirKilosLibres()` |
+| El número no se repite | `CorrelativoService::siguienteContinuo()` dentro de la transacción, y el índice único |
+| El arancel no cambia después de emitido | `monto` copiado al crear; `montoACobrar()` lee la columna, no `config()` |
+| El descuento de piscicultura | `GuiaMovimiento::factorArancel()`, en un solo lugar |
 
-| | Pendiente | En revisión | Aprobada / completada / vencida |
-| --- | :-: | :-: | :-: |
-| Editar | ✔ | ✘ | ✘ |
-| Eliminar | ✔ | ✘ | ✘ |
+**Ninguna está en el controlador ni en React.** Los modelos contestan
+`Carnet::puedeEmitirFaenas()` y `motivoSinPermisos()` —sí o no, y por qué, para
+mostrar el botón o el aviso—; los servicios IMPIDEN y explican cuál de las
+condiciones falló.
 
-**El estado no alcanza: un depósito cargado cierra las dos puertas.** Un pago
-significa que el pescador pagó por ESTA salida, y mover los kilos o las fechas
-después cambiaría lo que se cobró. Se da de baja el depósito primero. Lo dicen
-`PermisoFaena::puedeEditarse()` y `puedeEliminarse()`.
-
-**El CARNET no se edita.** Cambiar de titular no es corregir una salida, es
-emitir otra: el formulario muestra a la persona fija. Ver
-`EmitirFaenaService::editar()`.
-
-**El saldo que ve el formulario suma de vuelta los kilos propios SOLO si esa
-faena estaba descontando.** Desde el 21/09/2026 una pendiente no descuenta, así
-que devolvérselos igual mostraría el doble de cupo disponible. Ver
-`FaenaController::edit()` y `EmitirFaenaService::editar()`, que aplican el mismo
-criterio.
-
-**Eliminar devuelve los kilos al cupo pero NO devuelve el número.** La baja es
-lógica y el correlativo sigue donde estaba: la serie queda con un hueco, y eso
-es justamente lo que el motivo obligatorio tiene que explicar.
-
-**Emitir es de VENTANILLA; anular es de SUPERVISIÓN.** Son papeles que se llenan
-en el mostrador y se entregan en el acto: no hay nada que firmar después, y el
-carnet vigente ya es la autorización. Anular, en cambio, quema un número del
-talonario para siempre.
-
-**Anular va por PATCH y no por GET**, igual que los pasos del trámite: un verbo
-de lectura que escribe se dispara solo con que el navegador precargue el enlace.
+> **El error más probable del módulo es elegir el carnet equivocado.** La misma
+> persona tiene normalmente los DOS carnets. El formulario lista los carnets
+> vigentes de la persona (`BeneficiarioController::buscar()`) y deshabilita los
+> que no pueden emitir ese papel, con el motivo. El servicio igual lo vuelve a
+> comprobar: el filtro es comodidad, no seguridad.
 
 ---
 
-## 6. Lo que hay que saber antes de tocar el módulo
+## 4. El número
 
-- **LA FAENA GUARDA LOS RENGLONES DEL PAPEL**, agregados el 21/09/2026:
-  embarcación, propietario, comandante, matrícula naval, kardex y la región
-  desde/hasta. Todos nullable y texto libre — el formulario se llena a mano y
-  llega incompleto, y no hay padrón de embarcaciones ni de comandantes.
-- **Salida y desembarque los escribe la APROBACIÓN** (desde el 25/09/2026): sale
-  el día de la firma y desembarca a los 30 días. El formulario no tiene fechas;
-  `fecha_limite` y `fecha_emision` se sacaron por ser copias. Ver
-  [MER.md](../MER.md).
-- **El PDF lo dibuja `PermisoFaenaImpresionController`**, con la plantilla
-  `documentos/permiso-faena.blade.php`. Calca el talonario renglón por renglón y
-  sale recién con la faena APROBADA. Su sello de agua es
-  `public/image/faena-sello.png` —`sedag.png` mezclado contra blanco al 11% y
-  guardado en paleta—: para aclararlo se REGENERA el PNG, nunca con `opacity`.
-- **Arriba a la derecha van los PECES, no el logo del SEDAG**
-  (`public/image/faena-peces.png`): un surubí y un pacú en silueta verde plana,
-  como el talonario. El logo se sacó porque ya está en el sello de agua del
-  fondo, y repetirlo dejaba el escudo compitiendo con dos versiones del mismo
-  emblema. Plano y sin contorno a propósito: DomPDF no dibuja degradados y un
-  trazo fino desaparece al imprimir con poco tóner.
+**Lo genera el sistema en los dos papeles**: un correlativo **global y
+continuo** de seis dígitos que no reinicia por gestión, reservado con
+`CorrelativoService::siguienteContinuo()` dentro de la transacción del servicio.
+El operador no lo ve al cargar; lo lee del PDF.
 
-  **Desde el 22/09/2026 la AUTORIZACIÓN DE PESCA usa el mismo PNG y al mismo
-  cuerpo**, a pedido: los dos papeles del talonario se ven de la misma familia,
-  y el documento adelgazó de 139 a 104 KB —la silueta pesa 4 KB contra los 47
-  de la copia del logo—. Quedó sin usar `public/image/autorizacion-logo.png`.
+Antes lo tipeaba el operador y era correlativo DENTRO DEL CARNET. Las dos cosas
+estaban mal: el talonario de papel es **uno solo para toda la unidad** —la hoja
+real dice `N° 002190`—, y tipearlo abría la puerta a dos ventanillas cargando el
+mismo.
 
-- **`emite_faenas` / `emite_guias` son DOS columnas y no un `tipo_permiso`**,
-  porque no son excluyentes: una actividad piscícola necesitaría faena para la
-  cosecha y guía para trasladarla.
-- **Nunca preguntar por el nombre del rubro.** El catálogo lo edita la unidad
-  desde el panel y el mismo rubro figura como «Pescador» o como «Faena» según
-  quién lo cargó. Es la misma decisión que `requiere_capacidad`.
-- **Al pedir columnas de `rubros` con `with('rubro:id,nombre')`, incluir las dos
-  banderas.** `puedeEmitirFaenas()` las lee, y si no vinieron en el select
-  devuelven null —no un error—: el carnet se descarta en silencio y el formulario
-  abre vacío sin que nada lo explique. Ya pasó.
-- **`Faena` y `Guia` declaran sus valores por defecto en `protected $attributes`
-  además de en la base.** Un `default` de la columna lo aplica el INSERT y NO
-  llega al objeto que devuelve `create()`: emitir una faena y preguntarle
-  `estaEmitida()` en la línea siguiente contestaba que no.
-- **El cupo del carnet y la cantidad de la faena son DOS topes distintos.** El
-  primero es anual, el segundo es de ese viaje. Se controlan en momentos
-  distintos y el formulario lo aclara, porque es la confusión más frecuente.
-- **REVOCAR EL CARNET NO TOCA SUS FAENAS** —confirmado con el responsable el
-  25/09/2026—. `PermisoFaena::estaVigente()` mira solo su estado y su
-  `fecha_desembarque`: reponer un plástico perdido revoca el viejo, y la salida
-  ya aprobada y pagada sigue valiendo, también al escanear su QR. Solo el
-  carnet revocado da «NO vigente». Los kilos siguen descontando del mismo cupo.
+El número y el **código de verificación** conviven: el número es consecutivo
+porque Contabilidad audita sus huecos; el código de 16 caracteres es al azar
+porque es la llave de `/verificar`. Ver [MER.md](../MER.md), tabla `codigos`.
 
 ---
 
-Ver también: [ARQUITECTURA.md](../ARQUITECTURA.md) · [MER.md](../MER.md) ·
-[CARNETS.md](CARNETS.md)
+## 5. La carga de la guía
+
+Vive en `guia_detalles`, una fila por especie, y calca el **cuadro D** del
+talonario: especie (texto libre, no hay padrón), condición (`CondicionProducto`,
+las diez columnas de tilde del papel), kilos, y precio e importe **declarados**
+—lo que el comerciante pagó en origen, que solo se imprime; lo que cobra caja
+sale de `guias_movimiento.monto`—.
+
+`peso_total_kg` de la guía es la suma del cuadro D, guardada. Al corregir el
+borrador el detalle se **reemplaza entero**. La FK es CASCADE, pero la baja
+lógica no la dispara: `EmitirGuiaService::eliminar()` baja el detalle a mano.
+
+---
+
+## 6. Pantallas y rutas
+
+| Ruta | Permiso | Qué hace |
+| --- | --- | --- |
+| `GET /panel/faenas` | `faenas.ver` | Listado, con filtro por estado |
+| `GET /panel/faenas/crear` | `faenas.crear` | Formulario. Acepta `?beneficiario=` y `?carnet=` para llegar con todo elegido |
+| `POST /panel/faenas` | `faenas.crear` | Alta, nace pendiente |
+| `POST /panel/faenas/{faena}/pagos` | `caja.cobrar` | Cargar depósitos desde la ficha |
+| `POST /panel/faenas/{faena}/enviar` | `faenas.enviar` | A revisión; sale el recibo |
+| `PATCH /panel/faenas/{faena}/aprobar` · `/rechazar` | `faenas.aprobar` | La firma, o la devolución con motivo |
+| `GET /panel/faenas/{faena}/editar` · `PATCH /panel/faenas/{faena}` | `faenas.editar` | Corregir el borrador. `editar` va ANTES de `/{faena}` o se toma como id |
+| `DELETE /panel/faenas/{faena}` | `faenas.eliminar` | Baja con motivo |
+| `GET /panel/faenas/{faena}/imprimir` | `faenas.imprimir` | El «Permiso por Faena» en PDF. Solo aprobada |
+| `GET /panel/faenas/{faena}` | `faenas.ver` | Ficha |
+| `/panel/guias/…` | `guias.*` | Lo mismo para guías, más `PATCH …/cerrar` (`guias.cerrar`) y `PATCH …/anular` (`guias.anular`) |
+
+Los pasos del circuito van por **PATCH o POST, nunca GET**: un verbo de lectura
+que escribe se dispara solo con que el navegador precargue el enlace.
+
+En el menú lateral los dos van en el grupo **Ventanilla**, como «Faenas» y
+«Guías», junto a Beneficiarios, Aprov. Pesquero y Carnets. La faena también se
+emite desde la ficha de la autorización, que ya trae el carnet aprobado.
+
+---
+
+## 7. Lo que hay que saber antes de tocar el módulo
+
+- **Los modelos son `PermisoFaena` y `GuiaMovimiento`**, sobre
+  `permisos_faena` y `guias_movimiento`. Los viejos `Faena`, `Guia`,
+  `FaenaService` y `GuiaService` ya no existen.
+- **La faena guarda los renglones del papel**: embarcación, propietario,
+  comandante, matrícula naval, kardex y la región desde/hasta. Todos nullable y
+  texto libre —el formulario se llena a mano y llega incompleto—; los kilos son
+  lo único obligatorio.
+- **No se registra la vuelta de la faena** (retirado el 25/09/2026): termina en
+  `aprobado` y sus kilos cuentan como consumidos. `Completado` sigue en el enum,
+  pero hoy nada lleva a ese estado.
+- **Revocar el carnet NO toca sus faenas ni sus guías**: lo ya aprobado sigue
+  valiendo hasta su propia fecha. `PermisoFaena::estaVigente()` mira solo su
+  estado y su desembarque. **Revocar la AUTORIZACIÓN sí** revoca las faenas
+  aprobadas y vigentes —ver [REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md), Regla 5—.
+- **Los valores por defecto van también en `protected $attributes`** del modelo:
+  un `default` de la base no llega al objeto que devuelve `create()`.
+- **Pedir columnas sueltas en un `with()` rompe los métodos del modelo en
+  silencio**: si `puedeEmitirFaenas()` o `documento_identidad` leen una columna,
+  esa columna va en el select.
+- **El PDF de la faena** lo dibuja `PermisoFaenaImpresionController` con
+  `documentos/permiso-faena.blade.php`. Calca el talonario y sale recién
+  aprobada. Su sello de agua es `public/image/faena-sello.png`, horneado en el
+  PNG —para aclararlo se regenera, nunca con `opacity`—; arriba a la derecha van
+  los peces (`faena-peces.png`), el mismo PNG que usa la autorización.
+- **El PDF de la guía** lo dibuja `GuiaImpresionController` con
+  `documentos/guia-transporte.blade.php`. DomPDF no rota texto: los rótulos
+  verticales del cuadro D se apilan letra por letra.
+
+**Los archivos del módulo:**
+
+| Archivo | Qué hace |
+| --- | --- |
+| `app/Enums/EstadoFaena.php` / `EstadoGuia.php` | El circuito, y qué descuenta o reserva |
+| `app/Enums/CondicionProducto.php`, `MedioTransporte.php`, `TipoTransporte.php` | Las casillas del talonario de la guía |
+| `app/Services/EmitirFaenaService.php` | Emitir, corregir y eliminar la faena; controla los kilos libres |
+| `app/Services/RevisarFaenaService.php` | Enviar, aprobar y rechazar la faena |
+| `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar, cerrar y anular la guía |
+| `app/Services/RevisarGuiaService.php` | Enviar, aprobar y rechazar la guía |
+| `app/Http/Controllers/Panel/FaenaController.php` / `GuiaController.php` | Listado, formulario, ficha y circuito |
+| `resources/js/pages/panel/faenas/`, `resources/js/pages/panel/guias/` | Las pantallas |
+| `tests/Feature/Aprovechamientos/ReservaFaenaTest.php` | La reserva de kilos, 6 casos |
+
+---
+
+Ver también: [REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md) · [MER.md](../MER.md) ·
+[ARQUITECTURA.md](../ARQUITECTURA.md) · [CARNETS.md](CARNETS.md) ·
+[PAGOS.md](PAGOS.md)

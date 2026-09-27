@@ -240,6 +240,10 @@ export interface CarnetVigenteSugerido {
      * Kilos que quedan en la bolsa madre. Null si el carnet no lleva cupo.
      */
     saldo_kg: number | null;
+    /** Apartado por faenas pendientes o en revisión: no descuenta, pero no está libre. */
+    reservado_kg: number | null;
+    /** Lo que una faena nueva puede pedir: saldo menos reservado. */
+    libre_kg: number | null;
 }
 
 /** Una coincidencia del autocompletado de los formularios de emisión. */

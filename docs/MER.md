@@ -506,22 +506,30 @@ cupo ni se imprime; el motivo va a `auditorias`. Ver
 defecto, que es lo que dice el talonario— y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
 en los otros dos. El circuito vive en `RevisarFaenaService`.
 
-**Los kilos se descuentan DESDE LA FIRMA, no desde el pedido** —cambiado el
-21/09/2026 a pedido del responsable—. `EstadoFaena::consumeCupo()` deja pasar
-solo a la **aprobada** y a la **completada**: una pendiente o en revisión es una
-solicitud, todavía no autoriza a pescar, y por eso no le resta kilos a la bolsa.
+**Los kilos se DESCUENTAN desde la firma y se RESERVAN desde el registro.**
+`EstadoFaena::consumeCupo()` deja pasar solo a la **aprobada** y a la
+**completada**: es lo que se resta del saldo y lo único que lleva el cupo a
+`agotado`. `EstadoFaena::reservaCupo()` deja pasar a la **pendiente** y a la
+**en revisión**: no restan del saldo, pero apartan sus kilos, y en modo estricto
+una faena nueva solo puede pedir lo libre —`AprovechamientoPesq::libreKg()` =
+saldo − reservado—. El ejemplo está en
+[REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#paso-4--la-operativa-del-pescador-permisos-de-faena).
 
-Antes reservaba desde el pedido. Lo que se gana con el cambio es que el saldo
-que se ve es el volumen realmente comprometido; lo que se pierde es la reserva,
-así que **el cupo se puede sobrecomprometer**: tres solicitudes por el volumen
-entero se aceptan las tres y el choque aparece al aprobar la segunda. Ese
-control lo hace ahora `RevisarFaenaService::aprobar()`, que vuelve a medir el
-saldo con la fila del cupo bloqueada y rechaza la firma que no entra.
+Historia: hasta el 21/09/2026 la pendiente descontaba; ese día se pasó a
+descontar desde la firma, y el cupo se podía sobrecomprometer —tres solicitudes
+por el volumen entero pasaban las tres y chocaban al firmar la segunda—. El
+27/09/2026 volvió la reserva, pero separada del descuento: el saldo sigue siendo
+el volumen realmente firmado y el sobrecompromiso deja de ser posible en modo
+estricto. `RevisarFaenaService::aprobar()` vuelve a medir igual, por si la faena
+nació en modo flexible.
 
-⚠️ La lista de estados que consumen está escrita **dos veces** —en
-`EstadoFaena::consumeCupo()` para el filtro en memoria y en
-`AprovechamientoPesq::faenasQueConsumen()` para el filtro en SQL—. Si se separan,
-la ficha y el listado muestran saldos distintos.
+No hay columna nueva: la reserva se calcula con `withSum('faenasQueReservan', …)`,
+igual que el consumo.
+
+⚠️ Cada lista de estados está escrita **dos veces** —`EstadoFaena::consumeCupo()`
+/ `reservaCupo()` para el filtro en memoria y `AprovechamientoPesq::faenasQueConsumen()`
+/ `faenasQueReservan()` para el filtro en SQL—. Si se separan, la ficha y el
+listado muestran saldos distintos.
 
 **El titular llega por un accesor.** El recibo sale a nombre de
 `$tramite->beneficiario_id`, que la faena no guarda: lo resuelve

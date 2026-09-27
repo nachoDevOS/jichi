@@ -286,6 +286,7 @@ class Carnet extends Model
             ! $this->aprovechamiento->estaEnFecha() => 'La Autorización de Pesca para Aprovechamiento Pesquero venció.',
             $this->aprovechamiento->saldoKg() <= 0.0 => 'La Autorización de Pesca para Aprovechamiento Pesquero se quedó sin '
                 .'kilos. Hay que tramitar otra.',
+            $this->aprovechamiento->libreKg() <= 0.0 => $this->aprovechamiento->motivoReservado(),
             default => 'No autoriza a emitir.',
         };
     }
@@ -316,6 +317,9 @@ class Carnet extends Model
             'capacidad' => $cupo?->categoria?->descripcion_kg,
             'volumen_total_kg' => $cupo !== null ? (float) $cupo->volumen_total_kg : null,
             'saldo_kg' => $cupo?->saldoKg(),
+            // Lo que una faena nueva puede pedir: el saldo menos lo reservado.
+            'reservado_kg' => $cupo?->kilosReservados(),
+            'libre_kg' => $cupo?->libreKg(),
         ];
     }
 

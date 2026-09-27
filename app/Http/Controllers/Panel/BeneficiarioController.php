@@ -157,7 +157,8 @@ class BeneficiarioController extends Controller
                     'tipoCarnet',
                     'aprovechamiento' => fn ($a) => $a
                         ->with('categoria')
-                        ->withSum('faenasQueConsumen', 'kilos_extraidos'),
+                        ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                        ->withSum('faenasQueReservan', 'kilos_extraidos'),
                 ])
                 ->withSum('pagos', 'monto_parcial')
                 // Por id y no por emisión: la emisión es NULL hasta la firma, y
@@ -246,6 +247,7 @@ class BeneficiarioController extends Controller
             'cupos' => $beneficiario->aprovechamientos()
                 ->with('categoria')
                 ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                ->withSum('faenasQueReservan', 'kilos_extraidos')
                 ->withSum('pagos', 'monto_parcial')
                 // Por la SOLICITUD: la emisión está en NULL hasta la firma.
                 ->orderByDesc('fecha_solicitud')
@@ -361,7 +363,8 @@ class BeneficiarioController extends Controller
              */
             ->with(['aprovechamientos' => fn ($a) => $a
                 ->with('categoria')
-                ->withSum('faenasQueConsumen', 'kilos_extraidos'),
+                ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                ->withSum('faenasQueReservan', 'kilos_extraidos'),
             ])
             ->with(['carnets' => fn ($q) => $q
                 ->vigentes()
@@ -370,7 +373,8 @@ class BeneficiarioController extends Controller
                     'tipoCarnet:id,nombre',
                     'aprovechamiento' => fn ($a) => $a
                         ->with('categoria')
-                        ->withSum('faenasQueConsumen', 'kilos_extraidos'),
+                        ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                        ->withSum('faenasQueReservan', 'kilos_extraidos'),
                 ]),
             ])
             ->ordenAlfabetico()

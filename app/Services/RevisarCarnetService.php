@@ -67,15 +67,16 @@ class RevisarCarnetService
                 throw CarnetInvalidoException::noSePuedeRevisar($bloqueado->estado->etiqueta());
             }
 
+            // Un carnet no se emite sobre una autorización revocada mientras esperaba la firma;
+            // va primero: es lo que hay que resolver antes que cualquier pago.
+            if ($bloqueado->aprovechamiento?->estado === EstadoAprovechamiento::Revocado) {
+                throw CarnetInvalidoException::cupoRevocado();
+            }
+
             // Se vuelve a mirar el arancel: entre el envío y la firma se pudo dar
             // de baja un depósito.
             if ($bloqueado->saldoPendiente() > 0.0) {
                 throw CarnetInvalidoException::faltaCubrirElArancel($bloqueado->saldoPendiente());
-            }
-
-            // Un carnet no se emite sobre una autorización revocada mientras esperaba la firma.
-            if ($bloqueado->aprovechamiento?->estado === EstadoAprovechamiento::Revocado) {
-                throw CarnetInvalidoException::cupoRevocado();
             }
 
             // Y que ninguna boleta quede sin controlar: `sinValidar()` cuenta

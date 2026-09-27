@@ -118,7 +118,8 @@ class FaenaController extends Controller
                         'tipoCarnet:id,nombre',
                         'aprovechamiento' => fn ($a) => $a
                             ->with('categoria')
-                            ->withSum('faenasQueConsumen', 'kilos_extraidos'),
+                            ->withSum('faenasQueConsumen', 'kilos_extraidos')
+                            ->withSum('faenasQueReservan', 'kilos_extraidos'),
                     ])
                     ->get()
                     ->map(fn (Carnet $c): array => $c->resumenParaEmitir())
@@ -189,7 +190,8 @@ class FaenaController extends Controller
             'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
-            'carnet.aprovechamiento' => fn ($a) => $a->withSum('faenasQueConsumen', 'kilos_extraidos'),
+            'carnet.aprovechamiento' => fn ($a) => $a->withSum('faenasQueConsumen', 'kilos_extraidos')
+                ->withSum('faenasQueReservan', 'kilos_extraidos'),
         ]);
 
         $cupo = $faena->carnet?->aprovechamiento;
@@ -211,6 +213,10 @@ class FaenaController extends Controller
                 // no resta, así que devolvérselos mostraría el doble de cupo.
                 'saldo_kg' => $cupo !== null
                     ? $cupo->saldoKg() + ($faena->consumeCupo() ? (float) $faena->kilos_extraidos : 0.0)
+                    : null,
+                // Lo libre más lo que ella misma reserva: es lo que puede pedir al corregirse.
+                'libre_kg' => $cupo !== null
+                    ? $cupo->libreKg() + ($faena->estado->reservaCupo() ? (float) $faena->kilos_extraidos : 0.0)
                     : null,
 
                 'kilos_extraidos' => (float) $faena->kilos_extraidos,

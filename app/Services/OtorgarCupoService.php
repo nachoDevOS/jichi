@@ -174,6 +174,7 @@ class OtorgarCupoService
              */
             ->enCurso()
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
+            ->withSum('faenasQueReservan', 'kilos_extraidos')
             ->latest('fecha_solicitud')
             ->first();
     }

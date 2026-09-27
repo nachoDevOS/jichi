@@ -81,15 +81,10 @@ class EmitirFaenaService
                 throw PermisoOperativoException::cupoEnRevision();
             }
 
-            // Solo en modo ESTRICTO, y es un aviso temprano y no una reserva: dos
-            // solicitudes por el volumen entero pasan las dos. El control de
-            // verdad corre al APROBAR.
+            // Solo en modo ESTRICTO: la pendiente RESERVA, así que se mide contra
+            // lo libre. Con la fila del cupo bloqueada, dos ventanillas no apartan lo mismo.
             if (AprovechamientoPesq::modoEstricto()) {
-                $saldo = $cupo->saldoKg();
-
-                if ($kilos > $saldo) {
-                    throw PermisoOperativoException::excedeCupo($kilos, $saldo);
-                }
+                $this->exigirKilosLibres($cupo, $kilos, 0.0);
             }
 
             $faena = PermisoFaena::create([
@@ -112,8 +107,7 @@ class EmitirFaenaService
             // no se puede verificar.
             $faena->asignarCodigo();
 
-            // El cupo NO se toca acá: una faena nace PENDIENTE y la pendiente ya
-            // no descuenta. Eso pasa al firmarla.
+            // El cupo NO se descuenta acá: la pendiente solo reserva. Descuenta al firmarla.
 
             return $faena;
         });
@@ -156,16 +150,13 @@ class EmitirFaenaService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // Se suman de vuelta SOLO si descontaban: la pendiente ya no resta, y
-            // devolvérselos contaría dos veces el mismo volumen. Hoy la rama no
-            // suma nada; se pregunta por si la edición se abre en otro estado.
+            // Sus propios kilos vuelven a lo libre: los tenía reservados ella misma.
             if (AprovechamientoPesq::modoEstricto()) {
-                $disponible = $cupo->saldoKg()
-                    + ($bloqueada->consumeCupo() ? (float) $bloqueada->kilos_extraidos : 0.0);
-
-                if ($kilos > $disponible) {
-                    throw PermisoOperativoException::excedeCupo($kilos, $disponible);
-                }
+                $this->exigirKilosLibres(
+                    $cupo,
+                    $kilos,
+                    $bloqueada->estado->reservaCupo() ? (float) $bloqueada->kilos_extraidos : 0.0,
+                );
             }
 
             $bloqueada->update([
@@ -250,5 +241,24 @@ class EmitirFaenaService
     private function sincronizarEstadoDelCupo(AprovechamientoPesq $cupo): void
     {
         $cupo->sincronizarEstadoPorSaldo();
+    }
+
+    /**
+     * Frena si los kilos no entran en lo libre. `$propios` son los que la misma
+     * faena ya reservaba, al editarla. Sin reservas, el mensaje es el de siempre.
+     */
+    private function exigirKilosLibres(AprovechamientoPesq $cupo, float $kilos, float $propios): void
+    {
+        $libre = $cupo->libreKg() + $propios;
+
+        if ($kilos <= $libre) {
+            return;
+        }
+
+        $reservadoPorOtras = max(0.0, $cupo->kilosReservados() - $propios);
+
+        throw $reservadoPorOtras > 0.0
+            ? PermisoOperativoException::excedeLibre($kilos, $libre, $reservadoPorOtras)
+            : PermisoOperativoException::excedeCupo($kilos, $libre);
     }
 }
