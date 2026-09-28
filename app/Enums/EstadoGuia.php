@@ -19,9 +19,6 @@ enum EstadoGuia: string
     /** Firmada y vigente: la carga está en camino. Se llamaba `activa` hasta el 25/09/2026. */
     case Aprobada = 'aprobado';
 
-    /** Llegó a destino y se descargó. */
-    case Cerrada = 'cerrada';
-
     /** Dada de baja con motivo. No vuelve atrás: si hace falta, se emite otra. */
     case Anulada = 'anulada';
 
@@ -31,7 +28,6 @@ enum EstadoGuia: string
             self::Pendiente => 'Pendiente',
             self::EnRevision => 'En revisión',
             self::Aprobada => 'Aprobada',
-            self::Cerrada => 'Cerrada',
             self::Anulada => 'Anulada',
         };
     }
@@ -42,7 +38,6 @@ enum EstadoGuia: string
             self::Pendiente => 'sky',
             self::EnRevision => 'indigo',
             self::Aprobada => 'emerald',
-            self::Cerrada => 'teal',
             self::Anulada => 'rose',
         };
     }
@@ -102,20 +97,8 @@ enum EstadoGuia: string
     }
 
     /**
-     * Pendiente + en revisión: nadie la firmó todavía.
-     *
-     * ⚠️ NO ES PERMISO DE TRASLADO —para eso está `habilita()`— ni de
-     * escritura: eso lo dicen `permiteEdicion()` y `permiteEliminacion()`.
-     */
-    /** ¿Se registra que la carga llegó? Solo la firmada. */
-    public function permiteCierre(): bool
-    {
-        return $this === self::Aprobada;
-    }
-
-    /**
      * ¿Se anula? Solo la FIRMADA, cuyo papel está en la calle: el borrador se
-     * elimina y la presentada se rechaza. La cerrada ya cumplió.
+     * elimina y la presentada se rechaza.
      */
     public function permiteAnulacion(): bool
     {

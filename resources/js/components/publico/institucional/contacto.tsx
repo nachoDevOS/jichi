@@ -44,9 +44,9 @@ export function Contacto({ portada }: { portada: InstitucionPortada }) {
                     .map((d) => (
                         <div
                             key={d.rotulo}
-                            className="flex gap-4 rounded-xl border border-slate-200 bg-white p-5"
+                            className="flex gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:-translate-y-0.5 hover:border-rio-claro hover:shadow-lg"
                         >
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-institucional-azul/8 text-institucional-azul">
+                            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-rio-espuma text-rio">
                                 <d.icono className="size-5" />
                             </span>
 
@@ -57,7 +57,7 @@ export function Contacto({ portada }: { portada: InstitucionPortada }) {
                                 {d.href ? (
                                     <a
                                         href={d.href}
-                                        className="mt-1 block text-sm leading-relaxed text-institucional-azul hover:underline"
+                                        className="mt-1 block text-sm leading-relaxed font-medium text-rio hover:underline"
                                     >
                                         {d.valor}
                                     </a>

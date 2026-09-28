@@ -1,5 +1,6 @@
 import { Fish, Info, Truck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Aparecer } from '@/components/publico/institucional/aparecer';
 import { Seccion } from '@/components/publico/institucional/seccion';
 
 type Documento = { nombre: string; texto: string; vigencia: string };
@@ -22,9 +23,9 @@ const CAMINOS: {
         titulo: 'Si usted pesca',
         bajada: 'Para extraer producto de ríos y lagunas del departamento.',
         tono: {
-            cabecera: 'bg-emerald-700',
-            numero: 'bg-emerald-700 text-white',
-            chip: 'bg-emerald-50 text-emerald-800 ring-emerald-700/15',
+            cabecera: 'bg-linear-to-r from-rio to-selva',
+            numero: 'bg-rio text-white',
+            chip: 'bg-rio-espuma text-rio-profundo ring-rio/20',
         },
         documentos: [
             {
@@ -55,8 +56,8 @@ const CAMINOS: {
         titulo: 'Si usted comercializa',
         bajada: 'Para acopiar, trasladar y vender producto pesquero.',
         tono: {
-            cabecera: 'bg-institucional-azul',
-            numero: 'bg-institucional-azul text-white',
+            cabecera: 'bg-linear-to-r from-rio-profundo to-institucional-azul-claro',
+            numero: 'bg-rio-profundo text-white',
             chip: 'bg-sky-50 text-sky-800 ring-sky-700/15',
         },
         documentos: [
@@ -87,54 +88,64 @@ export function Servicios() {
             bajada="Depende de su actividad. Los documentos se sacan en este orden, y cada uno es requisito del siguiente."
         >
             <div className="grid gap-6 lg:grid-cols-2">
-                {CAMINOS.map((c) => (
-                    <article
-                        key={c.id}
-                        id={c.id}
-                        className="scroll-mt-28 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-                    >
-                        <header className={`flex items-center gap-4 px-5 py-4 text-white sm:px-6 ${c.tono.cabecera}`}>
-                            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                                <c.icono className="size-6" />
-                            </span>
-                            <div>
-                                <h3 className="text-lg font-bold">{c.titulo}</h3>
-                                <p className="text-sm text-white/80">{c.bajada}</p>
-                            </div>
-                        </header>
+                {CAMINOS.map((c, indice) => (
+                    <Aparecer key={c.id} retraso={indice * 120}>
+                        <article
+                            id={c.id}
+                            className="h-full scroll-mt-28 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-md transition-shadow hover:shadow-xl"
+                        >
+                            <header
+                                className={`flex items-center gap-4 px-5 py-4 text-white sm:px-6 ${c.tono.cabecera}`}
+                            >
+                                <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/15">
+                                    <c.icono className="size-6" />
+                                </span>
+                                <div>
+                                    <h3 className="text-lg font-bold">{c.titulo}</h3>
+                                    <p className="text-sm text-white/80">{c.bajada}</p>
+                                </div>
+                            </header>
 
-                        <ol className="px-5 py-5 sm:px-6">
-                            {c.documentos.map((d, i) => (
-                                <li key={d.nombre} className="flex gap-4">
-                                    {/* El número y la línea que lo une con el siguiente. */}
-                                    <div className="flex flex-col items-center">
-                                        <span
-                                            className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${c.tono.numero}`}
-                                        >
-                                            {i + 1}
-                                        </span>
-                                        {i < c.documentos.length - 1 && (
-                                            <i className="w-px flex-1 bg-slate-200" aria-hidden />
-                                        )}
-                                    </div>
-
-                                    <div className={`min-w-0 flex-1 ${i < c.documentos.length - 1 ? 'pb-6' : ''}`}>
-                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                            <h4 className="text-base font-semibold text-institucional-azul">
-                                                {d.nombre}
-                                            </h4>
+                            <ol className="px-5 py-5 sm:px-6">
+                                {c.documentos.map((d, i) => (
+                                    <li key={d.nombre} className="flex gap-4">
+                                        {/* El número y la línea que lo une con el siguiente. */}
+                                        <div className="flex flex-col items-center">
                                             <span
-                                                className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${c.tono.chip}`}
+                                                className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${c.tono.numero}`}
                                             >
-                                                {d.vigencia}
+                                                {i + 1}
                                             </span>
+                                            {i < c.documentos.length - 1 && (
+                                                <i
+                                                    className="w-px flex-1 bg-slate-200"
+                                                    aria-hidden
+                                                />
+                                            )}
                                         </div>
-                                        <p className="mt-1 text-sm leading-relaxed text-slate-600">{d.texto}</p>
-                                    </div>
-                                </li>
-                            ))}
-                        </ol>
-                    </article>
+
+                                        <div
+                                            className={`min-w-0 flex-1 ${i < c.documentos.length - 1 ? 'pb-6' : ''}`}
+                                        >
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                <h4 className="text-base font-semibold text-rio-profundo">
+                                                    {d.nombre}
+                                                </h4>
+                                                <span
+                                                    className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${c.tono.chip}`}
+                                                >
+                                                    {d.vigencia}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                                                {d.texto}
+                                            </p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ol>
+                        </article>
+                    </Aparecer>
                 ))}
             </div>
 

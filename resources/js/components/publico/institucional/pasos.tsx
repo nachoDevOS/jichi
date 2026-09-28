@@ -1,5 +1,15 @@
-import { Banknote, ClipboardCheck, FileSignature, FileText, Fish, IdCard, Printer, Truck } from 'lucide-react';
+import {
+    Banknote,
+    ClipboardCheck,
+    FileSignature,
+    FileText,
+    Fish,
+    IdCard,
+    Printer,
+    Truck,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Aparecer } from '@/components/publico/institucional/aparecer';
 import { Seccion } from '@/components/publico/institucional/seccion';
 
 /** El mismo circuito para todos los documentos: se presenta, se paga, se firma y se retira. */
@@ -36,12 +46,20 @@ const REQUISITOS: { icono: LucideIcon; titulo: string; items: string[] }[] = [
     {
         icono: Fish,
         titulo: 'Para un permiso de faena',
-        items: ['Su carnet de pescador vigente', 'Datos de la embarcación y del comandante', 'Kilos que va a extraer'],
+        items: [
+            'Su carnet de pescador vigente',
+            'Datos de la embarcación y del comandante',
+            'Kilos que va a extraer',
+        ],
     },
     {
         icono: Truck,
         titulo: 'Para una guía de transporte',
-        items: ['Su carnet de comercializador vigente', 'Origen, destino y vehículo', 'Carga: producto y kilos'],
+        items: [
+            'Su carnet de comercializador vigente',
+            'Origen, destino y vehículo',
+            'Carga: producto y kilos',
+        ],
     },
 ];
 
@@ -55,24 +73,33 @@ export function Pasos() {
         >
             <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {PASOS.map((p, i) => (
-                    <li key={p.titulo} className="relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <span className="absolute top-4 right-4 text-3xl font-bold text-slate-100 select-none" aria-hidden>
-                            {i + 1}
-                        </span>
-                        <span className="flex size-11 items-center justify-center rounded-lg bg-institucional-azul/10 text-institucional-azul">
-                            <p.icono className="size-5.5" />
-                        </span>
-                        <h3 className="mt-4 text-base font-semibold text-institucional-azul">
-                            <span className="sr-only">Paso {i + 1}: </span>
-                            {p.titulo}
-                        </h3>
-                        <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{p.texto}</p>
+                    <li key={p.titulo}>
+                        <Aparecer retraso={i * 100} className="h-full">
+                            <div className="relative h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+                                <span
+                                    className="absolute top-3 right-4 text-5xl font-extrabold text-rio-espuma select-none"
+                                    aria-hidden
+                                >
+                                    {i + 1}
+                                </span>
+                                <span className="relative flex size-12 items-center justify-center rounded-xl bg-linear-to-br from-rio to-rio-profundo text-white shadow-md">
+                                    <p.icono className="size-5.5" />
+                                </span>
+                                <h3 className="mt-4 text-base font-bold text-rio-profundo">
+                                    <span className="sr-only">Paso {i + 1}: </span>
+                                    {p.titulo}
+                                </h3>
+                                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                                    {p.texto}
+                                </p>
+                            </div>
+                        </Aparecer>
                     </li>
                 ))}
             </ol>
 
-            <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                <h3 className="flex items-center gap-2 text-lg font-bold text-institucional-azul">
+            <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-md sm:p-7">
+                <h3 className="flex items-center gap-2 text-lg font-bold text-rio-profundo">
                     <ClipboardCheck className="size-5 text-institucional-dorado-oscuro" />
                     Qué llevar a ventanilla
                 </h3>
@@ -87,7 +114,7 @@ export function Pasos() {
                             <ul className="mt-2.5 space-y-2 text-sm text-slate-600">
                                 {r.items.map((item) => (
                                     <li key={item} className="flex gap-2.5">
-                                        <i className="mt-2 size-1.5 shrink-0 rounded-full bg-institucional-dorado-oscuro" />
+                                        <i className="mt-2 size-1.5 shrink-0 rounded-full bg-rio" />
                                         {item}
                                     </li>
                                 ))}

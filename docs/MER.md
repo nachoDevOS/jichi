@@ -669,10 +669,11 @@ o se le quitaría al transportista casi un día.
 **EL CIRCUITO ES EL MISMO DEL CARNET, EL CUPO Y LA FAENA** —desde el 22/09/2026—:
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADA ──[cerrar]──▶ CERRADA
+PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADA ──▶ vence a los 5 días
 (en la base: `aprobado`, igual que carnet, cupo y faena — antes `activa`)
 (borrador)       │           │                        │
                  │           └──[rechazar]────────────┘  └──[anular]──▶ ANULADA
+(el estado CERRADA y «registrar llegada» se quitaron el 28/09/2026)
                  └── acá sale el RECIBO
 ```
 

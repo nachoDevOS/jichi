@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Publico;
 
 use App\Http\Controllers\Controller;
 use App\Models\Configuracion;
+use App\Models\ProductoHidrobiologico;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,6 +25,10 @@ class InicioController extends Controller
              * de página con el mismo nombre la tapa sin avisar.
              */
             'portada' => fn (): array => $this->institucion(),
+
+            // Solo nombres del catálogo: ni precios ni nada del trabajo interno.
+            'especies' => fn () => ProductoHidrobiologico::vigentes()->orderBy('nombre')->pluck('nombre'),
+            'provincias' => config('jichi.provincias', []),
         ]);
     }
 

@@ -49,7 +49,7 @@ decisiones que acá solo se nombran.
 | `PagoTramiteService.php` | 223 | Pagos parciales, 1 a N | Los métodos vienen **de a pares**: uno recibe `UploadedFile`, el otro `...ConRuta`. No es duplicación — ver §2.4 de ARQUITECTURA |
 | `ValidacionPagoService.php` | 127 | Validar u observar un depósito | Aparte de `PagoTramiteService` porque son actos de PERSONAS distintas: uno es de ventanilla, este de supervisión. Y vale para los tres, porque `pagos` es polimórfica |
 | `FaenaService.php` | 155 | Emitir y anular faenas | Tres comprobaciones y el ORDEN importa: el rubro primero, porque elegir el carnet equivocado es el error más probable. El número se comprueba ANTES del INSERT, porque en PostgreSQL un INSERT fallido aborta la transacción |
-| `EmitirGuiaService.php` | 330 | Emitir, corregir, eliminar, cerrar y anular guías | Cabecera y detalle en la MISMA transacción. El detalle se **reemplaza entero** al corregir: casarlo fila por fila sin un id estable del papel inventa una identidad que el talonario no tiene. `eliminar()` baja el detalle A MANO —la FK es CASCADE, y eso no se dispara con una baja lógica—. El arancel se copia DESPUÉS del `create()`: el factor de piscicultura lo calcula el modelo leyendo su propia columna |
+| `EmitirGuiaService.php` | 330 | Emitir, corregir, eliminar y anular guías | Cabecera y detalle en la MISMA transacción. El detalle se **reemplaza entero** al corregir: casarlo fila por fila sin un id estable del papel inventa una identidad que el talonario no tiene. `eliminar()` baja el detalle A MANO —la FK es CASCADE, y eso no se dispara con una baja lógica—. El arancel se copia DESPUÉS del `create()`: el factor de piscicultura lo calcula el modelo leyendo su propia columna |
 | `RevisarGuiaService.php` | 118 | El circuito de la guía: enviar, aprobar, rechazar | Espejo de `RevisarFaenaService`. **Las dos fechas de vigencia las escribe `aprobar()`**: los 5 días corren desde la firma, no desde que se cargó el borrador. Aprobar exige las tres cosas: estado, arancel cubierto y ninguna boleta sin validar |
 | `ArchivoTramiteService.php` | 107 | Subir/descartar adjuntos alrededor de una transacción | `descartar()` **no propaga errores**: se llama desde un `catch` y taparía la excepción original |
 | `ReciboTramiteService.php` | 200 | **Arma** el RECIBO OFICIAL, no lo guarda | `armar()` lo reconstruye desde el trámite. No hay tabla `recibos` |
@@ -75,7 +75,7 @@ decisiones que acá solo se nombran.
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
 | `FaenaController.php` | 400 | Listado, alta, ficha, cobro y circuito de revisión, más **corregir y eliminar el BORRADOR** (21/09/2026): solo en PENDIENTE y sin un peso cargado, porque el número lo pone el sistema y el papel sale recién al aprobar. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario. `edit()` manda el saldo del cupo **con los kilos de esta faena sumados de vuelta**, o el formulario diría que no entra lo que ya entró; y `libre_kg`, lo libre más lo que ella misma reservaba (27/09/2026) |
-| `GuiaController.php` | 745 | Listado, alta, ficha, corrección del borrador, cobro y circuito de revisión, más cerrar y anular. `resumir()` usa el `withSum` del listado para no calcular el saldo por fila, y `reciboDe()` lo resuelve desde los pagos ya precargados. El buscador OMITE la condición del número cuando el término no trae dígitos: un `like '%%'` traería la tabla entera |
+| `GuiaController.php` | 745 | Listado, alta, ficha, corrección del borrador, cobro y circuito de revisión, más anular. `resumir()` usa el `withSum` del listado para no calcular el saldo por fila, y `reciboDe()` lo resuelve desde los pagos ya precargados. El buscador OMITE la condición del número cuando el término no trae dígitos: un `like '%%'` traería la tabla entera |
 | `ProductoHidrobiologicoController.php` | 80 | Catálogo de productos hidrobiológicos: listado, alta y corrección, sin baja. `catalogosDelFormulario()` de `GuiaController` le pasa a la guía los activos más los que la guía ya usa |
 | `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario. Suma faenas y guías con el mismo corte que Caja (`admitePagos()`); antes olvidaba las faenas |
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
@@ -116,7 +116,6 @@ decisiones que acá solo se nombran.
 | --- | --- | --- |
 | `RegistrarSolicitudRequest.php` | 224 | `pagosIniciales()` arma la lista que espera el servicio |
 | `GuardarBeneficiarioRequest.php` | 186 | Índice único parcial ⇒ la regla `unique` ignora los dados de baja |
-| `GuardarUsuarioRequest.php` | 319 | **Escrito y comentado, pero sin ruta ni controlador** |
 | `RegistrarPagoRequest.php` | 103 | |
 | `CorregirPagoRequest.php` | 118 | Corregir una boleta ya cargada. La boleta es OPCIONAL y el `unique` del número **ignora la propia fila**, o guardar sin tocar el número se acusaría a sí mismo |
 | `GuardarRubroRequest.php` | 78 | |
@@ -142,7 +141,7 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `Sql.php` | 70 | `ILIKE` vs `LIKE`, truncado a mes (`periodoMes`) y a día (`periodoDia`). Lo que cambia entre motores |
+| `Sql.php` | 53 | `ILIKE` vs `LIKE` y truncado a mes (`periodoMes`). Lo que cambia entre motores |
 | `Archivos.php` | 142 | `url()` mira qué recibió antes de decidir. **`borrar()` no puede borrar** lo guardado como URL completa. `contenido()` devuelve los bytes, para embeber en un PDF |
 | `QrVerificacion.php` | 57 | El bloque de verificación de los CUATRO PDF: QR + código + URL. **Fuerza `APP_URL`**, porque `route()` absoluta usa el host de la petición y el QR queda impreso |
 | `CodigoQr.php` | 134 | El QR en sí. BaconQrCode + `gd`, porque el PNG de simple-qrcode exige `imagick` y acá no está |

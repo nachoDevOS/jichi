@@ -7,6 +7,7 @@ import type { InstitucionPortada } from '@/types/publico';
 
 /** Las anclas de la página larga. El orden es el de las secciones. */
 const SECCIONES = [
+    { id: 'sedag', texto: 'SEDAG' },
     { id: 'tramites', texto: 'Trámites' },
     { id: 'pasos', texto: 'En ventanilla' },
     { id: 'verificacion', texto: 'Verificar documento' },
@@ -26,7 +27,7 @@ export function Cabecera({ portada }: { portada: InstitucionPortada }) {
             {/* Barra de contacto. Se esconde en el teléfono: ahí el teléfono y
                 el correo ya están en la sección de contacto, y ocuparían la
                 mitad de la primera pantalla. */}
-            <div className="hidden bg-institucional-azul text-white/85 sm:block">
+            <div className="hidden bg-rio-profundo text-white/85 sm:block">
                 <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-1.5 text-xs sm:px-6">
                     <span className="font-semibold tracking-wide">{portada.sigla}</span>
 
@@ -55,7 +56,7 @@ export function Cabecera({ portada }: { portada: InstitucionPortada }) {
 
             <FranjaTricolor />
 
-            <div className="border-b border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 bg-white/90 shadow-sm backdrop-blur-md">
                 <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
                     <img
                         src="/image/icon.png"
@@ -66,7 +67,7 @@ export function Cabecera({ portada }: { portada: InstitucionPortada }) {
                     {/* min-w-0 para que el nombre largo de la institución pueda
                         truncarse en vez de empujar al botón fuera de pantalla. */}
                     <div className="min-w-0 flex-1 leading-tight">
-                        <p className="truncate text-[11px] font-semibold tracking-[0.12em] text-institucional-azul uppercase sm:text-xs">
+                        <p className="truncate text-[11px] font-semibold tracking-[0.12em] text-rio-profundo uppercase sm:text-xs">
                             {portada.nombre}
                         </p>
                         <p className="truncate text-[11px] text-slate-500">
@@ -79,7 +80,7 @@ export function Cabecera({ portada }: { portada: InstitucionPortada }) {
                             <a
                                 key={s.id}
                                 href={`#${s.id}`}
-                                className="rounded-md px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-institucional-azul"
+                                className="rounded-md px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-rio-espuma hover:text-rio"
                             >
                                 {s.texto}
                             </a>
@@ -133,7 +134,7 @@ function BotonAcceso({ autenticado }: { autenticado: boolean }) {
         <Link
             href={destino}
             aria-label={texto}
-            className="flex shrink-0 items-center gap-1.5 rounded-md bg-institucional-azul px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-institucional-azul-claro sm:text-sm"
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-rio px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rio-profundo sm:text-sm"
         >
             <Icono className="size-4" />
             <span className="hidden sm:inline">{texto}</span>

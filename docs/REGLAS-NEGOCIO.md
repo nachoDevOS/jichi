@@ -252,8 +252,10 @@ dentro de una transacción deshecha con `rollBack()`.
   vuelve a estar vigente. Si Juan no saca otro carnet, la guía no vale. Ver el
   paso 3.
 - Vigencia de transporte de **máximo 5 días**, con los estados `pendiente`,
-  `en_revision`, `aprobado`, `cerrada` o `anulada`. **Anular** es solo para la
-  guía aprobada; un borrador se elimina y una en revisión se rechaza.
+  `en_revision`, `aprobado` o `anulada`. **Anular** es solo para la
+  guía aprobada; un borrador se elimina y una en revisión se rechaza. **No se
+  registra la llegada de la carga** *(28/09/2026)*: la guía aprobada vale hasta
+  que vence.
 - **Productos hidrobiológicos parametrizados** *(27/09/2026)*. El cuadro D ya no
   se escribe a mano: cada renglón elige un producto del catálogo
   `productos_hidrobiologicos` —**nombre, precio por kilo y estado**—, que la

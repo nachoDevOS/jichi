@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BadgeCheck, BellRing, CalendarClock, CheckCircle2, PackageX, Truck } from 'lucide-react';
+import { BadgeCheck, BellRing, CalendarClock, CheckCircle2, PackageX } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Avisos } from '@/types/dashboard';
@@ -31,13 +31,6 @@ export function PanelAvisos({ avisos }: { avisos: Avisos }) {
             accion: 'El pescador necesita una nueva para seguir pescando',
             href: avisos.urls.agotadas,
         },
-        {
-            icono: Truck,
-            cantidad: avisos.guias_sin_cerrar,
-            texto: 'guía(s) vencida(s) sin cerrar',
-            accion: 'Registrar la llegada de la carga',
-            href: avisos.urls.guias,
-        },
     ].filter((a) => a.cantidad > 0);
 
     return (
@@ -47,14 +40,14 @@ export function PanelAvisos({ avisos }: { avisos: Avisos }) {
                     <BellRing className="size-4.5 text-muted-foreground" />
                     Avisos
                 </CardTitle>
-                <CardDescription>Lo que vence pronto o quedó sin cerrar.</CardDescription>
+                <CardDescription>Lo que vence pronto o necesita atención.</CardDescription>
             </CardHeader>
 
             <CardContent>
                 {lista.length === 0 ? (
                     <p className="flex items-start gap-2 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
                         <CheckCircle2 className="mt-0.5 size-4.5 shrink-0" />
-                        Nada por vencer ni sin cerrar.
+                        Nada por vencer.
                     </p>
                 ) : (
                     <ul className="space-y-2">

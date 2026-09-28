@@ -11,7 +11,7 @@ export function Pie({ portada }: { portada: InstitucionPortada }) {
         <footer className="mt-auto">
             <FranjaTricolor />
 
-            <div className="bg-institucional-azul text-white">
+            <div className="bg-rio-profundo text-white">
                 <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-3">
                     <div className="flex items-start gap-3">
                         <img
@@ -70,6 +70,11 @@ export function Pie({ portada }: { portada: InstitucionPortada }) {
                                 </a>
                             </li>
                             <li>
+                                <a href="#sedag" className="hover:text-white">
+                                    Sobre el SEDAG
+                                </a>
+                            </li>
+                            <li>
                                 <a href="#pasos" className="hover:text-white">
                                     Qué llevar a ventanilla
                                 </a>
@@ -85,8 +90,7 @@ export function Pie({ portada }: { portada: InstitucionPortada }) {
 
                 <div className="border-t border-white/15">
                     <p className="mx-auto max-w-6xl px-4 py-4 text-center text-xs text-white/60 sm:px-6">
-                        © {new Date().getFullYear()} {portada.nombre} · Sistema{' '}
-                        {portada.sistema}
+                        © {new Date().getFullYear()} {portada.nombre} · Sistema {portada.sistema}
                     </p>
                 </div>
             </div>

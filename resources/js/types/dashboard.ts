@@ -61,7 +61,6 @@ export interface Avisos {
     carnets_por_vencer: number;
     autorizaciones_por_vencer: number;
     autorizaciones_agotadas: number;
-    guias_sin_cerrar: number;
     /** Los listados ya filtrados; los arma el servidor con los enums. */
-    urls: { carnets: string; autorizaciones: string; agotadas: string; guias: string };
+    urls: { carnets: string; autorizaciones: string; agotadas: string };
 }

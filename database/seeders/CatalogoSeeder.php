@@ -27,28 +27,21 @@ class CatalogoSeeder extends Seeder
     ];
 
     /**
-     * La escala de aprovechamiento. REVISAR TODO: kilos, textos y precios.
+     * La escala de aprovechamiento: la del Art. 20 del Reglamento de Pesca del
+     * SEDAG-BENI (25/11/2016), tramo por tramo. Los tramos quedan contiguos.
      *
      * @var list<array{nro_escala: int, descripcion_kg: string, kilos_min: float, kilos_max: float, valor_bs: float, modalidad?: string}>
      */
     private const ESCALA = [
-        // Texto oficial conocido, y el valor de 55 Bs también.
         ['nro_escala' => 1, 'descripcion_kg' => '1 Kg Hasta 100 Kg', 'kilos_min' => 1, 'kilos_max' => 100, 'valor_bs' => 55.00],
-        // Valor de 110 Bs conocido; el texto y el corte en 200, supuestos.
         ['nro_escala' => 2, 'descripcion_kg' => '101 Kg Hasta 200 Kg', 'kilos_min' => 101, 'kilos_max' => 200, 'valor_bs' => 110.00],
-        ['nro_escala' => 3, 'descripcion_kg' => '201 Kg Hasta 300 Kg', 'kilos_min' => 201, 'kilos_max' => 300, 'valor_bs' => 165.00],
-        ['nro_escala' => 4, 'descripcion_kg' => '301 Kg Hasta 500 Kg', 'kilos_min' => 301, 'kilos_max' => 500, 'valor_bs' => 275.00],
-        ['nro_escala' => 5, 'descripcion_kg' => '501 Kg Hasta 750 Kg', 'kilos_min' => 501, 'kilos_max' => 750, 'valor_bs' => 412.50],
-        ['nro_escala' => 6, 'descripcion_kg' => '751 Kg Hasta 1000 Kg', 'kilos_min' => 751, 'kilos_max' => 1000, 'valor_bs' => 550.00],
-        // Texto oficial conocido. El «PAICHE» va en el texto y no en ningún
-        // número: es lo que obliga a guardar `descripcion_kg` además del rango.
-        //
-        // Y es el único con `modalidad` DECLARADA: los otros seis se quedan con
-        // el default de la tabla, `escala_general`. El paiche es una CUOTA DE LA
-        // ESPECIE con tasación fija que NO se amplía —agotada, hay que tramitar
-        // una nueva—, y eso lo fija la resolución al definir el tramo, no el
-        // operador al otorgar. Ver App\Enums\ModalidadAprovechamiento.
-        ['nro_escala' => 7, 'descripcion_kg' => '1001 kg Hasta 2000 Kg PAICHE', 'kilos_min' => 1001, 'kilos_max' => 2000, 'valor_bs' => 1100.00, 'modalidad' => ModalidadAprovechamiento::EspecieEspecial->value],
+        ['nro_escala' => 3, 'descripcion_kg' => '201 Kg Hasta 400 Kg', 'kilos_min' => 201, 'kilos_max' => 400, 'valor_bs' => 220.00],
+        ['nro_escala' => 4, 'descripcion_kg' => '401 Kg Hasta 600 Kg', 'kilos_min' => 401, 'kilos_max' => 600, 'valor_bs' => 330.00],
+        ['nro_escala' => 5, 'descripcion_kg' => '601 Kg Hasta 800 Kg', 'kilos_min' => 601, 'kilos_max' => 800, 'valor_bs' => 440.00],
+        ['nro_escala' => 6, 'descripcion_kg' => '801 Kg Hasta 1000 Kg', 'kilos_min' => 801, 'kilos_max' => 1000, 'valor_bs' => 660.00],
+        // El único con `modalidad` declarada: cuota de la especie que no se amplía.
+        // Ver App\Enums\ModalidadAprovechamiento.
+        ['nro_escala' => 7, 'descripcion_kg' => '1001 kg Hasta 2000 Kg PAICHE', 'kilos_min' => 1001, 'kilos_max' => 2000, 'valor_bs' => 500.00, 'modalidad' => ModalidadAprovechamiento::EspecieEspecial->value],
     ];
 
     /**

@@ -74,7 +74,7 @@ export default function VerCarnet({
                         onClick={() => router.visit(route('beneficiarios.show', carnet.beneficiario_id))}
                     >
                         <User className="size-4" />
-                        Ver al beneficiario
+                        Beneficiario
                     </Button>
 
                     {/*
@@ -163,7 +163,7 @@ export default function VerCarnet({
                         <a href={route('carnets.imprimir', carnet.id)} target="_blank" rel="noopener">
                             <Button variant="outline">
                                 <Printer className="size-4" />
-                                Imprimir carnet
+                                Carnet
                             </Button>
                         </a>
                     )}
@@ -180,7 +180,7 @@ export default function VerCarnet({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Receipt className="size-4" />
-                            Imprimir recibo
+                            Recibo
                         </a>
                     )}
 

@@ -12,7 +12,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\ActualizarGuiaRequest;
 use App\Http\Requests\Panel\AnularGuiaRequest;
-use App\Http\Requests\Panel\CerrarGuiaRequest;
 use App\Http\Requests\Panel\EliminarGuiaRequest;
 use App\Http\Requests\Panel\EmitirGuiaRequest;
 use App\Http\Requests\Panel\RechazarGuiaRequest;
@@ -500,24 +499,6 @@ class GuiaController extends Controller
     }
 
     /**
-     * Cerrar — PATCH /panel/guias/{guia}/cerrar
-     */
-    public function cerrar(CerrarGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
-    {
-        $peso = $request->validated()['peso_total_kg'] ?? null;
-
-        try {
-            $this->servicio->cerrar($guia, $peso !== null ? (float) $peso : null);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['peso_total_kg' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('guias.show', $guia)
-            ->with('exito', 'Guía cerrada. La carga llegó a destino.');
-    }
-
-    /**
      * Anular — PATCH /panel/guias/{guia}/anular
      */
     public function anular(AnularGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
@@ -681,7 +662,6 @@ class GuiaController extends Controller
             // Se resuelven acá para que la pantalla no las recalcule.
             'puede_editarse' => $guia->puedeEditarse(),
             'puede_eliminarse' => $guia->puedeEliminarse(),
-            'puede_cerrarse' => $guia->estado->permiteCierre(),
             'puede_anularse' => $guia->estado->permiteAnulacion(),
             'ya_fue_aprobada' => $guia->yaFueAprobada(),
             'admite_pagos' => $guia->admitePagos(),

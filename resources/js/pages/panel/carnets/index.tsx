@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { BadgeCheck, Eye, Pencil, Plus, Printer, Receipt, Search, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
@@ -12,8 +12,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn, fecha, fechaHora, hace } from '@/lib/utils';
-import type { OpcionEnum, PageProps, Paginado } from '@/types';
+import { cn, fecha, fechaHora, hace } from '@/lib/utils';
+import type { OpcionEnum, Paginado } from '@/types';
 import type { CarnetFila } from '@/types/carnets';
 
 /**
@@ -33,7 +33,6 @@ export default function IndiceCarnets({
     opcionesPorPagina: number[];
 }) {
     const { puede } = usePermisos();
-    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
     /*

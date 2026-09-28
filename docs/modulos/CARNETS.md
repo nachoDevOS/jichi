@@ -955,7 +955,7 @@ más de lado, así que el margen contra el piso de 69 px es de unas tres veces.
 
 ## 9. En la pantalla
 
-El botón **«Imprimir carnet»** aparece en dos lugares:
+El botón **«Carnet»** aparece en dos lugares:
 
 - la ficha del trámite (`pages/panel/tramites/ver.tsx`), junto a los del
   circuito;

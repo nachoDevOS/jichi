@@ -22,14 +22,14 @@ export function Seccion({
         // escondido debajo de ella.
         <section
             id={id}
-            className={`scroll-mt-24 px-4 py-14 sm:px-6 sm:py-18 ${oscuro ? 'bg-slate-50' : 'bg-white'}`}
+            className={`scroll-mt-24 px-4 py-14 sm:px-6 sm:py-18 ${oscuro ? 'bg-rio-espuma' : 'bg-white'}`}
         >
             <div className="mx-auto max-w-6xl">
-                <h2 className="text-center text-2xl font-bold text-institucional-azul sm:text-3xl">
+                <h2 className="text-center text-3xl font-extrabold tracking-tight text-rio-profundo sm:text-4xl">
                     {titulo}
                 </h2>
 
-                <i className="mx-auto mt-3 block h-1 w-16 rounded-full bg-institucional-dorado" />
+                <i className="mx-auto mt-4 block h-1.5 w-20 rounded-full bg-linear-to-r from-rio-claro to-institucional-dorado" />
 
                 {bajada && (
                     <p className="mx-auto mt-4 max-w-2xl text-center text-sm leading-relaxed text-slate-600 sm:text-base">

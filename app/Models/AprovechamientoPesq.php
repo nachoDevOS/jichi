@@ -422,7 +422,7 @@ class AprovechamientoPesq extends Model
         // tiene que resolver antes que los demás.
         return match (true) {
             $this->estado === EstadoAprovechamiento::Revocado => 'No autoriza faenas: la autorización fue revocada.',
-            $this->estado === EstadoAprovechamiento::Pendiente => 'Todavía no autoriza faenas: falta cubrir el monto y enviarlo a revisión.',
+            $this->estado === EstadoAprovechamiento::Pendiente => 'Todavía no autorizala cedula y faenas: falta cubrir el monto y enviarlo a revisión.',
             $this->estado === EstadoAprovechamiento::EnRevision => 'Todavía no autoriza faenas: está presentado y esperando la firma.',
             ! $this->estaEnFecha() => 'No autoriza faenas: el cupo venció.',
             $this->estaAgotado() => 'No autoriza faenas: el cupo se quedó sin kilos.',

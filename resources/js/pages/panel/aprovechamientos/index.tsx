@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Eye,
     Pencil,
@@ -23,8 +23,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn, fecha, fechaHora, hace } from '@/lib/utils';
-import type { OpcionEnum, PageProps, Paginado } from '@/types';
+import { cn, fecha, fechaHora, hace } from '@/lib/utils';
+import type { OpcionEnum, Paginado } from '@/types';
 import type { CupoFila } from '@/types/aprovechamientos';
 
 /**
@@ -47,7 +47,6 @@ export default function IndiceCupos({
     modoEstricto: boolean;
 }) {
     const { puede } = usePermisos();
-    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
     /*

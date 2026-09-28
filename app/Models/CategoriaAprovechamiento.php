@@ -74,14 +74,6 @@ class CategoriaAprovechamiento extends Model
         ));
     }
 
-    /**
-     * ¿Este volumen cae dentro del tramo?
-     */
-    public function contiene(float $kilos): bool
-    {
-        return $kilos >= (float) $this->kilos_min && $kilos <= (float) $this->kilos_max;
-    }
-
     //  Scopes
 
     public function scopeVigentes(Builder $query): Builder

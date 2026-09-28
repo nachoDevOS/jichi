@@ -16,8 +16,8 @@ return [
 
     /*
     | Vacío = el formulario acepta cualquier correo; con valor, exige ese
-    | dominio. No está en .env porque el módulo de Usuarios todavía no tiene
-    | ruta. Ver GuardarUsuarioRequest.
+    | dominio. Hoy no lo lee nadie: es para el módulo de Usuarios, que todavía
+    | no existe. Ver docs/PENDIENTES.md.
     */
     'dominio_institucional' => env('JICHI_DOMINIO_INSTITUCIONAL'),
 

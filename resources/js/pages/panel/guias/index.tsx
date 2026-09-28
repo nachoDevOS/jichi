@@ -212,7 +212,7 @@ export default function IndiceGuias({
                                                     <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
                                                     {g.caducada && (
                                                         <Badge color="amber" className="ml-1">
-                                                            sin cerrar
+                                                            vencida
                                                         </Badge>
                                                     )}
                                                 </td>

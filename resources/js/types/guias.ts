@@ -106,7 +106,7 @@ export interface GuiaFila extends RenglonesGuia {
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
-    /** Se pasó de hora y sigue activa: un camión sin papel válido en la ruta. */
+    /** Firmada y fuera de sus 5 días: ya no ampara el traslado. */
     caducada: boolean;
     /** Negativo si ya venció. Null mientras nadie la firmó. */
     horas_restantes: number | null;
@@ -114,13 +114,7 @@ export interface GuiaFila extends RenglonesGuia {
     /** Las dos puertas del borrador: PENDIENTE y sin un depósito cargado. */
     puede_editarse: boolean;
     puede_eliminarse: boolean;
-    puede_cerrarse: boolean;
-    /**
-     * Solo una guía EN CURSO se anula.
-     *
-     * Una CERRADA no: cerrar significa que la carga llegó, así que anularla
-     * declararía que nunca amparó nada y dejaría un viaje real sin respaldo.
-     */
+    /** Solo una guía FIRMADA se anula: el borrador se elimina y la presentada se rechaza. */
     puede_anularse: boolean;
     /** Ya pasó por la firma: es lo que habilita a imprimir el papel. */
     ya_fue_aprobada: boolean;

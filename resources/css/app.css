@@ -28,6 +28,13 @@
     --institucional-dorado: oklch(0.75 0.107 86);
     --institucional-dorado-oscuro: oklch(0.63 0.098 86);
 
+    /* Los ríos del Beni: la paleta del sitio público. Igual en los dos temas. */
+    --rio-profundo: oklch(0.26 0.05 222);
+    --rio: oklch(0.44 0.085 200);
+    --rio-claro: oklch(0.74 0.105 188);
+    --rio-espuma: oklch(0.97 0.018 195);
+    --selva: oklch(0.48 0.115 152);
+
     --radius: 0.625rem;
 
     --background: oklch(0.985 0.002 250);
@@ -262,6 +269,11 @@
     --color-institucional-azul-claro: var(--institucional-azul-claro);
     --color-institucional-dorado: var(--institucional-dorado);
     --color-institucional-dorado-oscuro: var(--institucional-dorado-oscuro);
+    --color-rio-profundo: var(--rio-profundo);
+    --color-rio: var(--rio);
+    --color-rio-claro: var(--rio-claro);
+    --color-rio-espuma: var(--rio-espuma);
+    --color-selva: var(--selva);
 
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
@@ -360,6 +372,90 @@
     .animar-escaneo,
     .animar-latido {
         animation: none;
+    }
+}
+
+/*
+| Animaciones de la portada: el agua corre, los peces nadan, las especies
+| desfilan y cada bloque aparece al llegar. Todas se apagan con
+| `prefers-reduced-motion`, sin esconder nada.
+*/
+@keyframes correr-agua {
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes nadar {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(calc(-100vw - 100%));
+    }
+}
+
+@keyframes flotar {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+.animar-agua {
+    animation: correr-agua 18s linear infinite;
+}
+
+.animar-agua-lenta {
+    animation: correr-agua 30s linear infinite;
+}
+
+.animar-nado {
+    animation: nadar var(--duracion, 22s) linear infinite;
+    animation-delay: var(--retraso, 0s);
+}
+
+.animar-flote {
+    animation: flotar 3s ease-in-out infinite;
+}
+
+.animar-desfile {
+    animation: correr-agua 40s linear infinite;
+}
+
+.animar-desfile:hover {
+    animation-play-state: paused;
+}
+
+.aparecer {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+        opacity 0.7s ease,
+        transform 0.7s cubic-bezier(0.18, 0.8, 0.22, 1);
+}
+
+.aparecer.visible {
+    opacity: 1;
+    transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animar-agua,
+    .animar-agua-lenta,
+    .animar-nado,
+    .animar-flote,
+    .animar-desfile {
+        animation: none;
+    }
+
+    .aparecer {
+        opacity: 1;
+        transform: none;
+        transition: none;
     }
 }
 

@@ -256,7 +256,6 @@ class GuiaMovimiento extends Model
                 'arancel y enviarla a revisión.',
             $this->estado === EstadoGuia::EnRevision => 'La guía está presentada y esperando la '.
                 'firma de quien la aprueba.',
-            $this->estado === EstadoGuia::Cerrada => 'La carga ya llegó a destino y se descargó.',
             $this->estado === EstadoGuia::Anulada => 'La guía fue anulada.',
             default => 'Pasó su fecha de vencimiento.',
         };
@@ -275,8 +274,7 @@ class GuiaMovimiento extends Model
     /**
      * ¿Ampara un traslado HOY?
      *
-     * Estado Y fecha: `cerrada` la escribe un comando diario, así que entre
-     * corrida y corrida la columna puede estar desfasada.
+     * Estado Y fecha: `aprobado` no dice si ya pasaron sus 5 días.
      */
     public function estaVigente(): bool
     {
@@ -323,7 +321,7 @@ class GuiaMovimiento extends Model
         return $this->sinEfecto() ? 'rose' : $this->estado->color();
     }
 
-    /** ¿Se pasó de fecha sin cerrarse? Es lo que busca el comando diario. */
+    /** ¿Firmada y ya fuera de sus 5 días? Venció: no ampara más el traslado. */
     public function estaCaducada(): bool
     {
         return $this->estado === EstadoGuia::Aprobada

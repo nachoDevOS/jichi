@@ -67,7 +67,6 @@ enum RolSistema: string
             'guias.crear',
             'guias.editar',
             'guias.enviar',
-            'guias.cerrar',
 
             // Entregar un papel es un acto distinto de consultar la ficha, así
             // que cada documento lleva su propio permiso.

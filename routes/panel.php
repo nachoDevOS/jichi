@@ -303,11 +303,6 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         ->middleware('permiso:guias.eliminar')
         ->name('guias.destroy');
 
-    // Cerrar es de VENTANILLA: que la carga llegó es un hecho, no una decisión.
-    Route::patch('/guias/{guia}/cerrar', [GuiaController::class, 'cerrar'])
-        ->middleware('permiso:guias.cerrar')
-        ->name('guias.cerrar');
-
     // Anular es de SUPERVISIÓN: quema un número del talonario para siempre.
     Route::patch('/guias/{guia}/anular', [GuiaController::class, 'anular'])
         ->middleware('permiso:guias.anular')

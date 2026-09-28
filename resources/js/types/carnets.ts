@@ -222,18 +222,3 @@ export interface CupoVigente {
     habilita_faenas: boolean;
 }
 
-/** Lo que el formulario de emisión manda de vuelta. */
-export interface FormularioCarnet {
-    beneficiario_id: number | null;
-    asociacion_id: number | string;
-    tipo_carnet_id: number | string;
-    /**
-     * La bolsa madre que respalda el carnet. Se manda EXPLÍCITA para que quede
-     * dicho de cuál cuelga; en un comercializador va en null.
-     */
-    aprovechamiento_id: number | null;
-    fecha_solicitud: string;
-    /** Los dos respaldos. Suben con el formulario: el post va con FormData. */
-    archivo_ci: File | null;
-    archivo_asociacion: File | null;
-}

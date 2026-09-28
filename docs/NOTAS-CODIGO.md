@@ -1900,104 +1900,6 @@
    Esta tabla NO tiene borrado lógico, así que el unique va simple
    —sin el whereNull de las asociaciones—.
 
-## `app/Http/Requests/Panel/GuardarUsuarioRequest.php`
-
-### Reglas de validación para crear y editar un FUNCIONARIO del sistema.
-
-   Es el hermano de GuardarBeneficiarioRequest, pero del otro lado del
-   mostrador: aquel valida al ciudadano que viene a hacer un trámite, este
-   valida a la persona de la Gobernación que lo atiende y que va a tener una
-   cuenta con contraseña.
-   ¿POR QUÉ LOS DOS CASOS —ALTA Y EDICIÓN— EN UN SOLO ARCHIVO?
-   Porque comparten casi todo: el nombre, la cédula, el correo, el cargo y el
-   rol se validan igual siempre. Lo ÚNICO que cambia es la contraseña: al dar
-   de alta es obligatoria, al editar es opcional —dejar el campo vacío
-   significa «no la toques»—. Esa diferencia se resuelve con una línea
-   (`$esAlta`) en vez de con dos archivos que hay que mantener sincronizados.
-   No hay auto-registro en este sistema: las cuentas las crea el administrador
-   y ahí mismo se resetean las contraseñas (ver routes/panel.php y la nota de
-   la migración de usuarios, que explica por qué no existe «olvidé mi
-   contraseña»). Por eso este formulario es la única puerta por la que entra
-   una cuenta nueva, y es donde tienen que estar todas las defensas.
-
-### Cédula del funcionario.
-
-   OJO: acá la regla es la ÚNICA defensa. La tabla `users` guarda
-   `ci` sin índice único (ver la migración
-   2026_09_01_100000_add_institutional_fields_to_users_table), así
-   que dos peticiones simultáneas podrían colar la misma cédula.
-   Con un solo administrador cargando usuarios a mano eso no pasa,
-   pero conviene saberlo: el día que se agregue el índice, se copia
-   el índice PARCIAL de beneficiarios (ver su migración),
-   nunca uno que incluya `deleted_at`.
-   whereNull('deleted_at') deja fuera a los funcionarios dados de
-   baja: si alguien renunció, su cédula tiene que poder volver a
-   usarse el día que lo recontraten.
-
-### Correo institucional. ES EL USUARIO CON EL QUE SE INICIA SESIÓN
-
-   ACÁ LA REGLA VA A PROPÓSITO SIN whereNull('deleted_at'), AL
-   REVÉS QUE LA CÉDULA DE ARRIBA.
-   El motivo es que `users.email` tiene un índice único COMPLETO,
-   puesto por la migración original de Laravel, que no sabe nada de
-   borrado lógico. Para la base de datos, el correo de un
-   funcionario dado de baja sigue ocupado.
-   Si acá se filtrara por deleted_at, la validación diría que el
-   correo está libre, el controlador intentaría guardar, y
-   PostgreSQL cortaría con un error 23505 —pantalla de error 500,
-   sin mensaje útil para quien está cargando el usuario—. La regla
-   de validación tiene que decir lo mismo que la base de datos, no
-   lo que a uno le gustaría que dijera.
-   Para que un correo se pueda reutilizar hay que cambiar primero
-   el índice de la base por uno parcial, como se hizo con
-   beneficiarios. Mientras tanto: restaurar al funcionario dado de
-   baja en vez de crear uno nuevo.
-
-### El rol decide TODO lo que la persona puede hacer: de él salen
-
-   Rule::enum y no una lista escrita a mano porque los roles viven
-   en App\Enums\RolSistema (regla 6 del proyecto: los enums mandan).
-   Si mañana se agrega un rol, esta validación se entera sola.
-   Es UN rol y no varios, aunque Spatie permita asignar muchos: los
-   cuatro roles del sistema son escalones, no capacidades sueltas
-   —supervisor ya incluye todo lo de operador—, así que acumular
-   dos solo serviría para confundir a quien audite.
-
-### Contraseña.
-
-   En el ALTA es obligatoria. En la EDICIÓN es opcional: el campo
-   vacío quiere decir «dejala como está», que es lo que espera
-   quien entra solo a corregir un cargo mal escrito. Ese vacío lo
-   convierte en null prepareForValidation(), y `nullable` hace que
-   las reglas de fuerza ni se ejecuten.
-   `confirmed` obliga a que venga también `password_confirmation`:
-   como la escribe el administrador y no su dueño, un dedazo acá
-   deja a alguien sin poder entrar y sin forma de recuperarla.
-
-### NADIE SE CIERRA LA PUERTA A SÍ MISMO.
-
-   Un administrador editando su propia ficha no puede
-   desactivarse ni bajarse de rango: apretaría guardar y en el
-   siguiente clic el sistema no lo dejaría volver a entrar para
-   deshacerlo. Como no hay «olvidé mi contraseña» ni
-   auto-registro, la única salida sería tocar la base a mano.
-
-### Y EL SISTEMA NO SE QUEDA SIN ADMINISTRADOR.
-
-   Distinto del caso de arriba: acá un administrador degrada o
-   desactiva a OTRO, y resulta que ese otro era el último que
-   quedaba en pie. El resultado sería un sistema donde ya nadie
-   puede crear usuarios, cambiar tasas ni tocar la
-   configuración.
-   La consulta corre solo cuando el funcionario editado ES
-   administrador y se le está sacando el rol o la cuenta, que
-   es un puñado de veces al año: no hace falta optimizarla.
-
-### Exige el dominio de la Gobernación, si está configurado.
-
-   Vive en su propio método y no incrustado en rules() para que el `if` no
-   ensucie el listado de reglas, que se lee de un vistazo.
-
 ## `app/Http/Requests/Panel/ObservarPagoRequest.php`
 
 ### Reglas para OBSERVAR un depósito.
@@ -6423,15 +6325,6 @@
    toca. El PDF sale de a una, pero la leyenda se conserva: es lo que
    Contabilidad y Archivo buscan cuando reciben su copia impresa.
 
-## `app/Http/Requests/Panel/CerrarGuiaRequest.php`
-
-### Reglas para cerrar una guía.
-
-   El peso es OPCIONAL: lo declarado al salir es lo que dijo la balanza del
-   origen, y al llegar se vuelve a pesar. Casi nunca coincide al kilo, así que
-   el campo permite corregirlo — y a diferencia de la faena, acá no hay tope:
-   no existe ningún cupo que exceder.
-
 ## `app/Http/Requests/Panel/CorregirPagoRequest.php`
 
 ### Reglas para CORREGIR un depósito, con dos diferencias contra la carga:
@@ -6544,12 +6437,6 @@
    institucional se toque UN archivo y no seis. Los valores no son colores
    escritos a mano: son variables CSS definidas en resources/css/app.css, así
    que los gráficos cambian solos entre el modo claro y el oscuro.
-
-### Serie de colores para categorías.
-
-   NO se exporta: quien necesite un color pide `colorSerie(i)`, que además
-   resuelve qué pasa cuando hay más categorías que colores. Exportada, cada
-   gráfico podría indexarla por su cuenta y salirse del arreglo.
 
 ## `routes/auth.php`
 

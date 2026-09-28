@@ -206,17 +206,10 @@ class DashboardController extends Controller
                 ->where('estado', EstadoAprovechamiento::Agotado)
                 ->count(),
 
-            // La guía, a diferencia de la faena, se cierra al llegar la carga: vencida y abierta es trabajo pendiente.
-            'guias_sin_cerrar' => GuiaMovimiento::query()
-                ->where('estado', EstadoGuia::Aprobada)
-                ->where('fecha_vencimiento', '<', now())
-                ->count(),
-
             'urls' => [
                 'carnets' => route('carnets.index', ['estado' => EstadoCarnet::Aprobado->value]),
                 'autorizaciones' => route('aprovechamientos.index', ['estado' => EstadoAprovechamiento::Aprobado->value]),
                 'agotadas' => route('aprovechamientos.index', ['estado' => EstadoAprovechamiento::Agotado->value]),
-                'guias' => route('guias.index', ['estado' => EstadoGuia::Aprobada->value]),
             ],
         ];
     }

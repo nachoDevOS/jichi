@@ -94,7 +94,7 @@ export function PestanaPagos({
                                                     href={route('recibos.imprimir', r.id)}
                                                     target="_blank"
                                                     rel="noreferrer"
-                                                    title="Imprimir recibo"
+                                                    title="Recibo
                                                     aria-label={`Imprimir el recibo ${r.numero}`}
                                                     className={cn(buttonVariants({ variant: 'outline', size: 'icon' }))}
                                                 >

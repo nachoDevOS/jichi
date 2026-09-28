@@ -1,6 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { Paperclip, Printer, ReceiptText, TriangleAlert } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,7 +42,7 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
                             className={cn(buttonVariants({ variant: 'default' }))}
                         >
                             <Printer className="size-4" />
-                            Imprimir recibo
+                            Recibo
                         </a>
                     )}
                 </div>

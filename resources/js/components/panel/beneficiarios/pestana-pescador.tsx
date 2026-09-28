@@ -267,7 +267,7 @@ function FilaFaena({ faena: f, moneda }: { faena: FaenaDelBeneficiario; moneda: 
                             href={route('faenas.imprimir', f.id)}
                             target="_blank"
                             rel="noreferrer"
-                            title="Imprimir permiso"
+                            title="Imprimir faena"
                             aria-label={`Imprimir el permiso de la faena ${f.numero_legible}`}
                             className={cn(buttonVariants({ variant: 'outline', size: 'icon' }))}
                         >

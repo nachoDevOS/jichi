@@ -103,44 +103,12 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     * El número del talonario ya está usado.
-     */
-    public static function numeroRepetido(string $permiso, string $numero): self
-    {
-        return new self(
-            "Ya existe {$permiso} con el número {$numero}. El número sale del talonario y no se ".
-            'puede repetir: verifique la hoja que tiene en la mano.',
-        );
-    }
-
-    /**
      * No se anula dos veces, y no se desanula.
      */
     public static function guiaYaAnulada(): self
     {
         return new self(
             'Esta guía ya está anulada. No se desanula: si hace falta, emita otra con otro código.',
-        );
-    }
-
-    /**
-     * Una guía CERRADA ya no se anula.
-     */
-    public static function cerradaNoSeAnula(): self
-    {
-        return new self(
-            'Esta guía ya está cerrada: la carga llegó a destino y el traslado ocurrió. '.
-            'Anularla dejaría ese viaje sin ningún papel que lo respalde.',
-        );
-    }
-
-    /**
-     * Solo se cierra una guía que está EN CURSO.
-     */
-    public static function noSePuedeCerrar(string $estado): self
-    {
-        return new self(
-            "La guía está {$estado} y solo se cierra una que esté en curso.",
         );
     }
 

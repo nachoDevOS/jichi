@@ -53,7 +53,7 @@ export default function VerFaena({
                             onClick={() => router.visit(route('beneficiarios.show', faena.beneficiario_id!))}
                         >
                             <User className="size-4" />
-                            Ver al beneficiario
+                            Beneficiario
                         </Button>
                     )}
 
@@ -73,7 +73,7 @@ export default function VerFaena({
                             onClick={() => router.visit(route('aprovechamientos.show', faena.cupo!.id))}
                         >
                             <Waves className="size-4" />
-                            Ver autorización
+                            Autorización
                         </Button>
                     )}
 
@@ -153,7 +153,7 @@ export default function VerFaena({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Printer className="size-4" />
-                            Imprimir permiso
+                            Faena
                         </a>
                     )}
 
@@ -166,7 +166,7 @@ export default function VerFaena({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Receipt className="size-4" />
-                            Imprimir recibo
+                            Recibo
                         </a>
                     )}
                 </div>

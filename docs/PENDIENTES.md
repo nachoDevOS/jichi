@@ -25,7 +25,8 @@
   y encenderla recién cuando haya un segundo usuario —con uno solo el circuito
   queda trabado—.
 - **No hay pantalla de usuarios**: se crean por consola (`php artisan tinker`).
-  `GuardarUsuarioRequest` ya está escrito, sin ruta ni controlador.
+  El borrador `GuardarUsuarioRequest` se quitó el 28/09/2026 por no tener ruta
+  ni controlador; está en el historial de git (commit `8511537`).
 
 ## 🔴 Nada vence solo
 
@@ -110,6 +111,24 @@ Quedan dos observaciones que **no bloquean** el trabajo de ventanilla:
 
 Revisado de punta a punta el 27/09/2026.
 
+### ✅ La escala ya es la del reglamento — 28/09/2026
+
+`CatalogoSeeder` siembra los 7 tramos del Art. 20 del Reglamento de Pesca del
+SEDAG-BENI (25/11/2016), con el paiche a 500 Bs. Se aplica **al volver a
+migrar** con `--seed`: sobre la base de trabajo actual el seeder no pisa nada,
+porque usa `firstOrCreate`.
+
+### 🟠 Piscicultura: la casilla está OCULTA — 28/09/2026
+
+El reglamento (Art. 22 VIII) da el 50% de la guía solo a comunidades indígenas y
+campesinas, organizaciones e iniciativas familiares, durante **3 años** desde el
+inicio de la producción y **con registro previo** en el SEDAG. El sistema lo
+aplicaba a cualquiera que marcara la casilla, así que se ocultó
+(`MOSTRAR_PISCICULTURA` en `campos-guia.tsx`). La lógica del descuento sigue
+en el servidor. Para reactivarla hace falta un registro de piscicultores, y
+conviene imprimir el descuento en la guía: hoy el papel no dice por qué el
+importe es la mitad.
+
 ### 🟠 Falta el reporte por especie y por período
 
 Es para lo que `guia_detalles` es una tabla aparte. Desde el 27/09/2026 la
@@ -125,19 +144,12 @@ resolución en Catálogos → Productos.
 
 ### 🟠 Los catálogos están sembrados con valores de PLANTILLA (afecta a los dos módulos)
 
-`CatalogoSeeder` llena `asociaciones` (4), `categorias_aprovechamiento` (los 7
-tramos) y `tipos_carnet` (2), para que el circuito se pueda recorrer en
-desarrollo. **Los números NO son los de la resolución.**
+`CatalogoSeeder` llena `asociaciones` (4) y `tipos_carnet` (2) con valores de
+ejemplo, para que el circuito se pueda recorrer en desarrollo. La escala
+(`categorias_aprovechamiento`) ya es la oficial: ver arriba.
 
 Qué se supuso, para que se sepa qué hay que confirmar:
 
-- De la escala, los únicos textos oficiales que había eran los DOS EXTREMOS:
-  «1 Kg Hasta 100 Kg» y «1001 kg Hasta 2000 Kg PAICHE». Los cinco tramos del
-  medio están repartidos a ojo.
-- Los precios siguen una regla lineal de 55 Bs cada 100 kg, que hace cerrar los
-  dos valores bajos conocidos (55 y 110). **El tercer valor conocido —500 Bs—
-  NO cae en esa recta**, así que la escala real casi seguro no es lineal: es la
-  señal más clara de que esto hay que confirmarlo.
 - Los NOMBRES de los dos tipos de carnet sí son los oficiales; sus precios no.
 - Las asociaciones son nombres verosímiles, no el registro real del SEDAG.
 
@@ -148,9 +160,7 @@ Dos cosas al reemplazarlos:
    valores. Hay que editarlos en la base o vaciar las tablas primero.
 2. Los tramos de la escala tienen que quedar **contiguos y sin huecos**: el
    `kilos_min` de cada uno es el `kilos_max` del anterior más 1. Con un hueco,
-   `CategoriaAprovechamiento::paraVolumen()` devuelve null para los volúmenes
-   que caen adentro y el formulario no ofrece ninguna escala, sin ningún error
-   que lo explique.
+   los volúmenes que caen adentro no encuentran escala.
 
 Mientras sigan siendo plantilla, `CatalogoSeeder` corre **solo fuera de
 producción**. En cuanto sean los de la resolución, sube al bloque de siempre de
@@ -240,6 +250,15 @@ Servicios, pasos y preguntas viven como constantes dentro de sus componentes.
 Es lo correcto hoy —son la especificación de `REGLAS-NEGOCIO.md`, no un dato que
 la unidad edite—, pero el día que quieran cambiar una respuesta sin tocar código
 hay que moverlos a `configuraciones` o a una tabla propia.
+
+### 🟠 El texto «Sobre el SEDAG» es una BASE — 28/09/2026
+
+La portada se rediseñó con la paleta «Ríos del Beni» y ganó la sección
+`#sedag` (`components/publico/institucional/sedag.tsx`). Su texto —qué es el
+SEDAG y las cuatro tareas de la Unidad de Pesca— se escribió sin cifras ni
+fechas, pero **no es el oficial**: hay que confirmarlo con la unidad o
+reemplazarlo por su misión y visión. Las cifras del hero y la franja de
+especies sí son reales: salen de `jichi.provincias` y del catálogo de productos.
 
 ### 🟠 `municipio.horario` no está en el seeder
 

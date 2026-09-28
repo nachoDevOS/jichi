@@ -114,21 +114,6 @@ export interface FaenaFicha extends FaenaFila {
     } | null;
 }
 
-/** Lo que el formulario de emisión manda de vuelta. */
-export interface FormularioFaena {
-    carnet_id: number | null;
-    kilos_extraidos: number | string;
-
-    /** Los renglones del talonario: opcionales, el papel llega incompleto. */
-    embarcacion: string;
-    propietario: string;
-    comandante_barco: string;
-    matricula_naval: string;
-    nro_kardex: string;
-    region_desde: string;
-    region_hasta: string;
-}
-
 /**
  * Lo que necesita el formulario de CORRECCIÓN. El titular y el carnet vienen
  * fijos, para mostrar: ver EmitirFaenaService::editar().

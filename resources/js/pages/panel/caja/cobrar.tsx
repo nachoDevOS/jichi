@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import { Textarea } from '@/components/ui/textarea';
 import LayoutPanel from '@/layouts/layout-panel';

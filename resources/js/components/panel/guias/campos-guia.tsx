@@ -4,6 +4,10 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { CampoGuia, CatalogosGuia, FormularioGuia } from '@/types/guias';
 
+// Oculta el 28/09/2026: el Art. 22 VIII del reglamento limita el 50% a ciertos
+// productores, por 3 años y con registro previo, y eso todavía no se controla.
+const MOSTRAR_PISCICULTURA = false;
+
 /**
  * Los bloques B y C DEL PAPEL — la ubicación y el transporte.
  *
@@ -150,22 +154,24 @@ export function CamposGuia({
             </section>
 
             {/* ─────────────────────────────── Lo que mueve el arancel */}
-            <Campo
-                etiqueta="Origen del producto"
-                error={errores.es_piscicultura}
-                ayuda="El pescado de criadero no sale del río, así que no consume el recurso que la tasa protege."
-            >
-                <label className="flex items-center gap-2 text-sm">
-                    <input
-                        type="checkbox"
-                        checked={datos.es_piscicultura}
-                        onChange={(e) => onCambio('es_piscicultura', e.target.checked)}
-                        className="size-4 rounded border-input"
-                    />
-                    Es producto de <strong>piscicultura</strong> — paga el{' '}
-                    {Math.round((1 - descuentoPiscicultura) * 100)}% del arancel
-                </label>
-            </Campo>
+            {MOSTRAR_PISCICULTURA && (
+                <Campo
+                    etiqueta="Origen del producto"
+                    error={errores.es_piscicultura}
+                    ayuda="El pescado de criadero no sale del río, así que no consume el recurso que la tasa protege."
+                >
+                    <label className="flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={datos.es_piscicultura}
+                            onChange={(e) => onCambio('es_piscicultura', e.target.checked)}
+                            className="size-4 rounded border-input"
+                        />
+                        Es producto de <strong>piscicultura</strong> — paga el{' '}
+                        {Math.round((1 - descuentoPiscicultura) * 100)}% del arancel
+                    </label>
+                </Campo>
+            )}
 
             <Campo
                 etiqueta="Observaciones"

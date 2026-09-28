@@ -28,7 +28,7 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
 | Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |
 | Vale | 30 días desde la firma | 5 días desde la firma (se cuentan con hora) |
-| Termina en | `aprobado` (no se registra la vuelta) | `cerrada` al llegar la carga, o `anulada` |
+| Termina en | `aprobado` (no se registra la vuelta) | `aprobado` (no se registra la llegada), o `anulada` |
 | Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
 
 ---
@@ -41,7 +41,7 @@ es a propósito: el operador aprende uno solo.
 ```
 PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (faena: vencido / revocado)
 (borrador)  ▲                │                        │
-   │        └──[rechazar]────┘                        └──▶ (guía: cerrada / anulada)
+   │        └──[rechazar]────┘                        └──▶ (guía: anulada)
    │                 └── al enviar sale el RECIBO, uno por trámite
    └──[eliminar, con motivo]──▶ baja lógica
 ```
@@ -51,7 +51,6 @@ PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO
 | **Pendiente** | ✔ | ✔ | ✔ | ✔ | ✘ | ✘ |
 | **En revisión** | ✘ | ✘ | ✘ | ✘ | ✔ | ✘ |
 | **Aprobado** | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
-| Cerrada (guía) | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
 
 Lo dictan los enums —`EstadoFaena` y `EstadoGuia`— y **nada más**: el servicio
 pregunta, el controlador no decide y React recibe la respuesta ya resuelta en
@@ -80,16 +79,17 @@ los campos `puede_*` de la ficha.
   donde estaba: la serie queda con un hueco, y eso es lo que el motivo
   obligatorio explica.
 
-### Lo que solo tiene la guía: cerrar y anular
+### Lo que solo tiene la guía: anular
 
-- **Cerrar** (`EmitirGuiaService::cerrar()`) registra que la carga llegó. Solo
-  sobre una guía aprobada; puede corregir el peso con el de la balanza.
+- **No hay cierre** *(28/09/2026)*: se quitó «Registrar llegada» con su ruta,
+  su permiso `guias.cerrar` y el estado `cerrada`. La guía aprobada vale sus 5
+  días y vence; vencer es su final normal, no un trabajo pendiente.
 - **Anular** (`EmitirGuiaService::anular()`) da de baja una guía **ya firmada**,
   cuyo papel está en la calle, con motivo obligatorio. Es de supervisión
   (`guias.anular`) y no se revierte. **Anular no es eliminar**: eliminar es
   sobre el borrador, donde nunca hubo papel. Las dos queman el número.
 
-Cerrar y anular los dicen `EstadoGuia::permiteCierre()` y `permiteAnulacion()`
+Anular lo dice `EstadoGuia::permiteAnulacion()`
 —solo `aprobado`—, y los usan el servicio (también sobre la fila bloqueada) y la
 ficha. Hasta el 27/09/2026 el servicio aceptaba anular un borrador o una guía en
 revisión aunque la pantalla no lo ofreciera.
@@ -239,7 +239,7 @@ lógica no la dispara: `EmitirGuiaService::eliminar()` baja el detalle a mano.
 | `DELETE /panel/faenas/{faena}` | `faenas.eliminar` | Baja con motivo |
 | `GET /panel/faenas/{faena}/imprimir` | `faenas.imprimir` | El «Permiso por Faena» en PDF. Solo aprobada |
 | `GET /panel/faenas/{faena}` | `faenas.ver` | Ficha |
-| `/panel/guias/…` | `guias.*` | Lo mismo para guías, más `PATCH …/cerrar` (`guias.cerrar`) y `PATCH …/anular` (`guias.anular`) |
+| `/panel/guias/…` | `guias.*` | Lo mismo para guías, más `PATCH …/anular` (`guias.anular`) |
 
 Los pasos del circuito van por **PATCH o POST, nunca GET**: un verbo de lectura
 que escribe se dispara solo con que el navegador precargue el enlace.
@@ -304,7 +304,7 @@ de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitida
 | `app/Enums/CondicionProducto.php`, `MedioTransporte.php`, `TipoTransporte.php` | Las casillas del talonario de la guía |
 | `app/Services/EmitirFaenaService.php` | Emitir, corregir y eliminar la faena; controla los kilos libres |
 | `app/Services/RevisarFaenaService.php` | Enviar, aprobar y rechazar la faena |
-| `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar, cerrar y anular la guía |
+| `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar y anular la guía |
 | `app/Services/RevisarGuiaService.php` | Enviar, aprobar y rechazar la guía |
 | `app/Http/Controllers/Panel/FaenaController.php` / `GuiaController.php` | Listado, formulario, ficha y circuito |
 | `resources/js/pages/panel/faenas/`, `resources/js/pages/panel/guias/` | Las pantallas |

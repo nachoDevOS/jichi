@@ -49,13 +49,11 @@ export default function VerGuia({
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
 
-    const [cerrando, setCerrando] = useState(false);
     const [aprobando, setAprobando] = useState(false);
     const [rechazando, setRechazando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
     const [anulando, setAnulando] = useState(false);
 
-    const cierre = useForm({ peso_total_kg: String(guia.peso_total_kg) });
     const envio = useForm({});
     const rechazo = useForm({ motivo: '' });
     const borrado = useForm({ motivo: '' });
@@ -73,7 +71,7 @@ export default function VerGuia({
                             onClick={() => router.visit(route('beneficiarios.show', guia.beneficiario_id!))}
                         >
                             <User className="size-4" />
-                            Ver al beneficiario
+                            Beneficiario
                         </Button>
                     )}
 
@@ -157,7 +155,7 @@ export default function VerGuia({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Printer className="size-4" />
-                            Imprimir guía
+                            Guía
                         </a>
                     )}
 
@@ -170,15 +168,8 @@ export default function VerGuia({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Receipt className="size-4" />
-                            Imprimir recibo
+                            Recibo
                         </a>
-                    )}
-
-                    {puede('guias.cerrar') && guia.puede_cerrarse && (
-                        <Button onClick={() => setCerrando((v) => !v)}>
-                            <CheckCheck className="size-4" />
-                            Registrar llegada
-                        </Button>
                     )}
 
                     {puede('guias.anular') && guia.puede_anularse && (
@@ -194,55 +185,6 @@ export default function VerGuia({
 
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="min-w-0 space-y-6 lg:col-span-2">
-                    {cerrando && guia.puede_cerrarse && (
-                        <Card className="border-emerald-300 bg-emerald-50/50 dark:border-emerald-500/40 dark:bg-emerald-500/5">
-                            <CardHeader>
-                                <CardTitle>Registrar la llegada</CardTitle>
-                            </CardHeader>
-
-                            <CardContent>
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        cierre.patch(route('guias.cerrar', guia.id), {
-                                            preserveScroll: true,
-                                            onSuccess: () => setCerrando(false),
-                                        });
-                                    }}
-                                    className="space-y-4"
-                                >
-                                    <Campo
-                                        etiqueta="Peso descargado (kg)"
-                                        htmlFor="peso_total_kg"
-                                        error={cierre.errors.peso_total_kg}
-                                        ayuda="Viene con lo declarado al salir. Corríjalo solo si la balanza de destino dijo otra cosa."
-                                        className="max-w-xs"
-                                    >
-                                        <Input
-                                            id="peso_total_kg"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={cierre.data.peso_total_kg}
-                                            onChange={(e) => cierre.setData('peso_total_kg', e.target.value)}
-                                            aria-invalid={Boolean(cierre.errors.peso_total_kg)}
-                                        />
-                                    </Campo>
-
-                                    <div className="flex gap-2">
-                                        <Button type="submit" disabled={cierre.processing}>
-                                            Cerrar guía
-                                        </Button>
-
-                                        <Button type="button" variant="outline" onClick={() => setCerrando(false)}>
-                                            Cancelar
-                                        </Button>
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     <Card>
                         <CardHeader>
                             <CardTitle>El traslado</CardTitle>
@@ -606,8 +548,8 @@ function Situacion({ guia }: { guia: GuiaFicha }) {
             <Marco
                 clase="bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
                 icono={<CalendarX className="mt-0.5 size-5 shrink-0" />}
-                titulo="Venció sin cerrarse"
-                texto="Pasaron los días de validez y nadie registró la llegada. Si la carga sigue en camino, está viajando sin amparo."
+                titulo="Vencida"
+                texto="Pasaron sus días de validez: ya no ampara ningún traslado. Si la carga sigue en camino, necesita una guía nueva."
             />
         );
     }
@@ -627,10 +569,10 @@ function Situacion({ guia }: { guia: GuiaFicha }) {
 
     return (
         <Marco
-            clase="bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
-            icono={<CheckCheck className="mt-0.5 size-5 shrink-0" />}
-            titulo="Cerrada"
-            texto="La carga llegó a destino. Esta guía amparó el traslado y ya no se puede anular."
+            clase="bg-rose-50 text-rose-900 dark:bg-rose-500/10 dark:text-rose-200"
+            icono={<Ban className="mt-0.5 size-5 shrink-0" />}
+            titulo={guia.estado_etiqueta}
+            texto={guia.motivo_sin_amparar ?? 'No ampara el traslado.'}
         />
     );
 }

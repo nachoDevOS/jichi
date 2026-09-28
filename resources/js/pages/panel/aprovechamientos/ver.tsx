@@ -35,7 +35,6 @@ import { bs, cn, fecha, fechaHora } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import { Campo } from '@/components/ui/campo';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import type {
     CarnetDelCupo,
@@ -218,7 +217,7 @@ export default function VerCupo({
                         }
                     >
                         <Eye className="size-4" />
-                        Ver al beneficiario
+                        Beneficiario
                     </Button>
 
                     {/* La autorización de pesca, en PDF. Sale recién con el cupo
@@ -232,7 +231,7 @@ export default function VerCupo({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Printer className="size-4" />
-                            Autorización de Pesca para Aprovechamiento Pesquero
+                            Autorización
                         </a>
                     )}
 
@@ -248,7 +247,7 @@ export default function VerCupo({
                             className={cn(buttonVariants({ variant: 'outline' }))}
                         >
                             <Receipt className="size-4" />
-                            Imprimir recibo
+                            Recibo
                         </a>
                     )}
 

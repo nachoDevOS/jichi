@@ -1,7 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Paperclip, Plus, Search, Wallet } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
@@ -11,7 +10,7 @@ import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fechaHora } from '@/lib/utils';
-import type { OpcionEnum, PageProps, Paginado } from '@/types';
+import type { PageProps, Paginado } from '@/types';
 import type { ArqueoDelDia, PagoFila } from '@/types/caja';
 
 /**

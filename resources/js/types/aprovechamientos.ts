@@ -226,11 +226,3 @@ export interface TramoElegible {
     modalidad_descripcion: string;
 }
 
-/** Lo que el formulario de otorgamiento manda de vuelta. */
-export interface FormularioCupo {
-    beneficiario_id: number | null;
-    categoria_aprov_id: number | string;
-    fecha_solicitud: string;
-    /** Opcional: el renglón del talonario tampoco es obligatorio. */
-    tipo_embarcacion: string;
-}

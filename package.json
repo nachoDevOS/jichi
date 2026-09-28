@@ -22,11 +22,9 @@
     },
     "dependencies": {
         "@inertiajs/react": "^3.7.0",
-        "@types/qrcode": "^1.5.6",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^1.39.0",
-        "qrcode": "^1.5.4",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
         "recharts": "^3.10.1",

@@ -49,7 +49,7 @@ export function Preguntas() {
 
     return (
         <Seccion id="preguntas" titulo="Preguntas frecuentes" oscuro>
-            <div className="mx-auto max-w-3xl divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="mx-auto max-w-3xl divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md">
                 {PREGUNTAS.map((item, i) => (
                     <div key={item.p}>
                         <button
@@ -58,12 +58,12 @@ export function Preguntas() {
                             aria-expanded={abierta === i}
                             className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none"
                         >
-                            <span className="flex-1 text-sm font-semibold text-institucional-azul">
+                            <span className="flex-1 text-sm font-semibold text-rio-profundo sm:text-base">
                                 {item.p}
                             </span>
                             <ChevronDown
                                 className={`size-4 shrink-0 text-slate-400 transition-transform ${
-                                    abierta === i ? 'rotate-180' : ''
+                                    abierta === i ? 'rotate-180 text-rio' : ''
                                 }`}
                             />
                         </button>

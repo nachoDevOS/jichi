@@ -125,7 +125,7 @@ export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 export type EstadoFaena = 'pendiente' | 'en_revision' | 'aprobado' | 'completado' | 'vencido' | 'revocado';
 
 /** Espejo de App\Enums\EstadoGuia. */
-export type EstadoGuia = 'pendiente' | 'en_revision' | 'aprobado' | 'cerrada' | 'anulada';
+export type EstadoGuia = 'pendiente' | 'en_revision' | 'aprobado' | 'anulada';
 
 /**
  * Espejo de App\Enums\EstadoAsociacion.

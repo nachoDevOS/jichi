@@ -190,33 +190,6 @@ class EmitirGuiaService
     }
 
     /**
-     * Registra que la carga llegó a destino.
-     */
-    public function cerrar(GuiaMovimiento $guia, ?float $pesoReal = null): GuiaMovimiento
-    {
-        if (! $guia->estado->permiteCierre()) {
-            throw PermisoOperativoException::noSePuedeCerrar(mb_strtolower($guia->estado->etiqueta()));
-        }
-
-        return DB::transaction(function () use ($guia, $pesoReal): GuiaMovimiento {
-            $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
-
-            $cambios = ['estado' => EstadoGuia::Cerrada];
-
-            if ($pesoReal !== null && abs($pesoReal - (float) $bloqueada->peso_total_kg) > 0.001) {
-                $cambios['peso_total_kg'] = $pesoReal;
-            }
-
-            $bloqueada->update($cambios);
-
-            // Se devuelve la instancia ORIGINAL refrescada: quien llamó tiene
-            // esa en la mano, y darle la copia bloqueada lo deja con el estado
-            // viejo en memoria.
-            return $guia->refresh();
-        });
-    }
-
-    /**
      * Da de baja una guía, con motivo.
      */
     public function anular(GuiaMovimiento $guia, string $motivo): GuiaMovimiento
@@ -229,10 +202,6 @@ class EmitirGuiaService
             throw PermisoOperativoException::guiaYaAnulada();
         }
 
-        if ($guia->estado === EstadoGuia::Cerrada) {
-            throw PermisoOperativoException::cerradaNoSeAnula();
-        }
-
         if (! $guia->estado->permiteAnulacion()) {
             throw PermisoOperativoException::guiaNoSeAnula(mb_strtolower($guia->estado->etiqueta()));
         }
@@ -240,7 +209,7 @@ class EmitirGuiaService
         return DB::transaction(function () use ($guia, $motivo): GuiaMovimiento {
             $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
 
-            // Otra ventanilla pudo cerrarla o anularla mientras tanto.
+            // Otra ventanilla pudo anularla mientras tanto.
             if (! $bloqueada->estado->permiteAnulacion()) {
                 throw PermisoOperativoException::guiaNoSeAnula(mb_strtolower($bloqueada->estado->etiqueta()));
             }

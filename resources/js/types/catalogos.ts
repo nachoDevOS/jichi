@@ -32,14 +32,6 @@ export interface AsociacionFila {
  */
 export type FichaAsociacion = Record<string, string | null>;
 
-/** Lo que el formulario de asociación manda de vuelta. */
-export interface FormularioAsociacion {
-    nombre: string;
-    sigla: string;
-    datos: Record<string, string>;
-    estado: EstadoAsociacion;
-}
-
 /** Un tramo de la escala oficial de aprovechamiento. */
 export interface EscalaFila {
     id: number;
@@ -73,17 +65,6 @@ export interface HuecoEscala {
     hasta: number;
 }
 
-/** Lo que el formulario de escala manda de vuelta. */
-export interface FormularioEscala {
-    nro_escala: number | string;
-    modalidad: ModalidadAprovechamiento;
-    descripcion_kg: string;
-    kilos_min: number | string;
-    kilos_max: number | string;
-    valor_bs: number | string;
-    estado: boolean;
-}
-
 /** Una fila del catálogo de credenciales. */
 export interface TipoCarnetFila {
     id: number;
@@ -98,14 +79,6 @@ export interface TipoCarnetFila {
     precio_bs: number;
     estado: boolean;
     carnets_count: number;
-}
-
-/** Lo que el formulario de tipo de carnet manda de vuelta. */
-export interface FormularioTipoCarnet {
-    nombre: string;
-    tipo_actor: TipoActor | '';
-    precio_bs: number | string;
-    estado: boolean;
 }
 
 /** Una fila del catálogo de productos hidrobiológicos. */

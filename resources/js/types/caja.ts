@@ -70,16 +70,6 @@ export interface LineaCobro {
     monto: number | string;
 }
 
-/** Lo que el formulario de cobro manda de vuelta. */
-export interface FormularioCobro {
-    /** Siempre obligatorios: todo pago es un depósito bancario. */
-    nro_transaccion: string;
-    fecha_deposito: string;
-    comprobante: File | null;
-    lineas: LineaCobro[];
-    concepto: string;
-}
-
 /** Un recibo, en el listado. */
 export interface ReciboFila {
     id: number;

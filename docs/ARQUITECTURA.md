@@ -104,7 +104,7 @@ PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO
 - **Revocar** (autorización y carnet) es de supervisión, con motivo, y no se
   revierte. Revocar la autorización deja **sin efecto** a sus carnets y faenas
   sin reescribirlos: su vigencia mira al padre.
-- La **guía** además se **cierra** al llegar la carga o se **anula**; la
+- La **guía** además se **anula**; no se registra su llegada: vence a los 5 días. La
   **autorización** además se **agota** cuando lo consumido llega al total.
 
 El circuito lo dicen los enums (`EstadoAprovechamiento`, `EstadoCarnet`,
@@ -203,7 +203,7 @@ en un redirect.
 | `EmitirCarnetService` | Emitir, corregir, eliminar, revocar y reponer el carnet |
 | `RevisarCarnetService` | Enviar, aprobar y rechazar el carnet |
 | `EmitirFaenaService` / `RevisarFaenaService` | Lo mismo para la faena; controla los kilos libres |
-| `EmitirGuiaService` / `RevisarGuiaService` | Lo mismo para la guía, más cerrar y anular |
+| `EmitirGuiaService` / `RevisarGuiaService` | Lo mismo para la guía, más anular |
 | `CobrarService` | Cargar depósitos y emitir recibos; la Caja |
 | `ControlarPagoService` | Validar, observar y corregir una boleta |
 | `CorrelativoService` | Los números correlativos, con la fila del contador bloqueada |
@@ -319,7 +319,7 @@ un botón con `usePermisos()` es solo comodidad; siempre van los dos.
 | Bloque | Qué hace |
 | --- | --- |
 | Lectura | Ver cada módulo |
-| **Ventanilla** (operación) | Cargar, corregir el borrador, cobrar, enviar a revisión, cerrar guías, imprimir, corregir depósitos |
+| **Ventanilla** (operación) | Cargar, corregir el borrador, cobrar, enviar a revisión, imprimir, corregir depósitos |
 | **Supervisión** | Aprobar, rechazar, validar u observar boletas, eliminar, revocar, anular |
 | Administración | Catálogos, usuarios, configuración |
 
