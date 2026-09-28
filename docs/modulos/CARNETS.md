@@ -625,7 +625,7 @@ contradicen el día que alguien cambia uno solo. Hoy la URL la arma
 > ruta RELATIVA y le pega `config('app.url')`. Está medido.
 
 > ⚠️ **Lo que diga `APP_URL` queda impreso en el plástico.** Con un valor local
-> —`http://jichi.test`— el QR no resuelve desde el teléfono de nadie, y eso
+> —`http://127.0.0.1:8000`— el QR no resuelve desde el teléfono de nadie, y eso
 > recién se descubre cuando alguien intenta verificar un carnet en la calle.
 > Antes de imprimir un lote, `APP_URL` tiene que ser el dominio público real.
 

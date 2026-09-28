@@ -275,12 +275,12 @@ Quien entra por Ibare sin usuario vinculado —o con el usuario dado de baja— 
 - **`invalid_client` en el paso ③ = la `redirect_uri` no coincide.** Tiene que ser
   idéntica, carácter por carácter, a la registrada en Ibare. Jichi la arma con
   `APP_URL` + `/auth/ibare/callback` —no con `route()` absoluta, que usaría el
-  host de la petición—. Pasó con `APP_URL=http://jichi.test`: Jichi mandaba
-  `jichi.test` y en Ibare estaba registrado `127.0.0.1:8000`.
+  host de la petición—. Pasó con `APP_URL=http://127.0.0.1:8000`: Jichi mandaba
+  `127.0.0.1:8000` y en Ibare estaba registrado `127.0.0.1:8000`.
 - **Cambiar el `.env` no alcanza: hay que cortar `composer run dev` entero.**
   `artisan serve` reinicia solo al proceso hijo, que hereda las variables viejas
   del padre. Síntoma: el `.env` dice `127.0.0.1` y la URL que sale sigue diciendo
-  `jichi.test`. Se comprueba con `php artisan tinker --execute 'echo config("app.url");'`
+  `127.0.0.1:8000`. Se comprueba con `php artisan tinker --execute 'echo config("app.url");'`
   (proceso nuevo) contra lo que muestra el navegador (proceso viejo).
 - **Jichi en `127.0.0.1` e Ibare en `localhost`, nunca los dos en `localhost`.** El
   navegador comparte cookies entre puertos del mismo host, y las dos apps

@@ -2654,7 +2654,7 @@
 
    Se devuelven tal cual. Pasarlas por `Storage::url()` las pegaría
    detrás del dominio local y saldría algo como
-   `http://jichi.test/storage/https://gadbeni.sfo3...`, que no abre nada.
+   `http://127.0.0.1:8000/storage/https://gadbeni.sfo3...`, que no abre nada.
    Esta rama es compatibilidad hacia atrás y se puede sacar el día que no
    queden filas así en la base.
 
@@ -3142,7 +3142,7 @@
    público: el ciudadano escanea desde su teléfono, fuera de la institución.
    DESACTUALIZADO desde el 22/09/2026: config('jichi.url_verificacion') se
    retiró y el dominio sale de APP_URL, que pasó a ser la única fuente. La
-   advertencia sigue valiendo, pero apuntada a APP_URL: si dice http://jichi.test
+   advertencia sigue valiendo, pero apuntada a APP_URL: si dice http://127.0.0.1:8000
    el QR impreso no abre nada. Ver App\Support\QrVerificacion.
    ¿POR QUÉ SE GENERA EN EL NAVEGADOR Y NO EN PHP?
    Este componente es para las pantallas del panel, donde el QR se dibuja

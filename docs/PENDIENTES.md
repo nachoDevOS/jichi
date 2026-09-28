@@ -140,7 +140,7 @@ dominio** desde el 22/09/2026: se retiraron las otras dos
 —`JICHI_URL_VERIFICACION` del `.env` y `sistema.url_verificacion` de
 `configuraciones`— porque tres lugares que dicen lo mismo se contradicen.
 
-**Hoy `APP_URL=http://jichi.test`**, que es un nombre local: un teléfono con
+**Hoy `APP_URL=http://127.0.0.1:8000`**, que es un nombre local: un teléfono con
 datos móviles no lo resuelve. Cada documento que se imprima así sale con un QR
 que no abre nada, y el papel ya está entregado cuando alguien lo nota.
 
@@ -488,7 +488,7 @@ la ruta, y la URL se arma al leer** en `Archivos::url()`, con el disco que el
 sistema tenga configurado en ese momento.
 
 Se descubrió porque con `FILESYSTEM_DISK=s3` los adjuntos abrían en
-`http://jichi.test/storage/...`: `Archivos::url()` estaba clavado en
+`http://127.0.0.1:8000/storage/...`: `Archivos::url()` estaba clavado en
 `disk('public')` e ignoraba el disco activo.
 
 Con el cambio se arreglan tres cosas de una:
@@ -516,12 +516,12 @@ servido los archivos del proyecto equivocado.
 
 ### 3c. `APP_URL` no coincide con cómo se accede — ABIERTO
 
-`.env` dice `APP_URL=http://jichi.test`, pero el sistema se usa en
-`http://127.0.0.1:8000`, y `jichi.test` no resuelve.
+`.env` dice `APP_URL=http://127.0.0.1:8000`, pero el sistema se usa en
+`http://127.0.0.1:8000`, y `127.0.0.1:8000` no resuelve.
 
 Con el disco en s3 ya no afecta a los adjuntos, pero `APP_URL` la usan las rutas
 absolutas, Ziggy y cualquier enlace que se mande por correo. **Hay que ponerlo en
-la dirección real de cada entorno** —o crear el host `jichi.test` en Laragon—.
+la dirección real de cada entorno** —o crear el host `127.0.0.1:8000` en Laragon—.
 
 No se cambió desde el código: es configuración del entorno de cada máquina.
 
