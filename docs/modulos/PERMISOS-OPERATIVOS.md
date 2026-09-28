@@ -309,8 +309,6 @@ de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitida
 | `app/Http/Controllers/Panel/FaenaController.php` / `GuiaController.php` | Listado, formulario, ficha y circuito |
 | `resources/js/pages/panel/faenas/`, `resources/js/pages/panel/guias/` | Las pantallas |
 | `app/Models/ProductoHidrobiologico.php`, `ProductoHidrobiologicoController.php` | El catálogo del cuadro D |
-| `tests/Feature/Aprovechamientos/ReservaFaenaTest.php` | La reserva de kilos, 6 casos |
-| `tests/Feature/Comercializador/`, `tests/Unit/ReglasGuiaTest.php` | El módulo del comercializador, 45 casos |
 
 ---
 

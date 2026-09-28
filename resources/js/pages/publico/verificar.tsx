@@ -9,7 +9,7 @@ import { fechaHora } from '@/lib/utils';
 import type { DocumentoPublico, InstitucionPublica } from '@/types/publico';
 
 /**
- *  VERIFICACIÓN PÚBLICA DE CARNETS
+ *  Verificación pública de carnets
  */
 interface Props {
     /** El código que venía en la URL, ya normalizado. Null si se entró sin nada. */

@@ -116,7 +116,7 @@ class EmitirCarnetService
     }
 
     /**
-     *  CORREGIR UN CARNET QUE TODAVÍA ES BORRADOR
+     *  Corregir un carnet que todavía es borrador
      *
      * El titular NO se toca: si se equivocaron de persona, eso no es una
      * corrección —es otro carnet— y el código ya emitido quedaría a nombre de
@@ -193,7 +193,7 @@ class EmitirCarnetService
     }
 
     /**
-     *  ELIMINAR UN CARNET CARGADO POR ERROR
+     *  Eliminar un carnet cargado por error
      *
      * Baja LÓGICA: la fila queda con `deleted_at` y el motivo en `auditorias`.
      * El código NO se libera —el índice único es global— porque un carnet

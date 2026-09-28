@@ -12,7 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
 /**
- * PERMISO POR FAENA — el papel que se lleva el pescador.
+ * Permiso por faena — el papel que se lleva el pescador.
  *
  * Calca el talonario del SEDAG y sale recién con la faena APROBADA: hasta la
  * firma no hay nada que autorizar. Controlador aparte, como el del carnet y el
@@ -24,7 +24,7 @@ class PermisoFaenaImpresionController extends Controller
     private const RESPONSABLE = 'RESP. PMFRPCRMBIG';
 
     /**
-     * IMPRIMIR — GET /panel/faenas/{faena}/imprimir
+     * Imprimir — GET /panel/faenas/{faena}/imprimir
      *
      * Una faena vencida o completada SÍ se reimprime: puede hacer falta
      * reponer el papel de una salida ya cerrada.
@@ -64,7 +64,7 @@ class PermisoFaenaImpresionController extends Controller
             // El QR y el código, para verificarlo desde el papel.
             'verificacion' => QrVerificacion::de($faena),
         ])
-            // CARTA VERTICAL: 612 x 792 puntos = 8,5" x 11".
+            // Carta vertical: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])
             // Sin esto DomPDF mete las dos tipografías completas —unas 380 KB
             // cada una— en cada documento.
@@ -81,7 +81,7 @@ class PermisoFaenaImpresionController extends Controller
     private function datos(PermisoFaena $faena): array
     {
         /*
-         * LA FECHA DEL PIE SALE DE `fecha_salida` —el día de la firma— Y NO DE HOY: una
+         * La fecha del pie sale de `fecha_salida` —el día de la firma— Y NO DE HOY: una
          * reimpresión del mes que viene tiene que decir lo mismo que el papel
          * que el pescador ya tiene en la mano.
          */

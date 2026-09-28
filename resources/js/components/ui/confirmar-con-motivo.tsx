@@ -5,7 +5,7 @@ import { Campo } from '@/components/ui/campo';
 import { Textarea } from '@/components/ui/textarea';
 
 /**
- *  VENTANA DE CONFIRMACIÓN QUE EXIGE ESCRIBIR UN MOTIVO
+ *  Ventana de confirmación que exige escribir un motivo
  */
 export function ConfirmarConMotivo({
     abierto,
@@ -177,5 +177,5 @@ export function ConfirmarConMotivo({
 }
 
 /**
- *  LA CASILLA DE CONSENTIMIENTO
+ *  La casilla de consentimiento
  */

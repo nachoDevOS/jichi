@@ -16,7 +16,7 @@ import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
 import type { FaenaFicha } from '@/types/faenas';
 
 /**
- *  LA FICHA DE UNA FAENA
+ *  La ficha de una faena
  *
  * La salida se cobra y se firma como el carnet y el aprovechamiento —pendiente
  * → en revisión → aprobada—, así que la tarjeta de pagos y los botones del
@@ -77,7 +77,7 @@ export default function VerFaena({
                         </Button>
                     )}
 
-                    {/* CORREGIR Y ELIMINAR SOLO SOBRE EL BORRADOR. Las dos
+                    {/* Corregir y eliminar solo sobre el borrador. Las dos
                         banderas llegan resueltas: miran el estado Y que no
                         haya entrado un peso. */}
                     {puede('faenas.editar') && faena.puede_editarse && (
@@ -174,7 +174,7 @@ export default function VerFaena({
         >
             <Head title={faena.etiqueta} />
 
-            {/* EL TITULAR, CON SU FOTO: mismo bloque que la autorización de pesca. */}
+            {/* El titular, con su foto: mismo bloque que la autorización de pesca. */}
             <Card className="mb-6 min-w-0">
                 <CardContent className="flex flex-wrap items-center gap-4 p-4">
                     <Retrato url={faena.foto_url} nombre={faena.beneficiario ?? 'Sin nombre'} className="size-16" />
@@ -209,7 +209,7 @@ export default function VerFaena({
                             <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                                 <Dato etiqueta="Kilos" valor={`${faena.kilos_extraidos} kg`} />
                                 <Dato etiqueta="Asociación" valor={faena.asociacion ?? '—'} />
-                                {/* DE QUÉ CARNET CUELGA. El número del libro es
+                                {/* De qué carnet cuelga. El número del libro es
                                     cómo se lo nombra; el código de 16 caracteres
                                     va al lado porque es la llave con la que se
                                     verifica el plástico. */}
@@ -339,7 +339,7 @@ export default function VerFaena({
                     </Card>
                 </div>
 
-                {/* LA MISMA TARJETA que el carnet y el cupo, y a lo ancho como en ellos. */}
+                {/* La misma tarjeta que el carnet y el cupo, y a lo ancho como en ellos. */}
                 <TarjetaPagos
                     pagos={pagos}
                     recibo={recibo}
@@ -352,7 +352,7 @@ export default function VerFaena({
                 />
             </div>
 
-            {/* APROBAR PIDE CASILLA: es la FIRMA. Desde acá la faena autoriza. */}
+            {/* Aprobar pide casilla: es la FIRMA. Desde acá la faena autoriza. */}
             <ConfirmarAccion
                 abierto={aprobando}
                 tono="afirmativo"
@@ -382,7 +382,7 @@ export default function VerFaena({
                 }
             />
 
-            {/* RECHAZAR PIDE MOTIVO Y CASILLA: es la otra mitad de la firma. */}
+            {/* Rechazar pide motivo y casilla: es la otra mitad de la firma. */}
             <ConfirmarConMotivo
                 abierto={rechazando}
                 titulo="Rechazar y devolver a ventanilla"
@@ -470,7 +470,7 @@ export default function VerFaena({
  */
 function Situacion({ faena }: { faena: FaenaFicha }) {
     /*
-     * MIENTRAS NADIE LA FIRMÓ, la faena no autoriza nada, y el porqué llega
+     * Mientras nadie la firmó, la faena no autoriza nada, y el porqué llega
      * RESUELTO del servidor —`motivo_sin_autorizar`—. React no vuelve a
      * evaluar el estado: así nacieron los carteles que decían «venció» sobre
      * un expediente que recién se estaba armando.

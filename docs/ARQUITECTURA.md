@@ -16,13 +16,12 @@
 
 Sistema de credenciales y permisos de pesca del Gobierno Autónomo Departamental
 del Beni (SEDAG). **Laravel 13 · PHP 8.3 · Inertia 2 · React 19 · TypeScript ·
-Tailwind 4 · PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite
-en memoria).
+Tailwind 4 · PostgreSQL 18** (corre también en SQLite).
 
 | Dato | Valor |
 | --- | --- |
 | Líneas de código | ~37.000 (`app/` + `resources/js/`) |
-| Pruebas | 200, de todos los módulos (ver §9) |
+| Pruebas | No hay: se retiraron el 27/09/2026 (ver §9) |
 | Idioma del código | Español, sin excepciones salvo `components/ui/` |
 | Pendiente | Reportes y Configuración (en gris en el menú) |
 
@@ -191,9 +190,8 @@ Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 
 ### 4.1 Las reglas viven en `app/Services/`, nunca en el controlador
 
-El mismo caso de uso lo necesitan el formulario, un comando de consola y las
-pruebas. Escrito en el controlador, los otros dos lo copian y las copias se
-quedan viejas. El controlador traduce HTTP, llama al servicio y convierte el
+El mismo caso de uso lo necesitan el formulario y un comando de consola.
+Escrito en el controlador, el otro lo copia y la copia se queda vieja. El controlador traduce HTTP, llama al servicio y convierte el
 resultado —o la excepción del dominio: `CarnetInvalidoException`,
 `CupoInvalidoException`, `PermisoOperativoException`, `CobroInvalidoException`—
 en un redirect.
@@ -393,21 +391,17 @@ verdad —no solo un CRUD—, copiar además el par `EmitirFaenaService` +
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
-php artisan test        # las 200 pruebas
 ```
 
-**Qué cubren las pruebas** (200, 27/09/2026): los siete pasos de REGLAS-NEGOCIO
-—beneficiarios, autorización, carnets, faenas, guías y productos, caja y
-control de boletas, verificación pública—, los catálogos, los permisos de cada
-pantalla y las reglas puras (`tests/Unit/`). El detalle por archivo está en
-[MAPA-ARCHIVOS.md](MAPA-ARCHIVOS.md). Lo que NO cubren: las pantallas por
-dentro —React no tiene pruebas— y que todo archivo pase por `StorageController`.
-**Todo cambio de pantalla se prueba además en el navegador.**
+**No hay pruebas automáticas**: se retiraron el 27/09/2026 a pedido del
+responsable; están en el historial de git (commit `7dc0ac6`). Los tres comandos
+revisan tipos, formato y compilación, no reglas de negocio: **todo cambio se
+prueba abriendo la pantalla y recorriendo el caso a mano.**
 
 Al agregar una migración, un permiso a `RolSistema` o una clave a
 `ConfiguracionSeeder`, hay que correr a mano `php artisan migrate` y
-`php artisan db:seed --class=RolPermisoSeeder`: las pruebas arman su propio
-esquema en memoria y no avisan si la base de trabajo quedó vieja.
+`php artisan db:seed --class=RolPermisoSeeder`: nada avisa si la base de
+trabajo quedó vieja.
 
 ---
 

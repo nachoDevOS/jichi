@@ -55,7 +55,7 @@ enum EstadoFaena: string
     /**
      * ¿Sus kilos pesan contra el cupo de la bolsa madre?
      *
-     * SOLO DESDE LA FIRMA (19/09/2026, a pedido del responsable). Una faena
+     * Solo desde la firma (19/09/2026, a pedido del responsable). Una faena
      * pendiente o en revisión es una SOLICITUD: todavía no autoriza a pescar,
      * así que no puede estar restándole kilos a la bolsa.
      *
@@ -84,7 +84,7 @@ enum EstadoFaena: string
     }
 
     /**
-     *  EL CIRCUITO, el mismo del carnet y del aprovechamiento
+     *  El circuito, el mismo del carnet y del aprovechamiento
      *
      * Estos métodos deciden qué se puede hacer en cada estado. Viven acá y NO
      * en el controlador: el servicio pregunta, y React recibe la respuesta ya

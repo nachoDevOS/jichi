@@ -127,5 +127,5 @@ export function ConfirmarAccion({
 }
 
 /**
- *  LA CASILLA DE CONSENTIMIENTO
+ *  La casilla de consentimiento
  */

@@ -37,7 +37,7 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
              * El TEXTO OFICIAL, y no se deduce de los kilos.
              */
             /*
-             * LA MODALIDAD LA FIJA LA RESOLUCIÓN AL DEFINIR EL TRAMO, no el
+             * La modalidad la fija la resolución al definir el tramo, no el
              * operador al otorgar: por eso se declara acá, en el catálogo, y no
              * en el formulario de otorgamiento. Puesta allá, dos cupos del mismo
              * tramo podrían terminar con reglas distintas.
@@ -72,7 +72,7 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
                 $max = (float) $this->input('kilos_max');
 
                 /*
-                 * DOS TRAMOS SE SOLAPAN cuando uno empieza antes de que el otro
+                 * Dos tramos se solapan cuando uno empieza antes de que el otro
                  * termine Y termina después de que el otro empiece. Es la forma
                  * estándar de comparar intervalos, y es más corta que enumerar
                  * los cuatro casos de «contiene», «contenido», «pisa por la

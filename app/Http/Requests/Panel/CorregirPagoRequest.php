@@ -25,7 +25,7 @@ class CorregirPagoRequest extends FormRequest
             'monto_parcial' => ['required', 'numeric', 'gt:0', 'max:99999999', 'decimal:0,2'],
 
             'nro_transaccion' => [
-                // SOLO DÍGITOS, y va `digits_between` y no `numeric`: la boleta
+                // Solo dígitos, y va `digits_between` y no `numeric`: la boleta
                 // suele empezar con ceros y `numeric` se los comería.
                 'required', 'string', 'digits_between:1,60',
                 Rule::unique('pagos', 'nro_transaccion')

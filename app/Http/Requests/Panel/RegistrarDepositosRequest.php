@@ -26,7 +26,7 @@ class RegistrarDepositosRequest extends FormRequest
     {
         return [
             /*
-             * AL MENOS UNO. Enviar el formulario vacío gastaría un número del
+             * Al menos uno. Enviar el formulario vacío gastaría un número del
              * correlativo de recibos para no decir nada.
              */
             'pagos' => ['required', 'array', 'min:1', 'max:20'],
@@ -34,12 +34,12 @@ class RegistrarDepositosRequest extends FormRequest
             'pagos.*.monto' => ['required', 'numeric', 'gt:0', 'max:99999999', 'decimal:0,2'],
 
             /*
-             * LA BOLETA ES SIEMPRE OBLIGATORIA: todo pago es un depósito
+             * La boleta es siempre obligatoria: todo pago es un depósito
              * bancario —no hay efectivo ni QR— y sin ella lo único que respalda
              * el cobro es que alguien lo tipeó.
              */
             'pagos.*.nro_transaccion' => [
-                // SOLO DÍGITOS, y va `digits_between` y no `numeric`: la boleta
+                // Solo dígitos, y va `digits_between` y no `numeric`: la boleta
                 // suele empezar con ceros y `numeric` se los comería.
                 'required', 'string', 'digits_between:1,60',
                 // Contra la tabla...
@@ -57,7 +57,7 @@ class RegistrarDepositosRequest extends FormRequest
             ],
 
             /*
-             * ¿EL OPERADOR PIDIÓ ENVIARLO A REVISIÓN EN EL MISMO ACTO?
+             * ¿El operador pidió enviarlo a revisión en el mismo acto?
              */
             'enviar' => ['nullable', 'boolean'],
         ];

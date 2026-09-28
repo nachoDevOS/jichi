@@ -17,7 +17,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  VERIFICACIÓN PÚBLICA DE DOCUMENTOS — la única pantalla sin sesión
+ *  Verificación pública de documentos — la única pantalla sin sesión
  *
  *  Desde el 22/09/2026 atiende los CINCO documentos que se entregan, no solo el
  *  carnet: el código sale de la tabla `codigos` y de ahí se resuelve qué es.
@@ -98,7 +98,7 @@ class VerificacionController extends Controller
     }
 
     /**
-     *  LO ÚNICO QUE SE LE MUESTRA A UN DESCONOCIDO
+     *  Lo único que se le muestra a un desconocido
      *
      * Misma forma para los cinco: el acta pública dibuja renglones, no campos
      * con nombre propio. Así sumar un documento nuevo no toca React.

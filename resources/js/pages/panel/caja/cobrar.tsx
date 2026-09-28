@@ -31,7 +31,7 @@ export default function Cobrar({
     const form = useForm({
         lineas: [] as LineaCobro[],
         /*
-         * LA BOLETA DEL BANCO, siempre: no hay efectivo ni QR, todo pago es un
+         * La boleta del banco, siempre: no hay efectivo ni QR, todo pago es un
          * depósito. La fecha se propone hoy, que es lo normal.
          */
         nro_transaccion: '',
@@ -219,7 +219,7 @@ export default function Cobrar({
                             </CardHeader>
 
                             <CardContent className="space-y-4">
-                                {/* A NOMBRE DE QUIÉN SALE NO SE TIPEA: el recibo
+                                {/* A nombre de quién sale no se tipea: el recibo
                                     guarda el id del titular de lo que se cobra,
                                     y el nombre y la cédula se leen del padrón. */}
                                 <div className="rounded-md bg-secondary/50 p-3 text-sm">

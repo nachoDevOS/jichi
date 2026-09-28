@@ -9,7 +9,7 @@ use App\Models\Carnet;
 use Illuminate\Support\Facades\DB;
 
 /**
- *  EL CIRCUITO DE REVISIÓN DE UN CARNET
+ *  El circuito de revisión de un carnet
  *
  * Espejo de `RevisarCupoService`, y a propósito: el carnet se cobra y se firma
  * igual que el aprovechamiento, así que el operador aprende un solo circuito.
@@ -56,7 +56,7 @@ class RevisarCarnetService
     }
 
     /**
-     * EN REVISIÓN ──▶ APROBADO. Recién acá el carnet habilita a trabajar.
+     * En revisión ──▶ APROBADO. Recién acá el carnet habilita a trabajar.
      */
     public function aprobar(Carnet $carnet): Carnet
     {
@@ -112,7 +112,7 @@ class RevisarCarnetService
     }
 
     /**
-     * EN REVISIÓN ──▶ PENDIENTE, con el motivo escrito.
+     * En revisión ──▶ PENDIENTE, con el motivo escrito.
      *
      * Los pagos NO se tocan: cuelgan del carnet y siguen ahí, así que
      * ventanilla corrige lo que haga falta y lo vuelve a presentar sin recargar

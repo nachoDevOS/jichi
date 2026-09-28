@@ -32,17 +32,8 @@ return new class extends Migration
 
             $table->string('tipo_actor', 20)->comment('pescador | comercializador');
 
-            /*
-             * EL NÚMERO IMPRESO EN EL PLÁSTICO. Correlativo por gestión,
-             * compartido entre pescadores y comercializadores, asignado AL
-             * APROBAR: un carnet pendiente no ocupa número y uno rechazado no
-             * gasta uno. La gestión no se guarda —es el año de `fecha_emision`—.
-             *
-             * Índice y NO único: el único sería «uno por año», y el año no es
-             * una columna; expresarlo pediría un índice funcional, que solo
-             * existe en PostgreSQL. Quien lo garantiza es CorrelativoService,
-             * que bloquea la fila del contador.
-             */
+            // Correlativo por gestión, asignado al aprobar. Índice y no único:
+            // lo garantiza CorrelativoService. Ver MER.md.
             $table->unsignedInteger('nro_registro')->nullable()->index()->comment('Correlativo anual, al aprobar');
 
             // Nullable: muchos carnets se cargan para poner al día lo emitido

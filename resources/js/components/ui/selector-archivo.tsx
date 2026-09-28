@@ -4,7 +4,7 @@ import { useArchivos } from '@/hooks/use-archivos';
 import { cn } from '@/lib/utils';
 
 /**
- *  EL CAMPO PARA ADJUNTAR UN ARCHIVO
+ *  El campo para adjuntar un archivo
  */
 export function SelectorArchivo({
     id,
@@ -31,7 +31,7 @@ export function SelectorArchivo({
     const [miniatura, setMiniatura] = useState<string | null>(null);
 
     /*
-     * LA MINIATURA HAY QUE LIBERARLA A MANO.
+     * La miniatura hay que liberarla a mano.
      */
     useEffect(() => {
         if (!archivo || !archivo.type.startsWith('image/')) {

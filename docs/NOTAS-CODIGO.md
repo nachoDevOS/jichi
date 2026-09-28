@@ -1,12 +1,16 @@
 # Notas de código
 
-> Lo que antes estaba escrito en comentarios largos dentro del código.
-> Se movió acá el 20/09/2026 para que los archivos se lean de corrido: en el
-> código quedó el primer párrafo de cada bloque —el porqué en dos líneas— y el
-> desarrollo está abajo, buscable por archivo.
+> El porqué largo de una decisión puntual, por archivo: lo que no entra en las
+> tres líneas de comentario que permite la regla 2 de CLAUDE.md.
+>
+> **Si una nota contradice a [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md) o a
+> [MER.md](MER.md), mandan ellos** y la nota está vieja: borrala o corregila.
+> El 27/09/2026 se unieron los archivos que figuraban dos veces, se sacaron los
+> de archivos borrados y las notas que contradecían el circuito actual. **Todavía
+> quedan notas escritas contra el modelo anterior** (trámites, rubros,
+> `codigo_carnet`): ver PENDIENTES.md. Lo sacado está en el historial de git.
 
 ---
-
 
 ## `app/Enums/ConceptoRecibo.php`
 
@@ -111,6 +115,38 @@
    moverlos mientras los está mirando es cambiarle el expediente de abajo.
    Lo que no sirve se RECHAZA, y el rechazo lo devuelve a pendiente.
 
+### Los depósitos están cargados y cubren el monto; falta que alguien firme.
+
+   NO autoriza a pescar todavía, y esa es la razón de que el estado exista:
+   entre «la plata entró» y «la unidad lo aprobó» hay un control, y sin un
+   estado propio ese control no tendría dónde ocurrir.
+
+### ¿Según el estado, todavía se le pueden colgar faenas?
+
+   PENDIENTE no habilita, y no es un descuido: lo que autoriza a pescar es
+   la concesión PAGADA. Un cupo cargado y sin cobrar es un papel a medio
+   llenar, y emitir faenas contra él dejaría al pescador trabajando sobre
+   una autorización que la unidad todavía no entregó.
+
+### ¿Se pueden CARGAR depósitos contra él?
+
+   En pendiente sí: es justamente lo que hay que hacer. En revisión no —el
+   monto ya está cubierto y el expediente presentado— y después tampoco:
+   un cupo aprobado está pagado por definición, y la plata que entre de más
+   no es de este trámite.
+
+### ¿Se puede mandar a que alguien lo firme?
+
+   El estado es solo una de las dos condiciones. La otra —que los depósitos
+   cubran el monto— la mira el servicio, porque depende de la suma de los
+   pagos y no del estado. Ver AprovechamientoPesq::puedeEnviarseARevision().
+
+### ¿Se puede borrar la fila entera?
+
+   Mismo criterio que la edición, y con más razón: un cupo con plata encima
+   no se elimina —se arregla por caja—, porque borrarlo dejaría pagos
+   colgando de algo que ya no existe.
+
 ## `app/Enums/EstadoAsociacion.php`
 
 ### Si una asociación se puede elegir hoy en un formulario.
@@ -137,19 +173,11 @@
    fecha de vencimiento de diciembre y la fecha no lo delata— y filtrar o
    agrupar en los listados sin calcular una comparación por fila.
 
-## `app/Enums/EstadoFaena.php`
+### Dado de baja por decisión de la unidad, antes de su vencimiento.
 
-### En qué situación está un permiso de faena — la autorización de UNA salida.
-
-   «COMPLETADO» ES LO QUE CIERRA EL CIRCUITO DE LA BOLSA MADRE
-   Una faena nace `Activo`: el pescador se llevó el papel y salió. Cuando vuelve
-   y descarga, la faena pasa a `Completado` — y es en ese momento cuando sus
-   `kilos_extraidos` cuentan definitivamente contra el cupo.
-   `Vencido` es la faena que se pasó de `fecha_limite` sin cerrarse. NO se borra
-   ni se reutiliza el número: el talonario ya gastó esa hoja.
-   Los kilos de una faena activa o completada se descuentan igual del saldo —lo
-   contrario dejaría emitir faenas infinitas mientras ninguna se cierre—; los de
-   una vencida se liberan. Ver AprovechamientoPesq::kilosConsumidos().
+   El documento sigue existiendo y su historial queda legible —un inspector
+   necesita saber que la persona estuvo autorizada hasta tal fecha— pero hoy
+   no habilita a trabajar ni a emitir faenas o guías.
 
 ## `app/Enums/EstadoGuia.php`
 
@@ -196,6 +224,19 @@
    Se COPIA al aprovechamiento al otorgarlo, por lo mismo que el volumen: si
    alguien reclasifica el tramo en el catálogo, los cupos ya otorgados no pueden
    cambiar de régimen retroactivamente.
+
+### ESPECIES ESPECIALES — el cupo de gran porte, con tasación fija.
+
+   Paiche y lo que la resolución sume después. Es una autorización específica
+   sobre la cuota de la especie, con TASACIÓN FIJA: el valor no sale de una
+   progresión por kilos como en los tramos menores, lo fija la resolución
+   para esa especie.
+
+### Nombre del color del badge.
+
+   Devuelve el NOMBRE y no las clases armadas con texto: Tailwind solo
+   incluye en el CSS final las que puede leer literalmente. Un color nuevo
+   acá va también al mapa de resources/js/components/ui/badge.tsx.
 
 ## `app/Enums/RolSistema.php`
 
@@ -286,6 +327,18 @@
    `caja.anular`: quien atiende el mostrador arregla lo que tipeó,
    hacer desaparecer un registro es otra cosa.
 
+### CORREGIR EL BORRADOR TAMBIÉN ES DE VENTANILLA.
+
+   Solo corre mientras el cupo está PENDIENTE DE PAGO: es arreglar
+   una carga equivocada con el pescador todavía enfrente, no cambiar
+   una autorización entregada. En cuanto entra plata el permiso deja
+   de alcanzar, porque el estado ya no lo permite.
+
+### Catálogo completo de permisos del sistema.
+
+   Sale del rol administrador porque es el que los tiene todos: escribir la
+   lista otra vez acá sería una segunda copia que puede quedar corta.
+
 ## `app/Enums/TipoActor.php`
 
 ### Qué habilita una credencial: PESCAR o COMERCIALIZAR.
@@ -301,6 +354,13 @@
    Y también si el carnet lleva colgada una BOLSA MADRE: el cupo en kilos se
    autoriza por volumen extraído, así que solo el pescador tiene
    `aprovechamiento_id`. Por eso esa columna es nullable.
+
+### ¿Esta credencial lleva colgada una bolsa madre de aprovechamiento?
+
+   Se pregunta acá y NUNCA con un match sobre el nombre del tipo de carnet:
+   `tipos_carnet` es un catálogo que edita la unidad desde el panel y el
+   mismo documento figura como «Carnet de Pescador» o como «Pescador
+   Artesanal» según quién lo cargó.
 
 ## `app/Exceptions/CarnetInvalidoException.php`
 
@@ -329,6 +389,18 @@
    que sirve ese carnet.
    POR ESO EL CUPO ES EL PASO 2 Y EL CARNET EL 3, y no al revés.
 
+### Se eligió una asociación o un tipo que ya no se puede usar.
+
+   Puede pasar entre que el operador abre el formulario y aprieta guardar:
+   la lista se armó con lo vigente en ese momento y en el medio alguien lo
+   desactivó desde el catálogo.
+
+### No se revoca dos veces.
+
+   Y tampoco se «desrevoca»: la revocación es definitiva. Si la persona
+   vuelve a estar en regla, lo que corresponde es emitirle un carnet nuevo,
+   con su propio código — el plástico viejo puede estar circulando.
+
 ## `app/Exceptions/CobroInvalidoException.php`
 
 ### Una regla de caja dijo que no.
@@ -356,6 +428,13 @@
    REVISIÓN contestaba «el papel está anulado», que manda a buscar una
    anulación que nunca existió.
 
+### No se puede validar ni observar este depósito.
+
+   Son dos motivos distintos y el mensaje los separa, porque lo que hay que
+   hacer después no es lo mismo: si el trámite no está en revisión hay que
+   presentarlo o dejar de discutir una firma puesta; si el depósito ya está
+   observado, lo que sigue es CORREGIRLO.
+
 ## `app/Exceptions/CupoInvalidoException.php`
 
 ### Una regla del otorgamiento de cupo dijo que no.
@@ -382,6 +461,30 @@
    El mensaje dice el saldo y la fecha porque son los dos datos con los que
    el operador decide qué hacer: esperar a que venza, o —si el cupo todavía
    es un borrador— corregirlo al tramo que corresponde.
+
+### Se eligió un tramo de la escala que ya no está vigente.
+
+   Puede pasar entre que el operador abre el formulario y aprieta guardar:
+   la lista se armó con los tramos de ese momento y en el medio alguien
+   derogó uno desde el catálogo.
+
+### Se quiso presentar o aprobar un cupo con saldo sin cubrir.
+
+   Dice CUÁNTO falta y no solo «falta plata», porque es el número con el que
+   el operador decide qué hacer: cargar otro depósito, o revisar si el que
+   cargó salió por menos.
+
+### Se quiso firmar con boletas sin controlar.
+
+   Dice CUÁNTAS quedan, que es lo que el revisor necesita para saber si le
+   falta mirar una o diez. El detalle —cuál y por qué— está en la tarjeta de
+   pagos de la ficha, que es donde se resuelve.
+
+### No se amplía un cupo que ya no corre.
+
+   Sumarle kilos a un cupo vencido daría volumen que no se puede usar —las
+   faenas miran la fecha— así que sería puro ruido en la ficha. Lo que
+   corresponde es otorgar el de la gestión nueva.
 
 ## `app/Exceptions/PermisoOperativoException.php`
 
@@ -414,6 +517,51 @@
    contrario de para qué existe la guía.
    Si el problema es que se emitió mal, lo que corresponde es dejar
    constancia por otro lado, no borrar el respaldo de un viaje que se hizo.
+
+### La credencial no habilita ESTE papel.
+
+   Quién puede emitir qué lo dice `TipoActor`, NUNCA el nombre del tipo de
+   carnet: `tipos_carnet` es un catálogo que edita la unidad y el mismo
+   documento figura como «Carnet de Pescador» o «Pescador Artesanal» según
+   quién lo cargó.
+
+### El cupo está presentado y esperando una firma.
+
+   Mensaje propio y no el de «pendiente de pago»: acá la plata YA entró, y
+   decirle al operador que cobre lo mandaría a buscar un depósito que no
+   existe. Lo que falta es una firma, y eso no se resuelve en la ventanilla.
+
+### La faena pedida no entra en lo que queda del cupo.
+
+   Se dicen los DOS números y no solo «no alcanza», porque lo que el
+   operador necesita decidir enfrente del pescador es por cuánto sí puede
+   emitirla.
+
+### El número del talonario ya está usado.
+
+   No se ofrece «usar el siguiente» automáticamente a propósito: el número
+   sale de un papel que el operador tiene en la mano, y si no coincide con
+   lo que el sistema propone hay algo mal que conviene mirar.
+
+### Solo se completa una faena que está EN CURSO.
+
+   Completar es registrar que el pescador volvió y descargó. Sobre una ya
+   completada no hay nada que registrar; sobre una VENCIDA tampoco, y ahí el
+   matiz importa: al vencer, la faena liberó su volumen, así que completarla
+   lo volvería a descontar de un cupo que ya se repuso.
+
+### No se anula dos veces, y no se desanula.
+
+   Es específico de las guías y no genérico a propósito: las faenas NO se
+   anulan —`EstadoFaena` no tiene ese estado— así que un método que dijera
+   «{X} ya está anulado» tendría que resolver el género del sujeto para un
+   solo caso. Escrito derecho, se lee derecho.
+
+### Solo se cierra una guía que está EN CURSO.
+
+   Cerrar es registrar que la carga llegó. Sobre una anulada no hay nada que
+   cerrar —ese papel no amparó ningún traslado— y sobre una ya cerrada
+   tampoco.
 
 ## `app/Http/Controllers/Panel/AprovechamientoController.php`
 
@@ -527,6 +675,25 @@
    en la pantalla serían una segunda copia de las tres reglas, y la
    copia se queda vieja sin que nada falle.
 
+### EL MODO SE MANDA A LA PANTALLA, y no es un detalle informativo.
+
+   En modo flexible las faenas se emiten por encima del cupo, así
+   que un listado que mostrara los saldos sin decir en qué modo está
+   el sistema haría leer «0 kg» como un bloqueo que no existe.
+
+### FORMULARIO — GET /panel/aprovechamientos/crear
+
+   Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
+   buscador ya resuelto: quien viene de ahí ya eligió a quién, y volver a
+   pedírselo es hacerle repetir un paso que acaba de dar.
+
+### LAS TRES DEL CIRCUITO DE REVISIÓN, resueltas en el servidor.
+
+   `puede_enviarse` no es «el estado es pendiente»: es eso Y que los
+   depósitos cubran el monto. Deducirlo en React sería una segunda
+   copia de la regla, y encima con el saldo que la pantalla conoce,
+   que puede estar viejo.
+
 ## `app/Http/Controllers/Panel/AsociacionController.php`
 
 ### CATÁLOGO DE ASOCIACIONES — el gremio que certifica al beneficiario
@@ -548,6 +715,19 @@
    formulario tiene veinte campos y una foto, y no entra al costado de nada.
 
 ## `app/Http/Controllers/Panel/BeneficiarioController.php`
+
+### Las bolsas madre que pueden respaldar un carnet de pescador nuevo
+
+   Son las EN CURSO —pendiente, en revisión o aprobada, en fecha—, que es
+   exactamente lo que acepta `EmitirCarnetService`. Miraba solo las aprobadas
+   y la pantalla avisaba «no tiene cupo» sobre alguien que sí podía sacar el
+   carnet: el plástico se emite con el cupo todavía sin cobrar, y los dos se
+   pagan juntos.
+   Estática y pública porque la usan el buscador y `CarnetController`: el dato
+   tiene que ser el mismo venga la persona preseleccionada o elegida a mano.
+   Devuelve una LISTA: la regla de una bolsa por persona deja una sola en
+   curso, pero si mañana hubiera dos, la pantalla las ofrece en vez de elegir
+   por su cuenta.
 
 ### MÓDULO BENEFICIARIOS — controlador de ejemplo
 
@@ -669,6 +849,25 @@
    pide más de una pantalla: escritas dos veces, tarde o temprano una se
    queda sin actualizar.
 
+### GUARDAR EL ALTA — POST /panel/beneficiarios
+
+   Fíjate en el tipo del parámetro: GuardarBeneficiarioRequest, no Request.
+   Con eso Laravel valida ANTES de entrar acá; si la validación falla, este
+   método nunca llega a ejecutarse.
+
+### FICHA — GET /panel/beneficiarios/{beneficiario}
+
+   El parámetro se declara como Beneficiario y Laravel busca el registro por
+   id automáticamente. Si no existe, responde 404 sin ejecutar el método. Eso
+   se llama «route model binding».
+
+### Guarda la foto y devuelve su ruta.
+
+   Todo archivo que sube al sistema pasa por StorageController, que es el
+   único que decide en qué disco se escribe. Para que la imagen sea visible
+   desde el navegador tiene que existir el enlace simbólico que crea
+   `php artisan storage:link`.
+
 ## `app/Http/Controllers/Panel/CajaController.php`
 
 ### CAJA — el circuito del dinero
@@ -712,6 +911,19 @@
    Un depósito del viernes cargado el lunes entra en el primero y no en
    el segundo, y esa diferencia es justamente la que hay que ver.
 
+### UNA RELACIÓN POLIMÓRFICA NO SE PRECARGA CON `with('pagable.x')`.
+
+   Eloquent no sabe qué es `pagable` hasta que lee la fila, así que
+   lo escrito así se IGNORA en silencio y el N+1 sigue ahí. Va con
+   morphWith, declarando qué traer para cada tipo.
+
+### EL ARQUEO DEL DÍA, siempre del día de HOY y no del rango filtrado.
+
+   Es lo que se cuadra contra el extracto del banco antes de cerrar,
+   y esa pregunta no cambia porque alguien esté mirando marzo. Un
+   total que siguiera al filtro invitaría a cuadrar la caja contra el
+   número equivocado.
+
 ## `app/Http/Controllers/Panel/CarnetController.php`
 
 ### CARNETS — la credencial anual (paso 3 del flujo)
@@ -735,6 +947,12 @@
    miente—, `cupo_kg` depende del tipo de actor y no del nombre del tipo de
    carnet, y `saldo_pendiente` se corta en cero. Son reglas, y deducirlas en
    la pantalla sería una segunda copia de cada una.
+
+### EL CUPO VIGENTE DE ESA PERSONA, si la hay.
+
+   La pantalla lo necesita para avisar ANTES de guardar que un carnet
+   de pescador sin cupo va a ser rechazado. El servidor lo comprueba
+   igual dentro de la transacción; esto evita el viaje en falso.
 
 ## `app/Http/Controllers/Panel/CarnetImpresionController.php`
 
@@ -1084,6 +1302,19 @@
    Sale siempre en PNG cuando se reduce: es sin pérdida, y una foto de
    carnet de 300 px pesa lo mismo en los dos formatos.
 
+### Hasta donde se puede achicar un texto que no entra, en fraccion de su
+
+   Por debajo del 70% deja de leerse en una tarjeta de 85 mm que alguien mira
+   en un control, y un apellido que no se puede leer es lo mismo que no
+   imprimirlo: ahi el texto pasa a dos lineas en vez de seguir encogiendo.
+
+### LA ACTIVIDAD SALE DEL ENUM Y NO DEL NOMBRE DEL TIPO DE CARNET.
+
+   `tipos_carnet` es un catálogo que la unidad edita: el mismo documento
+   figura como «Carnet de Pescador» o «Pescador Artesanal» según quién lo
+   cargó, y el título impreso no puede depender de eso. `tipo_actor` es
+   la regla, y no cambia.
+
 ## `app/Http/Controllers/Panel/CategoriaAprovechamientoController.php`
 
 ### LA ESCALA OFICIAL DE APROVECHAMIENTO — paso 2 del flujo del pescador
@@ -1120,85 +1351,23 @@
 
 ## `app/Http/Controllers/Panel/DashboardController.php`
 
-### El tablero de la gestión en curso.
+### El tablero: qué espera trabajo, cuánto hay vigente, cuánto se cobró y qué vence
 
-   QUÉ MIRA ESTE TABLERO, Y POR QUÉ CAMBIÓ
-   La versión anterior contaba EXPEDIENTES: cuántos entraron, cuántos esperan
-   firma, cuántos están listos para aprobar. Ese circuito ya no existe — hoy el
-   documento se emite y se cobra, sin trámite en el medio.
-   Lo que queda para mirar son las tres cosas que sí pueden salir mal en
-   ventanilla, y por eso son los tres bloques del tablero:
-   1. CUÁNTA GENTE ESTÁ HABILITADA HOY  → carnets vigentes
-   2. QUÉ ESTÁ POR CADUCAR              → carnets, cupos, faenas y guías
-   3. CUÁNTO ENTRÓ Y CUÁNTO FALTA COBRAR → recaudación y saldo pendiente
-   POR QUÉ CADA BLOQUE VA ENVUELTO EN UN fn()
-   Inertia evalúa las closures solo cuando la prop se va a enviar de verdad. En
-   una visita parcial —cuando la pantalla pide refrescar únicamente el gráfico
-   de recaudación, por ejemplo— las demás no se ejecutan, y esas consultas
-   agregadas no se corren al pedo. Pasadas como valores sueltos se calcularían
-   todas en cada refresco.
-
-### Lo que falta cobrar, sumando los tres trámites que se cobran.
-
-   LA RESTA SE HACE EN PHP A PROPÓSITO
-   «Cuánto falta» no es `precio - pagado` a secas: se corta en cero, porque
-   pagar de más no genera saldo a favor. Esa regla vive en
-   `Pagable::saldoPendiente()` y no se duplica acá — escrita en SQL con un
-   GREATEST habría dos versiones de la misma decisión, y además GREATEST se
-   escribe distinto en PostgreSQL que en SQLite.
-   EL withSum NO ES OPCIONAL. Sin él, cada `saldoPendiente()` cae en
-   `$this->pagos()->sum(...)` y dispara UNA CONSULTA POR FILA, en la pantalla
-   a la que cae todo el mundo al entrar. Con él, lo cobrado de todos viene en
-   la misma consulta y el trait lo reusa.
-   Los `with()` de los catálogos son por lo mismo: `montoACobrar()` lee el
-   precio del tipo de carnet y el valor de la escala.
-
-### Los últimos catorce días, jornada por jornada: cuántos documentos se
-
-   PARA QUÉ, SI LOS NÚMEROS YA ESTÁN ARRIBA
-   Alimenta las líneas chicas que van al pie de los indicadores. No son
-   adorno: un número solo —«0 documentos hoy»— no dice si eso es lo normal
-   de un martes o si la ventanilla se paró. La línea de atrás lo pone en
-   contexto sin gastar una tarjeta entera en un gráfico aparte.
-   CATORCE DÍAS, no treinta: el dibujo mide unos 60 px de alto y ahí adentro
-   treinta puntos se pisan entre sí y quedan como una mancha. Dos semanas
-   alcanzan para ver el ritmo y para que se distinga un lunes de un sábado.
-
-### Agrupa una tabla por jornada. Cuenta filas, o suma una columna si se le
-
-   Existe para no repetir cuatro veces el mismo group by: reducir un
-   timestamp al día se escribe distinto en cada motor, y esa expresión vive
-   en App\Support\Sql justamente para que no se copie por ahí.
-
-### Cuántos carnets vigentes hay de cada tipo del catálogo.
-
-   Se recorre el catálogo ENTERO y no solo lo que devolvió la consulta: un
-   tipo con cero carnets también es información —dice que nadie lo pide— y
-   si no aparece, el gráfico miente por omisión.
-
-### Pescadores contra comercializadores, entre los carnets vigentes.
-
-   Es el número que dice cómo se reparte el padrón habilitado entre las dos
-   actividades. Sale del enum y no de la base para que los dos aparezcan
-   aunque uno esté en cero.
-
-### with() para no caer en N+1: sin esto, diez filas serían 31
-
-   OJO CON PEDIR COLUMNAS SUELTAS: el beneficiario va con las CINCO
-   partes del nombre porque `nombreCompleto` las lee todas, y
-   `tipoCarnet` va ENTERO —sin `:id,nombre`— porque
-   `Carnet::montoACobrar()` lee `precio_bs`. Una columna que un
-   método consulta y no está en el select vuelve null, y el método
-   contesta cualquier cosa sin ningún error.
-
-### Lo que está por caducar o ya caducó sin cerrarse.
-
-   ES EL BLOQUE ACCIONABLE DEL TABLERO
-   Las dos últimas cifras no son avisos de vencimiento sino de TRABAJO SIN
-   CERRAR: una faena o una guía que se pasó de fecha y sigue en `activa` es
-   un papel que alguien se llevó y del que nadie registró la vuelta. El
-   comando diario las marca, pero entre corrida y corrida quedan acá a la
-   vista.
+   REHECHO EL 27/09/2026 PARA QUE SE ENTIENDA DE UN VISTAZO. Cinco bloques, en
+   el orden en que se miran: trabajo pendiente, cuatro números, recaudación,
+   avisos y últimos carnets. Se sacaron los minigráficos de 14 días, el gráfico
+   de carnets por tipo (repetía «por actividad») y «por cobrar», que cargaba
+   TODOS los carnets, autorizaciones y guías en PHP para restar.
+   TRABAJO PENDIENTE es lo accionable: por documento, cuántos borradores
+   esperan que ventanilla cobre y envíe (`pendiente`) y cuántos esperan firma
+   (`en_revision`). Una consulta agrupada por tabla. Las URL van armadas con
+   los enums, con el filtro `?estado=` que ya aceptan los listados.
+   AVISOS solo lista lo que pide una acción. Las faenas vencidas no están: la
+   faena no registra la vuelta y sus kilos quedan consumidos, así que vencer
+   no deja nada pendiente. La guía sí: vencida y sin cerrar, falta registrar
+   la llegada.
+   CADA BLOQUE VA EN UN fn(): Inertia evalúa la closure solo si la prop se
+   envía, así una visita parcial no corre las demás consultas.
 
 ## `app/Http/Controllers/Panel/FaenaController.php`
 
@@ -1229,6 +1398,12 @@
    enum, la tercera exige que esté en curso— y deducirlas en la pantalla
    sería una segunda copia de cada una.
 
+### EL CUPO DEL QUE SALIERON LOS KILOS.
+
+   Va en la ficha porque es la pregunta que sigue: «¿le queda
+   para otra salida?». Sin esto habría que ir al módulo de cupos
+   a buscarlo.
+
 ## `app/Http/Controllers/Panel/GuiaController.php`
 
 ### GUÍAS DE MOVIMIENTO — un traslado de producto (paso 4, rama comercializador)
@@ -1257,6 +1432,12 @@
    la última además prohíbe anular una guía CERRADA, porque el traslado ya
    ocurrió— y deducirlas en la pantalla sería una segunda copia.
 
+### Son MOMENTOS, no días: van con toIso8601String().
+
+   Los cinco días se cuentan desde la HORA de emisión —una guía de
+   las 18:00 del lunes vence a las 18:00 del sábado— así que mandarlas
+   como día perdería justamente el dato que decide la vigencia.
+
 ## `app/Http/Controllers/Panel/PagoController.php`
 
 ### El control de las boletas: validar, observar y corregir un depósito.
@@ -1265,6 +1446,12 @@
    está mirando la tarjeta de pagos y no hay por qué sacarlo de ahí.
    El controlador no decide nada: las reglas están en `Pago::admiteControl()` y
    en `ControlarPagoService`. Acá solo se sube el archivo y se traduce el error.
+
+### CORREGIR — POST /panel/pagos/{pago}/corregir
+
+   POST y no PATCH porque puede traer un ARCHIVO: un multipart no viaja en un
+   PATCH. Y se sube ANTES de la transacción, que no deshace escrituras en
+   disco; el `catch` lo borra. La boleta vieja la borra el servicio.
 
 ## `app/Http/Controllers/Panel/ReciboController.php`
 
@@ -1309,6 +1496,25 @@
    Se activa acá y no en `config/dompdf.php` a propósito: ese archivo
    lo publica el paquete y conviene dejarlo tal cual para poder
    compararlo cuando se actualice.
+
+### Cuántos renglones tiene el cuadro de importes como mínimo.
+
+   El talonario de papel trae tres rayas impresas: con un solo cobro, el
+   cuadro quedaría alto y vacío, y con menos de tres el recibo dejaría de
+   parecerse al papel que la gente conoce.
+
+### Qué trámite concreto pagó este abono.
+
+   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`: es el
+   mismo dato, pero así el analizador avisa cuando se agrega un cobrable y
+   este método se olvida.
+
+### IMPRIMIR — GET /panel/recibos/{recibo}/imprimir
+
+   Dibuja el talonario verde del SEDAG en media carta apaisada. La maqueta
+   está en `views/documentos/recibo-oficial.blade.php` y se adapta con
+   App\Support\ReciboImpreso, que expone lo que ese Blade pide sin obligar a
+   reescribirlo: es una maqueta de coordenadas fijas, medida contra el papel.
 
 ## `app/Http/Controllers/Panel/TipoCarnetController.php`
 
@@ -1370,6 +1576,32 @@
    no es un olvido: mostrar la actividad —aunque fuera marcada en
    rojo— arriesga que el inspector lea la fila y no el color. Lo que
    no habilita, no aparece.
+
+### Largo mínimo aceptado antes de ir a la base.
+
+   No es una regla de negocio sino un filtro barato: un código de dos letras
+   no puede existir, y cortando acá una URL manipulada ni siquiera llega a
+   consultar.
+
+### El código escrito a mano, cuando el QR no se deja escanear.
+
+   Se normaliza ANTES de validar, y eso no es un detalle: el código se
+   imprime en grupos de cuatro y la gente lo copia con los espacios. Sin
+   normalizar primero, la validación rechazaría lo que el operador ve
+   escrito en la tarjeta.
+
+### Busca el carnet por su código.
+
+   La comparación la hace el ÍNDICE ÚNICO de la base, que responde en el
+   mismo tiempo encuentre o no. Comparar en PHP obligaría a traer filas y a
+   cuidarse del ataque por tiempo —una comparación normal corta en el primer
+   carácter distinto—; acá no hay nada que filtrar.
+
+### La cédula va ENMASCARADA: solo los últimos tres dígitos.
+
+   Alcanza para que el inspector confirme contra el documento que la
+   persona le está mostrando, y no alcanza para que alguien que
+   encuentre un carnet tirado se haga con el número completo.
 
 ## `app/Http/Controllers/StorageController.php`
 
@@ -1472,17 +1704,17 @@
    comparación tiene que correr DENTRO de la transacción y con la fila del
    trámite bloqueada. Ver CobrarService::resolver().
 
-## `app/Http/Requests/Panel/CompletarFaenaRequest.php`
+### LA BOLETA ES SIEMPRE OBLIGATORIA
 
-### Reglas para cerrar un permiso de faena.
+   En esta unidad no se cobra en efectivo ni por QR: todo pago es un
+   depósito bancario, y sin la boleta lo único que respalda el cobro
+   es que alguien lo tipeó — eso no se puede cruzar contra el
+   extracto del banco.
 
-   LOS KILOS SON OPCIONALES, Y ESE ES EL PUNTO
-   Lo declarado al salir es una previsión; lo que se descargó lo dice la
-   balanza. Casi siempre coinciden y el operador no escribe nada: la faena se
-   cierra con lo que decía.
-   Cuando NO coinciden, el campo permite corregirlo. Si la corrección es hacia
-   arriba, el servicio vuelve a comprobar el saldo del cupo — de lo contrario
-   cerrar una faena sería la forma de saltear el límite.
+### ÚNICO entre los pagos VIVOS. Es lo que impide cargar la misma
+
+   El índice de la base lo vuelve a exigir: dos ventanillas
+   simultáneas pasarían esta comprobación las dos.
 
 ## `app/Http/Requests/Panel/EliminarCupoRequest.php`
 
@@ -1513,6 +1745,12 @@
    simultáneas las pasan las dos. Un Request corre antes de todo eso.
    Ver EmitirCarnetService::emitir().
 
+### LA ACTIVIDAD ES UN ENUM Y NO UN CATÁLOGO, y por eso se valida
+
+   De ella cuelga lógica —qué puede emitir la credencial, si lleva
+   cupo— así que no puede ser una fila editable: cambiarle el nombre
+   a un tipo de carnet no debe cambiar lo que ese carnet habilita.
+
 ## `app/Http/Requests/Panel/EmitirFaenaRequest.php`
 
 ### Reglas para emitir un permiso de faena.
@@ -1533,6 +1771,25 @@
    dependen de la fecha de hoy y no se pueden expresar en una regla de
    validación.
 
+### EL CÓDIGO DEL TALONARIO, único GLOBAL.
+
+   La regla replica el índice único de la base. Que esté duplicada
+   acá y en el servicio no es redundancia inútil: esta pinta el
+   mensaje bajo el campo, la del servicio cubre la carrera entre dos
+   ventanillas, y el índice es la red que garantiza.
+
+### El peso declarado al salir. `gt:0` porque una guía de cero kilos
+
+   Al CERRAR se puede corregir contra la balanza del destino, que es
+   donde el número se vuelve real.
+
+### LA MARCA QUE VALE PLATA: con ella el arancel se cobra al 50%.
+
+   Va como booleano y no como un catálogo de «tipo de producto»
+   porque la resolución solo distingue dos casos, y un catálogo
+   abriría la puerta a que alguien agregue una fila con descuento sin
+   que haya resolución detrás.
+
 ## `app/Http/Requests/Panel/GuardarAsociacionRequest.php`
 
 ### DOS ASOCIACIONES NO PUEDEN LLAMARSE IGUAL.
@@ -1542,6 +1799,12 @@
    `whereNull('deleted_at')` es lo que reproduce esa parcialidad:
    sin él, un nombre liberado por una baja seguiría bloqueado acá y
    la pantalla diría «ya existe» sobre algo que la base aceptaría.
+
+### Reglas para crear y editar una asociación.
+
+   Mismo criterio que GuardarBeneficiarioRequest: crear y editar comparten las
+   reglas, así que se escriben una sola vez y el día que cambien no hay dos
+   lados que sincronizar.
 
 ## `app/Http/Requests/Panel/GuardarBeneficiarioRequest.php`
 
@@ -1570,6 +1833,19 @@
    índice garantiza, pero su error es ilegible; esta regla es la que
    pinta el mensaje bajo el campo.
 
+### El nombre, partido como viene en la cédula.
+
+   El segundo nombre y el apellido materno no son obligatorios porque
+   mucha gente no los tiene, y exigirlos dejaría a esa gente fuera del
+   sistema. El apellido paterno sí: es NOT NULL en la base.
+
+### Normaliza los datos ANTES de validar.
+
+   Ventanilla escribe con espacios de más y en minúsculas; acá se limpia una
+   sola vez para que la base guarde siempre el mismo formato. Un espacio al
+   final no se ve en pantalla pero viaja a `nombreCompleto` y ensucia el
+   nombre impreso en el carnet.
+
 ## `app/Http/Requests/Panel/GuardarCategoriaAprovechamientoRequest.php`
 
 ### Reglas para crear y editar un tramo de la ESCALA OFICIAL.
@@ -1590,6 +1866,24 @@
    y bloquearlos haría imposible cargarla. Se avisa desde la pantalla, que ve
    la escala entera de una vez. Ver el índice de la escala.
 
+### NO lleva `max:7` aunque hoy la escala tenga siete tramos.
+
+   El número de tramos lo fija una resolución y puede cambiar; un
+   tope escrito en código convertiría ese cambio en un despliegue,
+   que es exactamente lo que esta tabla vino a evitar.
+
+### El TEXTO OFICIAL, y no se deduce de los kilos.
+
+   El tramo más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese
+   «PAICHE» no está en ningún número. El documento impreso tiene que
+   decir lo que dice la resolución.
+
+### El control que mira la escala ENTERA, no el tramo suelto.
+
+   Corre después de las reglas de campo —si los kilos ni siquiera son
+   números, no tiene sentido buscar solapes— y por eso va en `after()` y no
+   dentro de `rules()`.
+
 ## `app/Http/Requests/Panel/GuardarTipoCarnetRequest.php`
 
 ### Reglas para crear y editar un tipo de carnet.
@@ -1600,6 +1894,11 @@
    cada carnet emitido.
    Se acepta el 0 —un carnet gratuito por resolución es posible— pero no un
    negativo, que no significa nada.
+
+### Dos tipos no pueden llamarse igual: en un desplegable serían
+
+   Esta tabla NO tiene borrado lógico, así que el unique va simple
+   —sin el whereNull de las asociaciones—.
 
 ## `app/Http/Requests/Panel/GuardarUsuarioRequest.php`
 
@@ -1694,6 +1993,11 @@
    administrador y se le está sacando el rol o la cuenta, que
    es un puñado de veces al año: no hace falta optimizarla.
 
+### Exige el dominio de la Gobernación, si está configurado.
+
+   Vive en su propio método y no incrustado en rules() para que el `if` no
+   ensucie el listado de reglas, que se lee de un vistazo.
+
 ## `app/Http/Requests/Panel/ObservarPagoRequest.php`
 
 ### Reglas para OBSERVAR un depósito.
@@ -1745,31 +2049,6 @@
    El mínimo de 10 caracteres coincide con el de la ventana de confirmación del
    panel: si acá fuera menor, el botón se habilitaría antes de que el servidor
    acepte el texto.
-
-## `app/Http/Requests/Panel/RegistrarPagoCupoRequest.php`
-
-### Reglas para cargar UNO O VARIOS depósitos contra un aprovechamiento.
-
-   LLEGAN EN UN ARREGLO PORQUE LA PANTALLA ES REPETIBLE
-   El operador agrega tantas secciones como depósitos trajo la persona, y las
-   manda todas juntas. Cada una es un depósito completo: su monto, su número de
-   boleta, su fecha y su archivo.
-   LOS NÚMEROS DE BOLETA SE COMPARAN CONTRA LA BASE **Y ENTRE SÍ**
-   `Rule::unique` mira la tabla, no el resto del formulario: dos secciones con el
-   mismo número pasarían las dos y recién chocarían contra el índice, con un
-   error de base en la cara del operador. Por eso va además `distinct`.
-   LO QUE NO SE VALIDA ACÁ
-   Que la suma no exceda el saldo. Esa comparación corre DENTRO de la
-   transacción y con la fila del cupo bloqueada: entre que se abre el formulario
-   y se guarda, otra ventanilla puede haber cobrado. Ver CobrarService::resolver().
-
-### ¿EL OPERADOR PIDIÓ ENVIARLO A REVISIÓN EN EL MISMO ACTO?
-
-   Viene del botón, que cambia de texto según si las secciones cubren
-   el monto: «Registrar depósitos» cuando falta, «Registrar y enviar
-   a revisión» cuando alcanza. Es una INTENCIÓN, no un permiso: si al
-   guardar el saldo no quedó en cero —porque otra ventanilla movió
-   algo— el controlador registra igual y no envía.
 
 ## `app/Http/Requests/Panel/RevocarCarnetRequest.php`
 
@@ -1883,6 +2162,31 @@
    único que necesita del cupo es el volumen, que ya está decidido.
    NO incluye `agotado` —eso no cambió— ni, obviamente, los vencidos.
 
+### Lo que sale este cupo: el valor de la escala con la que se otorgó.
+
+   Exigido por el trait Pagable. Si la categoría no está cargada se consulta
+   —no se puede devolver 0 y seguir, porque eso daría un saldo de 0 y el
+   sistema creería que el cupo está pagado—.
+
+### ¿Se puede borrar la fila entera?
+
+   Mismo criterio que la edición MÁS las faenas: un cupo sin pagos puede
+   igual tener permisos emitidos encima —el talonario de faenas es papel y se
+   llena antes de cobrar— y borrarlo dejaría esas salidas sin la bolsa madre
+   que las respalda.
+
+### ¿Se le pueden cargar depósitos hoy?
+
+   Solo en pendiente: en revisión el monto ya está cubierto y el expediente
+   presentado, y después de aprobado la plata que entre de más no es de este
+   trámite.
+
+### ¿Vale HOY?
+
+   Mira el estado Y la fecha. El estado solo no alcanza: `vencido` lo
+   escribe un comando que corre una vez al día, así que entre corrida y
+   corrida un cupo que venció ayer sigue diciendo «activo» en la base.
+
 ## `app/Models/Asociacion.php`
 
 ### UN default de la base NO llega al objeto que devuelve create().
@@ -1986,6 +2290,24 @@
    vuelve lento, la salida es un índice funcional sobre esta misma expresión,
    no volver a guardar el nombre.
 
+### La dirección para mostrar la foto. NULL si la ficha no tiene.
+
+   Pasa por Archivos::url porque la columna guarda una ruta cuando el disco
+   es local y una dirección completa cuando es s3, y las dos formas pueden
+   convivir en la misma tabla.
+
+### Las guías que emitió COMO COMERCIALIZADOR.
+
+   La clave foránea va explícita porque no sigue la convención: la columna
+   se llama `beneficiario_com_id` justamente para que nadie la confunda con
+   el pescador que extrajo la carga, que es otra persona.
+
+### Su bolsa madre utilizable HOY, o null.
+
+   Es lo que el formulario de faenas necesita: sin ella no hay de dónde
+   descontar kilos y no se puede emitir el permiso.
+   Mismo cuidado con `relationLoaded()` que arriba, y por el mismo motivo.
+
 ## `app/Models/Carnet.php`
 
 ### La credencial física que se entrega en ventanilla.
@@ -2014,6 +2336,25 @@
    lo PROHÍBE, la ficha lo muestra o no, y el plástico imprime el renglón
    CUPO o le da la tira entera al tipo de actor.
 
+### El código en grupos de cuatro: «PES2 6000 0017».
+
+   Se guarda SIN separadores y se muestra con ellos. Un código de catorce
+   caracteres seguidos es imposible de dictar por teléfono o de tipear de un
+   plástico gastado, y los separadores guardados romperían la búsqueda de
+   quien lo escriba sin ellos.
+
+### Lo que sale esta credencial: el precio de su tipo.
+
+   Exigido por el trait Pagable. Si la relación no está cargada la consulta
+   sale igual —devolver 0 daría saldo 0 y el sistema creería que está
+   pagado—.
+
+### ¿Puede emitir permisos de faena?
+
+   Las tres condiciones son necesarias: que sea de pescador, que el carnet
+   valga hoy, y que tenga una bolsa madre con saldo. Sin la tercera se
+   emitirían faenas sin cupo del que descontarlas.
+
 ## `app/Models/CategoriaAprovechamiento.php`
 
 ### Un tramo de la ESCALA OFICIAL de aprovechamiento pesquero.
@@ -2024,6 +2365,24 @@
    NO SE BORRA UNA ESCALA. Los aprovechamientos otorgados apuntan acá para
    dejar constancia de bajo qué tramo se autorizaron; una escala derogada se
    pone en `estado = false` y desaparece del formulario sin tocar lo histórico.
+
+### Cómo se lee en un desplegable: «3 · 201 kg Hasta 500 Kg — 110,00 Bs».
+
+   Se usa `descripcion_kg` y no los dos decimales, porque el texto oficial
+   no siempre es la lectura literal del rango: el tramo más alto dice
+   «PAICHE» y eso no está en ningún número.
+
+### ¿Este volumen cae dentro del tramo?
+
+   Los dos extremos entran. Es lo que dice el texto oficial —«1 Kg Hasta 100
+   Kg»— y además, con uno de los dos abierto, un cupo de exactamente 100 kg
+   no caería en ninguna escala.
+
+### El tramo que corresponde a este volumen, o null si se pasa de la escala.
+
+   Devuelve null en vez de caer al tramo más alto a propósito: un pedido de
+   5000 kg cuando la escala llega a 2000 no es «el tramo 7», es un pedido
+   que necesita resolución aparte. Silenciarlo cobraría de menos.
 
 ## `app/Models/GuiaMovimiento.php`
 
@@ -2056,6 +2415,19 @@
    previa y el reporte de recaudación— y cada una parte de una tarifa
    distinta.
 
+### El vencimiento que corresponde a una emisión.
+
+   Se calcula y se GUARDA, no se deriva al leer: si la resolución cambia el
+   plazo, las guías ya emitidas tienen que seguir venciendo cuando dice el
+   papel que va dentro del camión.
+
+### Lo que se cobra por esta guía. Exigido por el trait Pagable.
+
+   La tarifa base sale de configuración y no de una tabla propia: hoy es un
+   único valor para todas las guías. El día que se vuelva una escala por
+   destino o por volumen, esto pasa a leer una tabla y el resto del circuito
+   de cobro no se entera.
+
 ## `app/Models/Pago.php`
 
 ### Un abono: una entrega de dinero, contra un trámite y bajo un recibo.
@@ -2086,6 +2458,31 @@
    GuiaMovimiento::class      => ['comercializador'],
    ])])
 
+### La dirección completa de la boleta, o null si no hay.
+
+   La columna guarda una RUTA; quién la convierte en dirección depende del
+   disco activo, y eso lo sabe App\Support\Archivos —el mismo que la escribe
+   y la borra—. Armada acá a mano, escribir y leer podrían mirar discos
+   distintos.
+
+### Cómo se nombra el trámite pagado en el detalle del recibo.
+
+   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`, que
+   es el mismo dato pero sin que el analizador pueda avisar cuando se agrega
+   un tipo nuevo y este método se olvida.
+
+### Los abonos de un trámite concreto.
+
+   Recibe el modelo y no el par (tipo, id) a mano: escrito a mano, el tipo
+   se copia como texto y el día que una clase se renombre o se mueva de
+   namespace la consulta deja de encontrar nada, en silencio.
+
+### Los depósitos hechos en una fecha, según lo que dice la BOLETA.
+
+   Es otra pregunta que `delDia()`, que mira `created_at`: un depósito del
+   viernes cargado el lunes entra en uno y no en el otro. El primero cuadra
+   el trabajo del día; este se cruza contra el extracto del banco.
+
 ## `app/Models/PermisoFaena.php`
 
 ### La autorización de UNA salida de pesca.
@@ -2105,6 +2502,20 @@
    fila deja un hueco en la serie que nadie puede explicar y libera un número
    que el índice único volvería a aceptar, así que dos salidas distintas
    podrían terminar diciendo ser el mismo papel. Se completa o se vence.
+
+### VIGENCIA MÁXIMA DE UNA FAENA, en días.
+
+   Está acá y no escrito a mano en el controlador porque es una regla de la
+   resolución, no un detalle del formulario: la usan el alta, la validación
+   y la vista previa del papel. Escrita en tres lados, cambiarla se hace en
+   dos y el tercero sigue emitiendo con el plazo viejo.
+
+### La fecha límite que corresponde a una salida.
+
+   Se CALCULA acá y se GUARDA en la fila, en vez de derivarse al leer: si
+   mañana la resolución baja el plazo a quince días, los permisos ya
+   emitidos tienen que seguir venciendo cuando dice el papel que el pescador
+   tiene en la mano.
 
 ## `app/Models/Recibo.php`
 
@@ -2133,6 +2544,19 @@
    ignora en silencio y el N+1 sigue ahí. Va con `morphWith`, declarando qué
    traer para cada tipo. Ver Pago::pagable().
 
+### La suma de lo que HOY cuelga de este recibo.
+
+   NO es lo mismo que `monto_total`, y la diferencia es el punto: la columna
+   es lo que se IMPRIMIÓ y este método es lo que HAY. Si alguien corrigió un
+   abono después de emitir el papel, los dos números se separan — y eso es
+   justamente lo que un arqueo tiene que poder detectar.
+
+### Recalcula y guarda el total a partir del detalle.
+
+   Se llama al CERRAR el recibo, antes de imprimirlo — nunca al leerlo. Una
+   vez que el papel salió, este método no se vuelve a tocar: para eso está
+   `cuadra()`, que informa la diferencia en vez de taparla.
+
 ## `app/Models/TipoCarnet.php`
 
 ### Una clase de credencial y su arancel: «Carnet de Pescador», 80 Bs.
@@ -2142,6 +2566,12 @@
    De este nombre no cuelga NINGUNA decisión: el mismo documento figura como
    «Carnet de Pescador» o como «Pescador Artesanal» según quién lo cargó, y un
    match sobre el texto rompería en silencio el día que alguien lo edite.
+
+### El precio de HOY, para armar un cobro nuevo.
+
+   No sirve para leer lo que salió un carnet ya emitido: si el arancel
+   cambió, esta columna ya dice otra cosa. Lo cobrado de verdad está en
+   `pagos`, que no se recalcula nunca.
 
 ## `app/Models/User.php`
 
@@ -2153,6 +2583,13 @@
    era el juego de pruebas, que se eliminó el 14/09/2026.
    `Beneficiario` sí conserva la suya: DemoSeeder la usa para poblar el
    padrón de prueba.
+
+### Los depósitos que esta persona cargó en ventanilla.
+
+   OJO: apuntaba a `user_id`, UNA COLUMNA QUE NUNCA EXISTIÓ en `pagos`. La
+   relación estaba rota desde el primer día y no se notaba porque nadie la
+   llamaba —Eloquent no valida el nombre de la columna hasta que se ejecuta
+   la consulta—. Se arregló al agregar `registrado_por`.
 
 ## `app/Services/CobrarService.php`
 
@@ -2240,6 +2677,26 @@
    explica por qué entró esa plata — y el recibo es justamente el respaldo
    de eso.
 
+### La serie del correlativo de caja.
+
+   Vive acá y no escrita en cada llamada porque `CorrelativoService` entrega
+   números POR SERIE: dos cadenas distintas son dos contadores distintos, y
+   un error de tipeo abriría una serie paralela que nadie pidió, con su
+   propio 0001.
+
+### El total se CONGELA acá, con los abonos que acaban de entrar.
+
+   Recalcularlo al leer haría que el papel entregado cambiara si
+   después se corrige un abono, y lo que se imprimió es lo que la
+   persona pagó. Ver Recibo::cuadra(), que compara lo impreso con lo
+   que hay hoy en vez de taparlo.
+
+### Cómo se nombra un trámite en el recibo y en los mensajes de error.
+
+   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`: es el
+   mismo dato, pero así el analizador avisa cuando se agrega un cobrable y
+   este método se olvida.
+
 ## `app/Services/ControlarPagoService.php`
 
 ### El control de las boletas: validar, observar y corregir.
@@ -2249,6 +2706,11 @@
    └──[corregir]──┘
    Un observado NO se valida: se corrige. Validarlo sin tocar el dato sería dar
    por bueno lo que se marcó como malo. Ver docs/MER.md.
+
+### Corregir el depósito: única salida de una observación.
+
+   Vuelve SIEMPRE a PENDIENTE, aunque no se cambie nada: el dato se volvió a
+   declarar y nadie lo miró desde entonces.
 
 ## `app/Services/CorrelativoService.php`
 
@@ -2274,6 +2736,13 @@
    ventanillas saquen el mismo número.
    La reserva —ese bloqueo— es la misma para las dos formas, y vive acá
    adentro una sola vez.
+
+### Entrega números correlativos por serie y gestión: DOC-PESCA-2026-0001.
+
+   El contador se bloquea con SELECT ... FOR UPDATE dentro de una transacción,
+   de modo que dos ventanillas cobrando al mismo tiempo nunca reciben el mismo
+   número. El contador se reinicia solo al cambiar de año porque la unicidad
+   de la fila es (serie, anio).
 
 ## `app/Services/EmitirCarnetService.php`
 
@@ -2351,6 +2820,19 @@
    columna tiene un índice único: sin reintentar, esa colisión sería un error
    de base de datos en la cara del operador, con alguien esperando el carnet.
    Se prueba varias veces y recién ahí se rinde.
+
+### Los catálogos se releen DENTRO de la transacción.
+
+   No es redundancia con el Request: entre que el operador abrió el
+   formulario y apretó guardar pueden pasar minutos, y en el medio alguien
+   pudo desactivar la asociación o el tipo desde el catálogo. El Request
+   mira el momento del envío; esto, el del guardado.
+
+### Su credencial vigente de ESTA actividad, o null.
+
+   Se consulta siempre contra la base y no se reutiliza ninguna relación
+   cargada: corre dentro del candado, y todo el punto es ver lo último
+   escrito, incluido lo que otra ventanilla acaba de crear.
 
 ## `app/Services/EmitirFaenaService.php`
 
@@ -2447,6 +2929,24 @@
    se rechaza— porque de lo contrario cerrar una faena sería la forma de
    saltear el cupo.
 
+### Y EL OTRO ESTADO QUE NO HABILITA: presentado y sin firmar.
+
+   Va aparte del anterior porque lo que falta es distinto —ahí plata,
+   acá una firma— y mandar al operador a cobrar un cupo ya cubierto
+   lo haría buscar un depósito que no existe.
+
+### EL TOPE SOLO SE HACE CUMPLIR EN MODO ESTRICTO.
+
+   La comprobación va acá adentro —con la fila del cupo bloqueada— y
+   no en el Request, porque el saldo puede moverlo otra ventanilla en
+   el mismo segundo.
+
+### Pone el cupo en `agotado` o lo devuelve a `activo` según su saldo real.
+
+   Vive acá y no en el modelo porque es una ESCRITURA, y el modelo solo
+   calcula. Se llama después de cualquier movimiento de kilos: emitir,
+   corregir al cerrar, o vencer una faena desde el comando diario.
+
 ## `app/Services/EmitirGuiaService.php`
 
 ### PASO 4 DEL FLUJO, RAMA COMERCIALIZADOR — la GUÍA DE MOVIMIENTO
@@ -2504,6 +3004,12 @@
    Cerrar significa que la carga llegó: el traslado ocurrió y esta guía lo
    amparó. Anularla después sería declarar que nunca amparó nada, y deja un
    viaje real sin respaldo — justo lo contrario de para qué existe.
+
+### LA ASOCIACIÓN SE COPIA DEL CARNET, no se pregunta de nuevo.
+
+   Es la que certificó a la persona al emitirle la credencial, y
+   preguntarla otra vez abriría la puerta a que una guía diga un
+   gremio y el carnet que la respalda diga otro.
 
 ## `app/Services/OtorgarCupoService.php`
 
@@ -2593,6 +3099,31 @@
    mañana una resolución cambia el criterio, los cupos ya otorgados tienen
    que seguir venciendo cuando dice el papel que la persona tiene en la mano.
 
+### EL VOLUMEN SALE DEL TECHO DEL TRAMO.
+
+   La escala dice «201 kg Hasta 500 Kg»: lo que se autoriza es el
+   máximo del rango, no un número que el operador elija adentro.
+   Dejarlo elegir convertiría la escala en una sugerencia y
+   abriría la puerta a cobrar el tramo 3 otorgando el volumen del 5.
+
+### NACE PENDIENTE, y de ahí sale solo al cobrarse.
+
+   Es lo que lo hace corregible: mientras no entró plata, el cupo
+   es un borrador que el operador puede arreglar o borrar con el
+   pescador todavía enfrente. Lo activa `CobrarService`.
+
+### SE COMPRUEBA CON LA COPIA BLOQUEADA, no con la que llegó.
+
+   Entre que el operador abrió el formulario y apretó guardar, otra
+   ventanilla pudo cobrar este mismo cupo. Preguntándole al modelo en
+   memoria, la edición pasaría sobre un cupo ya pagado.
+
+### Su bolsa madre utilizable hoy, o null.
+
+   Se consulta SIEMPRE contra la base y no se reutiliza la relación cargada:
+   este método corre dentro del candado, y todo el punto es ver lo último que
+   hay escrito, incluido lo que otra ventanilla acaba de crear.
+
 ## `app/Services/RevisarCupoService.php`
 
 ### EL CIRCUITO DE REVISIÓN DE UN APROVECHAMIENTO
@@ -2630,6 +3161,12 @@
    papel o no se presenta.
    El NIT y el nombre son opcionales: el comprobante puede ir a nombre de un
    tercero. Sin ellos sale a nombre del beneficiario.
+
+### SE VUELVE A MIRAR EL MONTO, aunque el envío ya lo había mirado.
+
+   No es redundancia: entre el envío y la firma pueden pasar días, y
+   en el medio alguien pudo dar de baja un pago. Aprobar un cupo que
+   dejó de estar cubierto lo habilitaría para pescar sin la plata.
 
 ## `app/Support/Archivos.php`
 
@@ -2683,6 +3220,18 @@
    más no rompe nada, una excepción acá sí —este método se llama desde
    los `catch` de operaciones que ya fallaron—.
 
+### El disco donde el sistema guarda y busca los adjuntos.
+
+   Sale de `FILESYSTEM_DISK`, igual que para StorageController. Vive acá —en
+   un solo método— para que escribir, leer y borrar no puedan terminar
+   mirando discos distintos.
+
+### Borra un archivo guardado.
+
+   Con la ruta —que es lo que hoy se guarda— se borra del disco activo, sea
+   local o s3. No hay nada especial que hacer: Flysystem resuelve el prefijo
+   del bucket solo, porque el disco lleva `'root' => env('AWS_ROOT')`.
+
 ## `app/Support/CodigoQr.php`
 
 ### EL CÓDIGO QR DE LOS DOCUMENTOS IMPRESOS
@@ -2717,6 +3266,24 @@
    con el QR maltratado, que es la única condición en la que alguien lo
    va a escanear.
 
+### Cuántos píxeles mide cada módulo (cada cuadradito) del código.
+
+   Con 8 px por módulo un QR de versión 3 sale de unos 300 px de lado: más
+   que suficiente para dibujarlo a 60 pt en el carnet sin que la impresora
+   tenga que inventar nada, y liviano (unos 2 KB en PNG).
+
+### El margen blanco alrededor, en módulos.
+
+   NO ES DECORACIÓN: la norma del QR lo llama «zona tranquila» y pide cuatro
+   módulos. Sin ella, el fondo verde del carnet toca los cuadritos del borde
+   y muchos lectores no encuentran dónde empieza el código.
+
+### El PNG del QR como data URI, listo para el `src` de un `<img>`.
+
+   Va embebido y no como ruta por lo mismo que las imágenes del recibo:
+   DomPDF resolvería una ruta contra el disco con las restricciones de
+   `chroot` y en producción terminaría en un recuadro vacío.
+
 ## `app/Support/Paginacion.php`
 
 ### Cuántas filas por página muestra un listado del panel.
@@ -2741,6 +3308,11 @@
    entre las opciones, el selector quedaría marcando una opción que no es
    la que se ve; por eso en ese caso se cae a la primera de la lista, que
    siempre existe.
+
+### Los tamaños de página que la pantalla puede pedir.
+
+   El primero es el que se usa cuando no se pide nada, y es también el que
+   el selector muestra marcado al entrar.
 
 ## `app/Support/ReciboImpreso.php`
 
@@ -2772,6 +3344,34 @@
    doscientas líneas de casos especiales —«veintiuno», «quinientos», «un
    millón»— que ya están resueltas y probadas ahí.
 
+### ARMA EL RECIBO IMPRESO A PARTIR DEL MODELO
+
+   Los pagos tienen que venir cargados con su `pagable`, y con `morphWith`:
+   una relación polimórfica NO se precarga con `with('pagable.beneficiario')`
+   —eso se ignora en silencio— y acá cada renglón necesita saber qué trámite
+   pagó.
+
+### Todas las boletas del recibo. El papel es UNO por trámite, así que tiene
+
+   Se corta en seis porque el renglón va de 198 a 226 pt —ahí empieza
+   DESCRIPCIÓN— y DomPDF no recorta, desborda.
+
+### El número que va en el recuadro N° del papel: 0016.
+
+   Se imprime SOLO LA PARTE NUMÉRICA de `REC-2026-0016`, porque el recuadro
+   del talonario es angosto y porque el prefijo y el año ya están impresos
+   alrededor. El número completo sigue en la base y en la pantalla.
+
+### Los tres recuadros DIA | MES | AÑO del encabezado.
+
+   Salen de `created_at` —cuándo se emitió el recibo— y no de hoy: una
+   reimpresión de marzo tiene que seguir diciendo marzo.
+
+### Los renglones del cuadro «IMPORTE A PAGAR Bs.».
+
+   Uno por cobro, en el orden en que entraron. Un pescador que pagó en dos
+   depósitos ve los dos escritos, igual que en el talonario de papel.
+
 ## `app/Support/Sql.php`
 
 ### Expresión que reduce una columna de fecha al día 'YYYY-MM-DD', para
@@ -2780,6 +3380,12 @@
    y en SQLite una cadena, así que la clave con la que vuelve el resultado
    cambia de forma según el motor y el `pluck` deja de encontrarla. Forzando
    el texto 'YYYY-MM-DD' en los dos, la clave es la misma.
+
+### Fragmentos de SQL que cambian entre motores.
+
+   El sistema corre sobre PostgreSQL en producción, pero en desarrollo puede
+   usarse SQLite. Todo lo que no sea SQL estándar pasa por acá para que no
+   haya consultas que funcionen en un motor y revienten en el otro.
 
 ## `app/Traits/Auditable.php`
 
@@ -2796,6 +3402,23 @@
    hecho: uno con el dato y otro con la explicación.
    ES ESPECIALMENTE ÚTIL AL BORRAR. Después del delete la fila ya no existe:
    si el motivo no viajó con el evento, no hay dónde colgarlo.
+
+### Registra en la tabla `auditorias` cada alta, cambio y baja del modelo,
+
+   Los modelos pueden declarar `$noAuditable` para excluir columnas del
+   registro (por ejemplo campos calculados o rutas de archivos temporales).
+
+## `app/Traits/Codificable.php`
+
+### El código en grupos de cuatro, separados por guion
+
+   Dieciséis caracteres seguidos no se pueden dictar por teléfono ni tipear de
+   un papel gastado, y de a cuatro sí. El separador es de PRESENTACIÓN —la
+   columna guarda los 16 pelados—, así que da igual cuál sea:
+   `normalizarCodigo()` borra todo lo que no sea alfanumérico antes de
+   comparar, y se puede tipear con guion, con espacio o sin nada.
+   Guion y no espacio: al copiar y pegar, un espacio se colapsa o se pierde
+   por el camino; el guion viaja entero.
 
 ## `app/Traits/Pagable.php`
 
@@ -2838,6 +3461,23 @@
    uno con su número de caja. Por eso la relación no puede ser un belongsTo
    colgado del trámite.
 
+### Cuánto cuesta este trámite. Lo define cada modelo:
+
+   - Carnet              → el precio de su tipo de carnet
+   - AprovechamientoPesq → el valor de la escala con la que se otorgó
+   - GuiaMovimiento      → el arancel, con el 50% de descuento si es piscicultura
+
+### Cuánto falta para cubrirlo.
+
+   Se corta en cero: pagar de más NO genera saldo a favor. Si entró dinero
+   de más, no es un abono de este trámite y se resuelve por caja — dejarlo
+   en negativo lo mostraría como un crédito que el sistema no sabe aplicar.
+
+### ¿Se pueden CONTROLAR sus depósitos? Solo donde hay circuito de revisión;
+
+   `false` acá y no un `method_exists` en quien pregunta: ese truco deja el
+   control apagado en silencio si alguien nombra el método distinto.
+
 ## `database/migrations/0001_01_01_000000_create_users_table.php`
 
 ### NO HAY TABLA DE RECUPERACION DE CONTRASEÑA.
@@ -2859,6 +3499,17 @@
    Va sobre `ci` SOLO: el complemento es parte del mismo documento, y con
    él adentro la misma persona pasaría cargada una vez con y otra sin.
 
+### Beneficiarios — la persona, UNA SOLA VEZ.
+
+   Tabla unificada y SIN columna de rol: quien pesca y además comercializa es una
+   persona con dos credenciales, no dos fichas. El rol vive en
+   `carnets.tipo_actor`, que es del documento.
+   De `primerNombre` en adelante van en camelCase, así que en SQL escrito a mano
+   hay que entrecomillar: SELECT "primerNombre". Sin comillas, PostgreSQL pasa el
+   nombre a minúscula y responde «column "primernombre" does not exist». Eloquent
+   entrecomilla solo; el problema aparece con whereRaw / orderByRaw.
+   Ver docs/MER.md.
+
 ## `database/migrations/2026_09_18_100500_create_carnets_table.php`
 
 ### Único GLOBAL, y en los dos sentidos:
@@ -2870,6 +3521,20 @@
    y está en la calle; reusar ese número haría que el mismo código
    llevara a dos documentos distintos.
 
+### Carnets — la credencial física que se entrega en ventanilla.
+
+   El mismo plástico para las dos actividades; lo que cambia es `tipo_actor`:
+   carnet (pescador)        ──< permisos_faena     (una por salida)
+   carnet (comercializador) ──< guias_movimiento   (una por traslado)
+   Se imprime lo que NO cambia después de salir de la impresora. El ESTADO no se
+   imprime: un carnet se revoca después y la tarjeta no se entera.
+   Ver docs/MER.md.
+
+### NULLABLE PORQUE SOLO EL PESCADOR LLEVA CUPO, y eso lo dice
+
+   `nullOnDelete` y no restrict: sin el cupo el carnet sigue siendo un
+   documento válido, se emitió y se entregó.
+
 ## `database/migrations/2026_09_18_100600_create_permisos_faena_table.php`
 
 ### Dos hojas del talonario no pueden tener el mismo número DENTRO del
@@ -2877,6 +3542,17 @@
    Y NO es parcial: dar de baja una faena no libera su número. La hoja
    se gastó y el pescador se la llevó; reusar el número dejaría dos
    salidas distintas diciendo ser el mismo papel.
+
+### Permisos de faena — la autorización de UNA salida de pesca.
+
+   El carnet es la llave anual; con él solo no se sale a trabajar. Cada salida se
+   autoriza con una faena: cuántos kilos y hasta cuándo. Vigencia máxima, un mes.
+   Apunta a DOS cosas a la vez y hacen falta las dos: `aprovechamiento_id` es de
+   dónde salen los kilos, `carnet_id` es quién los extrae. Son la misma persona
+   por caminos distintos, y se renuevan en fechas distintas.
+   NO se edita ni se borra: se vence o se completa. El número sale de un talonario
+   de papel que el pescador se llevó.
+   Ver docs/MER.md.
 
 ## `database/migrations/2026_09_18_100800_create_recibos_table.php`
 
@@ -2896,6 +3572,18 @@
    Ese listado además filtra por rango con `whereDate()`, y eso NO
    usa este índice —envuelve la columna en una función—. Se arregla
    comparando contra instantes en vez de días; queda anotado.
+
+### Recibos — la CABECERA del comprobante oficial de caja.
+
+   El papel numerado que la persona se lleva. Agrupa uno o varios `pagos`, que
+   pueden ser de trámites distintos:
+   recibo 0016 (180 Bs)  ──< pago  80 Bs → carnet
+   ──< pago 100 Bs → aprovechamiento
+   Es una tabla y no se arma al vuelo porque `numero_recibo` es un CORRELATIVO DE
+   CAJA —el dato que no se puede derivar de otras tablas— y porque el comprobante
+   tiene que ser INMUTABLE: por eso el nombre, el NIT y el total se COPIAN acá al
+   emitir.
+   Ver docs/MER.md.
 
 ## `database/migrations/2026_09_18_100900_create_pagos_table.php`
 
@@ -2935,6 +3623,32 @@
    libera su boleta y se la puede volver a cargar bien. Ya no hace falta
    excluir los NULL —como antes, por el efectivo— porque la columna es
    obligatoria.
+
+### Pagos — el DETALLE de lo que se cobró, depósito por depósito.
+
+   TODO pago es un DEPÓSITO BANCARIO: no hay efectivo ni QR en esta unidad. Por
+   eso cada fila lleva sí o sí su número de boleta, su fecha y su archivo.
+   Es POLIMÓRFICA porque se cobran tres cosas —carnet, cupo y guía— y las tres se
+   pagan igual. Partida en tres tablas, `numero_recibo` dejaría de ser único
+   global.
+   EL COSTO: se pierde la clave foránea. El motor no puede exigir que
+   `pagable_id` exista, porque no sabe en qué tabla buscarlo. La integridad la
+   sostienen los RESTRICT de las otras tablas y la aplicación.
+   Y no se precarga con `with('pagable.beneficiario')`: eso se IGNORA en silencio
+   y el N+1 sigue ahí. Va con `morphWith`.
+   Ver docs/MER.md.
+
+### NULLABLE: el depósito nace antes que el recibo. En el
+
+   CASCADE y no RESTRICT: un pago sin recibo no se imprime ni entra
+   en ningún arqueo.
+
+### EL NÚMERO DEL DEPÓSITO, ÚNICO GLOBAL.
+
+   Es lo que impide cargar la misma boleta dos veces —contra el mismo
+   trámite o contra otro—, que es la forma más fácil de que un cupo
+   figure pagado sin que haya entrado la plata. Único global y no por
+   trámite: la boleta es una sola en el banco.
 
 ## `database/seeders/BeneficiarioSeeder.php`
 
@@ -3086,6 +3800,171 @@
    polimórfico y mañana se controla igual el de un carnet o el de una guía.
    Las pantallas las llaman desde la ficha del trámite y vuelven ahí.
 
+### Panel de administración — requiere sesión iniciada
+
+   Todo lo de este archivo está dentro del middleware 'auth': si no hay sesión,
+   Laravel redirige al login antes de ejecutar nada.
+   Además cada ruta declara QUÉ PERMISO exige, con el middleware 'permiso'. Ese
+   alias apunta a spatie/laravel-permission y está registrado en
+   bootstrap/app.php. Los permisos salen del enum App\Enums\RolSistema, que es la
+   única fuente de verdad.
+   'permiso:beneficiarios.crear'  -> el usuario debe tener ese permiso
+   HOY EL ÚNICO ROL ES `administrador` Y LOS TIENE TODOS. El middleware igual va
+   en cada ruta, y no es trabajo de más: el día que exista el rol de ventanilla,
+   se agrega su lista al enum y las rutas ya están protegidas. Al revés —quitarlo
+   ahora «porque total el admin puede todo» y volver a ponerlo después— es donde
+   se olvida uno y queda un agujero.
+   ESCONDER UN BOTÓN EN REACT NO ES SEGURIDAD. usePermisos() sirve para que la
+   pantalla no ofrezca lo que no se puede hacer; quien realmente bloquea es este
+   middleware. Van siempre los dos.
+   Todas las URLs cuelgan de /panel. La parte pública vive fuera de ese prefijo
+   (routes/publico.php), así queda claro de un vistazo qué es administración y
+   qué ve el ciudadano.
+   No hay auto-registro de usuarios: las cuentas las crea el administrador.
+   EL ORDEN DE LOS BLOQUES ES EL DEL FLUJO DE TRABAJO
+   1. Beneficiarios      la persona, una sola vez
+   2. Aprovechamientos   la bolsa madre: el cupo en kilos
+   3. Carnets            la credencial anual, y su impresión
+   4. Faenas / Guías     los permisos operativos que cuelgan del carnet
+   5. Caja               recibos y pagos
+   Los módulos que todavía no existen NO tienen rutas declaradas, y eso es
+   deliberado: una ruta declarada convierte el renglón del menú en un enlace
+   pinchable (ver barra-lateral.tsx, que pregunta por la ruta antes de enlazar).
+   Sin ella, el renglón se dibuja en gris y se lee como «todavía no» en vez de
+   llevar a un 500.
+   Del modelo anterior no quedó nada: Trámites y Rubros no tienen equivalente y
+   se retiraron enteros. Están en git, en el commit `8d48422`.
+
+### 1. Beneficiarios — la persona, UNA SOLA VEZ
+
+   Es el primer paso del flujo, y el único módulo que sobrevivió al cambio de
+   núcleo casi intacto: la persona no cambió, lo que cambió es lo que le
+   cuelga.
+   OJO CON EL ORDEN DE LAS RUTAS. Laravel las evalúa de arriba hacia abajo y
+   se queda con la primera que coincide. Por eso 'beneficiarios/crear' tiene
+   que ir ANTES que 'beneficiarios/{beneficiario}': si estuviera después,
+   Laravel tomaría la palabra «crear» como si fuera el id, no encontraría
+   ningún registro y respondería 404.
+
+### 2. Aprovechamientos — la BOLSA MADRE del pescador
+
+   El cupo anual en kilos. Va ANTES del carnet en el flujo porque el plástico
+   necesita saber qué cupo imprimir: al revés habría que emitir el carnet y
+   corregirlo después, y en el medio existiría una credencial impresa sin
+   cupo.
+   `edit`, `update` y `destroy` EXISTEN, PERO SOLO SOBRE EL BORRADOR.
+   Un cupo nace PENDIENTE DE PAGO, y mientras nadie pagó nada es eso: un
+   borrador que el operador acaba de cargar contra el talonario, con el
+   pescador enfrente. Equivocarse de tramo se arregla corrigiendo la fila, y
+   uno cargado por error se borra con el motivo escrito.
+   En cuanto entra el primer boliviano las tres se cierran solas —lo decide
+   `EstadoAprovechamiento::permiteEdicion()`, no el middleware—: hay un recibo
+   numerado con el detalle impreso, y cambiar lo que ese papel dice por detrás
+   no es una corrección.
+   NO HAY «AMPLIAR». Un cupo cobrado es lo que dice el recibo, y si al pescador
+   le hacen falta más kilos, eso es un trámite nuevo: elegir el tramo, cobrarlo
+   y emitir otro recibo. Esa vuelta completa ES el control.
+   Un cupo editable SIEMPRE dejaría de ser un límite: alcanzaría con subirle
+   el tramo para saltear la escala, sin que quedara constancia de quién lo
+   decidió.
+   Mismo cuidado con el orden que en beneficiarios: 'crear' va ANTES de
+   '{aprovechamiento}' o Laravel toma esa palabra como si fuera el id.
+
+### CARGAR LOS DEPÓSITOS DESDE LA FICHA DEL CUPO.
+
+   El permiso es el de CAJA y no uno de aprovechamientos, porque esto es un
+   cobro: sale con recibo numerado y entra al arqueo del día. Que la pantalla
+   sea otra no cambia quién puede hacerlo.
+
+### 3. Carnets — la credencial anual
+
+   La LLAVE del año. De ella cuelgan los permisos operativos: faenas si es de
+   pescador, guías si es de comercializador.
+   NO HAY `edit` NI `update`. Un carnet emitido no se corrige: el plástico ya
+   salió de la impresora y está en manos de la persona, así que editarlo
+   dejaría al documento diciendo una cosa y al sistema otra —y la
+   verificación pública respondería por el dato nuevo, que el inspector NO
+   tiene delante—. Lo que hay es REVOCAR, con motivo, y emitir uno nuevo.
+   Mismo cuidado con el orden: 'crear' va ANTES de '{carnet}'.
+
+### 4a. Permisos de faena — una salida de pesca
+
+   Cuelgan del carnet de PESCADOR y descuentan kilos de la bolsa madre. El
+   carnet es la llave anual; con él solo no se sale a trabajar.
+   NO HAY `edit`, NI `update`, NI `destroy`, NI `anular`. El número sale de un
+   talonario de papel que el pescador se llevó: borrar la fila deja un hueco
+   en la serie que nadie puede explicar y libera un número que el índice único
+   volvería a aceptar.
+   Y `EstadoFaena` no tiene un estado anulado: una faena emitida de más se
+   deja VENCER, y al vencer libera su volumen sola. Lo único que se escribe
+   después de emitir es COMPLETAR, que registra la vuelta.
+
+### 4b. Guías de movimiento — un traslado de producto
+
+   La rama del COMERCIALIZADOR. Lo que la faena es para el pescador, la guía
+   es para él: el carnet habilita el año, la guía habilita el viaje.
+   TRES DIFERENCIAS CON LAS FAENAS:
+   - No toca ningún cupo: la comercialización no se autoriza por volumen.
+   - Lleva descuento: piscicultura paga el 50% del arancel.
+   - SÍ SE ANULA. `EstadoGuia` tiene ese estado y `EstadoFaena` no, porque
+   una guía emitida mal ampara un camión que puede estar en la ruta.
+   Igual que las faenas, NO hay `edit` ni `destroy`: el código sale de un
+   talonario de papel que viaja dentro del camión.
+
+### 5. Caja — el circuito del dinero
+
+   Atraviesa a todos los anteriores: se cobran la credencial, el cupo y la
+   guía, y los tres se pagan igual. NO es un paso del flujo —es algo que
+   puede pasar en cualquiera de ellos y varias veces— y por eso va aparte y
+   no intercalado.
+   DOS LISTADOS QUE NO SE REEMPLAZAN:
+   /caja     los ABONOS, uno por entrega de dinero. Es lo que se cuadra
+   contra el efectivo del cajón al cerrar el día.
+   /recibos  los PAPELES entregados, con su correlativo. Es lo que audita
+   Contabilidad.
+   Un recibo agrupa varios abonos, así que las dos listas nunca tienen la
+   misma cantidad de filas.
+   LOS RECIBOS NO TIENEN `store`: nacen del cobro, en la misma transacción.
+   Un endpoint para crear uno suelto permitiría un comprobante numerado sin
+   ningún pago detrás — un papel oficial que dice que entró plata que no
+   entró.
+
+### IMPRIMIR va ANTES de '/recibos/{recibo}'… no: van los dos con parámetro,
+
+   Entregar el papel numerado es un acto distinto de consultarlo: quien
+   audita la serie puede necesitar verla sin poder emitir comprobantes.
+
+### Catálogos — lo que sale de una resolución y casi no se toca
+
+   Son tres listas chicas: los gremios, la escala oficial de kilos y precios,
+   y los tipos de credencial con su arancel. De ellas dependen los dos pasos
+   siguientes del flujo —el cupo y el carnet— así que sin cargarlas no se
+   puede emitir nada.
+   CUELGAN DE /panel/catalogos/ Y NO DE LA RAÍZ del panel a propósito: son
+   mantenimiento, no trabajo de mostrador, y la URL lo dice sin que haga
+   falta explicarlo.
+   LOS TRES TIENEN index + store + update, Y NINGUNO TIENE destroy. No es un
+   olvido: los carnets, las guías y los aprovechamientos ya emitidos apuntan
+   a estas filas. Una entrada que se deja de usar se pone inactiva, y así los
+   documentos históricos la siguen mostrando —que es lo correcto: la persona
+   pertenecía a esa asociación cuando se le emitió el carnet—.
+   Tampoco tienen pantalla de alta ni de edición aparte: el formulario vive
+   al lado de la tabla, porque son listas de pocas filas que se comparan
+   entre sí mientras se cargan. Ver AsociacionController.
+   VER es de lectura y GESTIONAR es de administración, y por eso son dos
+   permisos: cualquiera que emita un carnet necesita LEER el catálogo —el
+   desplegable sale de acá— pero tocar una tarifa es otra cosa.
+
+### Módulos por construir
+
+   Aprovechamientos, Carnets, Faenas, Guías, Caja, Reportes y Configuración.
+   Todos aparecen en el menú lateral en gris, porque barra-lateral.tsx
+   comprueba si la ruta está declarada antes de convertir el renglón en
+   enlace.
+   Para construir cualquiera: copiar el patrón de Beneficiarios —controlador,
+   Request, tipos de TypeScript y pantallas—, que es la plantilla del sistema
+   y está comentado paso a paso a propósito.
+
 ## `routes/publico.php`
 
 ### throttle:60,1 = máximo 60 peticiones por minuto desde la misma IP.
@@ -3095,6 +3974,18 @@
    intento de adivinar una firma. Con 16 caracteres alfanuméricos —unas 8 · 10^24
    combinaciones— y 60 intentos por minuto, acertar deja de ser una posibilidad
    práctica.
+
+### Rutas públicas — sin autenticación
+
+   Acá va lo único que el sistema expone al ciudadano: la verificación de
+   autenticidad de un carnet. Es la URL codificada dentro del código QR impreso
+   en cada documento.
+   Un pescador muestra su carnet, el inspector escanea el QR con su teléfono y
+   cae en esta pantalla, que le dice si el documento es real, si está vigente y
+   para qué rubros habilita. Por eso NO puede pedir login.
+   HACE FALTA UN SOLO DATO: la firma de validación. El carnet no tiene número —se
+   retiró la columna `codigo`— y se identifica por esos dieciséis caracteres, que
+   están impresos en el plástico y dentro del QR. Ver VerificacionController.
 
 ## `resources/js/app.tsx`
 
@@ -3122,38 +4013,6 @@
    bajar el código de los seis módulos de una vez.
    Consecuencia práctica: cada archivo nuevo en pages/ queda disponible solo,
    sin registrarlo en ninguna lista.
-
-## `resources/js/components/comunes/codigo-qr.tsx`
-
-### EL CÓDIGO QR QUE SE IMPRIME EN CADA DOCUMENTO
-
-   Codifica la URL pública de verificación, que lleva la firma de validación:
-   /verificar/{firma}. Es lo ÚNICO del carnet que la contiene —en el plástico se
-   imprime el número de registro, que no abre nada—. El inspector lo escanea con
-   cualquier lector del teléfono y cae directo en la pantalla que le dice si el
-   carnet es auténtico y si está vigente.
-   ¿POR QUÉ EL QR LLEVA UNA URL Y NO SOLO EL CÓDIGO?
-   Porque un QR con el texto «4K7R-J2MX-P9TQ» adentro no hace nada: el lector
-   muestra esa cadena y el inspector tendría que abrir el navegador, recordar la
-   dirección del sistema y tipearla. Con la URL completa, escanear y verificar es
-   un solo gesto.
-   ¿Y POR QUÉ LA URL LA ARMA EL SERVIDOR Y SE RECIBE HECHA?
-   Porque lleva la firma de validación, y porque el dominio tiene que ser el
-   público: el ciudadano escanea desde su teléfono, fuera de la institución.
-   DESACTUALIZADO desde el 22/09/2026: config('jichi.url_verificacion') se
-   retiró y el dominio sale de APP_URL, que pasó a ser la única fuente. La
-   advertencia sigue valiendo, pero apuntada a APP_URL: si dice http://127.0.0.1:8000
-   el QR impreso no abre nada. Ver App\Support\QrVerificacion.
-   ¿POR QUÉ SE GENERA EN EL NAVEGADOR Y NO EN PHP?
-   Este componente es para las pantallas del panel, donde el QR se dibuja
-   mientras el operador carga los datos. Generarlo en el servidor obligaría a
-   una petición por cada tecla.
-   El PDF que se imprime es otra historia: ahí el QR lo va a generar PHP con
-   **simple-qrcode**, que ya está instalado, porque DomPDF no ejecuta
-   JavaScript. Los dos codifican exactamente la misma URL.
-   CORRECCIÓN DE ERRORES EN NIVEL ALTO ('H'). Permite reconstruir el código con
-   hasta un 30% de la superficie dañada. No es un lujo: estos documentos viven
-   doblados en el bolsillo de un pescador, se mojan y se despintan al sol.
 
 ## `resources/js/components/comunes/logo-jichi.tsx`
 
@@ -3197,6 +4056,12 @@
    modelo devuelve 100 en ese caso y sigue.
    La barra se dibuja con un div de ancho porcentual y no con una librería: para
    un solo valor, traer recharts sería cargar 100 KB para pintar un rectángulo.
+
+### Se avisa en ámbar por debajo del 20%.
+
+   Es el umbral en que conviene que el pescador se entere ANTES de salir:
+   descubrir que no alcanza cuando vuelve con la bodega llena no sirve de
+   nada, porque el producto ya se extrajo.
 
 ## `resources/js/components/panel/beneficiarios/formulario-beneficiario.tsx`
 
@@ -3264,6 +4129,20 @@
    el mismo archivo comparten esa corrección en vez de arrastrar cada una la
    suya. Ver `aFechaLocal()`.
 
+### BARRA DE ACCIONES FIJA AL PIE.
+
+   Con el formulario apilado, el botón de guardar quedaba al final de
+   tres pantallas de alto: había que bajar hasta el fondo para
+   usarlo, y para corregir un campo de arriba había que volver a
+   bajar. Fija, está siempre a un clic.
+
+### La fotografía, recortada en círculo como sale en el carnet.
+
+   Se muestra así y no como un rectángulo porque es como se va a imprimir: una
+   foto que se ve bien cuadrada puede quedar con la cabeza cortada al recortarla,
+   y descubrirlo recién al imprimir el carnet significa volver a llamar a la
+   persona.
+
 ## `resources/js/components/panel/comunes/buscador-beneficiario.tsx`
 
 ### AUTOCOMPLETADO DE BENEFICIARIOS
@@ -3286,21 +4165,6 @@
    tarda más que la de «antezana», llega después y PISA los resultados buenos:
    la pantalla termina mostrando coincidencias de un texto que ya no está en la
    caja. `AbortController` corta la anterior en cada tecleo.
-
-## `resources/js/components/panel/dashboard/grafico-carnets-por-tipo.tsx`
-
-### Cuántos carnets vigentes hay de cada tipo del catálogo.
-
-   Se cuentan solo los VIGENTES y no todos los emitidos, porque la pregunta del
-   tablero es «cuánta gente está habilitada hoy», y un carnet revocado o vencido
-   no habilita a nadie.
-   LAS BARRAS VAN HORIZONTALES (`layout="vertical"`) porque los nombres del
-   catálogo son largos —«Carnet Comercializador»— y en barras verticales
-   quedarían inclinados o cortados. Horizontal, el nombre entra entero sobre el
-   eje.
-   OJO: ResponsiveContainer mide a su padre, así que el padre necesita una
-   altura concreta. Por eso el CardContent lleva `h-72`. Sin esa altura el
-   gráfico se calcula con altura cero y no se ve nada.
 
 ## `resources/js/components/panel/dashboard/grafico-recaudacion-mensual.tsx`
 
@@ -3331,31 +4195,6 @@
    tokens ya tiene medido el contraste del texto encima, en modo claro y en
    oscuro. Los colores de recharts NO son clases de Tailwind sino atributos SVG,
    así que van como `var(--widget-1-fg)` y no como `text-widget-1-fg`.
-
-## `resources/js/components/panel/dashboard/mini-grafico.tsx`
-
-### LAS LÍNEAS CHICAS DEL PIE DE LOS INDICADORES
-
-   POR QUÉ ESTO NO USA RECHARTS, que ya está en el proyecto.
-   Un dibujo de estos son catorce puntos unidos, sin ejes, sin cuadrícula, sin
-   leyenda y sin globito al pasar el mouse. Recharts pesa más de 100 kB y trae
-   todo eso; acá se usaría el 2%. Y no es un costo cualquiera: los cuatro
-   indicadores son lo PRIMERO que se mira al entrar al sistema, la parte que el
-   tablero carga aparte justamente para que aparezca de inmediato (ver el
-   comentario de `lazy()` en pages/panel/dashboard.tsx). Meterles una librería
-   pesada adentro desarma esa decisión.
-   Un SVG a mano son treinta líneas y se dibuja en el primer cuadro.
-   LOS DOS DETALLES QUE HACEN FALTA PARA QUE UN SVG ESTIRADO NO SE VEA MAL
-   1. `preserveAspectRatio="none"` es lo que permite que el mismo dibujo llene
-   una tarjeta angosta y una ancha. Sin eso el SVG conserva su proporción y
-   deja aire a los costados.
-   2. Estirar el dibujo estira TAMBIÉN el grosor del trazo, y de forma despareja
-   —mucho a lo ancho, poco a lo alto—, así que la línea sale como una cuña.
-   `vector-effect="non-scaling-stroke"` le dice al navegador que dibuje el
-   trazo con el grosor pedido sin importar cuánto se haya estirado la caja.
-   El color no se elige acá: lo pone quien lo usa, porque estos dibujos van
-   sobre las tarjetas de color entero y tienen que salir del color del texto de
-   ESA tarjeta. `currentColor` los hereda solo.
 
 ## `resources/js/components/panel/dashboard/panel-avisos.tsx`
 
@@ -3388,42 +4227,11 @@
    NO SE NOTA EN EL ESCRITORIO, que es donde se prueba: aparece solo al
    angostar la ventana.
 
-## `resources/js/components/panel/dashboard/widget-estadistica.tsx`
+### Las últimas diez credenciales emitidas.
 
-### UNO DE LOS CUATRO NÚMEROS DE ARRIBA DEL TABLERO
-
-   Es el mismo componente repetido cuatro veces con datos distintos. Ese es el
-   sentido de un componente: se escribe el diseño UNA vez y se reutiliza
-   cambiándole las props.
-   VA PINTADO DE COLOR ENTERO y no como tarjeta blanca con un icono de color. La
-   diferencia no es estética: estos cuatro son el resumen del día y compiten por
-   la atención con dos gráficos, una tabla y un aviso de vencimiento. Siendo
-   blancos, pesan lo mismo que todo lo demás y hay que buscarlos; pintados, el
-   ojo cae ahí primero y recién después recorre el resto.
-   El pie es una franja translúcida que se apoya en el borde de abajo, y ahí va
-   el contexto: la línea de los últimos catorce días, o el desglose del número.
-   Puede no haber ninguno —no todo número tiene una serie detrás— y entonces la
-   tarjeta termina en la cifra.
-
-### Las clases van ESCRITAS ENTERAS, no armadas con `bg-widget-${tono}`.
-
-   Es la trampa clásica de Tailwind, la misma que está documentada en
-   components/ui/badge.tsx: solo llegan a la hoja de estilos final las clases
-   que Tailwind puede leer literalmente en el código. Armada juntando textos, la
-   clase no existe, la tarjeta sale transparente y no hay ningún error que lo
-   explique.
-   Fondo y color de texto van SIEMPRE juntos: el dorado necesita texto oscuro y
-   los tres azules texto claro (ver el comentario de los tokens en app.css), así
-   que separarlos permitiría combinar un par ilegible.
-
-### La franja de abajo cuando el número se puede PARTIR en pedazos.
-
-   «12 trámites sin resolver» no dice si son doce recién llegados o doce trabados
-   en revisión desde hace una semana, y esas dos situaciones piden cosas
-   distintas. La barra parte el número en sus pedazos reales y los rotula.
-   LOS PEDAZOS TIENEN QUE SER EXCLUYENTES entre sí: la barra los dibuja uno al
-   lado del otro sumando el total, así que dos categorías que se pisan —un mismo
-   expediente contado en las dos— dibujan una barra que miente sobre el total.
+   Se muestra el SALDO y no el precio: lo que le interesa a quien mira el
+   tablero es qué falta cobrar, no cuánto salía el carnet. Uno cubierto se ve de
+   un vistazo porque dice «Pagado» en verde.
 
 ## `resources/js/components/panel/layout/barra-lateral.tsx`
 
@@ -3445,6 +4253,19 @@
    justo en la configuración en la que el operador ya no ve los rótulos del menú
    y más necesita saber con qué sesión está trabajando. El encabezado, en
    cambio, mide siempre lo mismo.
+
+### El rótulo de una sección: «Ventanilla», «Registro», «Administración».
+
+   Angosta la barra, el texto no entra, pero el grupo sigue existiendo: se
+   reemplaza por una línea divisoria para que los iconos no queden como una
+   columna continua sin ninguna agrupación.
+
+### Un renglón del menú. Si el módulo todavía no existe se dibuja apagado.
+
+   LA FILA VA A TODO EL ANCHO y sin esquinas redondeadas, y el ítem activo se
+   marca con una barra dorada pegada al borde izquierdo. Es lo que hace que la
+   columna se lea como una lista y no como una pila de botones sueltos: la marca
+   está siempre en la misma coordenada, así que el ojo la encuentra sin buscar.
 
 ## `resources/js/components/panel/layout/barra-superior.tsx`
 
@@ -3603,45 +4424,6 @@
    Podría haber sido un GET, pero con POST el dato no queda en el historial del
    navegador de una computadora compartida.
 
-## `resources/js/components/publico/ficha-carnet.tsx`
-
-### EL ACTA DE VERIFICACIÓN DE UN CARNET
-
-   Lo que ve el inspector cuando escanea el QR. Va sobre la hoja blanca con
-   membrete, por lo explicado en `hoja-oficial.tsx`: el ciudadano tiene el papel
-   en la mano y compara, y si la pantalla se parece a otro papel oficial la
-   comparación la hace cualquiera sin que le expliquen.
-   EL SELLO ES LO PRIMERO Y LO MÁS GRANDE
-   La escena es un muelle, con sol, y el inspector mira el teléfono dos segundos.
-   Todo lo demás —nombre, gestión, actividad— es la letra chica que se lee si hace
-   falta; lo que tiene que entenderse de un vistazo es si el carnet vale o no.
-   Por eso el estado va arriba, en un sello grande y con color propio, y no como
-   una etiqueta más en una lista de datos.
-   LA ACTIVIDAD SOLO APARECE SI EL CARNET ESTÁ VIGENTE
-   Un carnet vencido o revocado no habilita nada, así que mostrar su actividad
-   —aunque fuera en gris— es pedirle al inspector que lea el sello y la línea al
-   mismo tiempo y saque la conclusión correcta. Con un carnet caído, el servidor
-   manda `actividad` en null y el bloque directamente no está.
-
-### LA ACTIVIDAD QUE EL CARNET AUTORIZA. Es UNA, no una lista: cada
-
-   Solo se muestra con el carnet VIGENTE, y el servidor ya manda
-   `actividad` en null cuando no lo está. Es deliberado: enseñar la
-   actividad de un carnet vencido o revocado —aunque fuera tachada—
-   arriesga que el inspector lea la línea y no la advertencia.
-
-### REVOCADO TIENE SELLO PROPIO, y no es un detalle estético.
-
-   Sin este caso el sello caería en el genérico de abajo y un carnet
-   revocado se anunciaría como VENCIDO. El inspector leería dos cosas
-   distintas en la misma pantalla, y se resuelven distinto: un vencimiento
-   se arregla emitiendo el carnet del año siguiente, una revocación es una
-   decisión de la unidad.
-   Va en rojo y no en ámbar porque, a diferencia del vencimiento, es una
-   SANCIÓN vigente: el documento no caducó solo, alguien lo cortó.
-   EL CASO `suspendido` SE FUE con el núcleo nuevo: `EstadoCarnet` pasó a
-   activo/revocado/vencido, y una suspensión temporal ya no existe.
-
 ## `resources/js/components/publico/hoja-oficial.tsx`
 
 ### LA HOJA
@@ -3676,6 +4458,11 @@
    todavía no se verificó nada, y una advertencia que aparece cuando no
    corresponde es una que después nadie lee cuando sí corresponde.
 
+### El membrete: escudo arriba y el nombre de la institución en tres renglones,
+
+   El nombre del sistema va último y en cuerpo chico a propósito. Al ciudadano
+   le importa qué institución responde, no cómo se llama el programa.
+
 ## `resources/js/components/publico/splash-verificacion.tsx`
 
 ### LA PANTALLA DE "VERIFICANDO..."
@@ -3694,16 +4481,6 @@
    simular—.
    SE RESPETA `prefers-reduced-motion`: quien pidió menos animaciones en su
    dispositivo va directo al resultado, sin splash y sin transición.
-
-## `resources/js/components/ui/badge.tsx`
-
-### Los colores llegan desde los enums de PHP (EstadoTramite::color(),
-
-   Es la trampa clásica de Tailwind: un `bg-${color}-100` armado juntando textos
-   nunca llega a la hoja de estilos, porque Tailwind solo incluye las clases que
-   puede leer literalmente en el código. El badge saldría sin fondo y sin ningún
-   error que lo explique.
-   Si se agrega un color a un enum de PHP, hay que agregarlo también acá.
 
 ## `resources/js/components/ui/button.tsx`
 
@@ -3777,6 +4554,12 @@
    todo lo demás estorba, y una casilla que se marca sin leer no protege nada.
    Se limpia al cerrar la ventana, o la segunda vez aparecería ya marcada y no
    serviría para nada.
+
+### useEffect ejecuta código "por fuera" del pintado: acá, escuchar la tecla
+
+   El `return` de adentro es la LIMPIEZA: React lo llama al cerrarse la
+   ventana. Sin eso, cada apertura dejaría un listener más pegado al
+   documento y se irían acumulando.
 
 ## `resources/js/components/ui/confirmar-con-motivo.tsx`
 
@@ -3861,6 +4644,12 @@
    Eso NO reemplaza la validación del servidor, que sigue siendo la que manda.
    Ver `RegistrarSolicitudRequest` y `StorageController::verificarPeso()`.
 
+### LA MINIATURA HAY QUE LIBERARLA A MANO.
+
+   `URL.createObjectURL()` deja el archivo retenido en memoria hasta que
+   alguien llame a `revokeObjectURL`. Sin esto, cargar y cambiar adjuntos
+   varias veces en la misma pantalla va dejando copias sin liberar.
+
 ## `resources/js/hooks/use-archivos.ts`
 
 ### EL LÍMITE DE LOS ARCHIVOS, UNO SOLO PARA TODO EL SISTEMA
@@ -3879,6 +4668,13 @@
    servidor esta pantalla seguiría diciendo el número viejo: el operador leería
    «hasta 4 MB» y el sistema le rechazaría un archivo de 3,5 MB sin que nadie
    entienda por qué.
+
+### Devuelve el mensaje de error, o NULL si el archivo sirve.
+
+   Se comprueban las dos cosas que el servidor va a comprobar: el tipo y el
+   peso. El tipo también, porque el atributo `accept` del input es una
+   sugerencia —el usuario puede elegir «Todos los archivos» en el diálogo
+   del sistema y mandar lo que quiera—.
 
 ## `resources/js/hooks/use-permisos.ts`
 
@@ -3932,6 +4728,13 @@
    encabezado (para los botones que los cambian). Cuando dos componentes
    comparten un dato, este sube al padre común. En React eso se llama
    "levantar el estado".
+
+### Lee la preferencia guardada del menú.
+
+   Va envuelto en try/catch porque `localStorage` LANZA —no devuelve null— en
+   una ventana de incógnito o con las cookies bloqueadas por política del
+   equipo, que es un escenario real en una oficina pública. Sin el catch, el
+   panel entero queda en blanco por recordar el ancho de una barra.
 
 ## `resources/js/layouts/layout-publico.tsx`
 
@@ -4045,6 +4848,19 @@
    cuatrocientos días salían como «el año pasado». Ahí se prefiere el
    número: «hace 1 mes», «hace 1 año».
 
+### Fecha y hora de un INSTANTE.
+
+   Recibe siempre ISO 8601 con zona —lo que devuelve `toIso8601String()` de
+   PHP—, así que convertir a horario local es lo correcto y no hace falta el
+   cuidado de `fecha()`: ahí el problema es al revés, una cadena sin zona a la
+   que no hay que aplicarle ninguna.
+
+### Solo la HORA de un instante: «14:17».
+
+   Aparte de `fechaHora()` porque en una tabla las dos partes van en renglones
+   distintos —la fecha arriba, la hora abajo— y juntas en una sola línea obligan
+   a ensanchar la columna.
+
 ## `resources/js/pages/panel/aprovechamientos/crear.tsx`
 
 ### OTORGAR UNA BOLSA MADRE — paso 2 del flujo del pescador
@@ -4072,6 +4888,12 @@
    «peque-peque», «bote», «chalana» y variantes, y un
    catálogo obligaría a dar de alta un tipo nuevo con el
    pescador esperando enfrente.
+
+### Sugerencias del campo de embarcación, NO una lista cerrada.
+
+   Es lo que más se escribe en ventanilla, puesto ahí para ahorrar tecleo y para
+   que el dato salga escrito igual la mayoría de las veces. El operador puede
+   escribir cualquier otra cosa: un `datalist` sugiere, no restringe.
 
 ## `resources/js/pages/panel/aprovechamientos/editar.tsx`
 
@@ -4139,6 +4961,12 @@
    listado buscando a quién le queda poco necesita saber que nadie va a ser
    frenado por eso.
 
+### Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor.
+
+   Va en la pantalla porque cambia qué significa un saldo en cero: con la
+   validación encendida es un bloqueo, y con ella apagada es un dato. Sin
+   este aviso, el listado se leería mal justo en el caso raro.
+
 ## `resources/js/pages/panel/aprovechamientos/ver.tsx`
 
 ### LA FICHA DE UN CUPO
@@ -4185,6 +5013,26 @@
    EliminarCupoRequest: si acá fuera menor, el botón se habilitaría
    y el servidor rechazaría igual.
 
+### LA INTENCIÓN DE ENVIAR, que viaja con los depósitos.
+
+   Se llena al enviar con lo que el botón estaba diciendo, para que el
+   servidor haga exactamente lo que el operador leyó. Es una intención y
+   no un permiso: si al guardar el saldo no quedó en cero, el servidor
+   registra igual y no envía.
+
+### ¿CON ESTO ALCANZA? Es lo que decide qué dice el botón y qué hace.
+
+   Con `puede('aprovechamientos.enviar')` adentro: sin ese permiso el botón
+   solo registra, y ofrecerle enviar a quien no puede sería prometer algo que
+   el servidor va a ignorar.
+
+### EDITAR Y ELIMINAR SOLO SOBRE EL BORRADOR.
+
+   Las dos banderas llegan resueltas del servidor: no son
+   «el estado es pendiente» sino eso Y que no haya entrado
+   plata —y para eliminar, además, que no tenga faenas—.
+   Deducirlas acá sería una segunda copia de tres reglas.
+
 ## `resources/js/pages/panel/beneficiarios/crear.tsx`
 
 ### EL ANCHO ES EL MISMO EN TODOS LOS FORMULARIOS DEL PANEL: max-w-7xl.
@@ -4196,6 +5044,12 @@
    7xl y no «sin tope»: en un monitor muy ancho, un formulario sin
    límite estira los renglones hasta que leerlos obliga a barrer la
    cabeza de lado a lado.
+
+### Alta de un beneficiario.
+
+   La pantalla es casi solo el envoltorio: el formulario vive en su propio
+   componente porque es el MISMO que usa la edición. Ver
+   components/panel/beneficiarios/formulario-beneficiario.tsx.
 
 ## `resources/js/pages/panel/beneficiarios/editar.tsx`
 
@@ -4218,6 +5072,12 @@
    personas eso es un JSON enorme por pantalla. Acá cada cambio
    dispara una petición y Laravel devuelve solo la página pedida
    (ver Beneficiario::scopeBuscar y App\Support\Paginacion).
+
+### El padrón de beneficiarios.
+
+   Los datos llegan como PROPS desde BeneficiarioController::index(). No hay
+   fetch() ni axios: el array que ese método pasa a Inertia::render() es
+   exactamente este objeto.
 
 ## `resources/js/pages/panel/beneficiarios/ver.tsx`
 
@@ -4264,6 +5124,13 @@
    Lo que NO se puede es subirlo por encima del saldo. El servidor lo rechaza, y
    la pantalla lo avisa antes: pagar de más no genera saldo a favor —el saldo se
    corta en cero— así que el excedente se perdería.
+
+### LA BOLETA DEL DEPÓSITO, SIEMPRE
+
+   No hay efectivo ni QR: todo pago es un depósito
+   bancario. Sin la boleta, lo único que respalda
+   el cobro es que alguien lo tipeó, y eso no se
+   puede cruzar contra el extracto del banco.
 
 ## `resources/js/pages/panel/caja/index.tsx`
 
@@ -4330,6 +5197,12 @@
    la respuesta YA RESUELTA por el servidor —`puede_emitir_faenas` exige carnet
    vigente Y cupo con saldo, dos cosas que la pantalla no puede juntar sola—.
 
+### Por qué el carnet no habilita, cuando no habilita.
+
+   Se arma de las banderas que ya llegaron resueltas, en orden de precedencia:
+   primero lo que bloquea el documento entero y después lo que bloquea solo al
+   cupo. Decir «no puede» sin decir por qué manda al operador a adivinar.
+
 ## `resources/js/pages/panel/catalogos/asociaciones.tsx`
 
 ### CATÁLOGO DE ASOCIACIONES — y el patrón de las tres pantallas de catálogo
@@ -4360,6 +5233,12 @@
    La columna «En uso» está para que eso se entienda solo: con 12 carnets
    colgando, que no haya papelera deja de parecer un descuido.
 
+### El formulario de alta y edición.
+
+   Es el MISMO para los dos casos, igual que el Request del servidor comparte
+   las reglas: escrito dos veces, alcanza con tocar uno para que crear y editar
+   acepten cosas distintas.
+
 ## `resources/js/pages/panel/catalogos/escala.tsx`
 
 ### LA ESCALA OFICIAL DE APROVECHAMIENTO
@@ -4379,6 +5258,12 @@
    Los huecos los calcula el SERVIDOR y llegan en `huecos`. La pantalla no los
    deduce recorriendo la tabla: ordenar por kilos y comparar extremos es la misma
    regla, y escrita en los dos lados se desincroniza.
+
+### El aviso de rangos sin cubrir.
+
+   Va ARRIBA DE TODO y en ámbar porque es lo único de esta pantalla que puede
+   romper el trabajo de mañana, y porque no se deduce mirando la tabla: los
+   tramos se ven correctos uno por uno.
 
 ## `resources/js/pages/panel/catalogos/tipos-carnet.tsx`
 
@@ -4402,34 +5287,14 @@
 
 ## `resources/js/pages/panel/dashboard.tsx`
 
-### LOS DOS GRÁFICOS GRANDES SE CARGAN APARTE, Y DESPUÉS
+### El tablero
 
-   `lazy()` le dice a Vite que ponga cada uno en su propio archivo y que lo baje
-   recién cuando haga falta dibujarlo, en vez de meterlo dentro del archivo del
-   tablero.
-   El motivo es concreto y se medía: los dos gráficos usan `recharts`, y por
-   arrastrarla el tablero pesaba **373 kB** —más que React entero—. Es la
-   pantalla a la que cae TODO el mundo apenas entra, así que ese peso lo pagaba
-   cada persona en cada ingreso, antes de ver un solo número.
-   Y los números son lo accionable: «cuánta gente está habilitada», «cuánto se
-   recaudó hoy». Los gráficos son contexto. Separándolos, lo importante aparece
-   de inmediato y lo demás llega un instante después, solo.
-   LAS LÍNEAS CHICAS DE LOS CUATRO INDICADORES NO PASAN POR ACÁ: están dibujadas
-   a mano en SVG justamente para no volver a meter recharts arriba de todo y
-   desarmar esta decisión. Ver components/panel/dashboard/mini-grafico.tsx.
-   `Suspense` es lo que React necesita para saber qué dibujar mientras tanto:
-   sin él, un componente `lazy()` que todavía no llegó revienta la pantalla.
-   El `fallback` es un recuadro de la MISMA altura —ver GraficoCargando—, así
-   la página no salta cuando el gráfico aparece.
-
-### El hueco del gráfico mientras se está bajando.
-
-   Ocupa lo mismo que el gráfico terminado, y por eso el alto es una prop y no
-   un número fijo: los dos gráficos miden distinto. Si el hueco midiera otra
-   cosa, al llegar el gráfico la página daría un salto y lo que el operador
-   estaba por tocar se le correría de lugar.
-   `animate-pulse` es de Tailwind y hace el latido gris de «esto está por
-   llegar».
+   Todo es de solo lectura salvo los números de «Trabajo pendiente» y los
+   avisos, que son enlaces al listado ya filtrado. Un cero se muestra apagado y
+   sin enlace: solo llama la atención lo que tiene trabajo.
+   El gráfico de recaudación va con `lazy()` + `Suspense`: recharts pesa más
+   que React entero y el resto del tablero no tiene por qué esperarlo. El
+   `fallback` mide lo mismo que el gráfico para que la página no salte.
 
 ## `resources/js/pages/panel/faenas/crear.tsx`
 
@@ -4495,6 +5360,13 @@
    entero cada una.
    Lo que sí mueve el saldo es CORREGIR los kilos al cerrar.
 
+### En qué situación está la salida, en una frase.
+
+   Los tres casos se resuelven con banderas que ya llegaron del servidor. El que
+   importa es el del medio: una faena que se pasó de fecha y sigue activa es un
+   papel que alguien se llevó y del que nadie registró la vuelta — no es una
+   previsión, es algo que hay que ir a buscar.
+
 ## `resources/js/pages/panel/guias/crear.tsx`
 
 ### EMITIR UNA GUÍA DE MOVIMIENTO — paso 4, rama comercializador
@@ -4507,6 +5379,12 @@
    los MISMOS que cobra `GuiaMovimiento::montoACobrar()`. Escritos en los dos
    lados, el día que la resolución cambie el 50% a 40% la pantalla seguiría
    prometiendo un precio que la caja no cobra.
+
+### Los carnets vigentes, con el que no sirve deshabilitado.
+
+   NO SE FILTRAN los que no pueden: aparecen en gris con el motivo al lado. Un
+   carnet que desaparece le dice al operador «esta persona no tiene carnet», que
+   es falso y lo manda a emitir otro.
 
 ## `resources/js/pages/panel/guias/index.tsx`
 
@@ -4532,6 +5410,12 @@
    dejaría un viaje real sin ningún respaldo.
    Las fechas van con `fechaHora()`: los cinco días se cuentan desde el instante
    de emisión, así que la hora es el dato que decide la vigencia.
+
+### En qué situación está el traslado, en una frase.
+
+   El caso que importa es el del medio: una guía que se pasó de hora y sigue
+   activa es un camión en la ruta con un papel que ya no vale. No es una
+   previsión — es algo que hay que resolver ahora.
 
 ## `resources/js/pages/panel/recibos/index.tsx`
 
@@ -4637,6 +5521,69 @@
    Un observado SIGUE SUMANDO en el saldo: lo que está en duda es si la
    boleta respalda lo que dice.
 
+### Los kilos OTORGADOS, copiados del techo del tramo al otorgar.
+
+   Están congelados a propósito: la escala cambia por resolución, y un cupo
+   dado en marzo bajo un tramo de 500 kg no puede pasar a valer 800 porque
+   alguien editó el catálogo. La única cosa que los mueve es una AMPLIACIÓN.
+
+### Lo que el pescador declaró que navega: «canoa», «peque-peque», «bote»…
+
+   Es el renglón «Tipo de Embarcación» del talonario verde, y va en texto
+   libre porque no hay padrón de embarcaciones ni nomenclatura fija. NULL
+   cuando no se declaró —que el papel también admite—, y por eso la pantalla
+   distingue «no declarada» de una cadena vacía.
+
+### Los kilos que se PASARON del volumen otorgado.
+
+   En modo estricto siempre es 0 —la emisión no deja pasar una faena que no
+   entre—, así que solo aparece en pantalla cuando hay algo que mostrar.
+   `saldo_kg` no puede decirlo: se corta en cero.
+
+### Si todavía se puede corregir, y si se puede borrar la fila entera.
+
+   NO son «el estado es pendiente»: son eso Y que no haya entrado plata —y
+   para eliminar, además, que no tenga faenas emitidas—. Llegan resueltas
+   del servidor porque deducirlas acá sería una segunda copia de tres reglas.
+
+### Las tres del circuito de revisión, resueltas en el servidor.
+
+   `puede_enviarse` NO es «el estado es pendiente»: es eso Y que los
+   depósitos cubran el monto entero. Deducirlo acá sería una segunda copia
+   de la regla, y con un saldo que la pantalla puede tener viejo.
+
+### Cuántas boletas quedan sin dar por buenas —sin validar u observadas—.
+
+   Es lo que frena la aprobación: `puede_aprobarse` NO es «el estado es en
+   revisión», es eso Y que este número esté en cero. Sin esa condición,
+   validar sería decorativo.
+
+### Un depósito que pagó este cupo, en la ficha.
+
+   Son VARIOS a propósito: un cupo se puede pagar en cuotas, y cada depósito
+   bancario llega con su propia boleta. No hay efectivo ni QR, así que las tres
+   columnas de la boleta están siempre.
+
+### EL RECIBO DEL TRÁMITE: uno solo, con todos los depósitos adentro.
+
+   No va por depósito, y ese es el punto: el aprovechamiento es un trámite, la
+   persona entrega sus boletas —una o cinco— y se lleva UN papel con el total.
+   Se emite al enviar a revisión, así que mientras el cupo está pendiente esto
+   llega en `null`.
+
+### Si sus kilos pesan contra el saldo.
+
+   Una faena VENCIDA libera su volumen —la salida no ocurrió— así que la
+   pantalla la marca aparte: sin eso, la suma de la lista no cuadra con el
+   saldo y parece un error del sistema.
+
+### El techo del rango, que es EL VOLUMEN QUE SE VA A OTORGAR.
+
+   La escala dice «201 kg Hasta 500 Kg»: lo que se autoriza es el máximo, no
+   un número que el operador elija adentro. Por eso el formulario lo muestra
+   al elegir el tramo: las dos consecuencias —kilos y precio— se ven antes
+   de guardar, no después.
+
 ## `resources/js/types/beneficiarios.ts`
 
 ### El resumen de un carnet que muestra la ficha del beneficiario.
@@ -4648,6 +5595,64 @@
    `vigente` llega YA RESUELTO del servidor y la pantalla no lo deduce: la
    columna `estado` puede estar desfasada, porque «vencido» lo escribe un
    comando que corre una vez al día. Ver Carnet::estaVigente().
+
+### Tipos del módulo Beneficiarios.
+
+   Cada interfaz describe, campo por campo, lo que arma
+   App\Http\Controllers\Panel\BeneficiarioController. Si allá se renombra una
+   clave y acá no, el editor lo marca en rojo al instante en vez de descubrirlo
+   con una pantalla en blanco.
+
+### Una fila de la tabla del padrón.
+
+   Los campos están agrupados como los pinta la tabla: identificación, la persona
+   y sus datos. No es casualidad —el controlador los arma en ese mismo orden—
+   para que agregar una columna sea encontrar el grupo al que pertenece.
+
+### Años CUMPLIDOS, calculados por el servidor.
+
+   Llega hecha y no se calcula en el navegador a propósito: con dos
+   definiciones de «edad» —la de PHP y la de JavaScript— tarde o temprano
+   difieren por un día en los bordes (el cumpleaños de hoy, los bisiestos, la
+   zona horaria del teléfono del operador). Ver Beneficiario::edad().
+
+### La ficha completa.
+
+   `nombreCompleto` va en camelCase porque así llega de PHP: el modelo lo manda
+   con ese nombre explícito. Ver el comentario de App\Models\Beneficiario sobre
+   por qué ese accesor no puede ir en #[Appends].
+
+### Los kilos impresos en el plástico, o null si es comercializador.
+
+   Lo decide `TipoActor::requiereAprovechamiento()` en el servidor, NUNCA un
+   `if` sobre el nombre del tipo de carnet: ese nombre es un catálogo que la
+   unidad edita, y el mismo documento figura de dos formas distintas según
+   quién lo cargó.
+
+### Una BOLSA MADRE de la persona: el cupo anual en kilos.
+
+   Se manda el SALDO y no solo el volumen otorgado porque es lo único
+   accionable: «tiene 500 kg» no dice si puede salir a pescar mañana, y «le
+   quedan 20» sí.
+
+### Un carnet vigente, tal como lo devuelve el autocompletado.
+
+   LAS DOS BANDERAS LLEGAN CALCULADAS y la pantalla no las deduce. Un `if` sobre
+   el tipo en React sería una segunda copia de la regla, y se desincroniza en
+   cuanto alguien renombre una fila del catálogo o cambie la vigencia del cupo.
+   Ver Carnet::puedeEmitirFaenas() y ::puedeEmitirGuias().
+
+### Kilos que quedan en la bolsa madre. Null si el carnet no lleva cupo.
+
+   Viene con el resultado de la búsqueda y no en un segundo viaje: el
+   formulario de faena lo necesita apenas se elige el carnet, y pedirlo
+   aparte se nota justo cuando el operador acaba de hacer clic.
+
+### El número de talonario que el sistema PROPONE. Null si no lleva cupo.
+
+   Es una propuesta y no una imposición: el número sale de la hoja que el
+   operador tiene en la mano, y si no coincide hay algo que conviene mirar
+   antes de seguir, no autocorregir en silencio.
 
 ## `resources/js/types/caja.ts`
 
@@ -4670,6 +5675,25 @@
    El reparto por método tampoco es decorativo: lo que hay que cuadrar contra el
    cajón es el EFECTIVO, y una transferencia no está ahí adentro.
 
+### NULL mientras el depósito no tiene papel.
+
+   Pasa con el aprovechamiento: sus depósitos se cargan mientras el trámite
+   está pendiente y el recibo —uno solo, con el total— se emite recién al
+   enviarlo a revisión. La plata ya entró, así que la fila está y suma en el
+   arqueo; lo que falta es el comprobante.
+
+### La boleta del banco. Nunca faltan: TODO pago es un depósito bancario —no
+
+   Cuando un mismo depósito cubre varias líneas, la segunda en adelante
+   llevan el número con un sufijo («0012345678-2»), porque es único global.
+
+### Una deuda de la persona, lista para cobrar.
+
+   `tipo` es una palabra corta —`carnet`, `cupo`, `guia`— y no un nombre de
+   clase: el servidor la traduce con una lista blanca. Mandando la clase
+   directo, cualquiera podría escribir otra en el navegador y el sistema crearía
+   pagos apuntando a cualquier tabla.
+
 ## `resources/js/types/carnets.ts`
 
 ### Tipos del módulo Carnets — la credencial anual.
@@ -4684,6 +5708,18 @@
    - `puede_emitir_faenas` exige además una bolsa madre con saldo.
    Un `if` sobre el nombre del tipo en React sería una segunda copia de esas
    reglas, y se rompería en silencio en cuanto alguien renombre una fila.
+
+### La bolsa madre que respalda el cupo impreso. Null en un comercializador.
+
+   Trae el SALDO y no solo el volumen porque es lo que decide si hoy se le
+   puede emitir una faena, que es la pregunta que trae a alguien a esta
+   ficha.
+
+### El cupo vigente de la persona elegida, si lo tiene.
+
+   La pantalla lo usa para avisar ANTES de guardar que un carnet de pescador sin
+   cupo va a ser rechazado. El servidor lo comprueba igual dentro de la
+   transacción; esto evita el viaje en falso.
 
 ## `resources/js/types/catalogos.ts`
 
@@ -4708,6 +5744,25 @@
    ninguna escala y el formulario de cupo no ofrece nada— así que sin este aviso
    se descubre en ventanilla, con alguien enfrente.
 
+### El RÉGIMEN del tramo, y de él depende si el cupo se va a poder ampliar.
+
+   Se declara acá, en el catálogo, y no al otorgar: la fija la resolución al
+   definir el tramo. Puesta en el otorgamiento, dos cupos del mismo tramo
+   podrían terminar con reglas distintas.
+
+### El texto literal de la resolución.
+
+   Se guarda aparte de los kilos porque no siempre es su lectura: el tramo
+   más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese «PAICHE» no está en
+   ningún número.
+
+### El arancel de HOY, para armar un cobro nuevo.
+
+   NO sirve para leer lo que salió un carnet ya emitido: lo cobrado de
+   verdad está en `pagos` y no se recalcula. Lo que SÍ cambia al subir este
+   número es el saldo pendiente de los carnets que todavía no están
+   cubiertos.
+
 ## `resources/js/types/dashboard.ts`
 
 ### Tipos del panel principal.
@@ -4719,6 +5774,24 @@
    CONVENCIÓN DEL PROYECTO
    - tipos compartidos por todo el sistema  -> types/index.d.ts
    - tipos de un módulo concreto            -> types/<modulo>.ts  (este archivo)
+
+### Una jornada de la serie de los últimos catorce días.
+
+   Es lo que dibujan las líneas chicas al pie de los indicadores. Cada fila trae
+   los DOS valores del día porque las dos series salen del mismo recorrido en
+   PHP: separarlas obligaría a mandar el calendario dos veces.
+
+### Pescadores contra comercializadores, entre los carnets vigentes.
+
+   Sale del enum y no de la base para que los dos aparezcan aunque uno esté en
+   cero: un valor que no vuelve en la consulta haría que el bloque mienta por
+   omisión.
+
+### Lo que está por caducar o ya caducó sin cerrarse.
+
+   Las dos últimas cifras no son avisos de vencimiento sino de TRABAJO SIN
+   CERRAR: una faena o una guía que se pasó de fecha y sigue activa es un papel
+   que alguien se llevó y del que nadie registró la vuelta.
 
 ## `resources/js/types/faenas.ts`
 
@@ -4750,6 +5823,12 @@
    y viajan con `toDateString()`. Mezclarlos corre la fecha: en UTC-4, un día
    mandado como instante se muestra con 24 horas menos.
 
+### Por cuánto se multiplicó el arancel: 1 o 0.5.
+
+   Viene explícito para que la ficha pueda decir «se cobró al 50%» sin
+   recalcularlo. La regla vive en `GuiaMovimiento::factorArancel()`, en un
+   solo lado.
+
 ## `resources/js/types/index.d.ts`
 
 ### TIPOS COMPARTIDOS POR TODO EL SISTEMA
@@ -4774,18 +5853,6 @@
    Paginado<PagoFila>          -> data es PagoFila[]
    Así el componente de paginación sirve para cualquier listado sin perder la
    verificación de tipos de las filas.
-
-### Espejo de App\Enums\EstadoTramite.
-
-   pendiente ──▶ en_revision ──▶ aprobado
-   │              │
-   └──────────────┴─────────▶ rechazado
-   Son CUATRO y no seis: «generado» y «entregado» no son estados sino hechos con
-   fecha, y viven en las columnas `fecha_generacion` y `fecha_entrega`. Un estado
-   obliga a mantener sincronizadas dos cosas que pueden discrepar; una fecha en
-   NULL dice «todavía no pasó» sin posibilidad de contradicción.
-   Qué salto vale desde dónde NO se decide acá: lo dice el enum de PHP, y llega a
-   la pantalla como los campos `puede_*` de la ficha.
 
 ### Espejo de App\Enums\EstadoAprovechamiento.
 
@@ -4820,6 +5887,37 @@
    desplegables de alta pero los documentos históricos la siguen mostrando — que
    es lo correcto, porque la persona pertenecía a ella cuando se le emitió el
    carnet.
+
+### Qué archivos acepta el sistema y hasta cuánto pesan.
+
+   Sale de `config/jichi.php`, no de un número escrito en React: es el mismo que
+   usan las reglas de validación del servidor. Se lee con el hook
+   `useArchivos()`.
+
+### ESTADOS DEL DOMINIO
+
+   Copian exactamente los enums de PHP en app/Enums/. Si allá se agrega un
+   estado nuevo, hay que agregarlo acá también: son las dos mitades de la
+   misma definición.
+
+### Espejo de App\Enums\EstadoCarnet.
+
+   `vencido` lo escribe un comando que corre una vez al día, así que esta
+   columna puede estar desfasada: para saber si un carnet vale HOY, el servidor
+   mira además `fecha_vencimiento`. La pantalla recibe la respuesta ya
+   calculada y no la vuelve a deducir.
+
+### Espejo de App\Enums\TipoActor.
+
+   Es del DOCUMENTO, no de la persona: quien pesca y además comercializa tiene
+   una ficha y dos carnets. De acá cuelga qué puede emitir cada credencial
+   —faenas o guías— y si lleva cupo en kilos.
+
+### route() convierte el nombre de una ruta de Laravel en su URL:
+
+   route('beneficiarios.show', 42)  ->  '/panel/beneficiarios/42'
+   No hace falta importarla: la inyecta la directiva @routes de Ziggy en
+   resources/views/app.blade.php, y está disponible en cualquier archivo.
 
 ## `resources/js/types/publico.ts`
 
@@ -5313,365 +6411,17 @@
    358 ES EL PISO. La lista de DESCRIPCIÓN, a esta misma altura, ocupa de
    14 a 344; con 14 pt de aire entre las dos. Correrlas más las mete abajo
 
-## `app/Enums/EstadoAprovechamiento.php`
+### DESCRIPCIÓN — las seis casillas del talonario
 
-### Los depósitos están cargados y cubren el monto; falta que alguien firme.
+   Se dibujan SIEMPRE las seis, aunque el sistema solo sepa cobrar dos:
+   el recibo tiene que salir igual al papel. Cuál queda marcada lo
+   decide App\Enums\ConceptoRecibo.
 
-   NO autoriza a pescar todavía, y esa es la razón de que el estado exista:
-   entre «la plata entró» y «la unidad lo aprobó» hay un control, y sin un
-   estado propio ese control no tendría dónde ocurrir.
+### PIE — las tres copias y la nota legal
 
-### ¿Según el estado, todavía se le pueden colgar faenas?
-
-   PENDIENTE no habilita, y no es un descuido: lo que autoriza a pescar es
-   la concesión PAGADA. Un cupo cargado y sin cobrar es un papel a medio
-   llenar, y emitir faenas contra él dejaría al pescador trabajando sobre
-   una autorización que la unidad todavía no entregó.
-
-### ¿Se pueden CARGAR depósitos contra él?
-
-   En pendiente sí: es justamente lo que hay que hacer. En revisión no —el
-   monto ya está cubierto y el expediente presentado— y después tampoco:
-   un cupo aprobado está pagado por definición, y la plata que entre de más
-   no es de este trámite.
-
-### ¿Se puede mandar a que alguien lo firme?
-
-   El estado es solo una de las dos condiciones. La otra —que los depósitos
-   cubran el monto— la mira el servicio, porque depende de la suma de los
-   pagos y no del estado. Ver AprovechamientoPesq::puedeEnviarseARevision().
-
-### ¿Se puede borrar la fila entera?
-
-   Mismo criterio que la edición, y con más razón: un cupo con plata encima
-   no se elimina —se arregla por caja—, porque borrarlo dejaría pagos
-   colgando de algo que ya no existe.
-
-## `app/Enums/EstadoCarnet.php`
-
-### Dado de baja por decisión de la unidad, antes de su vencimiento.
-
-   El documento sigue existiendo y su historial queda legible —un inspector
-   necesita saber que la persona estuvo autorizada hasta tal fecha— pero hoy
-   no habilita a trabajar ni a emitir faenas o guías.
-
-## `app/Enums/EstadoFaena.php`
-
-### ¿Sus kilos pesan contra el cupo de la bolsa madre?
-
-   Activo SÍ, aunque todavía no se haya descargado nada: el volumen está
-   comprometido y comprometerlo dos veces es justamente lo que el cupo viene
-   a impedir. Vencido NO: la salida no ocurrió y el volumen vuelve.
-
-## `app/Enums/ModalidadAprovechamiento.php`
-
-### ESPECIES ESPECIALES — el cupo de gran porte, con tasación fija.
-
-   Paiche y lo que la resolución sume después. Es una autorización específica
-   sobre la cuota de la especie, con TASACIÓN FIJA: el valor no sale de una
-   progresión por kilos como en los tramos menores, lo fija la resolución
-   para esa especie.
-
-### Nombre del color del badge.
-
-   Devuelve el NOMBRE y no las clases armadas con texto: Tailwind solo
-   incluye en el CSS final las que puede leer literalmente. Un color nuevo
-   acá va también al mapa de resources/js/components/ui/badge.tsx.
-
-## `app/Enums/RolSistema.php`
-
-### CORREGIR EL BORRADOR TAMBIÉN ES DE VENTANILLA.
-
-   Solo corre mientras el cupo está PENDIENTE DE PAGO: es arreglar
-   una carga equivocada con el pescador todavía enfrente, no cambiar
-   una autorización entregada. En cuanto entra plata el permiso deja
-   de alcanzar, porque el estado ya no lo permite.
-
-### Catálogo completo de permisos del sistema.
-
-   Sale del rol administrador porque es el que los tiene todos: escribir la
-   lista otra vez acá sería una segunda copia que puede quedar corta.
-
-## `app/Enums/TipoActor.php`
-
-### ¿Esta credencial lleva colgada una bolsa madre de aprovechamiento?
-
-   Se pregunta acá y NUNCA con un match sobre el nombre del tipo de carnet:
-   `tipos_carnet` es un catálogo que edita la unidad desde el panel y el
-   mismo documento figura como «Carnet de Pescador» o como «Pescador
-   Artesanal» según quién lo cargó.
-
-## `app/Exceptions/CarnetInvalidoException.php`
-
-### Se eligió una asociación o un tipo que ya no se puede usar.
-
-   Puede pasar entre que el operador abre el formulario y aprieta guardar:
-   la lista se armó con lo vigente en ese momento y en el medio alguien lo
-   desactivó desde el catálogo.
-
-### No se revoca dos veces.
-
-   Y tampoco se «desrevoca»: la revocación es definitiva. Si la persona
-   vuelve a estar en regla, lo que corresponde es emitirle un carnet nuevo,
-   con su propio código — el plástico viejo puede estar circulando.
-
-## `app/Exceptions/CobroInvalidoException.php`
-
-### No se puede validar ni observar este depósito.
-
-   Son dos motivos distintos y el mensaje los separa, porque lo que hay que
-   hacer después no es lo mismo: si el trámite no está en revisión hay que
-   presentarlo o dejar de discutir una firma puesta; si el depósito ya está
-   observado, lo que sigue es CORREGIRLO.
-
-## `app/Exceptions/CupoInvalidoException.php`
-
-### Se eligió un tramo de la escala que ya no está vigente.
-
-   Puede pasar entre que el operador abre el formulario y aprieta guardar:
-   la lista se armó con los tramos de ese momento y en el medio alguien
-   derogó uno desde el catálogo.
-
-### Se quiso presentar o aprobar un cupo con saldo sin cubrir.
-
-   Dice CUÁNTO falta y no solo «falta plata», porque es el número con el que
-   el operador decide qué hacer: cargar otro depósito, o revisar si el que
-   cargó salió por menos.
-
-### Se quiso firmar con boletas sin controlar.
-
-   Dice CUÁNTAS quedan, que es lo que el revisor necesita para saber si le
-   falta mirar una o diez. El detalle —cuál y por qué— está en la tarjeta de
-   pagos de la ficha, que es donde se resuelve.
-
-### No se amplía un cupo que ya no corre.
-
-   Sumarle kilos a un cupo vencido daría volumen que no se puede usar —las
-   faenas miran la fecha— así que sería puro ruido en la ficha. Lo que
-   corresponde es otorgar el de la gestión nueva.
-
-## `app/Exceptions/PermisoOperativoException.php`
-
-### La credencial no habilita ESTE papel.
-
-   Quién puede emitir qué lo dice `TipoActor`, NUNCA el nombre del tipo de
-   carnet: `tipos_carnet` es un catálogo que edita la unidad y el mismo
-   documento figura como «Carnet de Pescador» o «Pescador Artesanal» según
-   quién lo cargó.
-
-### El cupo está presentado y esperando una firma.
-
-   Mensaje propio y no el de «pendiente de pago»: acá la plata YA entró, y
-   decirle al operador que cobre lo mandaría a buscar un depósito que no
-   existe. Lo que falta es una firma, y eso no se resuelve en la ventanilla.
-
-### La faena pedida no entra en lo que queda del cupo.
-
-   Se dicen los DOS números y no solo «no alcanza», porque lo que el
-   operador necesita decidir enfrente del pescador es por cuánto sí puede
-   emitirla.
-
-### El número del talonario ya está usado.
-
-   No se ofrece «usar el siguiente» automáticamente a propósito: el número
-   sale de un papel que el operador tiene en la mano, y si no coincide con
-   lo que el sistema propone hay algo mal que conviene mirar.
-
-### Solo se completa una faena que está EN CURSO.
-
-   Completar es registrar que el pescador volvió y descargó. Sobre una ya
-   completada no hay nada que registrar; sobre una VENCIDA tampoco, y ahí el
-   matiz importa: al vencer, la faena liberó su volumen, así que completarla
-   lo volvería a descontar de un cupo que ya se repuso.
-
-### No se anula dos veces, y no se desanula.
-
-   Es específico de las guías y no genérico a propósito: las faenas NO se
-   anulan —`EstadoFaena` no tiene ese estado— así que un método que dijera
-   «{X} ya está anulado» tendría que resolver el género del sujeto para un
-   solo caso. Escrito derecho, se lee derecho.
-
-### Solo se cierra una guía que está EN CURSO.
-
-   Cerrar es registrar que la carga llegó. Sobre una anulada no hay nada que
-   cerrar —ese papel no amparó ningún traslado— y sobre una ya cerrada
-   tampoco.
-
-## `app/Http/Controllers/Panel/AprovechamientoController.php`
-
-### EL MODO SE MANDA A LA PANTALLA, y no es un detalle informativo.
-
-   En modo flexible las faenas se emiten por encima del cupo, así
-   que un listado que mostrara los saldos sin decir en qué modo está
-   el sistema haría leer «0 kg» como un bloqueo que no existe.
-
-### FORMULARIO — GET /panel/aprovechamientos/crear
-
-   Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
-   buscador ya resuelto: quien viene de ahí ya eligió a quién, y volver a
-   pedírselo es hacerle repetir un paso que acaba de dar.
-
-### LAS TRES DEL CIRCUITO DE REVISIÓN, resueltas en el servidor.
-
-   `puede_enviarse` no es «el estado es pendiente»: es eso Y que los
-   depósitos cubran el monto. Deducirlo en React sería una segunda
-   copia de la regla, y encima con el saldo que la pantalla conoce,
-   que puede estar viejo.
-
-## `app/Http/Controllers/Panel/BeneficiarioController.php`
-
-### GUARDAR EL ALTA — POST /panel/beneficiarios
-
-   Fíjate en el tipo del parámetro: GuardarBeneficiarioRequest, no Request.
-   Con eso Laravel valida ANTES de entrar acá; si la validación falla, este
-   método nunca llega a ejecutarse.
-
-### FICHA — GET /panel/beneficiarios/{beneficiario}
-
-   El parámetro se declara como Beneficiario y Laravel busca el registro por
-   id automáticamente. Si no existe, responde 404 sin ejecutar el método. Eso
-   se llama «route model binding».
-
-### Guarda la foto y devuelve su ruta.
-
-   Todo archivo que sube al sistema pasa por StorageController, que es el
-   único que decide en qué disco se escribe. Para que la imagen sea visible
-   desde el navegador tiene que existir el enlace simbólico que crea
-   `php artisan storage:link`.
-
-## `app/Http/Controllers/Panel/CajaController.php`
-
-### UNA RELACIÓN POLIMÓRFICA NO SE PRECARGA CON `with('pagable.x')`.
-
-   Eloquent no sabe qué es `pagable` hasta que lee la fila, así que
-   lo escrito así se IGNORA en silencio y el N+1 sigue ahí. Va con
-   morphWith, declarando qué traer para cada tipo.
-
-### EL ARQUEO DEL DÍA, siempre del día de HOY y no del rango filtrado.
-
-   Es lo que se cuadra contra el extracto del banco antes de cerrar,
-   y esa pregunta no cambia porque alguien esté mirando marzo. Un
-   total que siguiera al filtro invitaría a cuadrar la caja contra el
-   número equivocado.
-
-## `app/Http/Controllers/Panel/CarnetController.php`
-
-### EL CUPO VIGENTE DE ESA PERSONA, si la hay.
-
-   La pantalla lo necesita para avisar ANTES de guardar que un carnet
-   de pescador sin cupo va a ser rechazado. El servidor lo comprueba
-   igual dentro de la transacción; esto evita el viaje en falso.
-
-## `app/Http/Controllers/Panel/CarnetImpresionController.php`
-
-### Hasta donde se puede achicar un texto que no entra, en fraccion de su
-
-   Por debajo del 70% deja de leerse en una tarjeta de 85 mm que alguien mira
-   en un control, y un apellido que no se puede leer es lo mismo que no
-   imprimirlo: ahi el texto pasa a dos lineas en vez de seguir encogiendo.
-
-### LA ACTIVIDAD SALE DEL ENUM Y NO DEL NOMBRE DEL TIPO DE CARNET.
-
-   `tipos_carnet` es un catálogo que la unidad edita: el mismo documento
-   figura como «Carnet de Pescador» o «Pescador Artesanal» según quién lo
-   cargó, y el título impreso no puede depender de eso. `tipo_actor` es
-   la regla, y no cambia.
-
-## `app/Http/Controllers/Panel/DashboardController.php`
-
-### Con cuántos días de anticipación se avisa que algo está por caducar.
-
-   Vive acá y no repartido por los métodos porque el número tiene que decir
-   lo MISMO en el conteo y en el texto que lo explica: con dos constantes,
-   alcanza con cambiar una para que el tablero diga «12 por vencer en los
-   próximos 30 días» contando en realidad 45.
-
-### CUÁNTA GENTE ESTÁ HABILITADA HOY.
-
-   `vigentes()` mira el estado Y la fecha, y esa segunda mitad no es
-   de más: `vencido` lo escribe un comando que corre una vez al día,
-   así que contar solo por estado mostraría como habilitada a gente
-   cuyo carnet venció anoche.
-
-### LA RECAUDACIÓN SALE DE `created_at`, NO DE UNA COLUMNA DE FECHA.
-
-   `pagos` no tiene `fecha_pago`: un abono se registra cuando entra
-   la plata, así que el momento de la fila ES el momento del cobro.
-   Una columna aparte solo agregaría la posibilidad de que las dos
-   se contradigan.
-
-## `app/Http/Controllers/Panel/FaenaController.php`
-
-### EL CUPO DEL QUE SALIERON LOS KILOS.
-
-   Va en la ficha porque es la pregunta que sigue: «¿le queda
-   para otra salida?». Sin esto habría que ir al módulo de cupos
-   a buscarlo.
-
-## `app/Http/Controllers/Panel/GuiaController.php`
-
-### Son MOMENTOS, no días: van con toIso8601String().
-
-   Los cinco días se cuentan desde la HORA de emisión —una guía de
-   las 18:00 del lunes vence a las 18:00 del sábado— así que mandarlas
-   como día perdería justamente el dato que decide la vigencia.
-
-## `app/Http/Controllers/Panel/PagoController.php`
-
-### CORREGIR — POST /panel/pagos/{pago}/corregir
-
-   POST y no PATCH porque puede traer un ARCHIVO: un multipart no viaja en un
-   PATCH. Y se sube ANTES de la transacción, que no deshace escrituras en
-   disco; el `catch` lo borra. La boleta vieja la borra el servicio.
-
-## `app/Http/Controllers/Panel/ReciboController.php`
-
-### Cuántos renglones tiene el cuadro de importes como mínimo.
-
-   El talonario de papel trae tres rayas impresas: con un solo cobro, el
-   cuadro quedaría alto y vacío, y con menos de tres el recibo dejaría de
-   parecerse al papel que la gente conoce.
-
-### Qué trámite concreto pagó este abono.
-
-   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`: es el
-   mismo dato, pero así el analizador avisa cuando se agrega un cobrable y
-   este método se olvida.
-
-### IMPRIMIR — GET /panel/recibos/{recibo}/imprimir
-
-   Dibuja el talonario verde del SEDAG en media carta apaisada. La maqueta
-   está en `views/documentos/recibo-oficial.blade.php` y se adapta con
-   App\Support\ReciboImpreso, que expone lo que ese Blade pide sin obligar a
-   reescribirlo: es una maqueta de coordenadas fijas, medida contra el papel.
-
-## `app/Http/Controllers/Publico/VerificacionController.php`
-
-### Largo mínimo aceptado antes de ir a la base.
-
-   No es una regla de negocio sino un filtro barato: un código de dos letras
-   no puede existir, y cortando acá una URL manipulada ni siquiera llega a
-   consultar.
-
-### El código escrito a mano, cuando el QR no se deja escanear.
-
-   Se normaliza ANTES de validar, y eso no es un detalle: el código se
-   imprime en grupos de cuatro y la gente lo copia con los espacios. Sin
-   normalizar primero, la validación rechazaría lo que el operador ve
-   escrito en la tarjeta.
-
-### Busca el carnet por su código.
-
-   La comparación la hace el ÍNDICE ÚNICO de la base, que responde en el
-   mismo tiempo encuentre o no. Comparar en PHP obligaría a traer filas y a
-   cuidarse del ataque por tiempo —una comparación normal corta en el primer
-   carácter distinto—; acá no hay nada que filtrar.
-
-### La cédula va ENMASCARADA: solo los últimos tres dígitos.
-
-   Alcanza para que el inspector confirme contra el documento que la
-   persona le está mostrando, y no alcanza para que alguien que
-   encuentre un carnet tirado se haga con el número completo.
+   El talonario de papel es autocopiativo y cada hoja dice a quién le
+   toca. El PDF sale de a una, pero la leyenda se conserva: es lo que
+   Contabilidad y Archivo buscan cuando reciben su copia impresa.
 
 ## `app/Http/Requests/Panel/CerrarGuiaRequest.php`
 
@@ -5682,20 +6432,6 @@
    el campo permite corregirlo — y a diferencia de la faena, acá no hay tope:
    no existe ningún cupo que exceder.
 
-## `app/Http/Requests/Panel/CobrarRequest.php`
-
-### LA BOLETA ES SIEMPRE OBLIGATORIA
-
-   En esta unidad no se cobra en efectivo ni por QR: todo pago es un
-   depósito bancario, y sin la boleta lo único que respalda el cobro
-   es que alguien lo tipeó — eso no se puede cruzar contra el
-   extracto del banco.
-
-### ÚNICO entre los pagos VIVOS. Es lo que impide cargar la misma
-
-   El índice de la base lo vuelve a exigir: dos ventanillas
-   simultáneas pasarían esta comprobación las dos.
-
 ## `app/Http/Requests/Panel/CorregirPagoRequest.php`
 
 ### Reglas para CORREGIR un depósito, con dos diferencias contra la carga:
@@ -5703,491 +6439,6 @@
    1. La boleta se compara contra la tabla IGNORÁNDOSE a sí misma, o guardar
    sin tocar el número chocaría contra su propia fila.
    2. El archivo es OPCIONAL: ya hay una boleta guardada.
-
-## `app/Http/Requests/Panel/EmitirCarnetRequest.php`
-
-### LA ACTIVIDAD ES UN ENUM Y NO UN CATÁLOGO, y por eso se valida
-
-   De ella cuelga lógica —qué puede emitir la credencial, si lleva
-   cupo— así que no puede ser una fila editable: cambiarle el nombre
-   a un tipo de carnet no debe cambiar lo que ese carnet habilita.
-
-## `app/Http/Requests/Panel/EmitirGuiaRequest.php`
-
-### EL CÓDIGO DEL TALONARIO, único GLOBAL.
-
-   La regla replica el índice único de la base. Que esté duplicada
-   acá y en el servicio no es redundancia inútil: esta pinta el
-   mensaje bajo el campo, la del servicio cubre la carrera entre dos
-   ventanillas, y el índice es la red que garantiza.
-
-### El peso declarado al salir. `gt:0` porque una guía de cero kilos
-
-   Al CERRAR se puede corregir contra la balanza del destino, que es
-   donde el número se vuelve real.
-
-### LA MARCA QUE VALE PLATA: con ella el arancel se cobra al 50%.
-
-   Va como booleano y no como un catálogo de «tipo de producto»
-   porque la resolución solo distingue dos casos, y un catálogo
-   abriría la puerta a que alguien agregue una fila con descuento sin
-   que haya resolución detrás.
-
-## `app/Http/Requests/Panel/GuardarAsociacionRequest.php`
-
-### Reglas para crear y editar una asociación.
-
-   Mismo criterio que GuardarBeneficiarioRequest: crear y editar comparten las
-   reglas, así que se escriben una sola vez y el día que cambien no hay dos
-   lados que sincronizar.
-
-## `app/Http/Requests/Panel/GuardarBeneficiarioRequest.php`
-
-### El nombre, partido como viene en la cédula.
-
-   El segundo nombre y el apellido materno no son obligatorios porque
-   mucha gente no los tiene, y exigirlos dejaría a esa gente fuera del
-   sistema. El apellido paterno sí: es NOT NULL en la base.
-
-### Normaliza los datos ANTES de validar.
-
-   Ventanilla escribe con espacios de más y en minúsculas; acá se limpia una
-   sola vez para que la base guarde siempre el mismo formato. Un espacio al
-   final no se ve en pantalla pero viaja a `nombreCompleto` y ensucia el
-   nombre impreso en el carnet.
-
-## `app/Http/Requests/Panel/GuardarCategoriaAprovechamientoRequest.php`
-
-### NO lleva `max:7` aunque hoy la escala tenga siete tramos.
-
-   El número de tramos lo fija una resolución y puede cambiar; un
-   tope escrito en código convertiría ese cambio en un despliegue,
-   que es exactamente lo que esta tabla vino a evitar.
-
-### El TEXTO OFICIAL, y no se deduce de los kilos.
-
-   El tramo más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese
-   «PAICHE» no está en ningún número. El documento impreso tiene que
-   decir lo que dice la resolución.
-
-### El control que mira la escala ENTERA, no el tramo suelto.
-
-   Corre después de las reglas de campo —si los kilos ni siquiera son
-   números, no tiene sentido buscar solapes— y por eso va en `after()` y no
-   dentro de `rules()`.
-
-## `app/Http/Requests/Panel/GuardarTipoCarnetRequest.php`
-
-### Dos tipos no pueden llamarse igual: en un desplegable serían
-
-   Esta tabla NO tiene borrado lógico, así que el unique va simple
-   —sin el whereNull de las asociaciones—.
-
-## `app/Http/Requests/Panel/GuardarUsuarioRequest.php`
-
-### Exige el dominio de la Gobernación, si está configurado.
-
-   Vive en su propio método y no incrustado en rules() para que el `if` no
-   ensucie el listado de reglas, que se lee de un vistazo.
-
-## `app/Models/AprovechamientoPesq.php`
-
-### Lo que sale este cupo: el valor de la escala con la que se otorgó.
-
-   Exigido por el trait Pagable. Si la categoría no está cargada se consulta
-   —no se puede devolver 0 y seguir, porque eso daría un saldo de 0 y el
-   sistema creería que el cupo está pagado—.
-
-### ¿Se puede borrar la fila entera?
-
-   Mismo criterio que la edición MÁS las faenas: un cupo sin pagos puede
-   igual tener permisos emitidos encima —el talonario de faenas es papel y se
-   llena antes de cobrar— y borrarlo dejaría esas salidas sin la bolsa madre
-   que las respalda.
-
-### ¿Se le pueden cargar depósitos hoy?
-
-   Solo en pendiente: en revisión el monto ya está cubierto y el expediente
-   presentado, y después de aprobado la plata que entre de más no es de este
-   trámite.
-
-### ¿Vale HOY?
-
-   Mira el estado Y la fecha. El estado solo no alcanza: `vencido` lo
-   escribe un comando que corre una vez al día, así que entre corrida y
-   corrida un cupo que venció ayer sigue diciendo «activo» en la base.
-
-## `app/Models/Beneficiario.php`
-
-### La dirección para mostrar la foto. NULL si la ficha no tiene.
-
-   Pasa por Archivos::url porque la columna guarda una ruta cuando el disco
-   es local y una dirección completa cuando es s3, y las dos formas pueden
-   convivir en la misma tabla.
-
-### Las guías que emitió COMO COMERCIALIZADOR.
-
-   La clave foránea va explícita porque no sigue la convención: la columna
-   se llama `beneficiario_com_id` justamente para que nadie la confunda con
-   el pescador que extrajo la carga, que es otra persona.
-
-### Su bolsa madre utilizable HOY, o null.
-
-   Es lo que el formulario de faenas necesita: sin ella no hay de dónde
-   descontar kilos y no se puede emitir el permiso.
-   Mismo cuidado con `relationLoaded()` que arriba, y por el mismo motivo.
-
-## `app/Models/Carnet.php`
-
-### El código en grupos de cuatro: «PES2 6000 0017».
-
-   Se guarda SIN separadores y se muestra con ellos. Un código de catorce
-   caracteres seguidos es imposible de dictar por teléfono o de tipear de un
-   plástico gastado, y los separadores guardados romperían la búsqueda de
-   quien lo escriba sin ellos.
-
-### Lo que sale esta credencial: el precio de su tipo.
-
-   Exigido por el trait Pagable. Si la relación no está cargada la consulta
-   sale igual —devolver 0 daría saldo 0 y el sistema creería que está
-   pagado—.
-
-### ¿Puede emitir permisos de faena?
-
-   Las tres condiciones son necesarias: que sea de pescador, que el carnet
-   valga hoy, y que tenga una bolsa madre con saldo. Sin la tercera se
-   emitirían faenas sin cupo del que descontarlas.
-
-## `app/Models/CategoriaAprovechamiento.php`
-
-### Cómo se lee en un desplegable: «3 · 201 kg Hasta 500 Kg — 110,00 Bs».
-
-   Se usa `descripcion_kg` y no los dos decimales, porque el texto oficial
-   no siempre es la lectura literal del rango: el tramo más alto dice
-   «PAICHE» y eso no está en ningún número.
-
-### ¿Este volumen cae dentro del tramo?
-
-   Los dos extremos entran. Es lo que dice el texto oficial —«1 Kg Hasta 100
-   Kg»— y además, con uno de los dos abierto, un cupo de exactamente 100 kg
-   no caería en ninguna escala.
-
-### El tramo que corresponde a este volumen, o null si se pasa de la escala.
-
-   Devuelve null en vez de caer al tramo más alto a propósito: un pedido de
-   5000 kg cuando la escala llega a 2000 no es «el tramo 7», es un pedido
-   que necesita resolución aparte. Silenciarlo cobraría de menos.
-
-## `app/Models/GuiaMovimiento.php`
-
-### El vencimiento que corresponde a una emisión.
-
-   Se calcula y se GUARDA, no se deriva al leer: si la resolución cambia el
-   plazo, las guías ya emitidas tienen que seguir venciendo cuando dice el
-   papel que va dentro del camión.
-
-### Lo que se cobra por esta guía. Exigido por el trait Pagable.
-
-   La tarifa base sale de configuración y no de una tabla propia: hoy es un
-   único valor para todas las guías. El día que se vuelva una escala por
-   destino o por volumen, esto pasa a leer una tabla y el resto del circuito
-   de cobro no se entera.
-
-## `app/Models/Pago.php`
-
-### La dirección completa de la boleta, o null si no hay.
-
-   La columna guarda una RUTA; quién la convierte en dirección depende del
-   disco activo, y eso lo sabe App\Support\Archivos —el mismo que la escribe
-   y la borra—. Armada acá a mano, escribir y leer podrían mirar discos
-   distintos.
-
-### Cómo se nombra el trámite pagado en el detalle del recibo.
-
-   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`, que
-   es el mismo dato pero sin que el analizador pueda avisar cuando se agrega
-   un tipo nuevo y este método se olvida.
-
-### Los abonos de un trámite concreto.
-
-   Recibe el modelo y no el par (tipo, id) a mano: escrito a mano, el tipo
-   se copia como texto y el día que una clase se renombre o se mueva de
-   namespace la consulta deja de encontrar nada, en silencio.
-
-### Los depósitos hechos en una fecha, según lo que dice la BOLETA.
-
-   Es otra pregunta que `delDia()`, que mira `created_at`: un depósito del
-   viernes cargado el lunes entra en uno y no en el otro. El primero cuadra
-   el trabajo del día; este se cruza contra el extracto del banco.
-
-## `app/Models/PermisoFaena.php`
-
-### VIGENCIA MÁXIMA DE UNA FAENA, en días.
-
-   Está acá y no escrito a mano en el controlador porque es una regla de la
-   resolución, no un detalle del formulario: la usan el alta, la validación
-   y la vista previa del papel. Escrita en tres lados, cambiarla se hace en
-   dos y el tercero sigue emitiendo con el plazo viejo.
-
-### La fecha límite que corresponde a una salida.
-
-   Se CALCULA acá y se GUARDA en la fila, en vez de derivarse al leer: si
-   mañana la resolución baja el plazo a quince días, los permisos ya
-   emitidos tienen que seguir venciendo cuando dice el papel que el pescador
-   tiene en la mano.
-
-## `app/Models/Recibo.php`
-
-### La suma de lo que HOY cuelga de este recibo.
-
-   NO es lo mismo que `monto_total`, y la diferencia es el punto: la columna
-   es lo que se IMPRIMIÓ y este método es lo que HAY. Si alguien corrigió un
-   abono después de emitir el papel, los dos números se separan — y eso es
-   justamente lo que un arqueo tiene que poder detectar.
-
-### Recalcula y guarda el total a partir del detalle.
-
-   Se llama al CERRAR el recibo, antes de imprimirlo — nunca al leerlo. Una
-   vez que el papel salió, este método no se vuelve a tocar: para eso está
-   `cuadra()`, que informa la diferencia en vez de taparla.
-
-## `app/Models/TipoCarnet.php`
-
-### El precio de HOY, para armar un cobro nuevo.
-
-   No sirve para leer lo que salió un carnet ya emitido: si el arancel
-   cambió, esta columna ya dice otra cosa. Lo cobrado de verdad está en
-   `pagos`, que no se recalcula nunca.
-
-## `app/Models/User.php`
-
-### Los depósitos que esta persona cargó en ventanilla.
-
-   OJO: apuntaba a `user_id`, UNA COLUMNA QUE NUNCA EXISTIÓ en `pagos`. La
-   relación estaba rota desde el primer día y no se notaba porque nadie la
-   llamaba —Eloquent no valida el nombre de la columna hasta que se ejecuta
-   la consulta—. Se arregló al agregar `registrado_por`.
-
-## `app/Services/CobrarService.php`
-
-### La serie del correlativo de caja.
-
-   Vive acá y no escrita en cada llamada porque `CorrelativoService` entrega
-   números POR SERIE: dos cadenas distintas son dos contadores distintos, y
-   un error de tipeo abriría una serie paralela que nadie pidió, con su
-   propio 0001.
-
-### El total se CONGELA acá, con los abonos que acaban de entrar.
-
-   Recalcularlo al leer haría que el papel entregado cambiara si
-   después se corrige un abono, y lo que se imprimió es lo que la
-   persona pagó. Ver Recibo::cuadra(), que compara lo impreso con lo
-   que hay hoy en vez de taparlo.
-
-### Cómo se nombra un trámite en el recibo y en los mensajes de error.
-
-   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`: es el
-   mismo dato, pero así el analizador avisa cuando se agrega un cobrable y
-   este método se olvida.
-
-## `app/Services/ControlarPagoService.php`
-
-### Corregir el depósito: única salida de una observación.
-
-   Vuelve SIEMPRE a PENDIENTE, aunque no se cambie nada: el dato se volvió a
-   declarar y nadie lo miró desde entonces.
-
-## `app/Services/CorrelativoService.php`
-
-### Entrega números correlativos por serie y gestión: DOC-PESCA-2026-0001.
-
-   El contador se bloquea con SELECT ... FOR UPDATE dentro de una transacción,
-   de modo que dos ventanillas cobrando al mismo tiempo nunca reciben el mismo
-   número. El contador se reinicia solo al cambiar de año porque la unicidad
-   de la fila es (serie, anio).
-
-## `app/Services/EmitirCarnetService.php`
-
-### Los catálogos se releen DENTRO de la transacción.
-
-   No es redundancia con el Request: entre que el operador abrió el
-   formulario y apretó guardar pueden pasar minutos, y en el medio alguien
-   pudo desactivar la asociación o el tipo desde el catálogo. El Request
-   mira el momento del envío; esto, el del guardado.
-
-### Su credencial vigente de ESTA actividad, o null.
-
-   Se consulta siempre contra la base y no se reutiliza ninguna relación
-   cargada: corre dentro del candado, y todo el punto es ver lo último
-   escrito, incluido lo que otra ventanilla acaba de crear.
-
-## `app/Services/EmitirFaenaService.php`
-
-### Y EL OTRO ESTADO QUE NO HABILITA: presentado y sin firmar.
-
-   Va aparte del anterior porque lo que falta es distinto —ahí plata,
-   acá una firma— y mandar al operador a cobrar un cupo ya cubierto
-   lo haría buscar un depósito que no existe.
-
-### EL TOPE SOLO SE HACE CUMPLIR EN MODO ESTRICTO.
-
-   La comprobación va acá adentro —con la fila del cupo bloqueada— y
-   no en el Request, porque el saldo puede moverlo otra ventanilla en
-   el mismo segundo.
-
-### Pone el cupo en `agotado` o lo devuelve a `activo` según su saldo real.
-
-   Vive acá y no en el modelo porque es una ESCRITURA, y el modelo solo
-   calcula. Se llama después de cualquier movimiento de kilos: emitir,
-   corregir al cerrar, o vencer una faena desde el comando diario.
-
-## `app/Services/EmitirGuiaService.php`
-
-### LA ASOCIACIÓN SE COPIA DEL CARNET, no se pregunta de nuevo.
-
-   Es la que certificó a la persona al emitirle la credencial, y
-   preguntarla otra vez abriría la puerta a que una guía diga un
-   gremio y el carnet que la respalda diga otro.
-
-## `app/Services/OtorgarCupoService.php`
-
-### EL VOLUMEN SALE DEL TECHO DEL TRAMO.
-
-   La escala dice «201 kg Hasta 500 Kg»: lo que se autoriza es el
-   máximo del rango, no un número que el operador elija adentro.
-   Dejarlo elegir convertiría la escala en una sugerencia y
-   abriría la puerta a cobrar el tramo 3 otorgando el volumen del 5.
-
-### NACE PENDIENTE, y de ahí sale solo al cobrarse.
-
-   Es lo que lo hace corregible: mientras no entró plata, el cupo
-   es un borrador que el operador puede arreglar o borrar con el
-   pescador todavía enfrente. Lo activa `CobrarService`.
-
-### SE COMPRUEBA CON LA COPIA BLOQUEADA, no con la que llegó.
-
-   Entre que el operador abrió el formulario y apretó guardar, otra
-   ventanilla pudo cobrar este mismo cupo. Preguntándole al modelo en
-   memoria, la edición pasaría sobre un cupo ya pagado.
-
-### Su bolsa madre utilizable hoy, o null.
-
-   Se consulta SIEMPRE contra la base y no se reutiliza la relación cargada:
-   este método corre dentro del candado, y todo el punto es ver lo último que
-   hay escrito, incluido lo que otra ventanilla acaba de crear.
-
-## `app/Services/RevisarCupoService.php`
-
-### SE VUELVE A MIRAR EL MONTO, aunque el envío ya lo había mirado.
-
-   No es redundancia: entre el envío y la firma pueden pasar días, y
-   en el medio alguien pudo dar de baja un pago. Aprobar un cupo que
-   dejó de estar cubierto lo habilitaría para pescar sin la plata.
-
-## `app/Support/Archivos.php`
-
-### El disco donde el sistema guarda y busca los adjuntos.
-
-   Sale de `FILESYSTEM_DISK`, igual que para StorageController. Vive acá —en
-   un solo método— para que escribir, leer y borrar no puedan terminar
-   mirando discos distintos.
-
-### Borra un archivo guardado.
-
-   Con la ruta —que es lo que hoy se guarda— se borra del disco activo, sea
-   local o s3. No hay nada especial que hacer: Flysystem resuelve el prefijo
-   del bucket solo, porque el disco lleva `'root' => env('AWS_ROOT')`.
-
-## `app/Support/CodigoQr.php`
-
-### Cuántos píxeles mide cada módulo (cada cuadradito) del código.
-
-   Con 8 px por módulo un QR de versión 3 sale de unos 300 px de lado: más
-   que suficiente para dibujarlo a 60 pt en el carnet sin que la impresora
-   tenga que inventar nada, y liviano (unos 2 KB en PNG).
-
-### El margen blanco alrededor, en módulos.
-
-   NO ES DECORACIÓN: la norma del QR lo llama «zona tranquila» y pide cuatro
-   módulos. Sin ella, el fondo verde del carnet toca los cuadritos del borde
-   y muchos lectores no encuentran dónde empieza el código.
-
-### El PNG del QR como data URI, listo para el `src` de un `<img>`.
-
-   Va embebido y no como ruta por lo mismo que las imágenes del recibo:
-   DomPDF resolvería una ruta contra el disco con las restricciones de
-   `chroot` y en producción terminaría en un recuadro vacío.
-
-## `app/Support/Paginacion.php`
-
-### Los tamaños de página que la pantalla puede pedir.
-
-   El primero es el que se usa cuando no se pide nada, y es también el que
-   el selector muestra marcado al entrar.
-
-## `app/Support/ReciboImpreso.php`
-
-### ARMA EL RECIBO IMPRESO A PARTIR DEL MODELO
-
-   Los pagos tienen que venir cargados con su `pagable`, y con `morphWith`:
-   una relación polimórfica NO se precarga con `with('pagable.beneficiario')`
-   —eso se ignora en silencio— y acá cada renglón necesita saber qué trámite
-   pagó.
-
-### Todas las boletas del recibo. El papel es UNO por trámite, así que tiene
-
-   Se corta en seis porque el renglón va de 198 a 226 pt —ahí empieza
-   DESCRIPCIÓN— y DomPDF no recorta, desborda.
-
-### El número que va en el recuadro N° del papel: 0016.
-
-   Se imprime SOLO LA PARTE NUMÉRICA de `REC-2026-0016`, porque el recuadro
-   del talonario es angosto y porque el prefijo y el año ya están impresos
-   alrededor. El número completo sigue en la base y en la pantalla.
-
-### Los tres recuadros DIA | MES | AÑO del encabezado.
-
-   Salen de `created_at` —cuándo se emitió el recibo— y no de hoy: una
-   reimpresión de marzo tiene que seguir diciendo marzo.
-
-### Los renglones del cuadro «IMPORTE A PAGAR Bs.».
-
-   Uno por cobro, en el orden en que entraron. Un pescador que pagó en dos
-   depósitos ve los dos escritos, igual que en el talonario de papel.
-
-## `app/Support/Sql.php`
-
-### Fragmentos de SQL que cambian entre motores.
-
-   El sistema corre sobre PostgreSQL en producción, pero en desarrollo puede
-   usarse SQLite. Todo lo que no sea SQL estándar pasa por acá para que no
-   haya consultas que funcionen en un motor y revienten en el otro.
-
-## `app/Traits/Auditable.php`
-
-### Registra en la tabla `auditorias` cada alta, cambio y baja del modelo,
-
-   Los modelos pueden declarar `$noAuditable` para excluir columnas del
-   registro (por ejemplo campos calculados o rutas de archivos temporales).
-
-## `app/Traits/Pagable.php`
-
-### Cuánto cuesta este trámite. Lo define cada modelo:
-
-   - Carnet              → el precio de su tipo de carnet
-   - AprovechamientoPesq → el valor de la escala con la que se otorgó
-   - GuiaMovimiento      → el arancel, con el 50% de descuento si es piscicultura
-
-### Cuánto falta para cubrirlo.
-
-   Se corta en cero: pagar de más NO genera saldo a favor. Si entró dinero
-   de más, no es un abono de este trámite y se resuelve por caja — dejarlo
-   en negativo lo mostraría como un crédito que el sistema no sabe aplicar.
-
-### ¿Se pueden CONTROLAR sus depósitos? Solo donde hay circuito de revisión;
-
-   `false` acá y no un `method_exists` en quien pregunta: ese truco deja el
-   control apagado en silencio si alguien nombra el método distinto.
 
 ## `database/factories/BeneficiarioFactory.php`
 
@@ -6245,19 +6496,6 @@
    sale— y nunca se decide nada con un match sobre este nombre.
    Ver docs/MER.md.
 
-## `database/migrations/2026_09_18_100300_create_beneficiarios_table.php`
-
-### Beneficiarios — la persona, UNA SOLA VEZ.
-
-   Tabla unificada y SIN columna de rol: quien pesca y además comercializa es una
-   persona con dos credenciales, no dos fichas. El rol vive en
-   `carnets.tipo_actor`, que es del documento.
-   De `primerNombre` en adelante van en camelCase, así que en SQL escrito a mano
-   hay que entrecomillar: SELECT "primerNombre". Sin comillas, PostgreSQL pasa el
-   nombre a minúscula y responde «column "primernombre" does not exist». Eloquent
-   entrecomilla solo; el problema aparece con whereRaw / orderByRaw.
-   Ver docs/MER.md.
-
 ## `database/migrations/2026_09_18_100400_create_aprovechamientos_pesq_table.php`
 
 ### Aprovechamientos pesqueros — la BOLSA MADRE del pescador.
@@ -6271,35 +6509,6 @@
    revés, en `carnets.aprovechamiento_id`.
    Ver docs/MER.md.
 
-## `database/migrations/2026_09_18_100500_create_carnets_table.php`
-
-### Carnets — la credencial física que se entrega en ventanilla.
-
-   El mismo plástico para las dos actividades; lo que cambia es `tipo_actor`:
-   carnet (pescador)        ──< permisos_faena     (una por salida)
-   carnet (comercializador) ──< guias_movimiento   (una por traslado)
-   Se imprime lo que NO cambia después de salir de la impresora. El ESTADO no se
-   imprime: un carnet se revoca después y la tarjeta no se entera.
-   Ver docs/MER.md.
-
-### NULLABLE PORQUE SOLO EL PESCADOR LLEVA CUPO, y eso lo dice
-
-   `nullOnDelete` y no restrict: sin el cupo el carnet sigue siendo un
-   documento válido, se emitió y se entregó.
-
-## `database/migrations/2026_09_18_100600_create_permisos_faena_table.php`
-
-### Permisos de faena — la autorización de UNA salida de pesca.
-
-   El carnet es la llave anual; con él solo no se sale a trabajar. Cada salida se
-   autoriza con una faena: cuántos kilos y hasta cuándo. Vigencia máxima, un mes.
-   Apunta a DOS cosas a la vez y hacen falta las dos: `aprovechamiento_id` es de
-   dónde salen los kilos, `carnet_id` es quién los extrae. Son la misma persona
-   por caminos distintos, y se renuevan en fechas distintas.
-   NO se edita ni se borra: se vence o se completa. El número sale de un talonario
-   de papel que el pescador se llevó.
-   Ver docs/MER.md.
-
 ## `database/migrations/2026_09_18_100700_create_guias_movimiento_table.php`
 
 ### Guías de movimiento — el amparo de UN traslado de producto.
@@ -6310,142 +6519,6 @@
    50% —el pescado de criadero no sale del río—. El descuento se aplica en UN
    solo lugar: GuiaMovimiento::factorArancel().
    Ver docs/MER.md.
-
-## `database/migrations/2026_09_18_100800_create_recibos_table.php`
-
-### Recibos — la CABECERA del comprobante oficial de caja.
-
-   El papel numerado que la persona se lleva. Agrupa uno o varios `pagos`, que
-   pueden ser de trámites distintos:
-   recibo 0016 (180 Bs)  ──< pago  80 Bs → carnet
-   ──< pago 100 Bs → aprovechamiento
-   Es una tabla y no se arma al vuelo porque `numero_recibo` es un CORRELATIVO DE
-   CAJA —el dato que no se puede derivar de otras tablas— y porque el comprobante
-   tiene que ser INMUTABLE: por eso el nombre, el NIT y el total se COPIAN acá al
-   emitir.
-   Ver docs/MER.md.
-
-## `database/migrations/2026_09_18_100900_create_pagos_table.php`
-
-### Pagos — el DETALLE de lo que se cobró, depósito por depósito.
-
-   TODO pago es un DEPÓSITO BANCARIO: no hay efectivo ni QR en esta unidad. Por
-   eso cada fila lleva sí o sí su número de boleta, su fecha y su archivo.
-   Es POLIMÓRFICA porque se cobran tres cosas —carnet, cupo y guía— y las tres se
-   pagan igual. Partida en tres tablas, `numero_recibo` dejaría de ser único
-   global.
-   EL COSTO: se pierde la clave foránea. El motor no puede exigir que
-   `pagable_id` exista, porque no sabe en qué tabla buscarlo. La integridad la
-   sostienen los RESTRICT de las otras tablas y la aplicación.
-   Y no se precarga con `with('pagable.beneficiario')`: eso se IGNORA en silencio
-   y el N+1 sigue ahí. Va con `morphWith`.
-   Ver docs/MER.md.
-
-### NULLABLE: el depósito nace antes que el recibo. En el
-
-   CASCADE y no RESTRICT: un pago sin recibo no se imprime ni entra
-   en ningún arqueo.
-
-### EL NÚMERO DEL DEPÓSITO, ÚNICO GLOBAL.
-
-   Es lo que impide cargar la misma boleta dos veces —contra el mismo
-   trámite o contra otro—, que es la forma más fácil de que un cupo
-   figure pagado sin que haya entrado la plata. Único global y no por
-   trámite: la boleta es una sola en el banco.
-
-## `resources/js/components/panel/aprovechamientos/barra-saldo.tsx`
-
-### Se avisa en ámbar por debajo del 20%.
-
-   Es el umbral en que conviene que el pescador se entere ANTES de salir:
-   descubrir que no alcanza cuando vuelve con la bodega llena no sirve de
-   nada, porque el producto ya se extrajo.
-
-## `resources/js/components/panel/beneficiarios/formulario-beneficiario.tsx`
-
-### BARRA DE ACCIONES FIJA AL PIE.
-
-   Con el formulario apilado, el botón de guardar quedaba al final de
-   tres pantallas de alto: había que bajar hasta el fondo para
-   usarlo, y para corregir un campo de arriba había que volver a
-   bajar. Fija, está siempre a un clic.
-
-### La fotografía, recortada en círculo como sale en el carnet.
-
-   Se muestra así y no como un rectángulo porque es como se va a imprimir: una
-   foto que se ve bien cuadrada puede quedar con la cabeza cortada al recortarla,
-   y descubrirlo recién al imprimir el carnet significa volver a llamar a la
-   persona.
-
-## `resources/js/components/panel/dashboard/mini-grafico.tsx`
-
-### Convierte la serie a coordenadas.
-
-   El máximo se fuerza a 1 como mínimo para que una serie de puros ceros —un
-   feriado, una ventanilla recién instalada— no divida por cero: sale una línea
-   apoyada en el piso, que es exactamente lo que pasó.
-
-### La serie como barras sueltas.
-
-   Se usa para los conteos: «entraron 3 trámites» es una cantidad discreta, y
-   una línea que sube y baja entre enteros sugiere una continuidad que no
-   existe —no hubo medio trámite a las once de la mañana—.
-
-## `resources/js/components/panel/dashboard/tabla-ultimos-carnets.tsx`
-
-### Las últimas diez credenciales emitidas.
-
-   Se muestra el SALDO y no el precio: lo que le interesa a quien mira el
-   tablero es qué falta cobrar, no cuánto salía el carnet. Uno cubierto se ve de
-   un vistazo porque dice «Pagado» en verde.
-
-## `resources/js/components/panel/dashboard/widget-estadistica.tsx`
-
-### Qué color de los cuatro usa la tarjeta.
-
-   Es un número y no un nombre de color a propósito: los tonos están definidos
-   en app.css como una escala institucional, y nombrarlos «azul» o «dorado» acá
-   ataría el tablero a un color concreto. El día que la paleta cambie se toca el
-   CSS y este archivo no se entera.
-
-## `resources/js/components/panel/layout/barra-lateral.tsx`
-
-### El rótulo de una sección: «Ventanilla», «Registro», «Administración».
-
-   Angosta la barra, el texto no entra, pero el grupo sigue existiendo: se
-   reemplaza por una línea divisoria para que los iconos no queden como una
-   columna continua sin ninguna agrupación.
-
-### Un renglón del menú. Si el módulo todavía no existe se dibuja apagado.
-
-   LA FILA VA A TODO EL ANCHO y sin esquinas redondeadas, y el ítem activo se
-   marca con una barra dorada pegada al borde izquierdo. Es lo que hace que la
-   columna se lea como una lista y no como una pila de botones sueltos: la marca
-   está siempre en la misma coordenada, así que el ojo la encuentra sin buscar.
-
-## `resources/js/components/publico/ficha-carnet.tsx`
-
-### El sello de estado.
-
-   Los colores NO se arman juntando textos (`bg-${color}-50`): Tailwind solo
-   incluye en el CSS final las clases que puede leer literalmente en el código, y
-   una clase compuesta nunca llega a la hoja de estilos. El sello saldría sin
-   fondo y sin ningún error que lo explique.
-
-## `resources/js/components/publico/hoja-oficial.tsx`
-
-### El membrete: escudo arriba y el nombre de la institución en tres renglones,
-
-   El nombre del sistema va último y en cuerpo chico a propósito. Al ciudadano
-   le importa qué institución responde, no cómo se llama el programa.
-
-## `resources/js/components/ui/confirmar-accion.tsx`
-
-### useEffect ejecuta código "por fuera" del pintado: acá, escuchar la tecla
-
-   El `return` de adentro es la LIMPIEZA: React lo llama al cerrarse la
-   ventana. Sin eso, cada apertura dejaría un listener más pegado al
-   documento y se irían acumulando.
 
 ## `resources/js/components/ui/estado-vacio.tsx`
 
@@ -6463,32 +6536,6 @@
    <select> nativo funciona mejor en celular (abre el selector del sistema
    operativo) y ya viene accesible con teclado sin escribir nada.
 
-## `resources/js/components/ui/selector-archivo.tsx`
-
-### LA MINIATURA HAY QUE LIBERARLA A MANO.
-
-   `URL.createObjectURL()` deja el archivo retenido en memoria hasta que
-   alguien llame a `revokeObjectURL`. Sin esto, cargar y cambiar adjuntos
-   varias veces en la misma pantalla va dejando copias sin liberar.
-
-## `resources/js/hooks/use-archivos.ts`
-
-### Devuelve el mensaje de error, o NULL si el archivo sirve.
-
-   Se comprueban las dos cosas que el servidor va a comprobar: el tipo y el
-   peso. El tipo también, porque el atributo `accept` del input es una
-   sugerencia —el usuario puede elegir «Todos los archivos» en el diálogo
-   del sistema y mandar lo que quiera—.
-
-## `resources/js/layouts/layout-panel.tsx`
-
-### Lee la preferencia guardada del menú.
-
-   Va envuelto en try/catch porque `localStorage` LANZA —no devuelve null— en
-   una ventana de incógnito o con las cookies bloqueadas por política del
-   equipo, que es un escenario real en una oficina pública. Sin el catch, el
-   panel entero queda en blanco por recordar el ancho de una barra.
-
 ## `resources/js/lib/graficos.ts`
 
 ### Ajustes compartidos por todos los gráficos del sistema.
@@ -6503,404 +6550,6 @@
    NO se exporta: quien necesite un color pide `colorSerie(i)`, que además
    resuelve qué pasa cuando hay más categorías que colores. Exportada, cada
    gráfico podría indexarla por su cuenta y salirse del arreglo.
-
-## `resources/js/lib/utils.ts`
-
-### Fecha y hora de un INSTANTE.
-
-   Recibe siempre ISO 8601 con zona —lo que devuelve `toIso8601String()` de
-   PHP—, así que convertir a horario local es lo correcto y no hace falta el
-   cuidado de `fecha()`: ahí el problema es al revés, una cadena sin zona a la
-   que no hay que aplicarle ninguna.
-
-### Solo la HORA de un instante: «14:17».
-
-   Aparte de `fechaHora()` porque en una tabla las dos partes van en renglones
-   distintos —la fecha arriba, la hora abajo— y juntas en una sola línea obligan
-   a ensanchar la columna.
-
-## `resources/js/pages/panel/aprovechamientos/crear.tsx`
-
-### Sugerencias del campo de embarcación, NO una lista cerrada.
-
-   Es lo que más se escribe en ventanilla, puesto ahí para ahorrar tecleo y para
-   que el dato salga escrito igual la mayoría de las veces. El operador puede
-   escribir cualquier otra cosa: un `datalist` sugiere, no restringe.
-
-## `resources/js/pages/panel/aprovechamientos/index.tsx`
-
-### Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor.
-
-   Va en la pantalla porque cambia qué significa un saldo en cero: con la
-   validación encendida es un bloqueo, y con ella apagada es un dato. Sin
-   este aviso, el listado se leería mal justo en el caso raro.
-
-## `resources/js/pages/panel/aprovechamientos/ver.tsx`
-
-### LA INTENCIÓN DE ENVIAR, que viaja con los depósitos.
-
-   Se llena al enviar con lo que el botón estaba diciendo, para que el
-   servidor haga exactamente lo que el operador leyó. Es una intención y
-   no un permiso: si al guardar el saldo no quedó en cero, el servidor
-   registra igual y no envía.
-
-### ¿CON ESTO ALCANZA? Es lo que decide qué dice el botón y qué hace.
-
-   Con `puede('aprovechamientos.enviar')` adentro: sin ese permiso el botón
-   solo registra, y ofrecerle enviar a quien no puede sería prometer algo que
-   el servidor va a ignorar.
-
-### EDITAR Y ELIMINAR SOLO SOBRE EL BORRADOR.
-
-   Las dos banderas llegan resueltas del servidor: no son
-   «el estado es pendiente» sino eso Y que no haya entrado
-   plata —y para eliminar, además, que no tenga faenas—.
-   Deducirlas acá sería una segunda copia de tres reglas.
-
-## `resources/js/pages/panel/beneficiarios/crear.tsx`
-
-### Alta de un beneficiario.
-
-   La pantalla es casi solo el envoltorio: el formulario vive en su propio
-   componente porque es el MISMO que usa la edición. Ver
-   components/panel/beneficiarios/formulario-beneficiario.tsx.
-
-## `resources/js/pages/panel/beneficiarios/index.tsx`
-
-### El padrón de beneficiarios.
-
-   Los datos llegan como PROPS desde BeneficiarioController::index(). No hay
-   fetch() ni axios: el array que ese método pasa a Inertia::render() es
-   exactamente este objeto.
-
-## `resources/js/pages/panel/caja/cobrar.tsx`
-
-### LA BOLETA DEL DEPÓSITO, SIEMPRE
-
-   No hay efectivo ni QR: todo pago es un depósito
-   bancario. Sin la boleta, lo único que respalda
-   el cobro es que alguien lo tipeó, y eso no se
-   puede cruzar contra el extracto del banco.
-
-## `resources/js/pages/panel/carnets/ver.tsx`
-
-### Por qué el carnet no habilita, cuando no habilita.
-
-   Se arma de las banderas que ya llegaron resueltas, en orden de precedencia:
-   primero lo que bloquea el documento entero y después lo que bloquea solo al
-   cupo. Decir «no puede» sin decir por qué manda al operador a adivinar.
-
-## `resources/js/pages/panel/catalogos/asociaciones.tsx`
-
-### El formulario de alta y edición.
-
-   Es el MISMO para los dos casos, igual que el Request del servidor comparte
-   las reglas: escrito dos veces, alcanza con tocar uno para que crear y editar
-   acepten cosas distintas.
-
-## `resources/js/pages/panel/catalogos/escala.tsx`
-
-### El aviso de rangos sin cubrir.
-
-   Va ARRIBA DE TODO y en ámbar porque es lo único de esta pantalla que puede
-   romper el trabajo de mañana, y porque no se deduce mirando la tabla: los
-   tramos se ven correctos uno por uno.
-
-## `resources/js/pages/panel/dashboard.tsx`
-
-### El tablero de la gestión en curso.
-
-   Los siete bloques llegan como props desde DashboardController, cada uno
-   calculado en su propia consulta. Todo lo que se muestra acá es de solo
-   lectura: el tablero informa, no permite hacer nada.
-
-### Pescadores contra comercializadores, entre los carnets vigentes.
-
-   Va como dos cifras y no como gráfico porque son dos valores: una torta con
-   dos porciones no agrega nada que el número no diga, y costaría traer
-   recharts a la parte de arriba de la pantalla —que es justo lo que la carga
-   diferida vino a evitar—.
-
-## `resources/js/pages/panel/faenas/ver.tsx`
-
-### En qué situación está la salida, en una frase.
-
-   Los tres casos se resuelven con banderas que ya llegaron del servidor. El que
-   importa es el del medio: una faena que se pasó de fecha y sigue activa es un
-   papel que alguien se llevó y del que nadie registró la vuelta — no es una
-   previsión, es algo que hay que ir a buscar.
-
-## `resources/js/pages/panel/guias/crear.tsx`
-
-### Los carnets vigentes, con el que no sirve deshabilitado.
-
-   NO SE FILTRAN los que no pueden: aparecen en gris con el motivo al lado. Un
-   carnet que desaparece le dice al operador «esta persona no tiene carnet», que
-   es falso y lo manda a emitir otro.
-
-## `resources/js/pages/panel/guias/ver.tsx`
-
-### En qué situación está el traslado, en una frase.
-
-   El caso que importa es el del medio: una guía que se pasó de hora y sigue
-   activa es un camión en la ruta con un papel que ya no vale. No es una
-   previsión — es algo que hay que resolver ahora.
-
-## `resources/js/types/aprovechamientos.ts`
-
-### Los kilos OTORGADOS, copiados del techo del tramo al otorgar.
-
-   Están congelados a propósito: la escala cambia por resolución, y un cupo
-   dado en marzo bajo un tramo de 500 kg no puede pasar a valer 800 porque
-   alguien editó el catálogo. La única cosa que los mueve es una AMPLIACIÓN.
-
-### Lo que el pescador declaró que navega: «canoa», «peque-peque», «bote»…
-
-   Es el renglón «Tipo de Embarcación» del talonario verde, y va en texto
-   libre porque no hay padrón de embarcaciones ni nomenclatura fija. NULL
-   cuando no se declaró —que el papel también admite—, y por eso la pantalla
-   distingue «no declarada» de una cadena vacía.
-
-### Los kilos que se PASARON del volumen otorgado.
-
-   En modo estricto siempre es 0 —la emisión no deja pasar una faena que no
-   entre—, así que solo aparece en pantalla cuando hay algo que mostrar.
-   `saldo_kg` no puede decirlo: se corta en cero.
-
-### Si todavía se puede corregir, y si se puede borrar la fila entera.
-
-   NO son «el estado es pendiente»: son eso Y que no haya entrado plata —y
-   para eliminar, además, que no tenga faenas emitidas—. Llegan resueltas
-   del servidor porque deducirlas acá sería una segunda copia de tres reglas.
-
-### Las tres del circuito de revisión, resueltas en el servidor.
-
-   `puede_enviarse` NO es «el estado es pendiente»: es eso Y que los
-   depósitos cubran el monto entero. Deducirlo acá sería una segunda copia
-   de la regla, y con un saldo que la pantalla puede tener viejo.
-
-### Cuántas boletas quedan sin dar por buenas —sin validar u observadas—.
-
-   Es lo que frena la aprobación: `puede_aprobarse` NO es «el estado es en
-   revisión», es eso Y que este número esté en cero. Sin esa condición,
-   validar sería decorativo.
-
-### Un depósito que pagó este cupo, en la ficha.
-
-   Son VARIOS a propósito: un cupo se puede pagar en cuotas, y cada depósito
-   bancario llega con su propia boleta. No hay efectivo ni QR, así que las tres
-   columnas de la boleta están siempre.
-
-### EL RECIBO DEL TRÁMITE: uno solo, con todos los depósitos adentro.
-
-   No va por depósito, y ese es el punto: el aprovechamiento es un trámite, la
-   persona entrega sus boletas —una o cinco— y se lleva UN papel con el total.
-   Se emite al enviar a revisión, así que mientras el cupo está pendiente esto
-   llega en `null`.
-
-### Si sus kilos pesan contra el saldo.
-
-   Una faena VENCIDA libera su volumen —la salida no ocurrió— así que la
-   pantalla la marca aparte: sin eso, la suma de la lista no cuadra con el
-   saldo y parece un error del sistema.
-
-### El techo del rango, que es EL VOLUMEN QUE SE VA A OTORGAR.
-
-   La escala dice «201 kg Hasta 500 Kg»: lo que se autoriza es el máximo, no
-   un número que el operador elija adentro. Por eso el formulario lo muestra
-   al elegir el tramo: las dos consecuencias —kilos y precio— se ven antes
-   de guardar, no después.
-
-## `resources/js/types/beneficiarios.ts`
-
-### Tipos del módulo Beneficiarios.
-
-   Cada interfaz describe, campo por campo, lo que arma
-   App\Http\Controllers\Panel\BeneficiarioController. Si allá se renombra una
-   clave y acá no, el editor lo marca en rojo al instante en vez de descubrirlo
-   con una pantalla en blanco.
-
-### Una fila de la tabla del padrón.
-
-   Los campos están agrupados como los pinta la tabla: identificación, la persona
-   y sus datos. No es casualidad —el controlador los arma en ese mismo orden—
-   para que agregar una columna sea encontrar el grupo al que pertenece.
-
-### Años CUMPLIDOS, calculados por el servidor.
-
-   Llega hecha y no se calcula en el navegador a propósito: con dos
-   definiciones de «edad» —la de PHP y la de JavaScript— tarde o temprano
-   difieren por un día en los bordes (el cumpleaños de hoy, los bisiestos, la
-   zona horaria del teléfono del operador). Ver Beneficiario::edad().
-
-### La ficha completa.
-
-   `nombreCompleto` va en camelCase porque así llega de PHP: el modelo lo manda
-   con ese nombre explícito. Ver el comentario de App\Models\Beneficiario sobre
-   por qué ese accesor no puede ir en #[Appends].
-
-### Los kilos impresos en el plástico, o null si es comercializador.
-
-   Lo decide `TipoActor::requiereAprovechamiento()` en el servidor, NUNCA un
-   `if` sobre el nombre del tipo de carnet: ese nombre es un catálogo que la
-   unidad edita, y el mismo documento figura de dos formas distintas según
-   quién lo cargó.
-
-### Una BOLSA MADRE de la persona: el cupo anual en kilos.
-
-   Se manda el SALDO y no solo el volumen otorgado porque es lo único
-   accionable: «tiene 500 kg» no dice si puede salir a pescar mañana, y «le
-   quedan 20» sí.
-
-### Un carnet vigente, tal como lo devuelve el autocompletado.
-
-   LAS DOS BANDERAS LLEGAN CALCULADAS y la pantalla no las deduce. Un `if` sobre
-   el tipo en React sería una segunda copia de la regla, y se desincroniza en
-   cuanto alguien renombre una fila del catálogo o cambie la vigencia del cupo.
-   Ver Carnet::puedeEmitirFaenas() y ::puedeEmitirGuias().
-
-### Kilos que quedan en la bolsa madre. Null si el carnet no lleva cupo.
-
-   Viene con el resultado de la búsqueda y no en un segundo viaje: el
-   formulario de faena lo necesita apenas se elige el carnet, y pedirlo
-   aparte se nota justo cuando el operador acaba de hacer clic.
-
-### El número de talonario que el sistema PROPONE. Null si no lleva cupo.
-
-   Es una propuesta y no una imposición: el número sale de la hoja que el
-   operador tiene en la mano, y si no coincide hay algo que conviene mirar
-   antes de seguir, no autocorregir en silencio.
-
-## `resources/js/types/caja.ts`
-
-### NULL mientras el depósito no tiene papel.
-
-   Pasa con el aprovechamiento: sus depósitos se cargan mientras el trámite
-   está pendiente y el recibo —uno solo, con el total— se emite recién al
-   enviarlo a revisión. La plata ya entró, así que la fila está y suma en el
-   arqueo; lo que falta es el comprobante.
-
-### La boleta del banco. Nunca faltan: TODO pago es un depósito bancario —no
-
-   Cuando un mismo depósito cubre varias líneas, la segunda en adelante
-   llevan el número con un sufijo («0012345678-2»), porque es único global.
-
-### Una deuda de la persona, lista para cobrar.
-
-   `tipo` es una palabra corta —`carnet`, `cupo`, `guia`— y no un nombre de
-   clase: el servidor la traduce con una lista blanca. Mandando la clase
-   directo, cualquiera podría escribir otra en el navegador y el sistema crearía
-   pagos apuntando a cualquier tabla.
-
-## `resources/js/types/carnets.ts`
-
-### La bolsa madre que respalda el cupo impreso. Null en un comercializador.
-
-   Trae el SALDO y no solo el volumen porque es lo que decide si hoy se le
-   puede emitir una faena, que es la pregunta que trae a alguien a esta
-   ficha.
-
-### El cupo vigente de la persona elegida, si lo tiene.
-
-   La pantalla lo usa para avisar ANTES de guardar que un carnet de pescador sin
-   cupo va a ser rechazado. El servidor lo comprueba igual dentro de la
-   transacción; esto evita el viaje en falso.
-
-## `resources/js/types/catalogos.ts`
-
-### El RÉGIMEN del tramo, y de él depende si el cupo se va a poder ampliar.
-
-   Se declara acá, en el catálogo, y no al otorgar: la fija la resolución al
-   definir el tramo. Puesta en el otorgamiento, dos cupos del mismo tramo
-   podrían terminar con reglas distintas.
-
-### El texto literal de la resolución.
-
-   Se guarda aparte de los kilos porque no siempre es su lectura: el tramo
-   más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese «PAICHE» no está en
-   ningún número.
-
-### El arancel de HOY, para armar un cobro nuevo.
-
-   NO sirve para leer lo que salió un carnet ya emitido: lo cobrado de
-   verdad está en `pagos` y no se recalcula. Lo que SÍ cambia al subir este
-   número es el saldo pendiente de los carnets que todavía no están
-   cubiertos.
-
-## `resources/js/types/dashboard.ts`
-
-### Una jornada de la serie de los últimos catorce días.
-
-   Es lo que dibujan las líneas chicas al pie de los indicadores. Cada fila trae
-   los DOS valores del día porque las dos series salen del mismo recorrido en
-   PHP: separarlas obligaría a mandar el calendario dos veces.
-
-### Pescadores contra comercializadores, entre los carnets vigentes.
-
-   Sale del enum y no de la base para que los dos aparezcan aunque uno esté en
-   cero: un valor que no vuelve en la consulta haría que el bloque mienta por
-   omisión.
-
-### Lo que está por caducar o ya caducó sin cerrarse.
-
-   Las dos últimas cifras no son avisos de vencimiento sino de TRABAJO SIN
-   CERRAR: una faena o una guía que se pasó de fecha y sigue activa es un papel
-   que alguien se llevó y del que nadie registró la vuelta.
-
-## `resources/js/types/guias.ts`
-
-### Por cuánto se multiplicó el arancel: 1 o 0.5.
-
-   Viene explícito para que la ficha pueda decir «se cobró al 50%» sin
-   recalcularlo. La regla vive en `GuiaMovimiento::factorArancel()`, en un
-   solo lado.
-
-## `resources/js/types/index.d.ts`
-
-### Qué archivos acepta el sistema y hasta cuánto pesan.
-
-   Sale de `config/jichi.php`, no de un número escrito en React: es el mismo que
-   usan las reglas de validación del servidor. Se lee con el hook
-   `useArchivos()`.
-
-### ESTADOS DEL DOMINIO
-
-   Copian exactamente los enums de PHP en app/Enums/. Si allá se agrega un
-   estado nuevo, hay que agregarlo acá también: son las dos mitades de la
-   misma definición.
-
-### Espejo de App\Enums\EstadoCarnet.
-
-   `vencido` lo escribe un comando que corre una vez al día, así que esta
-   columna puede estar desfasada: para saber si un carnet vale HOY, el servidor
-   mira además `fecha_vencimiento`. La pantalla recibe la respuesta ya
-   calculada y no la vuelve a deducir.
-
-### Espejo de App\Enums\TipoActor.
-
-   Es del DOCUMENTO, no de la persona: quien pesca y además comercializa tiene
-   una ficha y dos carnets. De acá cuelga qué puede emitir cada credencial
-   —faenas o guías— y si lleva cupo en kilos.
-
-### route() convierte el nombre de una ruta de Laravel en su URL:
-
-   route('beneficiarios.show', 42)  ->  '/panel/beneficiarios/42'
-   No hace falta importarla: la inyecta la directiva @routes de Ziggy en
-   resources/views/app.blade.php, y está disponible en cualquier archivo.
-
-## `resources/views/documentos/recibo-oficial.blade.php`
-
-### DESCRIPCIÓN — las seis casillas del talonario
-
-   Se dibujan SIEMPRE las seis, aunque el sistema solo sepa cobrar dos:
-   el recibo tiene que salir igual al papel. Cuál queda marcada lo
-   decide App\Enums\ConceptoRecibo.
-
-### PIE — las tres copias y la nota legal
-
-   El talonario de papel es autocopiativo y cada hoja dice a quién le
-   toca. El PDF sale de a una, pero la leyenda se conserva: es lo que
-   Contabilidad y Archivo buscan cuando reciben su copia impresa.
 
 ## `routes/auth.php`
 
@@ -6925,187 +6574,6 @@
    el problema 2 de docs/PENDIENTES.md.
    Mientras tanto el sistema no miente, porque `Carnet::estaVigente()` compara
    además contra `fecha_vencimiento`.
-
-## `routes/panel.php`
-
-### Panel de administración — requiere sesión iniciada
-
-   Todo lo de este archivo está dentro del middleware 'auth': si no hay sesión,
-   Laravel redirige al login antes de ejecutar nada.
-   Además cada ruta declara QUÉ PERMISO exige, con el middleware 'permiso'. Ese
-   alias apunta a spatie/laravel-permission y está registrado en
-   bootstrap/app.php. Los permisos salen del enum App\Enums\RolSistema, que es la
-   única fuente de verdad.
-   'permiso:beneficiarios.crear'  -> el usuario debe tener ese permiso
-   HOY EL ÚNICO ROL ES `administrador` Y LOS TIENE TODOS. El middleware igual va
-   en cada ruta, y no es trabajo de más: el día que exista el rol de ventanilla,
-   se agrega su lista al enum y las rutas ya están protegidas. Al revés —quitarlo
-   ahora «porque total el admin puede todo» y volver a ponerlo después— es donde
-   se olvida uno y queda un agujero.
-   ESCONDER UN BOTÓN EN REACT NO ES SEGURIDAD. usePermisos() sirve para que la
-   pantalla no ofrezca lo que no se puede hacer; quien realmente bloquea es este
-   middleware. Van siempre los dos.
-   Todas las URLs cuelgan de /panel. La parte pública vive fuera de ese prefijo
-   (routes/publico.php), así queda claro de un vistazo qué es administración y
-   qué ve el ciudadano.
-   No hay auto-registro de usuarios: las cuentas las crea el administrador.
-   EL ORDEN DE LOS BLOQUES ES EL DEL FLUJO DE TRABAJO
-   1. Beneficiarios      la persona, una sola vez
-   2. Aprovechamientos   la bolsa madre: el cupo en kilos
-   3. Carnets            la credencial anual, y su impresión
-   4. Faenas / Guías     los permisos operativos que cuelgan del carnet
-   5. Caja               recibos y pagos
-   Los módulos que todavía no existen NO tienen rutas declaradas, y eso es
-   deliberado: una ruta declarada convierte el renglón del menú en un enlace
-   pinchable (ver barra-lateral.tsx, que pregunta por la ruta antes de enlazar).
-   Sin ella, el renglón se dibuja en gris y se lee como «todavía no» en vez de
-   llevar a un 500.
-   Del modelo anterior no quedó nada: Trámites y Rubros no tienen equivalente y
-   se retiraron enteros. Están en git, en el commit `8d48422`.
-
-### 1. Beneficiarios — la persona, UNA SOLA VEZ
-
-   Es el primer paso del flujo, y el único módulo que sobrevivió al cambio de
-   núcleo casi intacto: la persona no cambió, lo que cambió es lo que le
-   cuelga.
-   OJO CON EL ORDEN DE LAS RUTAS. Laravel las evalúa de arriba hacia abajo y
-   se queda con la primera que coincide. Por eso 'beneficiarios/crear' tiene
-   que ir ANTES que 'beneficiarios/{beneficiario}': si estuviera después,
-   Laravel tomaría la palabra «crear» como si fuera el id, no encontraría
-   ningún registro y respondería 404.
-
-### 2. Aprovechamientos — la BOLSA MADRE del pescador
-
-   El cupo anual en kilos. Va ANTES del carnet en el flujo porque el plástico
-   necesita saber qué cupo imprimir: al revés habría que emitir el carnet y
-   corregirlo después, y en el medio existiría una credencial impresa sin
-   cupo.
-   `edit`, `update` y `destroy` EXISTEN, PERO SOLO SOBRE EL BORRADOR.
-   Un cupo nace PENDIENTE DE PAGO, y mientras nadie pagó nada es eso: un
-   borrador que el operador acaba de cargar contra el talonario, con el
-   pescador enfrente. Equivocarse de tramo se arregla corrigiendo la fila, y
-   uno cargado por error se borra con el motivo escrito.
-   En cuanto entra el primer boliviano las tres se cierran solas —lo decide
-   `EstadoAprovechamiento::permiteEdicion()`, no el middleware—: hay un recibo
-   numerado con el detalle impreso, y cambiar lo que ese papel dice por detrás
-   no es una corrección.
-   NO HAY «AMPLIAR». Un cupo cobrado es lo que dice el recibo, y si al pescador
-   le hacen falta más kilos, eso es un trámite nuevo: elegir el tramo, cobrarlo
-   y emitir otro recibo. Esa vuelta completa ES el control.
-   Un cupo editable SIEMPRE dejaría de ser un límite: alcanzaría con subirle
-   el tramo para saltear la escala, sin que quedara constancia de quién lo
-   decidió.
-   Mismo cuidado con el orden que en beneficiarios: 'crear' va ANTES de
-   '{aprovechamiento}' o Laravel toma esa palabra como si fuera el id.
-
-### CARGAR LOS DEPÓSITOS DESDE LA FICHA DEL CUPO.
-
-   El permiso es el de CAJA y no uno de aprovechamientos, porque esto es un
-   cobro: sale con recibo numerado y entra al arqueo del día. Que la pantalla
-   sea otra no cambia quién puede hacerlo.
-
-### 3. Carnets — la credencial anual
-
-   La LLAVE del año. De ella cuelgan los permisos operativos: faenas si es de
-   pescador, guías si es de comercializador.
-   NO HAY `edit` NI `update`. Un carnet emitido no se corrige: el plástico ya
-   salió de la impresora y está en manos de la persona, así que editarlo
-   dejaría al documento diciendo una cosa y al sistema otra —y la
-   verificación pública respondería por el dato nuevo, que el inspector NO
-   tiene delante—. Lo que hay es REVOCAR, con motivo, y emitir uno nuevo.
-   Mismo cuidado con el orden: 'crear' va ANTES de '{carnet}'.
-
-### 4a. Permisos de faena — una salida de pesca
-
-   Cuelgan del carnet de PESCADOR y descuentan kilos de la bolsa madre. El
-   carnet es la llave anual; con él solo no se sale a trabajar.
-   NO HAY `edit`, NI `update`, NI `destroy`, NI `anular`. El número sale de un
-   talonario de papel que el pescador se llevó: borrar la fila deja un hueco
-   en la serie que nadie puede explicar y libera un número que el índice único
-   volvería a aceptar.
-   Y `EstadoFaena` no tiene un estado anulado: una faena emitida de más se
-   deja VENCER, y al vencer libera su volumen sola. Lo único que se escribe
-   después de emitir es COMPLETAR, que registra la vuelta.
-
-### 4b. Guías de movimiento — un traslado de producto
-
-   La rama del COMERCIALIZADOR. Lo que la faena es para el pescador, la guía
-   es para él: el carnet habilita el año, la guía habilita el viaje.
-   TRES DIFERENCIAS CON LAS FAENAS:
-   - No toca ningún cupo: la comercialización no se autoriza por volumen.
-   - Lleva descuento: piscicultura paga el 50% del arancel.
-   - SÍ SE ANULA. `EstadoGuia` tiene ese estado y `EstadoFaena` no, porque
-   una guía emitida mal ampara un camión que puede estar en la ruta.
-   Igual que las faenas, NO hay `edit` ni `destroy`: el código sale de un
-   talonario de papel que viaja dentro del camión.
-
-### 5. Caja — el circuito del dinero
-
-   Atraviesa a todos los anteriores: se cobran la credencial, el cupo y la
-   guía, y los tres se pagan igual. NO es un paso del flujo —es algo que
-   puede pasar en cualquiera de ellos y varias veces— y por eso va aparte y
-   no intercalado.
-   DOS LISTADOS QUE NO SE REEMPLAZAN:
-   /caja     los ABONOS, uno por entrega de dinero. Es lo que se cuadra
-   contra el efectivo del cajón al cerrar el día.
-   /recibos  los PAPELES entregados, con su correlativo. Es lo que audita
-   Contabilidad.
-   Un recibo agrupa varios abonos, así que las dos listas nunca tienen la
-   misma cantidad de filas.
-   LOS RECIBOS NO TIENEN `store`: nacen del cobro, en la misma transacción.
-   Un endpoint para crear uno suelto permitiría un comprobante numerado sin
-   ningún pago detrás — un papel oficial que dice que entró plata que no
-   entró.
-
-### IMPRIMIR va ANTES de '/recibos/{recibo}'… no: van los dos con parámetro,
-
-   Entregar el papel numerado es un acto distinto de consultarlo: quien
-   audita la serie puede necesitar verla sin poder emitir comprobantes.
-
-### Catálogos — lo que sale de una resolución y casi no se toca
-
-   Son tres listas chicas: los gremios, la escala oficial de kilos y precios,
-   y los tipos de credencial con su arancel. De ellas dependen los dos pasos
-   siguientes del flujo —el cupo y el carnet— así que sin cargarlas no se
-   puede emitir nada.
-   CUELGAN DE /panel/catalogos/ Y NO DE LA RAÍZ del panel a propósito: son
-   mantenimiento, no trabajo de mostrador, y la URL lo dice sin que haga
-   falta explicarlo.
-   LOS TRES TIENEN index + store + update, Y NINGUNO TIENE destroy. No es un
-   olvido: los carnets, las guías y los aprovechamientos ya emitidos apuntan
-   a estas filas. Una entrada que se deja de usar se pone inactiva, y así los
-   documentos históricos la siguen mostrando —que es lo correcto: la persona
-   pertenecía a esa asociación cuando se le emitió el carnet—.
-   Tampoco tienen pantalla de alta ni de edición aparte: el formulario vive
-   al lado de la tabla, porque son listas de pocas filas que se comparan
-   entre sí mientras se cargan. Ver AsociacionController.
-   VER es de lectura y GESTIONAR es de administración, y por eso son dos
-   permisos: cualquiera que emita un carnet necesita LEER el catálogo —el
-   desplegable sale de acá— pero tocar una tarifa es otra cosa.
-
-### Módulos por construir
-
-   Aprovechamientos, Carnets, Faenas, Guías, Caja, Reportes y Configuración.
-   Todos aparecen en el menú lateral en gris, porque barra-lateral.tsx
-   comprueba si la ruta está declarada antes de convertir el renglón en
-   enlace.
-   Para construir cualquiera: copiar el patrón de Beneficiarios —controlador,
-   Request, tipos de TypeScript y pantallas—, que es la plantilla del sistema
-   y está comentado paso a paso a propósito.
-
-## `routes/publico.php`
-
-### Rutas públicas — sin autenticación
-
-   Acá va lo único que el sistema expone al ciudadano: la verificación de
-   autenticidad de un carnet. Es la URL codificada dentro del código QR impreso
-   en cada documento.
-   Un pescador muestra su carnet, el inspector escanea el QR con su teléfono y
-   cae en esta pantalla, que le dice si el documento es real, si está vigente y
-   para qué rubros habilita. Por eso NO puede pedir login.
-   HACE FALTA UN SOLO DATO: la firma de validación. El carnet no tiene número —se
-   retiró la columna `codigo`— y se identifica por esos dieciséis caracteres, que
-   están impresos en el plástico y dentro del QR. Ver VerificacionController.
 
 ## `routes/web.php`
 

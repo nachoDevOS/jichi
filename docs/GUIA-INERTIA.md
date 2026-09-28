@@ -404,8 +404,8 @@ una transacción. El controlador que lo usa —`TramiteController::store()`— t
 quince líneas, y esa es la señal de que está bien repartido.
 
 El motivo es concreto: el mismo caso de uso lo necesitan el formulario del
-panel, un comando de consola y las pruebas automáticas. Escrito adentro del
-controlador, los otros dos tienen que copiarlo, y las copias se quedan viejas.
+panel y un comando de consola. Escrito adentro del controlador, el otro tiene
+que copiarlo, y la copia se queda vieja.
 
 ### Frontend
 
@@ -466,7 +466,6 @@ composer run dev       # levanta todo junto: servidor, vite, cola y logs
 
 npx tsc --noEmit       # revisa los tipos SIN compilar. Rápido, usarlo seguido
 npm run build          # compila para producción
-php artisan test       # las pruebas automáticas
 ./vendor/bin/pint      # formatea el PHP
 ```
 

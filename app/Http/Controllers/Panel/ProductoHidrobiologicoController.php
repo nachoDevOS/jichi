@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  CATÁLOGO DE PRODUCTOS HIDROBIOLÓGICOS — el cuadro D de la guía
+ *  Catálogo de productos hidrobiológicos — el cuadro D de la guía
  *
  * Nombre, tasa por kilo que se cobra en la guía y si se puede elegir. Sin baja: un
  * producto usado en una guía se pone fuera de uso, no se borra.
@@ -21,7 +21,7 @@ use Inertia\Response;
 class ProductoHidrobiologicoController extends Controller
 {
     /**
-     * LISTADO Y FORMULARIO — GET /panel/catalogos/productos
+     * Listado y formulario — GET /panel/catalogos/productos
      */
     public function index(Request $request): Response
     {
@@ -67,7 +67,7 @@ class ProductoHidrobiologicoController extends Controller
     }
 
     /**
-     * EDICIÓN — PUT /panel/catalogos/productos/{producto}
+     * Edición — PUT /panel/catalogos/productos/{producto}
      */
     public function update(GuardarProductoHidrobiologicoRequest $request, ProductoHidrobiologico $producto): RedirectResponse
     {

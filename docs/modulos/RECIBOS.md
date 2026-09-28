@@ -143,11 +143,6 @@ Se copian igual, y es la decisión central del módulo:
 Es el mismo criterio de `tramites.monto_requerido`, llevado hasta el final: acá
 se congela el documento entero.
 
-Dos pruebas lo fijan:
-
-- `test_corregir_el_beneficiario_no_cambia_un_recibo_ya_emitido`
-- `test_subir_la_tarifa_del_rubro_no_cambia_un_recibo_ya_emitido`
-
 ---
 
 ## 4. El recibo sobrevive al borrado del trámite
@@ -464,7 +459,6 @@ justamente el caso en el que hay que volver a sacarlo.
 | `app/Http/Controllers/Panel/ReciboController.php` | Arma el PDF |
 | `resources/views/documentos/recibo-oficial.blade.php` | El calco del talonario |
 | `database/migrations/2026_09_14_100000_create_recibos_table.php` | El esquema, muy comentado |
-| ~~`tests/Feature/ReciboTramiteTest.php`~~ | Eran 31 pruebas. Borrado el 14/09/2026 |
 | `public/image/recibo-escudo.png`, `recibo-sello.png` | Assets de impresión |
 
 Tocados: `CorrelativoService` (se le extrajo `siguienteNumero()`),

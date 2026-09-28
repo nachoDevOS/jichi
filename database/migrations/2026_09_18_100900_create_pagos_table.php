@@ -52,7 +52,7 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // LA MISMA BOLETA NO SE CARGA DOS VECES. Parcial y no inline: con
+        // La misma boleta no se carga dos veces. Parcial y no inline: con
         // `deleted_at` adentro el índice no bloquea nada (NULL != NULL).
         DB::statement(<<<'SQL'
             CREATE UNIQUE INDEX pagos_nro_transaccion_unico

@@ -20,12 +20,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  MÓDULO BENEFICIARIOS — controlador de ejemplo
+ *  Módulo beneficiarios — controlador de ejemplo
  */
 class BeneficiarioController extends Controller
 {
     /**
-     * LISTADO — GET /panel/beneficiarios
+     * Listado — GET /panel/beneficiarios
      */
     public function index(Request $request): Response
     {
@@ -88,7 +88,7 @@ class BeneficiarioController extends Controller
     }
 
     /**
-     * FORMULARIO DE ALTA — GET /panel/beneficiarios/crear
+     * Formulario de alta — GET /panel/beneficiarios/crear
      */
     public function create(): Response
     {
@@ -96,7 +96,7 @@ class BeneficiarioController extends Controller
     }
 
     /**
-     * GUARDAR EL ALTA — POST /panel/beneficiarios
+     * Guardar el alta — POST /panel/beneficiarios
      */
     public function store(GuardarBeneficiarioRequest $request): RedirectResponse
     {
@@ -146,7 +146,7 @@ class BeneficiarioController extends Controller
             'deuda' => $beneficiario->deudaTotal(),
 
             /*
-             *  SUS CREDENCIALES — el paso 3 del flujo
+             *  Sus credenciales — el paso 3 del flujo
              */
             'carnets' => $beneficiario->carnets()
                 // El cupo con su saldo precargado: `motivoSinPermisos()` y
@@ -243,7 +243,7 @@ class BeneficiarioController extends Controller
                 ->all(),
 
             /*
-             *  SUS BOLSAS MADRE — el paso 2, y el que explica las faenas
+             *  Sus bolsas madre — el paso 2, y el que explica las faenas
              */
             'cupos' => $beneficiario->aprovechamientos()
                 ->with('categoria')
@@ -277,7 +277,7 @@ class BeneficiarioController extends Controller
     }
 
     /**
-     * FORMULARIO DE EDICIÓN — GET /panel/beneficiarios/{beneficiario}/editar
+     * Formulario de edición — GET /panel/beneficiarios/{beneficiario}/editar
      */
     public function edit(Beneficiario $beneficiario): Response
     {
@@ -297,7 +297,7 @@ class BeneficiarioController extends Controller
     }
 
     /**
-     * GUARDAR LA EDICIÓN — PUT /panel/beneficiarios/{beneficiario}
+     * Guardar la edición — PUT /panel/beneficiarios/{beneficiario}
      */
     public function update(GuardarBeneficiarioRequest $request, Beneficiario $beneficiario): RedirectResponse
     {
@@ -321,7 +321,7 @@ class BeneficiarioController extends Controller
     }
 
     /**
-     * BAJA — DELETE /panel/beneficiarios/{beneficiario}
+     * Baja — DELETE /panel/beneficiarios/{beneficiario}
      */
     public function destroy(Beneficiario $beneficiario): RedirectResponse
     {
@@ -333,7 +333,7 @@ class BeneficiarioController extends Controller
     }
 
     /**
-     * BUSCADOR PARA EL FORMULARIO DE SOLICITUD — GET /panel/beneficiarios/buscar
+     * Buscador para el formulario de solicitud — GET /panel/beneficiarios/buscar
      *
      * @return array<int, array<string, mixed>>
      */
@@ -354,10 +354,10 @@ class BeneficiarioController extends Controller
              * de consultas.
              */
             /*
-             * EL CUPO VIAJA CON EL CARNET, y los dos agregados con él.
+             * El cupo viaja con el carnet, y los dos agregados con él.
              */
             /*
-             * SU BOLSA MADRE, para el formulario de carnet: es de dónde va a
+             * Su bolsa madre, para el formulario de carnet: es de dónde va a
              * salir el cupo impreso, y la pantalla tiene que poder decir cuál.
              * Va con la categoría y el agregado de kilos, o cada fila del
              * autocompletado dispararía dos consultas más.
@@ -395,7 +395,7 @@ class BeneficiarioController extends Controller
                 'direccion' => $b->direccion,
 
                 /*
-                 * QUÉ PUEDE EMITIR ESTA PERSONA HOY, ya resuelto.
+                 * Qué puede emitir esta persona hoy, ya resuelto.
                  */
                 'carnets_vigentes' => $b->carnets->map(fn (Carnet $c): array => $c->resumenParaEmitir())->values()->all(),
 
@@ -407,17 +407,9 @@ class BeneficiarioController extends Controller
     /**
      * Las bolsas madre que pueden respaldar un carnet de pescador nuevo.
      *
-     * Son las EN CURSO —pendiente, en revisión o aprobada, en fecha—, que es
-     * exactamente lo que acepta `EmitirCarnetService`. Miraba solo las
-     * aprobadas y la pantalla avisaba «no tiene cupo» sobre alguien que sí
-     * podía sacar el carnet: el plástico se emite con el cupo todavía sin
-     * cobrar, y los dos se pagan juntos.
-     *
-     * Estática y pública porque la usan el buscador y `CarnetController`: el
-     * dato tiene que ser el mismo venga la persona preseleccionada o elegida
-     * a mano. Devuelve una LISTA: la regla de una bolsa por persona deja una
-     * sola en curso, pero si mañana hubiera dos, la pantalla las ofrece en vez
-     * de elegir por su cuenta.
+     * Las en curso —lo mismo que acepta `EmitirCarnetService`—, no solo las
+     * aprobadas. Estática porque la usan el buscador y `CarnetController`.
+     * Ver NOTAS-CODIGO.
      *
      * @return array<int, array<string, mixed>>
      */

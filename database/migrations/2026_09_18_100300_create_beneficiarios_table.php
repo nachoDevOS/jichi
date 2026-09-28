@@ -52,7 +52,7 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        // UNA PERSONA, UNA FICHA. Parcial y no inline: con `deleted_at` adentro
+        // Una persona, una ficha. Parcial y no inline: con `deleted_at` adentro
         // el índice no bloquea nada, porque en SQL NULL != NULL.
         DB::statement(<<<'SQL'
             CREATE UNIQUE INDEX beneficiarios_ci_unico

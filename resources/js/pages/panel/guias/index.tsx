@@ -15,7 +15,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { GuiaFila } from '@/types/guias';
 
 /**
- *  LISTADO DE GUÍAS DE MOVIMIENTO
+ *  Listado de guías de movimiento
  */
 export default function IndiceGuias({
     guias,

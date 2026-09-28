@@ -34,7 +34,7 @@ class EmitirFaenaRequest extends FormRequest
             // Las fechas NO vienen del formulario: las escribe la aprobación.
 
             /*
-             * LOS RENGLONES DEL PAPEL. Nullable porque el formulario se llena a
+             * Los renglones del papel. Nullable porque el formulario se llena a
              * mano y llega incompleto: la obligatoriedad es del trámite en
              * ventanilla, no de la tabla.
              */

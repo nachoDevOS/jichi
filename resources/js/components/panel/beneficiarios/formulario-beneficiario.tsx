@@ -13,7 +13,7 @@ import { edadEnAnios, fecha } from '@/lib/utils';
 import type { BeneficiarioFicha, FormularioBeneficiario } from '@/types/beneficiarios';
 
 /**
- *  EL FORMULARIO DE BENEFICIARIO
+ *  El formulario de beneficiario
  */
 export function FormularioBeneficiarioComponente({
     beneficiario,
@@ -106,7 +106,7 @@ export function FormularioBeneficiarioComponente({
     return (
         <form onSubmit={enviar}>
             <div className="grid gap-6 lg:grid-cols-3">
-                {/* ============================================ Los campos */}
+                {/* Los campos */}
                 <Card className="h-fit lg:col-span-2">
                     <Seccion
                         numero={1}
@@ -381,7 +381,7 @@ export function FormularioBeneficiarioComponente({
                     </Seccion>
                 </Card>
 
-                {/* ========================================== La vista previa */}
+                {/* La vista previa */}
                 <div className="lg:col-span-1">
                     {/*
                         sticky + top-20: la tarjeta acompaña el scroll y queda
@@ -610,9 +610,7 @@ function Compuesto({
     );
 }
 
-/* ==========================================================================
-   LAS TRES COMPOSICIONES DE LA VISTA PREVIA
-   ========================================================================== */
+// Las tres composiciones de la vista previa.
 
 function componerNombre(datos: FormularioBeneficiario): string {
     const partes = [

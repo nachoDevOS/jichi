@@ -31,7 +31,7 @@ class ReciboController extends Controller
     private const RENGLONES_MINIMOS = 3;
 
     /**
-     * LISTADO — GET /panel/recibos
+     * Listado — GET /panel/recibos
      */
     public function index(Request $request): Response
     {
@@ -44,7 +44,7 @@ class ReciboController extends Controller
 
         $recibos = Recibo::query()
             /*
-             * CON LAS COLUMNAS DEL NOMBRE Y LAS DE LA CÉDULA: los dos accesores
+             * Con las columnas del nombre y las de la cédula: los dos accesores
              * las leen todas, y una que falte vuelve null sin ningún error.
              */
             ->with('beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado')
@@ -161,7 +161,7 @@ class ReciboController extends Controller
     }
 
     /**
-     *  IMPRIMIR — GET /panel/recibos/{recibo}/imprimir
+     *  Imprimir — GET /panel/recibos/{recibo}/imprimir
      */
     public function imprimir(Recibo $recibo): RespuestaHttp
     {
@@ -193,7 +193,7 @@ class ReciboController extends Controller
             'verificacion' => QrVerificacion::de($recibo),
 
             /*
-             * YA NO SE MANDA `esDeposito`, y no es un olvido.
+             * Ya no se manda `esDeposito`, y no es un olvido.
              */
             'renglones' => array_map(
                 fn (array $linea): array => [
@@ -213,12 +213,12 @@ class ReciboController extends Controller
             'casillas' => ConceptoRecibo::cases(),
 
             /*
-             * LAS IMÁGENES SON COPIAS A MEDIDA Y VAN EMBEBIDAS EN BASE64.
+             * Las imágenes son copias a medida y van embebidas en BASE64.
              */
             'escudo' => $this->imagenEmbebida('image/recibo-escudo.png'),
             'selloSedag' => $this->imagenEmbebida('image/recibo-sello.png'),
         ])
-            // MEDIA CARTA APAISADA: 612 x 396 puntos = 8,5" x 5,5".
+            // Media carta apaisada: 612 x 396 puntos = 8,5" x 5,5".
             ->setPaper([0, 0, 612, 396])
             /*
              * Sin subsetting, DomPDF mete las dos tipografías COMPLETAS en cada

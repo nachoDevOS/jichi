@@ -143,7 +143,6 @@ copiar su patrón en los que falten.
 ## Comandos útiles
 
 ```sh
-php artisan test              # las pruebas automáticas
 ./vendor/bin/pint             # formatea el PHP
 npx tsc --noEmit              # revisa los tipos de TypeScript
 npm run build                 # compila el frontend para producción

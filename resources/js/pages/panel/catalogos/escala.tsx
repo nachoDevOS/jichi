@@ -16,7 +16,7 @@ import type { ModalidadAprovechamiento, OpcionEnum, PageProps, Paginado } from '
 import type { EscalaFila, HuecoEscala } from '@/types/catalogos';
 
 /**
- *  LA ESCALA OFICIAL DE APROVECHAMIENTO
+ *  La escala oficial de aprovechamiento
  */
 export default function CatalogoEscala({
     escala,

@@ -59,7 +59,7 @@ class EmitirGuiaRequest extends FormRequest
             'transporte_capacidad_kg' => ['nullable', 'numeric', 'min:0', 'max:9999999999', 'decimal:0,2'],
 
             /*
-             * LA MARCA QUE VALE PLATA: con ella el arancel se cobra al 50%.
+             * La marca que vale plata: con ella el arancel se cobra al 50%.
              */
             'es_piscicultura' => ['required', 'boolean'],
 
@@ -75,7 +75,7 @@ class EmitirGuiaRequest extends FormRequest
             'fecha_solicitud' => ['required', 'date', 'before_or_equal:today'],
 
             /*
-             *  EL CUADRO D. Al menos un renglón: una guía sin especies no
+             *  El cuadro D. Al menos un renglón: una guía sin especies no
              *  ampara nada y solo gastaría una hoja del talonario.
              */
             'detalles' => ['required', 'array', 'min:1', 'max:20'],
@@ -113,7 +113,7 @@ class EmitirGuiaRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         /*
-         * LAS FILAS VACÍAS SE DESCARTAN ACÁ. El formulario manda los cinco
+         * Las filas vacías se descartan acá. El formulario manda los cinco
          * renglones del papel y el operador llena los que usa; sin esto, las
          * vacías se validarían y el submit fallaría pidiendo un producto que
          * nadie quiso elegir.

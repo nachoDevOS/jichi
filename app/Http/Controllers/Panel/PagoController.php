@@ -19,7 +19,7 @@ class PagoController extends Controller
 {
     public function __construct(private readonly ControlarPagoService $servicio) {}
 
-    /** VALIDAR — PATCH /panel/pagos/{pago}/validar */
+    /** Validar — PATCH /panel/pagos/{pago}/validar */
     public function validar(Pago $pago): RedirectResponse
     {
         try {
@@ -32,7 +32,7 @@ class PagoController extends Controller
     }
 
     /**
-     * OBSERVAR — PATCH /panel/pagos/{pago}/observar
+     * Observar — PATCH /panel/pagos/{pago}/observar
      *
      * El depósito sigue sumando en el saldo: lo que se duda es la boleta.
      */
@@ -48,7 +48,7 @@ class PagoController extends Controller
     }
 
     /**
-     * CORREGIR — POST /panel/pagos/{pago}/corregir
+     * Corregir — POST /panel/pagos/{pago}/corregir
      */
     public function corregir(CorregirPagoRequest $request, Pago $pago): RedirectResponse
     {

@@ -6,7 +6,7 @@ use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 
 /**
- *  EL CÓDIGO QR DE LOS DOCUMENTOS IMPRESOS
+ *  El código QR de los documentos impresos
  */
 class CodigoQr
 {
@@ -34,7 +34,7 @@ class CodigoQr
     public static function png(string $texto): string
     {
         /*
-         * CORRECCIÓN DE ERRORES EN NIVEL «Q» —el 25% del código puede perderse
+         * Corrección de errores en nivel «Q» —el 25% del código puede perderse
          * y seguir leyéndose—, y no el «L» que viene por defecto.
          */
         $qr = Encoder::encode($texto, ErrorCorrectionLevel::Q(), Encoder::DEFAULT_BYTE_MODE_ECODING);

@@ -166,8 +166,8 @@ resources/js/
 │           ├── franja-tricolor.tsx    la franja de los documentos oficiales
 │           ├── seccion.tsx            el envoltorio de cada bloque
 │           ├── hero.tsx               portada
-│           ├── servicios.tsx          los cuatro trámites
-│           ├── pasos.tsx              el circuito del beneficiario
+│           ├── servicios.tsx          «¿Qué trámite necesita?»: los caminos del pescador y del comercializador
+│           ├── pasos.tsx              los cuatro pasos de ventanilla y qué llevar
 │           ├── verificacion.tsx       reusa buscador-codigo.tsx
 │           ├── preguntas.tsx          acordeón
 │           └── contacto.tsx           dónde se atiende
@@ -269,7 +269,7 @@ database/
 │   ├── RubroSeeder.php         el catálogo de actividades con sus tarifas
 │   ├── UsuarioSeeder.php       la cuenta admin@admin.com
 │   └── DemoSeeder.php          datos de prueba (NO corre en producción)
-└── factories/      Generadores de datos falsos para las pruebas
+└── factories/      Generadores de datos falsos para los seeders
 ```
 
 ---
@@ -293,17 +293,11 @@ Casi todos los archivos de `config/` son los que trae Laravel. Los propios son:
 
 ---
 
-## Verificación (`tests/`)
+## Verificación
 
-```
-tests/
-└── TestCase.php     la clase base. Feature/ quedó vacío
-```
-
-**Ya no hay pruebas automáticas.** `tests/Feature/` se vació el 14/09/2026 por
-pedido del responsable del proyecto; eran 143 y cubrían el backend entero.
-
-Lo que queda para verificar antes de dar algo por terminado:
+No hay carpeta `tests/`: las pruebas automáticas se retiraron el 27/09/2026 a
+pedido del responsable (están en el historial de git, commit `7dc0ac6`). Lo que
+queda para verificar antes de dar algo por terminado:
 
 ```sh
 npx tsc --noEmit        # tipos
@@ -311,15 +305,9 @@ npx tsc --noEmit        # tipos
 npm run build           # que compile
 ```
 
-> ⚠️ Los tres revisan **tipos y formato**. De la lógica de negocio no dicen nada:
-> que no se apruebe un trámite sin cobrar, que no se emitan dos carnets por
-> gestión, que un recibo reimpreso conserve su número — eso hoy **no lo comprueba
-> nada**. Todo cambio se verifica **abriendo la pantalla y probando el caso a
-> mano**, incluidos los bordes.
->
-> El andamiaje quedó (`phpunit.xml`, `TestCase.php`, PHPUnit instalado), así que
-> volver a escribir una prueba es crear un archivo. Ver el punto 10 de
-> [PENDIENTES.md](PENDIENTES.md).
+> ⚠️ Los tres revisan **tipos y formato**, no las reglas de negocio. Todo cambio
+> se verifica **abriendo la pantalla y probando el caso a mano**, incluidos los
+> bordes.
 
 ---
 

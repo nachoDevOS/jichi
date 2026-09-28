@@ -1,55 +1,15 @@
 # Jichi — guía para agentes de IA
 
-Sistema de gestión de carnets, rubros y trámites del Gobierno Autónomo
-Departamental del Beni, Bolivia.
+Sistema de carnets, autorizaciones de pesca, permisos de faena y guías de
+transporte del Gobierno Autónomo Departamental del Beni (SEDAG), Bolivia.
 
 **Laravel 13 · PHP 8.3 · Inertia 2 · React 19 · TypeScript · Tailwind 4 ·
-PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
+PostgreSQL 18** (corre también en SQLite).
 
----
-
-> # ⚠️ EL NÚCLEO DE DATOS SE REHIZO EL 18/09/2026 — ESTE ARCHIVO ESTÁ VIEJO
->
-> Todo lo que sigue —«El dominio en cinco líneas», el circuito del trámite, la
-> tabla de estados, los rubros, los recibos armados al vuelo— describe el
-> modelo **ANTERIOR**, y ya no existe en la base. Sigue sirviendo para entender
-> el código del panel, que todavía está escrito contra él; **no** para entender
-> el esquema.
->
-> **La base corre hoy sobre `jichi1` con este esqueleto:**
->
-> ```
-> beneficiario ──< carnet (pescador)        ──< permiso_faena   (una por salida)
->              ──< carnet (comercializador) ──< guia_movimiento (una por traslado)
->              ──< aprovechamiento_pesq  ─── la bolsa madre: el cupo en kilos
->
-> recibo ──< pago ──(polimórfico)──▶ Carnet | AprovechamientoPesq | GuiaMovimiento
-> ```
->
-> | Ya no existe | Lo reemplaza |
-> | --- | --- |
-> | `rubros`, `carnet_rubro` | `carnets.tipo_actor` (enum `TipoActor`) + `tipos_carnet` (catálogo) |
-> | `tramites` y su circuito de estados | Nada: el documento se emite y se cobra; no hay expediente |
-> | `faenas`, `guias`, `guia_detalles` | `permisos_faena`, `guias_movimiento` |
-> | recibo armado al vuelo | tabla `recibos`, con correlativo propio y datos copiados |
-> | `pagos.monto` | `pagos.monto_parcial` + `pagos.recibo_id` (se admite pagar en cuotas) |
-> | `beneficiarios.ci_nit` | `beneficiarios.ci` |
->
-> **Qué leer para ponerse al día, en este orden:**
-> [docs/MER.md](docs/MER.md) —**está al día y es la fuente del esquema**— →
-> [docs/sesiones/09-2026/2026-09-18.md](docs/sesiones/09-2026/2026-09-18.md) →
-> `app/Traits/Pagable.php`.
->
-> **Las migraciones son cortas a propósito: el porqué de cada decisión está en
-> `MER.md`, no en ellas.** Las del modelo anterior se BORRARON el 22/09/2026;
-> si hace falta leerlas, están en el historial de git.
->
-> **El panel NO está portado:** controladores, `app/Services/`, `app/Support/` y
-> las pantallas de React siguen nombrando `Rubro`, `Tramite`, `Faena` y `Guia`,
-> y las columnas que leen ya no existen. Ese es el trabajo siguiente.
->
-> Las secciones que SÍ siguen valiendo enteras: **«Reglas que no se rompen»**,
-> **«Verificar antes de dar algo por terminado»** y **«Trampas conocidas»**.
+> **El modelo anterior —`rubros`, `tramites`, `faenas`, `guias`, el recibo
+> armado al vuelo— ya no existe**, ni en la base ni en el código: se rehízo el
+> 18/09/2026 y el panel quedó portado el 27/09/2026. Si aparece en un `.md`, esa
+> parte está vieja. Si hace falta leerlo, está en el historial de git.
 
 ---
 
@@ -74,242 +34,60 @@ PostgreSQL 18** (corre también en SQLite; las pruebas usan SQLite en memoria).
 
 ---
 
-## El dominio en cinco líneas
+## El dominio, en corto
 
-Un **beneficiario** saca un **carnet** por cada **rubro** (actividad) que
-ejerce, y cada carnet es anual. Para obtenerlo presenta un **trámite**, que se
-cubre con uno o varios **pagos**. Al aprobarlo, el carnet queda habilitado y
-recién ahí la persona puede trabajar en esa actividad.
-
-Quien pesca y además comercializa tiene **dos carnets** en la misma gestión, con
-dos plásticos, dos firmas de validación y dos cupos autorizados.
-
-> **EL CARNET ES LA LLAVE ANUAL; CON ÉL SOLO NO SE SALE A TRABAJAR.** De cada
-> carnet cuelgan los **permisos operativos**, que son muchos por gestión y son
-> los que autorizan el trabajo de cada día:
->
-> ```
-> beneficiario ──< carnet (Pescador, 2026)        ──< faena  (una por salida)
->              ──< carnet (Comercializador, 2026) ──< guia   (una por traslado)
->                                                        └──< guia_detalle
-> ```
->
-> Una **faena** autoriza UNA salida: esta embarcación, este comandante, de tal
-> día a tal día, con tanto en kilos. Una **guía** ampara UN traslado: de dónde a
-> dónde, en qué vehículo, con qué carga — y su detalle lista la carga especie
-> por especie, con su condición y sus kilos.
->
-> **Qué emite cada carnet lo dicen `rubros.emite_faenas` y `rubros.emite_guias`,
-> NUNCA el nombre del rubro** — mismo criterio que `requiere_capacidad`, y por
-> el mismo motivo: el catálogo lo edita la unidad desde el panel.
->
-> Las dos tienen su módulo en el panel —listado, formulario y ficha— y sus
-> reglas en `FaenaService` / `GuiaService`. **No se editan ni se borran**: el
-> número sale de un talonario de papel que la persona se llevó, así que se
-> ANULAN con motivo. La única corrección es el detalle de la guía, porque el
-> peso real se conoce en la balanza. Ver
-> [docs/modulos/PERMISOS-OPERATIVOS.md](docs/modulos/PERMISOS-OPERATIVOS.md).
->
-> **Los tres se cobran con la MISMA tabla `pagos`, que es polimórfica**
-> (`pagable_type` + `pagable_id`). Una sola tabla y no tres porque
-> `nro_transaccion` es único GLOBAL: partido en tres dejaría de serlo, y la
-> misma boleta podría pagar un trámite y una faena. El costo es que **se perdió
-> la clave foránea** — la integridad la sostienen los `RESTRICT` de arriba y la
-> aplicación, no el motor.
-
-El expediente recorre este circuito:
+El detalle está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) y las reglas,
+con ejemplos, en [docs/REGLAS-NEGOCIO.md](docs/REGLAS-NEGOCIO.md). Lo mínimo
+para no equivocarse:
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
-(borrador)  ▲                │                         │
-            │                │                         └── el carnet queda habilitado
-            │                ├── queda habilitado el RECIBO OFICIAL
-            │                └──[rechazar]──▶ RECHAZADO
-            └────────────────────[reabrir]───────┘
+                          BENEFICIARIO (C.I. único)
+              pescador ┌──────────┴──────────┐ comercializador
+                       ▼                     ▼
+ AUTORIZACIÓN DE PESCA PARA            CARNET (comercializador)
+ APROVECHAMIENTO PESQUERO                    │  sin autorización
+ (la bolsa madre: un cupo en kg)             ▼
+                 │                     GUÍA ÚNICA DE TRANSPORTE
+                 ▼                     (una por traslado, 5 días)
+        CARNET (pescador)                    └──< detalle por producto
+                 │
+                 ▼
+        PERMISO DE FAENA (una por salida, 30 días;
+        reserva kilos al registrarse, los descuenta al aprobarse)
+
+ recibo ──< pago ──(polimórfico)──▶ Autorización | Carnet | Faena | Guía
 ```
 
-**Enviar a revisión es OBLIGATORIO: no se aprueba desde PENDIENTE.** Mientras
-está pendiente el expediente se arma —papeles, depósitos, correcciones—; al
-enviarlo, ventanilla declara que está completo y pasa a quien lo firma. El
-atajo `PENDIENTE ──▶ APROBADO` existió y se sacó: con él, quien cargaba la
-solicitud podía aprobarla sin que nadie más la tocara.
+- **El carnet es la llave anual; con él solo no se sale a trabajar.** Lo que
+  autoriza el trabajo de cada día son la faena y la guía.
+- **Qué emite cada carnet lo dice `carnets.tipo_actor`** (`TipoActor::emiteFaenas()`
+  / `emiteGuias()`), NUNCA el nombre del tipo de carnet: ese catálogo lo edita la
+  unidad desde el panel.
+- **Una autorización vigente por persona y un carnet vigente por actividad.** El
+  pescador no saca carnet sin autorización; el comercializador nunca lleva una.
+- **El circuito es el mismo para los cuatro documentos**, y lo dictan los enums
+  (`EstadoAprovechamiento`, `EstadoCarnet`, `EstadoFaena`, `EstadoGuia`):
 
-**RECHAZADO NO ES EL FINAL: SE REABRE.** Rechazar es devolverle los papeles al
-pescador con el motivo escrito, y lo que sigue es que vuelva con lo corregido.
-Eso antes obligaba a presentar un expediente NUEVO, y ahí estaba el problema:
-**los depósitos ya cargados se quedaban colgados del trámite muerto** —cuelgan
-de él por `pagable_id` y no se trasladan solos—, así que la persona figuraba
-debiendo todo de nuevo. Reabrir lo devuelve a PENDIENTE con su dinero y su
-historial. No es «des-rechazar»: el rechazo queda en `auditorias` con su motivo.
-Solo APROBADO es final.
+  ```
+  PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ vencido / revocado / agotado
+  (borrador)  ▲                │   └── al enviar sale el RECIBO
+     │        └──[rechazar]────┘
+     └──[eliminar, con motivo]
+  ```
 
-**PENDIENTE es un BORRADOR, y eso define qué se puede hacer en cada estado:**
+  Enviar exige el monto cubierto; aprobar exige todas las boletas validadas.
+  Rechazar devuelve a pendiente, no es un estado final.
+- **Revocar la autorización NO reescribe sus carnets ni sus faenas: los deja
+  «sin efecto»**, porque su vigencia se calcula mirando al padre. Ver la trampa
+  de la vigencia, más abajo.
+- **Lo que se entregó, se congela**: el recibo copia monto y concepto, la guía
+  copia el precio de cada producto. **No hay columnas de saldo**: lo pagado es la
+  suma de `pagos` y el saldo de kilos se calcula sobre las faenas.
 
-| Estado | Editar | Eliminar | Enviar | Aprobar | Rechazar | Reabrir |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| **Pendiente** | ✔ | ✔ | ✔ | ✘ | ✘ | ✘ |
-| **En revisión** | ✘ | ✘ | ✘ | ✔ | ✔ | ✘ |
-| **Rechazado** | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
-| Aprobado | ✘ | ✘ | ✘ | ✘ | ✘ | ✘ |
-
-Las dos mitades de esa tabla salen de la misma idea:
-
-- **En pendiente no se rechaza.** Rechazar es la respuesta a algo que alguien
-  PRESENTÓ, y un borrador todavía no se presentó — lo está armando la misma
-  ventanilla. Un borrador que no sirve se ELIMINA, que también pide motivo.
-- **En revisión no se edita ni se elimina.** Al enviar salió el RECIBO OFICIAL
-  numerado y el pescador se fue con ese papel; además, quien aprueba firma sobre
-  los papeles que vio. Un expediente presentado que no sirve se RECHAZA, con su
-  motivo escrito.
-- **En rechazado no se hace nada hasta reabrirlo.** La fila entera es ✘ menos
-  esa columna a propósito: editar, borrar o cobrar sobre un expediente que está
-  en el mostrador del pescador sería trabajar sobre algo que no está en la mesa
-  de nadie. Reabrir es el acto de decir «esto se retoma», y va antes que todo lo
-  demás.
-
-La tabla la dicta `EstadoTramite::permiteEdicion()`, `permiteEliminacion()` y
-`siguientes()`. **Ojo con `estaAbierto()`**: agrupa pendiente + en revisión y
-sirve para contar trabajo sin terminar, pero NO es permiso de escritura.
-
-> **AL REENVIAR, `fecha_revision` NO SE PISA.** Es la fecha del recibo oficial,
-> y ese papel ya está en manos del pescador desde el primer envío. Se escribe
-> solo si está en NULL; si no, el mismo número saldría con dos fechas distintas.
-
-**Lo que se congela al enviar son los PAPELES, no el dinero.** Un expediente en
-revisión sigue aceptando depósitos, correcciones y bajas de depósitos —eso pasa
-en la FICHA, no en «Editar trámite»—, porque el control de las boletas es parte
-de la revisión y un depósito observado tiene que poder arreglarse ahí mismo.
-
-> **QUITAR SE HABILITA EXACTAMENTE CUANDO CORREGIR**, y estuvo restringido al
-> borrador por un argumento que no se sostiene: «el recibo ya salió». Corregir ya
-> cambia el recibo igual —se arma al vuelo con los depósitos que hay, así que
-> bajar un monto de 110 a 30 mueve el papel entregado tanto como borrar la fila—.
-> Lo que separa a las dos no es el momento sino el PERMISO: quitar pide
-> `pagos.eliminar`, que es de administración, y el motivo por escrito. Ver
-> `Pago::admiteEliminacion()`, que delega en `admiteCorreccion()`.
-
-> **AL APROBAR SE CIERRA EL DINERO.** `permitePagos()` vale solo en PENDIENTE y
-> EN REVISIÓN. Decía además APROBADO, con el motivo «un trámite puede aprobarse
-> y terminarse de cobrar después» — y eso dejó de poder pasar cuando
-> `puedeAprobarse()` pasó a exigir el monto CUBIERTO: un expediente aprobado
-> está pagado por definición. La regla quedó permitiendo algo imposible, y lo
-> único que habilitaba era cargar plata de más sobre un carnet ya emitido y
-> cambiar el detalle de un recibo ya entregado. Si entró dinero de más, no es un
-> depósito de este expediente.
-
-Impreso y entregado no son estados sino fechas: `fecha_generacion` y
-`fecha_entrega`. Un estado obliga a sincronizar dos cosas que pueden discrepar;
-una fecha en NULL dice «todavía no pasó» sin posibilidad de contradicción.
-
-> **CADA DEPÓSITO SE CONTROLA, Y ESO FRENA LA APROBACIÓN.**
->
-> ```
-> PENDIENTE ──▶ VALIDADO    la boleta cuadra con el extracto del banco
->     ▲     └─▶ OBSERVADO   no cuadra, con el motivo escrito
->     └──[corregir]──┘
-> ```
->
-> `pagos.estado_validacion` NO es el estado del pago —el dinero entró o no
-> entró— sino el de su CONTROL. Un depósito observado **sigue sumando** en
-> `montoPagado()`: existe y está cargado; lo que está en duda es si respalda lo
-> que dice.
->
-> **UN OBSERVADO NO SE VALIDA: PRIMERO SE CORRIGE.** Es la única salida y el
-> botón «Validar» no aparece sobre él. Validarlo sin que nadie haya tocado el
-> dato es dar por bueno justo lo que se marcó como malo, y el problema señalado
-> se pierde sin que quede si se arregló. Al CORREGIRLO vuelve solo a PENDIENTE
-> —el dato es nuevo y nadie lo miró— y desde ahí se valida. Si la observación
-> estaba equivocada, se abre «Corregir» y se guarda sin cambiar nada: queda en
-> `auditorias` quién lo hizo.
->
-> **Y por eso corregir un depósito vive en la FICHA además de en «Editar
-> trámite»**: observar solo pasa EN REVISIÓN, y esa pantalla no abre ahí. Con el
-> botón en un solo lado el circuito no se podía cerrar y el expediente quedaba
-> trabado — pasó de verdad.
->
-> **QUIÉN CARGÓ Y QUIÉN VALIDÓ SE GUARDAN SIEMPRE**, en dos columnas distintas.
-> Que el sistema EXIJA que sean personas distintas es configurable
-> —`pagos.revisor_distinto`, apagado por defecto y **todavía no implementado**,
-> ver PENDIENTES—: encendido con un solo usuario
-> deja el circuito trabado, porque la misma cuenta carga y no puede validar.
->
-> **El control es parte de la REVISIÓN**: solo se valida con el trámite EN
-> REVISIÓN. Pendiente es un borrador y aprobado ya no admite reparos. Ver
-> `Pago::admiteControl()`.
->
-> `Tramite::puedeAprobarse()` exige las tres cosas: el estado, el monto cubierto
-> y **todos los depósitos validados**. Sin la tercera, la validación sería
-> decorativa.
-
-Al pasar a EN REVISIÓN queda habilitado el **RECIBO OFICIAL** —el talonario
-verde del SEDAG—: es el momento en que el pescador entregó los papeles y la
-plata, y se va con su comprobante.
-
-> **NO HAY TABLA `recibos`.** Se retiró a pedido: toda su información ya vive en
-> `beneficiarios`, `carnets`, `rubros`, `tramites` y `pagos`, así que el
-> comprobante se **arma al vuelo** cada vez que alguien lo imprime. Su número es
-> el id del trámite y su fecha es `tramites.fecha_revision` —el dato que ya
-> estaba guardado, y por eso una reimpresión de marzo sigue diciendo marzo—.
->
-> Lo que eso cuesta, y hay que tenerlo presente: **el recibo dejó de ser
-> inmutable**. Corregir un apellido en la ficha cambia los comprobantes ya
-> entregados, borrar el trámite se lleva el recibo, y la serie tiene huecos
-> porque no todo trámite emite uno. Está explicado en
-> `App\Support\ReciboArmado`.
-
-Ver [docs/modulos/RECIBOS.md](docs/modulos/RECIBOS.md).
-
-Al aprobar, el carnet queda habilitado, y recién ahí se puede IMPRIMIR:
-`GET /panel/carnets/{carnet}/imprimir` dibuja el plástico —una carilla, CR80,
-calcando la cédula de papel—. **La maqueta impresa y `vista-previa-carnet.tsx`
-son el mismo diseño escrito dos veces**: ese componente es el recuadro «así va a
-salir el carnet» del paso 3 del formulario, así que si se toca una hay que tocar
-la otra, o la vista previa pasa a prometer algo que el PDF no cumple. La tarjeta
-lleva QR de nuevo desde el 22/09/2026, en el DORSO: `App\Support\CodigoQr` con la
-dirección de `/verificar/{codigo}`.
-
-**El plástico SÍ lleva el rubro y el cupo**, al revés de lo que valía con el
-modelo anterior: son seis renglones y tres de ellos comparten dos pares
-—RUBRO + CUPO, CIUDAD + PROV., REGISTRO + GESTIÓN—. Ver
-[docs/modulos/CARNETS.md](docs/modulos/CARNETS.md).
-
-> **EL CUPO NO LO LLEVAN TODAS LAS ACTIVIDADES.** La pesca se autoriza por
-> volumen —tantos kilos, contrastables contra una guía de transporte—; la
-> comercialización no. Lo dice la columna `rubros.requiere_capacidad`, NUNCA un
-> `match` sobre el nombre: el mismo rubro figura como «Pescador» o como «Faena»
-> según quién lo cargó, y los que vengan por ordenanza entran sin pasar por
-> código.
->
-> De esa bandera cuelgan cuatro cosas: el formulario muestra u oculta el campo,
-> la validación lo exige o lo **prohíbe**, la ficha del carnet lo muestra o no, y
-> el plástico imprime el renglón CUPO o le da la tira entera al nombre del rubro.
-> Ver `Rubro::requiereCapacidad()` y `CarnetImpresionController::renglonRubro()`.
-
-> **LA REGLA QUE ORDENA TODO: una persona tiene como máximo UN carnet por RUBRO
-> y por gestión.**
-
-La garantiza el índice único `(beneficiario_id, rubro_id, gestion)` de la tabla
-`carnets`. De ahí salen los dos únicos tipos de trámite, y **los decide el
-sistema, no el operador**:
-
-| Situación | Tipo | Qué hace |
-| --- | --- | --- |
-| No tiene carnet **de ese rubro** este año | `emision_inicial` | Crea el carnet y cuelga el trámite |
-| Ya lo tiene | `actualizacion` | Reutiliza ese carnet; al aprobar, consolida cupo y asociación |
-
-> **NO EXISTE LA «ADICIÓN DE RUBRO».** Existió, y la pregunta vuelve cada vez
-> que alguien lee código viejo. Con el modelo anterior el carnet era uno por
-> persona y los rubros se le colgaban en una tabla `carnet_rubro`: sumar una
-> actividad hacía CRECER ese carnet, y eso era la adición. Hoy cada actividad es
-> un documento propio, así que pedir un rubro más no agranda nada — emite otro
-> carnet, y eso ya se llama emisión inicial.
->
-> `carnet_rubro` y el enum `EstadoHabilitacion` **fueron eliminados**: el carnet
-> ES la habilitación. Suspender una actividad es suspender su carnet.
-
-Todo eso vive en `app/Services/SolicitudCarnetService.php`, en una transacción,
-con la fila del beneficiario bloqueada. **No se replica en el controlador ni en
-React.**
+Todo eso vive en `app/Services/` (`OtorgarCupoService`, `Emitir*Service`,
+`Revisar*Service`, `CobrarService`, `ControlarPagoService`), en transacciones con
+la fila que contiene el recurso escaso bloqueada. **No se replica en el
+controlador ni en React.**
 
 ---
 
@@ -364,9 +142,10 @@ React.**
    No escribir esos valores como texto suelto en el código.
 
    Eso incluye las TRANSICIONES: qué salto de estado vale desde dónde lo dice
-   `EstadoTramite::siguientes()`, y nada más. El servicio pregunta, el
-   controlador no decide y React recibe la respuesta ya calculada en los campos
-   `puede_*` de la ficha. Un `if ($tramite->estado === ...)` suelto en un
+   `siguientes()` / `permite*()` de cada enum de estado (`EstadoAprovechamiento`,
+   `EstadoCarnet`, `EstadoFaena`, `EstadoGuia`), y nada más. El servicio
+   pregunta, el controlador no decide y React recibe la respuesta ya calculada en
+   los campos `puede_*` de la ficha. Un `if ($carnet->estado === ...)` suelto en un
    controlador es la señal de que la regla se está duplicando.
 
 7. **Enums en columnas `string`**, nunca tipos ENUM nativos de PostgreSQL: así
@@ -375,23 +154,22 @@ React.**
 8. **SQL específico de motor va en `app/Support/Sql.php`.** El sistema tiene que
    correr igual en PostgreSQL y en SQLite.
 
-9. **Scopes con `qualifyColumn()`.** `tramites`, `carnets` y `rubros` tienen
-   todas una columna `estado`, y los reportes las cruzan con `join`. Desde que
-   el carnet tiene `rubro_id`, `carnets` y `tramites` comparten además esa
-   columna: un `where('rubro_id', ...)` sin calificar sobre una consulta con
-   join responde «column reference is ambiguous».
+9. **Scopes con `qualifyColumn()`.** `aprovechamientos_pesq`, `carnets`,
+   `permisos_faena` y `guias_movimiento` tienen todas una columna `estado`, y las
+   consultas las cruzan con `join`: un `where('estado', ...)` sin calificar
+   responde «column reference is ambiguous».
 
 10. **Las reglas de negocio van en `app/Services/`, no en el controlador.** El
-    mismo caso de uso lo necesitan el formulario del panel, un comando de
-    consola y las pruebas. Escrito en el controlador, los otros dos lo copian —y
-    las copias se quedan viejas—.
+    mismo caso de uso lo necesitan el formulario del panel y un comando de
+    consola. Escrito en el controlador, el otro lo copia —y la copia se queda
+    vieja—.
 
 11. **TODO archivo se sube con `StorageController::file()`.** Nunca `->store()`,
     `->storeAs()` ni `Storage::put()` en otra clase. Es el único lugar que aplica
     las tres reglas que valen para todos los adjuntos: el tope de **3 MB**, el
     nombre aleatorio —el del usuario no se conserva nunca— y en qué disco se
-    escribe. `SubidaArchivosTest` revisa el código fuente y falla si aparece un
-    atajo nuevo.
+    escribe. Nada lo controla automáticamente: al revisar un cambio, buscar
+    `->store(`, `->storeAs(` y `Storage::put(` fuera de `StorageController`.
 
 12. **MIENTRAS EL NÚCLEO SE ESTÉ ARMANDO, NO SE AGREGAN MIGRACIONES DE
     PARCHE.** Una columna nueva va DENTRO de la migración que crea su tabla, no
@@ -485,6 +263,7 @@ React.**
     escribe en lenguaje simple —sin términos técnicos— porque se copia a Word y
     lo lee gente que no programa.
 
+
 ---
 
 ## El patrón a copiar
@@ -507,6 +286,7 @@ el par `EmitirFaenaService` + `PermisoOperativoException`.
 El procedimiento detallado está en
 [docs/GUIA-INERTIA.md](docs/GUIA-INERTIA.md#7-agregar-un-módulo-nuevo-paso-a-paso).
 
+
 ---
 
 ## Verificar antes de dar algo por terminado
@@ -515,25 +295,16 @@ El procedimiento detallado está en
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
-php artisan test        # las 200 pruebas, ~30 s
 ```
 
-> **LAS PRUEBAS VOLVIERON el 27/09/2026: 200, sobre SQLite en memoria.** Cubren
-> los siete pasos de REGLAS-NEGOCIO: beneficiarios, autorización (circuito,
-> revocación, agotado), carnets (pescador, comercializador, reposición), faenas
-> (circuito, reserva de kilos), guías y productos, caja, recibos y control de
-> boletas, catálogos, permisos de cada pantalla y verificación pública, más las
-> reglas puras en `tests/Unit/`. El mapa está en
-> [docs/MAPA-ARCHIVOS.md](docs/MAPA-ARCHIVOS.md#tests). **Una regla nueva va con
-> su prueba**, y se comprueba que la prueba sirve rompiendo la regla a propósito
-> y viendo que falla. El camino armado de ventanilla —otorgar, cobrar, enviar,
-> validar, aprobar— está en `tests/Concerns/ArmaEscenarios.php`.
->
-> **Y siguen sin cubrir** las pantallas por dentro (React no tiene pruebas) y
-> que `StorageController` sea el único que sube archivos. Por eso **todo cambio
-> de pantalla se verifica además en el navegador**.
+> **No hay pruebas automáticas**: se retiraron el 27/09/2026 a pedido del
+> responsable (están en el historial de git, commit `7dc0ac6`). Los tres
+> comandos revisan tipos, formato y compilación; de las reglas de negocio no
+> dicen nada. **Todo cambio se verifica abriendo la pantalla y probando el caso
+> a mano**, incluidos los bordes: aprobar sin cobrar, pasarse del cupo, una
+> fecha en el límite.
 
-Los cuatro tienen que pasar.
+Los tres tienen que pasar.
 
 ---
 
@@ -542,13 +313,13 @@ Los cuatro tienen que pasar.
 - **Una transacción de base de datos NO deshace escrituras en disco.** Si se
   sube un archivo dentro de la transacción y algo falla, el rollback borra las
   filas pero el archivo queda huérfano para siempre. Por eso TODOS los adjuntos
-  —los del trámite y la boleta de cada pago— se suben ANTES de abrir la
-  transacción, y el `catch` los borra. Ver `ArchivoTramiteService` y el paso 2 de
-  `SolicitudCarnetService::registrar()`.
+  —la cédula y el aval del carnet, la boleta de cada pago— se suben ANTES de
+  abrir la transacción, y el `catch` los borra. Ver `CarnetController::store()` y
+  `PagoController`.
 - **`env()` en `StorageController` devolvía null con `config:cache`.** El error
   era silencioso: el sistema creía que el disco no era s3 y escribía los adjuntos
-  en el servidor local sin avisar. Ahora todo sale de `config(...)`; el prefijo
-  del bucket vive en `jichi.archivos.prefijo_s3`.
+  en el servidor local sin avisar. Ahora todo sale de `config(...)`, y la
+  carpeta raíz del bucket la pone el disco (`AWS_ROOT`).
 - **Orden de rutas:** `/beneficiarios/crear` y `/beneficiarios/buscar` van ANTES
   de `/beneficiarios/{beneficiario}`, o esas palabras se toman como id.
 - **`cascadeOnDelete` NO se dispara con una baja lógica.** Es una restricción
@@ -569,11 +340,12 @@ Los cuatro tienen que pasar.
   Escribir sobre esa copia deja la instancia de quien llamó con el estado viejo
   en memoria, y cualquier comprobación posterior responde como si el cambio no
   hubiera ocurrido. La convención del servicio: se escribe sobre la copia
-  bloqueada y se devuelve `$tramite->refresh()` —la original—. Ver
-  `SolicitudCarnetService::bloquear()`.
-- **El estado guardado de un carnet puede mentir.** `vencido` lo escribe un
-  comando programado que corre una vez al día. Para saber si un carnet vale HOY
-  se mira además `fecha_vencimiento`. Ver `Carnet::estaVigente()`.
+  bloqueada y se devuelve `$modelo->refresh()` —la original—. Ver
+  `EmitirFaenaService::corregir()`.
+- **El estado guardado de un documento puede mentir.** `vencido` lo tendría que
+  escribir un comando diario que **todavía no existe** (ver PENDIENTES), así que
+  un carnet del año pasado sigue diciendo `aprobado`. Para saber si vale HOY se
+  mira además la fecha: `Carnet::estaVigente()` y el scope `vigentes()`.
 - **EL CÓDIGO DE UN DOCUMENTO NO ES UNA COLUMNA SUYA: vive en `codigos`.**
   Desde el 22/09/2026 los cinco documentos que se entregan —carnet,
   aprovechamiento, faena, guía y recibo— comparten una tabla polimórfica con un
@@ -591,16 +363,16 @@ Los cuatro tienen que pasar.
 - **Dos botones en la misma posición de un ternario necesitan `key` distinto.**
   React los reconcilia como el MISMO `<button>` y solo le cambia el atributo
   `type`; si uno es `type="button"` y el otro `type="submit"`, el cambio ocurre
-  mientras el clic se está procesando y el formulario se envía solo. En el
-  formulario de trámite eso registraba la solicitud al pasar del paso 2 al 3, con
-  los adjuntos vacíos. Ver la barra de navegación de `pages/panel/tramites/crear.tsx`.
+  mientras el clic se está procesando y el formulario se envía solo. En un
+  formulario por pasos eso registraba la solicitud al pasar del paso 2 al 3, con
+  los adjuntos vacíos.
 - **Pedir columnas sueltas en un `with()` rompe los métodos del modelo, y no
-  avisa.** `with('rubro:id,nombre')` deja `emite_faenas` sin cargar, así que
-  `Carnet::puedeEmitirFaenas()` lee null, devuelve false, y el formulario de
-  faenas abre vacío descartando en silencio un carnet perfectamente válido.
-  Es la misma trampa que ya estaba anotada para las cinco columnas del nombre
-  del beneficiario, pero vale para CUALQUIER columna que un método lea: si el
-  modelo la consulta, va en el select. Ver `FaenaController::create()`.
+  avisa.** Un método que lee una columna que no vino en el select la ve en null
+  y contesta mal: `Carnet::puedeEmitirFaenas()` sin `tipo_actor` o sin
+  `aprovechamiento_id` devuelve false, y el formulario de faenas abre vacío
+  descartando en silencio un carnet válido. Vale para CUALQUIER columna que un
+  método lea, empezando por las cinco del nombre del beneficiario: si el modelo
+  la consulta, va en el select. Ver `FaenaController::create()`.
 
   **Volvió a morder con la CÉDULA, y con el mismo silencio:**
   `documento_identidad` arma «1234567-1A BN» leyendo `ci`, `complemento` y
@@ -612,18 +384,18 @@ Los cuatro tienen que pasar.
 - **Un `default` de la base NO llega al objeto que devuelve `create()`.** El
   INSERT lo aplica el motor, y el modelo en memoria se queda con la columna en
   `null` hasta que alguien haga `refresh()`. Eso rompe lo obvio: emitir una
-  faena y preguntarle `estaEmitida()` en la línea siguiente contestaba que no,
-  con la fila ya escrita y correcta en la base. Si una columna tiene valor por
-  defecto y el código lo lee, va **también** en `protected $attributes` del
-  modelo. Pasó TRES veces en un día —`faenas.estado`, `faenas.monto`,
-  `pagos.estado_validacion`— y las tres se descubrieron igual: una prueba que
-  preguntaba por el estado justo después de `create()` — con el `->value` del enum, porque `$attributes` se llena antes de que
-  corran los casts. Ver `Faena` y `Guia`.
+  faena y preguntarle su estado en la línea siguiente contestaba null, con la
+  fila ya escrita y correcta en la base. Si una columna tiene valor por defecto
+  y el código lo lee, va **también** en `protected $attributes` del modelo, con
+  el `->value` del enum, porque `$attributes` se llena antes de que corran los
+  casts. Pasó TRES veces en un día —el estado y el monto de la faena y
+  `pagos.estado_validacion`— y las tres las descubrió una prueba que preguntaba
+  por el estado justo después de `create()`. Ver `PermisoFaena` y `Pago`.
 - **Una relación polimórfica NO se puede precargar con `with('pagable.carnet')`.**
   Eloquent no sabe qué es `pagable` hasta que lee la fila, así que no puede
   resolver lo que cuelga de él: lo que se escribe así se ignora y el N+1 sigue
   ahí, sin ningún error. Va con `morphWith`, declarando qué traer para cada
-  tipo. Ver `PagoController::index()`.
+  tipo. Ver `CajaController::index()` y `ReciboController`.
 - **Una variable CSS declarada en `:root` NO crea una utilidad de Tailwind.**
   `--institucional-azul` estaba escrita desde el principio, pero
   `bg-institucional-azul` no existía: Tailwind 4 solo genera la utilidad si el
@@ -651,8 +423,18 @@ Los cuatro tienen que pasar.
   el celular se corre de costado la pantalla completa —menú, encabezado y todo—
   para leer una columna. `min-w-0` en el elemento de grilla devuelve el permiso
   de encogerse, y recién ahí el `overflow-x-auto` hace su trabajo. Lo mismo vale
-  para un elemento `flex`. Ver `tabla-ultimos-tramites.tsx`. **No se nota en el
+  para un elemento `flex`. Ver `tabla-ultimos-carnets.tsx`. **No se nota en el
   escritorio**, que es donde se prueba: aparece solo al angostar la ventana.
+- **LA APLICACIÓN CORRE EN HORA DE BOLIVIA, NO EN UTC** (27/09/2026).
+  `config/app.php` traía `'timezone' => 'UTC'`, y en UTC-4 eso significa que
+  de 20:00 a medianoche `now()` ya es el día siguiente: un carnet aprobado a
+  las 21:00 salía emitido «mañana», la faena salía con fecha de mañana y el
+  arqueo de «hoy» en Caja y en el tablero no veía lo cobrado esa noche. Nadie lo
+  notó porque se prueba de día. Hoy es `America/La_Paz` (`APP_TIMEZONE`).
+  **Ojo con los datos cargados antes del cambio**: sus `created_at` se
+  guardaron en hora UTC sin zona, así que ahora se leen 4 horas corridos. En
+  desarrollo alcanza con `migrate:fresh --seed`; en producción el sistema ya
+  arranca con la zona correcta.
 - **`new Date('2026-12-31')` en JavaScript NO da el 31 de diciembre.** El
   estándar interpreta una cadena `AAAA-MM-DD` como medianoche UTC, y Bolivia está
   en UTC-4: al formatear en horario local sale **30/12**. Afectaba al vencimiento
@@ -671,8 +453,8 @@ Los cuatro tienen que pasar.
   validó, cuándo se cargó— va con `toIso8601String()`. Y para rellenar un
   `<input type="date">` va `fechaInput()`, nunca `slice(0, 10)`.
 - **`pluck()` sobre una columna que no existe NO FALLA: devuelve nulls.** Es el
-  mismo silencio de `update()` con algo fuera de `#[Fillable]`, y acá costó
-  archivos: `rutasDeAdjuntos()` juntaba las boletas de los pagos con
+  mismo silencio de `update()` con algo fuera de `#[Fillable]`, y costó
+  archivos: con el modelo anterior, las boletas se juntaban con
   `pluck('comprobante')` —la columna es `urlFile`; `comprobante_url` es el
   accesor con la dirección completa— así que **cada expediente eliminado dejaba
   todas sus boletas tiradas en el disco**, para siempre y sin ningún error. Al
@@ -690,14 +472,14 @@ Los cuatro tienen que pasar.
   «Call to undefined method getNombreCompletoAttribute()». Acceder directo
   (`$beneficiario->nombreCompleto`) sí funciona. Ver `app/Models/Beneficiario.php`.
 - **`attach()` no dispara eventos de Eloquent**, así que el trait `Auditable` no
-  registra nada. Por eso las habilitaciones se crean con `CarnetRubro::create()`
-  y el pivote es un modelo propio.
+  registra nada. Un pivote que tenga que quedar en `auditorias` va como modelo
+  propio y se crea con `create()`.
 - **`$modelo->relacion()->where(...)` consulta SIEMPRE**, aunque quien llamó haya
   hecho `with('relacion')` justamente para evitarlo. El `with()` queda escrito,
   se ve correcto, y el N+1 sigue ahí en silencio —el autocompletado de
   beneficiarios hacía 18 consultas por tecleada con el eager loading puesto—. Un
   método del modelo que lo use debe preguntar antes con `relationLoaded()`; ver
-  `Beneficiario::carnetDeGestion()`.
+  `AprovechamientoPesq::kilosConsumidos()`.
 - **`php artisan serve` LEE EL `.env` UNA SOLA VEZ, y REINICIAR EL SERVIDOR NO
   ES LO QUE PARECE.** Es la trampa más cara de este proyecto hasta ahora: costó
   dos diagnósticos equivocados.
@@ -896,13 +678,11 @@ Los cuatro tienen que pasar.
   `trim(json_encode($termino), '"')`. Ver `AsociacionController::comoEnElJson()`.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
-- **LAS PRUEBAS NO AVISAN SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Corren
-  sobre SQLite en memoria con `RefreshDatabase`, que arma el esquema entero desde
-  cero en cada corrida: una tabla nueva existe ahí aunque nadie haya hecho
-  `migrate` sobre PostgreSQL. Lo mismo con un permiso o una clave de
-  configuración nuevos, que los seeders siembran en la base de pruebas y no en la
-  de desarrollo. **Al agregar una migración, un permiso al enum `RolSistema` o
-  una clave a `ConfiguracionSeeder`, hay que correr a mano:**
+- **NADA AVISA SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Una tabla, un
+  permiso o una clave de configuración nuevos existen en el código pero no en la
+  base de trabajo hasta que alguien corre el comando. **Al agregar una
+  migración, un permiso al enum `RolSistema` o una clave a
+  `ConfiguracionSeeder`, hay que correr a mano:**
 
   ```sh
   php artisan migrate
@@ -910,9 +690,8 @@ Los cuatro tienen que pasar.
   ```
 
   Y después abrir la pantalla en el navegador. Pasó con la tabla `recibos`: la
-  pantalla reventaba con `relation "recibos" does not exist` mientras las
-  pruebas de entonces estaban todas en verde, porque corrían sobre un esquema
-  armado desde cero en memoria.
+  pantalla reventaba con `relation "recibos" does not exist` con el código ya
+  escrito y correcto.
 - **DomPDF no es un navegador.** No entiende flexbox, grid ni variables CSS, y no
   ejecuta JavaScript: los documentos se maquetan con tablas y `position:
   absolute`. Además su `opacity` es poco confiable —según la versión lo ignora y
@@ -983,11 +762,9 @@ Los cuatro tienen que pasar.
   en `carnet-fondo.png`, y el blanco al 85% de la pantalla va como color sólido
   ya mezclado sobre el verde.
 
-  **Por eso el verde del carnet vive en DOS lugares**: el PNG para el PDF y un
-  `linear-gradient` de CSS para la vista previa. Se tocan los dos o se separan.
-  Y para recolorearlo, el PNG **no se regenera** —habría que rehacer la mezcla
-  del sello—: se le aplica un ajuste en HSV al archivo entero. Multiplicar el
-  RGB a secas apaga el verde hacia el oliva.
+  Para recolorear el verde, el PNG **no se regenera** —habría que rehacer la
+  mezcla del sello—: se le aplica un ajuste en HSV al archivo entero.
+  Multiplicar el RGB a secas apaga el verde hacia el oliva.
 - **DomPDF no dibuja contornos de texto.** No tiene `-webkit-text-stroke` ni
   `text-shadow`, y lo escrito con ellas se dibuja sin contorno y sin avisar. El
   perfilado se hace a mano dibujando el texto **cinco veces** —cuatro copias del
@@ -1000,9 +777,9 @@ Los cuatro tienen que pasar.
   6%.** El título del carnet va a 11 pt corrido 0,5; los rótulos, a 4,6 corridos
   0,3. Medio punto sobre 4,6 pt no perfila —engorda la letra hasta cerrarle los
   huecos, la «O» se llena y la «E» se vuelve una mancha— y el texto deja de
-  leerse, que es lo contrario de lo que el contorno viene a hacer. Por eso
-  tampoco sirve `-webkit-text-stroke` en la vista previa: su trazo va CENTRADO
-  sobre el contorno, así que la mitad se come el relleno.
+  leerse, que es lo contrario de lo que el contorno viene a hacer. Y en el
+  navegador tampoco sirve `-webkit-text-stroke`: su trazo va CENTRADO sobre el
+  contorno, así que la mitad se come el relleno.
 - **En el carnet, el RÓTULO del segundo par también tiene un ancho fijo, y nadie
   lo mide.** El cálculo de encogido de `texto()` protege a los VALORES: si un
   nombre no entra, se achica. Los rótulos no pasan por ahí —son constantes— así
@@ -1029,10 +806,9 @@ Los cuatro tienen que pasar.
   ese número lo reinicia alguien de verdad.
 - **DomPDF no rota texto: no tiene `transform` ni `writing-mode`.** Lo escrito
   con ellas sale horizontal y sin avisar, y en una columna de 16 pt eso se
-  desborda sobre la vecina. Los rótulos rotados de un talonario —las diez
-  casillas del cuadro D de la guía— se arman apilando **una letra por
-  renglón**, con el alto DECLARADO en cada una: `line-height` tampoco manda acá.
-  Ver `guia-transporte.blade.php`.
+  desborda sobre la vecina. Los rótulos rotados del cuadro D de la guía se
+  dibujan girados con GD y entran como PNG, igual que el QR. Ver
+  `App\Support\TextoVertical`.
 - **En CSS el `padding` SUMA al `width`**, y en una maqueta de coordenadas fijas
   eso descoloca sin avisar. **En una GRILLA se paga por columna, y ahí el error
   se multiplica:** el cuadro D de la guía tiene quince, así que sus 2 pt de cada
@@ -1109,13 +885,13 @@ Los cuatro tienen que pasar.
   Con el carnet viejo —uno por persona, con los rubros colgados— el plástico NO
   llevaba ni los rubros ni el cupo: una adición posterior dejaba vieja la lista
   impresa y el documento pasaba a decir MENOS de lo que la persona podía hacer.
-  Hoy el carnet es de UN rubro que es parte de su llave y no cambia nunca, así
-  que **los dos van impresos** — y hacen falta, porque sin el rubro dos carnets
+  Hoy el carnet es de UNA actividad que no cambia nunca, así que **la actividad
+  y el cupo van impresos** — y hacen falta, porque sin la actividad dos carnets
   de la misma persona son plásticos idénticos.
 
-  Lo que sigue sin imprimirse es el ESTADO: un carnet se suspende o se anula
-  después de impreso y la tarjeta no se entera. Mismo criterio que la copia
-  congelada del recibo, mirado desde el otro lado.
+  Lo que sigue sin imprimirse es el ESTADO: un carnet se revoca o queda sin
+  efecto después de impreso y la tarjeta no se entera. Mismo criterio que la
+  copia congelada del recibo, mirado desde el otro lado.
 
   **La lección no es «imprimir todo» ni «imprimir poco»: es preguntarse qué
   puede cambiar después de que el plástico salga de la impresora.**
@@ -1124,8 +900,9 @@ Los cuatro tienen que pasar.
 
 ## Lo que falta
 
-Dos módulos: Reportes y Configuración. Aparecen en gris en el menú lateral. La
-lista completa, con los problemas conocidos que siguen abiertos, está en
+Tres módulos: Reportes, Configuración y Usuarios (hoy se crean por consola).
+Los dos primeros aparecen en gris en el menú lateral. La lista completa, con los
+problemas conocidos que siguen abiertos, está en
 [docs/PENDIENTES.md](docs/PENDIENTES.md).
 
 ---

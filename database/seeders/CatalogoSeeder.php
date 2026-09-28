@@ -43,7 +43,7 @@ class CatalogoSeeder extends Seeder
         // Texto oficial conocido. El «PAICHE» va en el texto y no en ningún
         // número: es lo que obliga a guardar `descripcion_kg` además del rango.
         //
-        // Y ES EL ÚNICO CON `modalidad` DECLARADA: los otros seis se quedan con
+        // Y es el único con `modalidad` DECLARADA: los otros seis se quedan con
         // el default de la tabla, `escala_general`. El paiche es una CUOTA DE LA
         // ESPECIE con tasación fija que NO se amplía —agotada, hay que tramitar
         // una nueva—, y eso lo fija la resolución al definir el tramo, no el

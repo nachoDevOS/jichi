@@ -75,7 +75,7 @@ class CobrarService
             $beneficiarioId = $this->titularDe($resueltas);
 
             /*
-             * EL NÚMERO SE RESERVA DENTRO DE LA MISMA TRANSACCIÓN.
+             * El número se reserva dentro de la misma transacción.
              */
             $recibo = Recibo::create([
                 'beneficiario_id' => $beneficiarioId,
@@ -287,7 +287,7 @@ class CobrarService
     }
 
     /**
-     *  COBRAR YA NO ACTIVA NADA, Y ES DELIBERADO
+     *  Cobrar ya no activa nada, y es deliberado
      */
 
     /**

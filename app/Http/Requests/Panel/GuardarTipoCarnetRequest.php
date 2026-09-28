@@ -37,7 +37,7 @@ class GuardarTipoCarnetRequest extends FormRequest
             ],
 
             /*
-             * PARA QUÉ ACTIVIDAD SIRVE. Es lo que después obliga a que el tipo
+             * Para qué actividad sirve. Es lo que después obliga a que el tipo
              * elegido y el `tipo_actor` del carnet coincidan.
              */
             'tipo_actor' => ['required', Rule::enum(TipoActor::class)],

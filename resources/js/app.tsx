@@ -8,7 +8,7 @@ import { inicializarApariencia } from '@/hooks/use-apariencia';
 import { bloquearRuedaEnNumericos } from '@/lib/rueda-numerica';
 
 /**
- *  PUNTO DE ENTRADA DE TODO EL FRONTEND
+ *  Punto de entrada de todo el frontend
  */
 
 const nombreApp = import.meta.env.VITE_APP_NAME || 'Jichi';

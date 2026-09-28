@@ -114,7 +114,7 @@ export interface CarnetFicha extends CarnetFila {
     /** Solo el APROBADO: ver EstadoCarnet::permiteRevocacion(). */
     puede_revocarse: boolean;
     /**
-     * LAS DEL CIRCUITO DE REVISIÓN, resueltas en el servidor. React no vuelve
+     * Las del circuito de revisión, resueltas en el servidor. React no vuelve
      * a evaluar el estado: pregunta por estas.
      */
     puede_enviarse: boolean;

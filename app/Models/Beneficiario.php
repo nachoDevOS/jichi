@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /*
- * LA PERSONA, UNA SOLA VEZ. No hay columna de rol: quien pesca y además
+ * La persona, una sola vez. No hay columna de rol: quien pesca y además
  * comercializa es UNA ficha con DOS carnets. El rol es del documento.
  */
 #[Appends(['documento_identidad', 'foto_url', 'edad'])]
@@ -193,7 +193,7 @@ class Beneficiario extends Model
     //  Reglas de negocio
 
     /**
-     *  LA CREDENCIAL VIGENTE DE ESTA PERSONA PARA ESTA ACTIVIDAD, O NULL
+     *  La credencial vigente de esta persona para esta actividad, o NULL
      */
     public function carnetVigenteDe(TipoActor $tipo): ?Carnet
     {

@@ -64,11 +64,11 @@ class EmitirGuiaService
                 'carnet_id' => $carnet->id,
 
                 /*
-                 * LA ASOCIACIÓN SE COPIA DEL CARNET, no se pregunta de nuevo.
+                 * La asociación se copia del carnet, no se pregunta de nuevo.
                  */
                 'asociacion_id' => $carnet->asociacion_id,
 
-                // EL NÚMERO LO PONE EL SISTEMA, no el operador: correlativo
+                // El número lo pone el sistema, no el operador: correlativo
                 // global y continuo, como el talonario de papel.
                 'numero_guia' => $this->correlativos->siguienteContinuo(GuiaMovimiento::SERIE),
 
@@ -154,7 +154,7 @@ class EmitirGuiaService
     }
 
     /**
-     *  ELIMINAR UNA GUÍA CARGADA POR ERROR
+     *  Eliminar una guía cargada por error
      */
     public function eliminar(GuiaMovimiento $guia, string $motivo): void
     {

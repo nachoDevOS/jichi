@@ -16,7 +16,7 @@ import type { PageProps, Paginado } from '@/types';
 import type { ProductoFila } from '@/types/catalogos';
 
 /**
- *  CATÁLOGO DE PRODUCTOS HIDROBIOLÓGICOS — el cuadro D de la guía
+ *  Catálogo de productos hidrobiológicos — el cuadro D de la guía
  */
 export default function CatalogoProductos({
     productos,

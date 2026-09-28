@@ -124,7 +124,7 @@ class GuardarUsuarioRequest extends FormRequest
                 }
 
                 /*
-                 * NADIE SE CIERRA LA PUERTA A SÍ MISMO.
+                 * Nadie se cierra la puerta a sí mismo.
                  */
                 if ($usuario->id === $this->user()?->id) {
                     if (! $this->boolean('activo')) {
@@ -137,7 +137,7 @@ class GuardarUsuarioRequest extends FormRequest
                 }
 
                 /*
-                 * Y EL SISTEMA NO SE QUEDA SIN ADMINISTRADOR.
+                 * Y el sistema no se queda sin administrador.
                  */
                 $pierdeElRol = $this->input('rol') !== RolSistema::Administrador->value
                     || ! $this->boolean('activo');

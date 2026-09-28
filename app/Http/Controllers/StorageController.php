@@ -8,12 +8,12 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- *  EL ÚNICO PUNTO DEL SISTEMA QUE ESCRIBE ARCHIVOS EN DISCO
+ *  El único punto del sistema que escribe archivos en disco
  */
 class StorageController extends Controller
 {
     /**
-     *  GUARDA UN ARCHIVO Y DEVUELVE SIEMPRE UNA RUTA, NUNCA UNA URL
+     *  Guarda un archivo y devuelve siempre una ruta, nunca una URL
      *
      * @param  string  $folder  Carpeta lógica: 'beneficiarios', 'tramites', 'pagos'.
      *
@@ -52,7 +52,7 @@ class StorageController extends Controller
     }
 
     /**
-     *  EL LÍMITE DE 3 MB — la última línea de defensa
+     *  El límite de 3 MB — la última línea de defensa
      *
      * @throws ValidationException
      */

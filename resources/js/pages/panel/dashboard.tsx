@@ -1,37 +1,17 @@
-import { Head, usePage } from '@inertiajs/react';
-import { BadgeCheck, FileText, Wallet, Waves } from 'lucide-react';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { BadgeCheck, CheckCircle2, ClipboardList, Fish, Scale, Wallet } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { lazy, Suspense } from 'react';
-import { MiniBarras, MiniLinea } from '@/components/panel/dashboard/mini-grafico';
+import type { ReactNode } from 'react';
 import { PanelAvisos } from '@/components/panel/dashboard/panel-avisos';
 import { TablaUltimosCarnets } from '@/components/panel/dashboard/tabla-ultimos-carnets';
-import { DesglosePie, WidgetEstadistica } from '@/components/panel/dashboard/widget-estadistica';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs } from '@/lib/utils';
+import { bs, cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
-import type {
-    ActividadDia,
-    Avisos,
-    CarnetsPorActor,
-    CarnetsPorTipo,
-    RecaudacionMes,
-    ResumenDelDia,
-    UltimoCarnet,
-} from '@/types/dashboard';
+import type { Avisos, Pendiente, RecaudacionMes, Resumen, UltimoCarnet } from '@/types/dashboard';
 
-/**
- *  LOS DOS GRÁFICOS GRANDES SE CARGAN APARTE, Y DESPUÉS
- */
-const GraficoCarnetsPorTipo = lazy(() =>
-    import('@/components/panel/dashboard/grafico-carnets-por-tipo').then((m) => ({
-        // lazy() espera un módulo con `default`, y estos componentes se exportan
-        // por nombre —como todos los del sistema—. Esto los adapta sin tener que
-        // cambiar la forma en que se exportan.
-        default: m.GraficoCarnetsPorTipo,
-    })),
-);
-
+// El gráfico trae recharts (≈100 KB): se baja aparte para que el resto del tablero aparezca enseguida.
 const GraficoRecaudacionMensual = lazy(() =>
     import('@/components/panel/dashboard/grafico-recaudacion-mensual').then((m) => ({
         default: m.GraficoRecaudacionMensual,
@@ -39,24 +19,20 @@ const GraficoRecaudacionMensual = lazy(() =>
 );
 
 /**
- * El tablero de la gestión en curso.
+ * El tablero: qué espera trabajo, cuánto hay vigente, cuánto se cobró y qué está por vencer.
  */
 export default function Dashboard({
     gestion,
+    pendientes,
     resumen,
-    porDia,
-    porTipoCarnet,
     porMes,
-    porActor,
     ultimosCarnets,
     avisos,
 }: {
     gestion: number;
-    resumen: ResumenDelDia;
-    porDia: ActividadDia[];
-    porTipoCarnet: CarnetsPorTipo[];
+    pendientes: Pendiente[];
+    resumen: Resumen;
     porMes: RecaudacionMes[];
-    porActor: CarnetsPorActor[];
     ultimosCarnets: UltimoCarnet[];
     avisos: Avisos;
 }) {
@@ -67,187 +43,175 @@ export default function Dashboard({
             <Head title="Panel" />
 
             <div className="space-y-4">
-                {/* ------------------------------------------------- Indicadores */}
+                <TrabajoPendiente pendientes={pendientes} />
+
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <WidgetEstadistica
-                        tono={1}
+                    <Numero
                         icono={BadgeCheck}
-                        etiqueta="Carnets vigentes"
-                        valor={String(resumen.carnets_vigentes)}
-                        pie={`${resumen.carnets_gestion} emitidos en la gestión`}
-                    >
-                        {/*
-                            Un carnet emitido este año puede estar vigente o no
-                            —vencido, revocado—, así que los dos pedazos suman
-                            exactamente los emitidos de la gestión y la barra no
-                            puede mentir.
-                        */}
-                        <DesglosePie
-                            partes={[
-                                { etiqueta: 'vigentes', cantidad: resumen.carnets_vigentes },
-                                {
-                                    etiqueta: 'no vigentes',
-                                    cantidad: Math.max(
-                                        0,
-                                        resumen.carnets_gestion - resumen.carnets_vigentes,
-                                    ),
-                                },
-                            ]}
-                        />
-                    </WidgetEstadistica>
-
-                    <WidgetEstadistica
-                        tono={2}
-                        icono={FileText}
-                        etiqueta="Documentos de hoy"
-                        valor={String(resumen.documentos_hoy)}
-                        pie="Carnets, faenas y guías · últimos 14 días"
-                    >
-                        {/* Barras y no línea: son conteos enteros. Ver el
-                            comentario de MiniBarras. */}
-                        <MiniBarras
-                            valores={porDia.map((d) => d.documentos)}
-                            className="h-10 w-full"
-                        />
-                    </WidgetEstadistica>
-
-                    <WidgetEstadistica
-                        tono={3}
-                        icono={Waves}
-                        etiqueta="Permisos vigentes"
-                        valor={String(resumen.faenas_vigentes + resumen.guias_vigentes)}
-                        pie={`${resumen.cupos_activos} cupo(s) de pesca activo(s)`}
-                    >
-                        {/*
-                            Faenas y guías son EXCLUYENTES —un permiso es de uno
-                            o del otro tipo, nunca de los dos—, que es lo que la
-                            barra necesita para que los pedazos sumen el total.
-                        */}
-                        <DesglosePie
-                            partes={[
-                                { etiqueta: 'faenas', cantidad: resumen.faenas_vigentes },
-                                { etiqueta: 'guías', cantidad: resumen.guias_vigentes },
-                            ]}
-                        />
-                    </WidgetEstadistica>
-
-                    <WidgetEstadistica
-                        tono={4}
+                        titulo="Carnets vigentes"
+                        valor={resumen.pescadores + resumen.comercializadores}
+                        detalle={`${resumen.pescadores} de pescador · ${resumen.comercializadores} de comercializador`}
+                    />
+                    <Numero
+                        icono={Scale}
+                        titulo="Autorizaciones de pesca vigentes"
+                        valor={resumen.autorizaciones_vigentes}
+                        detalle="Con kilos disponibles y en fecha"
+                    />
+                    <Numero
+                        icono={Fish}
+                        titulo="Permisos en curso"
+                        valor={resumen.faenas_vigentes + resumen.guias_vigentes}
+                        detalle={`${resumen.faenas_vigentes} faena(s) · ${resumen.guias_vigentes} guía(s)`}
+                    />
+                    <Numero
                         icono={Wallet}
-                        etiqueta="Recaudado este mes"
-                        valor={bs(resumen.recaudado_mes, institucion.moneda)}
-                        // El dato accionable no es cuánto entró, sino cuánto
-                        // falta entrar: eso es trabajo de cobranza pendiente.
-                        pie={`Hoy: ${bs(resumen.recaudado_hoy, institucion.moneda)} · Por cobrar: ${bs(resumen.por_cobrar, institucion.moneda)}`}
-                    >
-                        <MiniLinea
-                            valores={porDia.map((d) => d.recaudado)}
-                            className="h-10 w-full"
-                        />
-                    </WidgetEstadistica>
+                        titulo="Cobrado este mes"
+                        valor={bs(resumen.cobrado_mes, institucion.moneda)}
+                        detalle={`Hoy: ${bs(resumen.cobrado_hoy, institucion.moneda)}`}
+                    />
                 </div>
 
-                {/* ---------------------------------------------- Gráfico ancla */}
                 <div className="grid gap-4 lg:grid-cols-4">
-                    <Suspense
-                        fallback={<GraficoCargando titulo="Recaudación del año" alto="h-[26rem]" />}
-                    >
+                    <Suspense fallback={<GraficoCargando />}>
                         <GraficoRecaudacionMensual datos={porMes} moneda={institucion.moneda} />
-                    </Suspense>
-
-                    <RepartoPorActividad datos={porActor} gestion={gestion} />
-                </div>
-
-                {/* ------------------------------------------ Tipos y avisos */}
-                <div className="grid gap-4 lg:grid-cols-4">
-                    <Suspense
-                        fallback={
-                            <GraficoCargando
-                                titulo="Carnets por tipo"
-                                alto="h-72"
-                                className="lg:col-span-2"
-                            />
-                        }
-                    >
-                        <GraficoCarnetsPorTipo datos={porTipoCarnet} gestion={gestion} />
                     </Suspense>
 
                     <PanelAvisos avisos={avisos} />
                 </div>
 
-                {/* ----------------------------------------------------- Tabla */}
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <TablaUltimosCarnets carnets={ultimosCarnets} moneda={institucion.moneda} />
-                </div>
+                <TablaUltimosCarnets carnets={ultimosCarnets} moneda={institucion.moneda} />
             </div>
         </LayoutPanel>
     );
 }
 
 /**
- * El hueco del gráfico mientras se está bajando.
+ * Lo primero que se mira al llegar: qué hay que cobrar y enviar, y qué hay que firmar.
+ * Cada número lleva al listado ya filtrado.
  */
-function GraficoCargando({
-    titulo,
-    alto,
-    className = 'lg:col-span-3',
-}: {
-    titulo: string;
-    /** La misma clase de altura que usa el gráfico de verdad. */
-    alto: string;
-    className?: string;
-}) {
+function TrabajoPendiente({ pendientes }: { pendientes: Pendiente[] }) {
+    const total = pendientes.reduce((s, p) => s + p.por_enviar + p.por_firmar, 0);
+
     return (
-        <Card className={className}>
-            <CardHeader>
-                <CardTitle>{titulo}</CardTitle>
+        <Card>
+            <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ClipboardList className="size-5" />
+                </span>
+                <div>
+                    <CardTitle>Trabajo pendiente</CardTitle>
+                    <CardDescription>
+                        {total === 0
+                            ? 'No hay trámites esperando. Todo está al día.'
+                            : 'Toque un número para ver la lista.'}
+                    </CardDescription>
+                </div>
             </CardHeader>
 
-            <CardContent className={alto}>
-                <div className="h-full w-full animate-pulse rounded-md bg-secondary" />
+            {total === 0 ? (
+                <CardContent>
+                    <p className="flex items-center gap-2 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+                        <CheckCircle2 className="size-4.5 shrink-0" />
+                        Ningún borrador sin enviar y ningún trámite esperando firma.
+                    </p>
+                </CardContent>
+            ) : (
+                <CardContent className="p-0">
+                    {/* min-w-0 + overflow: la tabla se desplaza sola en el celular sin mover la página. */}
+                    <div className="min-w-0 overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="border-y border-border text-left text-xs text-muted-foreground">
+                                <tr>
+                                    <th className="px-5 py-2.5 font-medium">Documento</th>
+                                    <th className="px-5 py-2.5 text-center font-medium">
+                                        Por cobrar y enviar
+                                        <span className="block font-normal">ventanilla</span>
+                                    </th>
+                                    <th className="px-5 py-2.5 text-center font-medium">
+                                        Por firmar
+                                        <span className="block font-normal">supervisión</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {pendientes.map((p) => (
+                                    <tr key={p.documento}>
+                                        <td className="px-5 py-3 font-medium">{p.documento}</td>
+                                        <td className="px-5 py-3 text-center">
+                                            <Cantidad valor={p.por_enviar} href={p.url_por_enviar} tono="ambar" />
+                                        </td>
+                                        <td className="px-5 py-3 text-center">
+                                            <Cantidad valor={p.por_firmar} href={p.url_por_firmar} tono="azul" />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            )}
+        </Card>
+    );
+}
+
+/** Un cero se ve apagado y no es enlace: solo llama la atención lo que tiene trabajo. */
+function Cantidad({ valor, href, tono }: { valor: number; href: string; tono: 'ambar' | 'azul' }) {
+    if (valor === 0) {
+        return <span className="text-muted-foreground/60 tabular-nums">0</span>;
+    }
+
+    return (
+        <Link
+            href={href}
+            className={cn(
+                'inline-flex min-w-10 items-center justify-center rounded-full px-3 py-1 font-semibold tabular-nums transition-colors',
+                tono === 'ambar'
+                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300'
+                    : 'bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-500/15 dark:text-sky-300',
+            )}
+        >
+            {valor}
+        </Link>
+    );
+}
+
+function Numero({
+    icono: Icono,
+    titulo,
+    valor,
+    detalle,
+}: {
+    icono: LucideIcon;
+    titulo: string;
+    valor: ReactNode;
+    detalle: string;
+}) {
+    return (
+        <Card>
+            <CardContent className="flex items-start gap-4 p-5">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                    <Icono className="size-5" />
+                </span>
+                <div className="min-w-0">
+                    <p className="text-sm text-muted-foreground">{titulo}</p>
+                    <p className="mt-0.5 truncate text-2xl font-bold tabular-nums">{valor}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{detalle}</p>
+                </div>
             </CardContent>
         </Card>
     );
 }
 
-/**
- * Pescadores contra comercializadores, entre los carnets vigentes.
- */
-function RepartoPorActividad({ datos, gestion }: { datos: CarnetsPorActor[]; gestion: number }) {
-    const total = datos.reduce((suma, d) => suma + d.cantidad, 0);
-
+/** El hueco del gráfico mientras se está bajando, con su misma altura. */
+function GraficoCargando() {
     return (
-        <Card>
+        <Card className="lg:col-span-3">
             <CardHeader>
-                <CardTitle>Por actividad</CardTitle>
+                <CardTitle>Recaudación del año</CardTitle>
             </CardHeader>
-
-            <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                    Gestión {gestion} · {total} carnet(s) vigente(s)
-                </p>
-
-                {datos.map((d) => (
-                    <div key={d.tipo} className="space-y-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                            <Badge color={d.color}>{d.etiqueta}</Badge>
-                            <span className="text-xl font-semibold tabular-nums">{d.cantidad}</span>
-                        </div>
-
-                        {/*
-                            La barra de proporción se dibuja con un div de ancho
-                            porcentual y no con una librería: para dos valores,
-                            traer recharts sería cargar 100 KB para dibujar un
-                            rectángulo.
-                        */}
-                        <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                            <div
-                                className="h-full rounded-full bg-primary"
-                                style={{ width: total > 0 ? `${(d.cantidad / total) * 100}%` : '0%' }}
-                            />
-                        </div>
-                    </div>
-                ))}
+            <CardContent className="h-[26rem]">
+                <div className="h-full w-full animate-pulse rounded-md bg-secondary" />
             </CardContent>
         </Card>
     );

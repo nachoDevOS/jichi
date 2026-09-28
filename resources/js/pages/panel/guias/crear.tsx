@@ -15,9 +15,9 @@ import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/benefi
 import type { CatalogosGuia, FormularioGuia } from '@/types/guias';
 
 /**
- *  REGISTRAR UNA GUÍA DE MOVIMIENTO — paso 4, rama comercializador
+ *  Registrar una guía de movimiento — paso 4, rama comercializador
  *
- * NACE PENDIENTE: acá se arma el papel y nada más. Los depósitos se cargan
+ * Nace pendiente: acá se arma el papel y nada más. Los depósitos se cargan
  * desde la ficha, y recién con la firma la guía ampara el traslado.
  */
 export default function CrearGuia({
@@ -64,7 +64,7 @@ export default function CrearGuia({
         observaciones: '',
 
         /*
-         * LA SOLICITUD ES UN DÍA, no un instante: es la fecha en que la persona
+         * La solicitud es un día, no un instante: es la fecha en que la persona
          * vino al mostrador. La emisión —y con ella los cinco días de validez—
          * la escribe la APROBACIÓN.
          */

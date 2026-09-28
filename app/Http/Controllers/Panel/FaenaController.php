@@ -29,14 +29,14 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  PERMISOS DE FAENA — una salida de pesca (paso 4 del flujo)
+ *  Permisos de faena — una salida de pesca (paso 4 del flujo)
  */
 class FaenaController extends Controller
 {
     public function __construct(private readonly EmitirFaenaService $servicio) {}
 
     /**
-     * LISTADO — GET /panel/faenas
+     * Listado — GET /panel/faenas
      */
     public function index(Request $request): Response
     {
@@ -47,7 +47,7 @@ class FaenaController extends Controller
         ];
 
         $faenas = PermisoFaena::query()
-            // OJO CON PEDIR COLUMNAS SUELTAS: van las CINCO partes del nombre
+            // Ojo con pedir columnas sueltas: van las CINCO partes del nombre
             // porque `nombreCompleto` las lee todas. La que falte vuelve null y
             // el método contesta cualquier cosa, sin error.
             ->with([
@@ -86,7 +86,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * FORMULARIO — GET /panel/faenas/crear
+     * Formulario — GET /panel/faenas/crear
      *
      * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
      * buscador ya resuelto.
@@ -143,7 +143,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * EMITIR — POST /panel/faenas
+     * Emitir — POST /panel/faenas
      */
     public function store(EmitirFaenaRequest $request): RedirectResponse
     {
@@ -176,7 +176,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * CORREGIR EL BORRADOR — GET /panel/faenas/{faena}/editar
+     * Corregir el borrador — GET /panel/faenas/{faena}/editar
      */
     public function edit(PermisoFaena $faena): Response|RedirectResponse
     {
@@ -237,7 +237,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * GUARDAR LA CORRECCIÓN — PATCH /panel/faenas/{faena}
+     * Guardar la corrección — PATCH /panel/faenas/{faena}
      */
     public function update(ActualizarFaenaRequest $request, PermisoFaena $faena): RedirectResponse
     {
@@ -262,7 +262,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * ELIMINAR — DELETE /panel/faenas/{faena}
+     * Eliminar — DELETE /panel/faenas/{faena}
      */
     public function destroy(EliminarFaenaRequest $request, PermisoFaena $faena): RedirectResponse
     {
@@ -312,7 +312,7 @@ class FaenaController extends Controller
                 'pagos_sin_validar' => $sinValidar,
 
                 /*
-                 * EL CUPO DEL QUE SALIERON LOS KILOS.
+                 * El cupo del que salieron los kilos.
                  */
                 'cupo' => $faena->cupo() ? [
                     'id' => $faena->cupo()->id,
@@ -365,7 +365,7 @@ class FaenaController extends Controller
     }
 
     /**
-     *  CARGAR LOS DEPÓSITOS — POST /panel/faenas/{faena}/pagos
+     *  Cargar los depósitos — POST /panel/faenas/{faena}/pagos
      *
      * Mismo circuito que el carnet y el cupo: las boletas entran juntas, tienen
      * que cubrir el arancel entero y, si el operador lo pide, la faena queda
@@ -440,7 +440,7 @@ class FaenaController extends Controller
         $faena->refresh();
         $cuantos = count($datos['pagos']);
 
-        //  REGISTRAR Y ENVIAR SON UN SOLO ACTO CUANDO EL ARANCEL QUEDA CUBIERTO
+        //  Registrar y enviar son un solo acto cuando el arancel queda cubierto
         $enviada = false;
 
         if (($datos['enviar'] ?? false) && $faena->puedeEnviarseARevision()) {
@@ -470,7 +470,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * ENVIAR A REVISIÓN — POST /panel/faenas/{faena}/enviar
+     * Enviar a revisión — POST /panel/faenas/{faena}/enviar
      */
     public function enviar(PermisoFaena $faena, RevisarFaenaService $revision): RedirectResponse
     {
@@ -487,7 +487,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * APROBAR — PATCH /panel/faenas/{faena}/aprobar
+     * Aprobar — PATCH /panel/faenas/{faena}/aprobar
      *
      * Recién acá el permiso autoriza a salir a pescar.
      */
@@ -505,7 +505,7 @@ class FaenaController extends Controller
     }
 
     /**
-     * RECHAZAR — PATCH /panel/faenas/{faena}/rechazar
+     * Rechazar — PATCH /panel/faenas/{faena}/rechazar
      */
     public function rechazar(
         RechazarFaenaRequest $request,
@@ -571,7 +571,7 @@ class FaenaController extends Controller
 
             'kilos_extraidos' => (float) $faena->kilos_extraidos,
 
-            // LOS RENGLONES DEL TALONARIO. Nullable: el papel llega incompleto.
+            // Los renglones del talonario. Nullable: el papel llega incompleto.
             'embarcacion' => $faena->embarcacion,
             'propietario' => $faena->propietario,
             'comandante_barco' => $faena->comandante_barco,

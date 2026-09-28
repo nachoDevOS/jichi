@@ -11,7 +11,7 @@ import type { PageProps } from '@/types';
 import type { ReciboFicha } from '@/types/caja';
 
 /**
- *  LA FICHA DE UN RECIBO
+ *  La ficha de un recibo
  */
 export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
     const { puede } = usePermisos();

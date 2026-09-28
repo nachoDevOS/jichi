@@ -5,7 +5,7 @@ import { bs } from '@/lib/utils';
 import type { RecaudacionMes } from '@/types/dashboard';
 
 /**
- *  LA RECAUDACIÓN DE LOS ÚLTIMOS DOCE MESES
+ *  La recaudación de los últimos doce meses
  */
 
 /** Color del texto sobre el panel. Se repite en todos los trazos del gráfico. */
@@ -80,6 +80,9 @@ export function GraficoRecaudacionMensual({
 
                             <Tooltip
                                 contentStyle={ESTILO_TOOLTIP}
+                                // Sin esto el texto toma el color del trazo (claro) y no se lee sobre el globo blanco.
+                                itemStyle={{ color: 'var(--popover-foreground)' }}
+                                labelStyle={{ color: 'var(--popover-foreground)', fontWeight: 600 }}
                                 // El globito sale del panel de color y cae sobre
                                 // el fondo de la página, así que usa el estilo
                                 // común del sistema y no la tinta de acá.

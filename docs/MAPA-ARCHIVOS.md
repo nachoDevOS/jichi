@@ -106,7 +106,7 @@ decisiones que acá solo se nombran.
 | `Panel/PermisoFaenaImpresionController.php` | 130 | El «Permiso por Faena» en PDF. Carta vertical. Sale recién con la faena **aprobada**. El monto es la copia congelada de la fila, no la tarifa de hoy; la fecha del pie sale de `fecha_emision` para que una reimpresión diga lo mismo |
 | `Panel/GuiaImpresionController.php` | 190 | La «Guía Única de Transporte» en PDF. Carta vertical. Sale recién con la guía **aprobada**. **Rellena el cuadro D hasta cinco renglones** aunque la guía traiga menos: la hoja impresa tiene que medir siempre lo mismo que la preimpresa del archivo. Un cero entra como celda VACÍA, no como «0,00» |
 | `Panel/AutorizacionPescaController.php` | 187 | La autorización de pesca en PDF. Carta vertical. Sale recién con el cupo **aprobado**; la tabla de tamaños mínimos y las reglas de redes van como constantes —son texto del reglamento, no de la base— |
-| `Panel/DashboardController.php` | 330 | Cada bloque envuelto en `fn()` para las visitas parciales. `listos_para_aprobar` **cae en N+1**. `actividadDiaria()` arma la serie de 14 días de los indicadores |
+| `Panel/DashboardController.php` | 223 | Trabajo pendiente (borradores y por firmar, con URL filtradas), cuatro números, recaudación de 12 meses, avisos y últimos carnets. Cada bloque en `fn()` para las visitas parciales |
 | `Publico/VerificacionController.php` | 265 | Atiende los CINCO documentos, no solo el carnet: una consulta a `codigos` y `morphTo`. Devuelve **renglones ya resueltos**, así que sumar un tipo no toca React. Cédula enmascarada, sin ids internos |
 | `Publico/InicioController.php` | 52 | La portada institucional. **No consulta el dominio**: todo sale de `configuraciones`, con valor por defecto para que se dibuje en una base sin seeder. Manda la prop como `portada` y no `institucion` porque esa clave ya la ocupa una prop compartida, y una de página con el mismo nombre la tapa sin avisar |
 
@@ -187,7 +187,7 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `components/panel/beneficiarios/` | Ficha en pestañas: `pestana-pescador.tsx`, `pestana-comercializador.tsx`, `pestana-pagos.tsx` y `partes-ficha.tsx` | La pestaña va a la URL (`?pestana=`). Pescador se agrupa por **período** = autorización → cédulas (`aprovechamiento_id`) → faenas (`carnet_id`), en `armarPeriodos()`; Comercializador, por cédula → guías. Sin eso, al renovar la autorización se mezclaban las faenas de dos años. Los botones de emitir salen de las banderas del servidor —`puede_emitir`—, no de reglas propias. `CredencialMini` **no** es la vista previa del plástico: esa es `vista-previa-carnet.tsx` |
 | `components/panel/carnets/` | `dialogo-imprimir-carnet.tsx` | La vista previa antes de imprimir. Muestra el PDF DE VERDAD en un `iframe`, no una maqueta |
 | `components/panel/layout/` | Barra lateral, encabezado, menú | El ancho de la barra está escrito **dos veces** —`w-16`/`w-64` en la barra y `lg:pl-16`/`lg:pl-64` en el layout— y los dos se mueven juntos. `moduloActual()` de `navegacion.ts` es lo ÚNICO que decide qué módulo está abierto: lo usan el menú y las migas |
-| `components/panel/dashboard/` | Los bloques del tablero | `widget-estadistica.tsx` pinta de color entero: las clases van **escritas enteras**, como en `badge.tsx`. `mini-grafico.tsx` NO usa recharts a propósito |
+| `components/panel/dashboard/` | Gráfico de recaudación, avisos y últimos carnets | El gráfico se carga con `lazy()`. Los avisos solo listan lo que tiene algo, y enlazan al listado filtrado |
 | `components/publico/` | Hoja oficial, ficha, buscador | `buscador-codigo.tsx` vive en TRES sitios —el acta, su fondo verde y la portada— y por eso no lleva margen propio |
 | `components/publico/institucional/` | Las seis secciones de la portada, su cabecera y su pie | Los textos de servicios, pasos y preguntas salen de `docs/REGLAS-NEGOCIO.md`: si la regla cambia, cambian con ella. `seccion.tsx` lleva `scroll-mt` porque la cabecera es sticky y sin eso el ancla deja el título tapado |
 | `hooks/use-permisos.ts` | `puede('x.y')` | **Comodidad, no seguridad** |
@@ -196,64 +196,16 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `lib/rueda-numerica.ts` | `bloquearRuedaEnNumericos()` | Se llama una vez en `app.tsx`. Quita el foco al `<input type="number">` cuando le giran la rueda encima: sin foco el navegador no cambia el valor y la página se desplaza igual |
 | `types/` | La forma de lo que manda Laravel | Hay que actualizarlos al cambiar un controlador |
 
-## `tests/`
-
-Desde el 27/09/2026 hay **200 pruebas**, además de `TestCase.php`. El camino
-armado de ventanilla —otorgar, cobrar, enviar, validar, aprobar— vive en
-`Concerns/ArmaEscenarios.php`, para que cada prueba se ocupe solo de su regla.
-
-| Archivo | Casos | Qué protege |
-| --- | --: | --- |
-| `Unit/CircuitoEstadosTest.php` | 20 | La tabla de cada estado de autorización, carnet y faena (qué permite, reserva y consumo) |
-| `Unit/ReglasPurasTest.php` | 4 | Alfabeto del código, limpieza de lo tipeado, relleno de correlativos, 30 días de la faena |
-| `Unit/ReglasGuiaTest.php` | 11 | Estados de la guía, arancel, importe, 5 días, mensajes de carnet, grupos de condición |
-| `Feature/Beneficiarios/BeneficiarioTest.php` | 8 | Alta, cédula única entre vigentes, baja lógica que la libera, búsqueda, pantallas |
-| `Feature/Aprovechamientos/AutorizacionCircuitoTest.php` | 10 | Hereda la escala, borrador, cobro y recibo, firma, rechazo, agotado, impresión |
-| `Feature/Aprovechamientos/RevocacionTest.php` | 21 | Una por persona, revocar deja sin efecto sin reescribir, reposición |
-| `Feature/Aprovechamientos/ReservaFaenaTest.php` | 6 | La faena pendiente o en revisión reserva sus kilos |
-| `Feature/Carnets/CarnetPescadorTest.php` | 12 | Exige autorización, registro consecutivo, circuito, uno por actividad, reposición, plástico |
-| `Feature/Faenas/FaenaCircuitoTest.php` | 11 | Arancel, número, fechas de la firma, 30 días, quién emite, rechazo, baja, impresión |
-| `Feature/Caja/CobroYControlTest.php` | 12 | Un recibo por varios trámites, correlativo, no cobrar de más, validar/observar/corregir |
-| `Feature/Catalogos/CatalogosTest.php` | 5 | Asociaciones, escala sin solapes, tipos de carnet |
-| `Feature/Sistema/PermisosYPantallasTest.php` | 39 | Cada pantalla abre, sin sesión va al login, sin permiso 403, rutas sin alta |
-| `Feature/Publico/VerificacionTest.php` | 7 | QR de los cinco documentos, cédula enmascarada, código único e idempotente |
-| `Feature/Comercializador/GuiaTest.php` | 13 | El cuadro D sale del catálogo, cobra su total, quién emite, circuito, anular |
-| `Feature/Comercializador/GuiaCircuitoTest.php` | 12 | Rechazo y reenvío, boleta observada, 5 días, corrección, baja, HTTP, PDF, QR |
-| `Feature/Comercializador/CarnetComercializadorTest.php` | 9 | Sin autorización, circuito, la guía de un carnet revocado vale con el nuevo, cambio de año |
-**14/09/2026** por pedido del responsable del proyecto.
-
-Eran 143 pruebas y cubrían el backend entero. Lo que comprobaban, y que hoy **no
-comprueba nada**:
-
-| Archivo que había | Qué protegía |
-| --- | --- |
-| `SolicitudCarnetTest.php` | Un carnet por persona y gestión; que un rollback no deje archivos huérfanos |
-| `PagoTramiteTest.php` | Que no se apruebe sin cobrar; que no se cargue dos veces la misma boleta |
-| `FlujoEstadoTramiteTest.php` | La máquina de estados: los saltos que **no** valen |
-| `ReciboTramiteTest.php` | Que reimprimir conserve el número; que el recibo quede congelado |
-| `SubidaArchivosTest.php` | Tope de 3 MB + **leía el código fuente** buscando quién se saltaba `StorageController` |
-| `BeneficiarioTest.php` | CRUD, búsqueda, índice único parcial |
-| `SituacionCarnetTest.php` | Lo que ve el formulario antes de cargar |
-| `PantallasPanelTest.php` | Que cada pantalla responda 200 |
-| `AccesoTest.php` | Login, logout, bitácora, verificación pública |
-
-> Ese `SubidaArchivosTest` era el más difícil de reemplazar mirando la pantalla:
-> no probaba que el código de hoy funcione, sino que **mañana nadie tome el
-> atajo**. Esa clase de regla no se ve ejecutando el sistema.
-
-`phpunit.xml`, `TestCase.php` y las dependencias de PHPUnit se dejaron en su
-lugar: no molestan y permiten volver a escribir una prueba creando un solo
-archivo. Ver el punto 10 de [PENDIENTES.md](PENDIENTES.md).
-
 ## `database/`
 
 | Carpeta | Qué hay | No obvio |
 | --- | --- | --- |
-| `migrations/` | 17 archivos, en orden cronológico | Las del dominio (`2026_09_10_*`) están **muy** comentadas: son el mejor lugar para entender el esquema |
-| `seeders/RubroSeeder` | Pescador (80 Bs), Comercializador (120 Bs) | Los dos rubros **son** dos casillas del recibo de papel. Siembra además `emite_faenas` / `emite_guias` |
-| `seeders/ConfiguracionSeeder` | Datos de la institución | |
-| `seeders/RolPermisoSeeder` | Lee los permisos de `RolSistema` | |
-| `seeders/DemoSeeder` | Datos de prueba | **No pasa por el servicio** — es una copia que puede quedar vieja |
+| `migrations/` | 23 archivos: los de Laravel (`0001_*`) y el núcleo del dominio (`2026_09_18_*`) | Cortos a propósito: el porqué de cada columna e índice está en [MER.md](MER.md) |
+| `seeders/RolPermisoSeeder` | Lee los permisos de `RolSistema` | Correrlo a mano al sumar un permiso |
+| `seeders/ConfiguracionSeeder` | Datos de la institución | Usa `updateOrCreate`: pisa lo ajustado a mano |
+| `seeders/UsuarioSeeder` | El administrador inicial | |
+| `seeders/CatalogoSeeder` | Asociaciones, escala, tipos de carnet y productos | Valores de **plantilla**; solo fuera de producción. Ver PENDIENTES |
+| `seeders/BeneficiarioSeeder` | Padrón de prueba | Solo el padrón: el circuito se carga desde la pantalla |
 | `factories/` | `BeneficiarioFactory` | |
 
 ## `public/image/`
@@ -286,4 +238,4 @@ archivo. Ver el punto 10 de [PENDIENTES.md](PENDIENTES.md).
 - Módulos de Reportes y Configuración
 - Comando de vencimiento de carnets
 - PDF del carnet (el del **recibo** sí existe)
-- Pruebas de JavaScript
+- Pruebas automáticas (se retiraron el 27/09/2026; están en el commit `7dc0ac6`)

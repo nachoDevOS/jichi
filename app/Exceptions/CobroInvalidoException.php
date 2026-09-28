@@ -16,7 +16,7 @@ class CobroInvalidoException extends RuntimeException
     }
 
     /**
-     *  NO SE COBRA MÁS DE LO QUE SE DEBE
+     *  No se cobra más de lo que se debe
      */
     public static function excedeElSaldo(string $tramite, float $monto, float $saldo): self
     {
@@ -30,7 +30,7 @@ class CobroInvalidoException extends RuntimeException
     }
 
     /**
-     *  TAMPOCO SE COBRA DE MENOS: los depósitos entran todos juntos
+     *  Tampoco se cobra de menos: los depósitos entran todos juntos
      */
     public static function noCubreElMonto(string $tramite, float $suma, float $saldo): self
     {

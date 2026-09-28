@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use RuntimeException;
 
 /**
- *  EL CÓDIGO DE 16 DE CUALQUIER DOCUMENTO
+ *  El código de 16 DE CUALQUIER DOCUMENTO
  *
  *  Vivía adentro de EmitirCarnetService; se sacó acá el 22/09/2026 porque lo
  *  necesitan cinco documentos. Ver docs/MER.md, tabla `codigos`.
@@ -15,7 +15,7 @@ use RuntimeException;
 class CodigoService
 {
     /**
-     * SIN `I L O S 0 1 5`: son los que se confunden al dictar por teléfono o
+     * Sin `I L o S 0 1 5`: son los que se confunden al dictar por teléfono o
      * al tipear de un plástico gastado.
      */
     public const ALFABETO = 'ABCDEFGHJKMNPQRTUVWXYZ2346789';

@@ -8,7 +8,7 @@ use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 
 /**
- *  LAS CASILLAS DE «DESCRIPCIÓN» DEL RECIBO OFICIAL
+ *  Las casillas de «descripción» del recibo oficial
  */
 enum ConceptoRecibo: string
 {
@@ -35,7 +35,7 @@ enum ConceptoRecibo: string
     }
 
     /**
-     *  QUÉ CASILLA VA MARCADA, SEGÚN LO QUE SE COBRÓ
+     *  Qué casilla va marcada, según lo que se cobró
      */
     public static function desdePagable(?object $pagable): self
     {

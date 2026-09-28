@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Auth;
 trait Auditable
 {
     /**
-     *  EL PORQUÉ DEL PRÓXIMO MOVIMIENTO
+     *  El porqué del próximo movimiento
      */
     public ?string $motivoAuditoria = null;
 

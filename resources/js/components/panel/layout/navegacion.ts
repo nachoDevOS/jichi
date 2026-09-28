@@ -40,7 +40,7 @@ export interface ItemNavegacion {
 }
 
 /**
- * EL MENÚ DEL PANEL DE ADMINISTRACIÓN.
+ * El menú del panel de administración.
  */
 export const NAVEGACION: ItemNavegacion[] = [
     { titulo: 'Panel', ruta: 'dashboard', icono: LayoutDashboard, permiso: 'dashboard.ver' },

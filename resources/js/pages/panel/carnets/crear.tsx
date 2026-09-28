@@ -16,7 +16,7 @@ import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { AsociacionElegible, CupoVigente, ReposicionDeCarnet, TipoElegible } from '@/types/carnets';
 
 /**
- *  EMITIR UNA CREDENCIAL — paso 3 del flujo
+ *  Emitir una credencial — paso 3 del flujo
  */
 export default function CrearCarnet({
     beneficiario,
@@ -48,7 +48,7 @@ export default function CrearCarnet({
             null) as number | null,
         fecha_solicitud: new Date().toISOString().slice(0, 10),
 
-        // LOS DOS PAPELES QUE RESPALDAN LA EMISIÓN. Suben con el formulario,
+        // Los dos papeles que respaldan la emisión. Suben con el formulario,
         // así que el post va con `forceFormData`.
         archivo_ci: null as File | null,
         archivo_asociacion: null as File | null,
@@ -57,7 +57,7 @@ export default function CrearCarnet({
     const tipo = tipos.find((t) => String(t.id) === String(form.data.tipo_carnet_id)) ?? null;
 
     /*
-     * LA ACTIVIDAD NO SE PREGUNTA: la dice el tipo elegido.
+     * La actividad no se pregunta: la dice el tipo elegido.
      *
      * Eran dos campos y decían lo mismo —cada tipo del catálogo ya declara para
      * qué actividad sirve—, así que el operador tenía que acertar dos veces la
@@ -68,7 +68,7 @@ export default function CrearCarnet({
     const esPescador = actor === 'pescador';
 
     /*
-     * SUS BOLSAS MADRE EN CURSO. Son las que el servidor acepta para respaldar
+     * Sus bolsas madre en curso. Son las que el servidor acepta para respaldar
      * el carnet —pendiente, en revisión o aprobada—, no solo las que ya
      * autorizan a pescar: el plástico se emite con el cupo sin cobrar y los dos
      * se pagan juntos.
@@ -165,7 +165,7 @@ export default function CrearCarnet({
                                 value={form.data.tipo_carnet_id}
                                 onChange={(e) => {
                                     /*
-                                     * EL CUPO SE LIMPIA AL PASAR A COMERCIALIZADOR.
+                                     * El cupo se limpia al pasar a comercializador.
                                      * Se proponía solo, del cupo de la persona,
                                      * y seguía viajando aunque el tipo elegido
                                      * no llevara volumen: el servidor lo
@@ -230,7 +230,7 @@ export default function CrearCarnet({
                                 }
                                 obligatorio
                             >
-                                {/* CON UNA SOLA NO SE PREGUNTA: se muestra. Un
+                                {/* Con una sola no se pregunta: se muestra. Un
                                     desplegable de una opción es un clic que no
                                     decide nada. Con dos o más, elige el
                                     operador y no el servidor. */}
@@ -415,7 +415,7 @@ export default function CrearCarnet({
                                     {esPescador ? 'Emitir permisos de faena' : 'Emitir guías de movimiento'}
                                 </p>
 
-                                {/* LA CAPACIDAD, no el número de la escala: el
+                                {/* La capacidad, no el número de la escala: el
                                     tramo es un dato del catálogo interno, y lo
                                     que dice cuánto autoriza el carnet son los
                                     kilos. */}

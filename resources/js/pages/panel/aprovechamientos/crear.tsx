@@ -20,7 +20,7 @@ import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 const TIPOS_DE_EMBARCACION = ['Canoa', 'Peque-peque', 'Bote', 'Chalana', 'Deslizador', 'Balsa'];
 
 /**
- *  OTORGAR UNA BOLSA MADRE — paso 2 del flujo del pescador
+ *  Otorgar una bolsa madre — paso 2 del flujo del pescador
  */
 export default function CrearCupo({
     beneficiario,

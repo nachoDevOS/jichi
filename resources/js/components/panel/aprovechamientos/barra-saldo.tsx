@@ -34,7 +34,7 @@ export function BarraSaldo({
     }
 
     /*
-     * SIN NADA CONSUMIDO NO HAY SALDO QUE DIBUJAR. Un cupo recién firmado, sin
+     * Sin nada consumido no hay saldo que dibujar. Un cupo recién firmado, sin
      * una sola faena, mostraba «300 / 300 kg» con la barra vacía de punta a
      * punta: se lee como un cupo gastado, que es justo lo contrario. Mientras
      * nadie haya pescado, lo único cierto es cuánto se otorgó. No dice «sin

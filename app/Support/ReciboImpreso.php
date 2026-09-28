@@ -8,7 +8,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Number;
 
 /**
- *  EL RECIBO, COMO LO NECESITA LA PLANTILLA IMPRESA
+ *  El recibo, como lo necesita la plantilla impresa
  */
 readonly class ReciboImpreso
 {
@@ -21,7 +21,7 @@ readonly class ReciboImpreso
     ) {}
 
     /**
-     *  ARMA EL RECIBO IMPRESO A PARTIR DEL MODELO
+     *  Arma el recibo impreso a partir del modelo
      */
     public static function desde(Recibo $recibo, string $lugar): self
     {
@@ -55,7 +55,7 @@ readonly class ReciboImpreso
             'concepto' => $this->recibo->concepto,
 
             /*
-             * LAS BOLETAS DEL BANCO —TODAS—, no el número del recibo.
+             * Las boletas del banco —todas—, no el número del recibo.
              *
              * Va en el renglón «N°» del papel. Ver `boletas()`.
              */
@@ -102,7 +102,7 @@ readonly class ReciboImpreso
     }
 
     /**
-     *  EL MONTO EN LETRAS — el renglón «La suma de:»
+     *  El monto en letras — el renglón «La suma de:»
      */
     public function montoEnLetras(): string
     {

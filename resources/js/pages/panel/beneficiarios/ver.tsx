@@ -102,7 +102,7 @@ export default function VerBeneficiario({
 
             <Cabecera beneficiario={beneficiario} carnets={carnets} gestion={gestion} />
 
-            {/* LAS PESTAÑAS: una por actividad, porque cada una es un carnet propio. */}
+            {/* Las pestañas: una por actividad, porque cada una es un carnet propio. */}
             <div
                 role="tablist"
                 aria-label="Secciones de la ficha"

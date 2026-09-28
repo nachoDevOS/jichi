@@ -32,7 +32,7 @@ import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
 import type { CarnetFicha, FaenaDelCarnet, GuiaDelCarnet } from '@/types/carnets';
 
 /**
- *  LA FICHA DE UN CARNET
+ *  La ficha de un carnet
  */
 export default function VerCarnet({
     carnet,
@@ -62,7 +62,7 @@ export default function VerCarnet({
     return (
         <LayoutPanel
             /*
-             * EL ENCABEZADO NO REPITE AL TITULAR, igual que en la ficha del
+             * El encabezado no repite al titular, igual que en la ficha del
              * cupo: el nombre, la cédula y el código están en la tarjeta de
              * abajo, con la foto al lado. Arriba quedan las acciones.
              */
@@ -189,7 +189,7 @@ export default function VerCarnet({
         >
             <Head title={`Carnet ${carnet.codigo}`} />
 
-            {/* EL TITULAR, CON SU FOTO. Sobre un carnet la primera pregunta
+            {/* El titular, con su foto. Sobre un carnet la primera pregunta
                 es de quién es, y la cara al lado del nombre es lo que deja
                 confirmarlo contra la persona que está en el mostrador. */}
             <Card className="mb-6 min-w-0">
@@ -248,7 +248,7 @@ export default function VerCarnet({
                                 <div className="flex flex-wrap items-center gap-2">
                                     <Waves className="size-4 shrink-0 text-muted-foreground" />
 
-                                    {/* EL NOMBRE VERDADERO del documento, el
+                                    {/* El nombre verdadero del documento, el
                                         mismo que imprime el recibo y encabeza
                                         su ficha. «Cupo de pesca» era jerga
                                         nuestra. Ver App\Enums\ConceptoRecibo. */}
@@ -410,7 +410,7 @@ export default function VerCarnet({
                             <Badge color={carnet.tipo_actor_color}>{carnet.tipo_actor_etiqueta}</Badge>
                         </div>
 
-                        {/* EL REGISTRO PRIMERO: es el número que va impreso en
+                        {/* El registro primero: es el número que va impreso en
                             el carnet y el que se dicta. El código largo es la
                             llave de la verificación pública. */}
                         <Dato
@@ -467,7 +467,7 @@ export default function VerCarnet({
                 </Card>
             </div>
 
-            {/* EL COBRO DEL ARANCEL, con el mismo formulario que el cupo. */}
+            {/* El cobro del arancel, con el mismo formulario que el cupo. */}
             <div className="mt-6">
                 <TarjetaPagos
                     pagos={pagos}
@@ -481,7 +481,7 @@ export default function VerCarnet({
                 />
             </div>
 
-            {/* LAS SALIDAS DE ESTE CARNET, recién desde la aprobación. Revocarlo no las anula. */}
+            {/* Las salidas de este carnet, recién desde la aprobación. Revocarlo no las anula. */}
             {carnet.tipo_actor === 'pescador' && carnet.ya_fue_aprobado && (
                 <Card className="mt-6 min-w-0">
                     <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
@@ -554,7 +554,7 @@ export default function VerCarnet({
                 </Card>
             )}
 
-            {/* LOS TRASLADOS DE ESTE CARNET, espejo de las faenas. Revocarlo no los anula. */}
+            {/* Los traslados de este carnet, espejo de las faenas. Revocarlo no los anula. */}
             {carnet.tipo_actor === 'comercializador' && carnet.ya_fue_aprobado && (
                 <Card className="mt-6 min-w-0">
                     <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">

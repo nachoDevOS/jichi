@@ -31,7 +31,7 @@ import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
 import type { GuiaFicha } from '@/types/guias';
 
 /**
- *  LA FICHA DE UNA GUÍA
+ *  La ficha de una guía
  *
  * El traslado se cobra y se firma como el carnet, el cupo y la faena
  * —pendiente → en revisión → activa—, así que la tarjeta de pagos y los
@@ -87,7 +87,7 @@ export default function VerGuia({
                         </Button>
                     )}
 
-                    {/* CORREGIR Y ELIMINAR SOLO SOBRE EL BORRADOR. Las dos
+                    {/* Corregir y eliminar solo sobre el borrador. Las dos
                         banderas llegan resueltas: miran el estado Y que no haya
                         entrado un depósito. */}
                     {puede('guias.editar') && guia.puede_editarse && (
@@ -260,7 +260,7 @@ export default function VerGuia({
                                 <Dato etiqueta="Aprobada" valor={fechaHora(guia.fecha_emision)} />
                                 <Dato etiqueta="Vence" valor={fechaHora(guia.fecha_vencimiento)} />
                                 <Dato etiqueta="Asociación" valor={guia.asociacion_nombre ?? guia.asociacion ?? '—'} />
-                                {/* DE QUÉ CARNET CUELGA. El número del libro es
+                                {/* De qué carnet cuelga. El número del libro es
                                     cómo se lo nombra; el código de 16 caracteres
                                     es la llave con la que se verifica. */}
                                 <Dato etiqueta="Carnet" valor={`N° ${guia.carnet_registro ?? '—'}`} />
@@ -325,7 +325,7 @@ export default function VerGuia({
                         </CardContent>
                     </Card>
 
-                    {/* EL CUADRO D: lo que un control lee en la ruta. */}
+                    {/* El cuadro D: lo que un control lee en la ruta. */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Productos hidrobiológicos</CardTitle>
@@ -388,7 +388,7 @@ export default function VerGuia({
                         </CardContent>
                     </Card>
 
-                    {/* LA MISMA TARJETA que el carnet, el cupo y la faena. */}
+                    {/* La misma tarjeta que el carnet, el cupo y la faena. */}
                     <TarjetaPagos
                         pagos={pagos}
                         recibo={recibo}
@@ -421,7 +421,7 @@ export default function VerGuia({
                 </Card>
             </div>
 
-            {/* APROBAR PIDE CASILLA: es la FIRMA. Desde acá la guía ampara. */}
+            {/* Aprobar pide casilla: es la FIRMA. Desde acá la guía ampara. */}
             <ConfirmarAccion
                 abierto={aprobando}
                 tono="afirmativo"
@@ -451,7 +451,7 @@ export default function VerGuia({
                 }
             />
 
-            {/* RECHAZAR PIDE MOTIVO Y CASILLA: es la otra mitad de la firma. */}
+            {/* Rechazar pide motivo y casilla: es la otra mitad de la firma. */}
             <ConfirmarConMotivo
                 abierto={rechazando}
                 titulo="Rechazar y devolver a ventanilla"
@@ -574,7 +574,7 @@ export default function VerGuia({
  */
 function Situacion({ guia }: { guia: GuiaFicha }) {
     /*
-     * MIENTRAS NADIE LA FIRMÓ, la guía no ampara nada, y el porqué llega
+     * Mientras nadie la firmó, la guía no ampara nada, y el porqué llega
      * RESUELTO del servidor —`motivo_sin_amparar`—. React no vuelve a evaluar
      * el estado: así nacieron los carteles que decían «venció» sobre un
      * expediente que recién se estaba armando.

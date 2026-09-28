@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { CampoGuia, CatalogosGuia, FormularioGuia } from '@/types/guias';
 
 /**
- * LOS BLOQUES B y C DEL PAPEL — la ubicación y el transporte.
+ * Los bloques B y C DEL PAPEL — la ubicación y el transporte.
  *
  * Vive acá y no en cada pantalla porque lo comparten emitir y corregir: escrito
  * dos veces, el día que el talonario sume un renglón se agrega en uno y el otro

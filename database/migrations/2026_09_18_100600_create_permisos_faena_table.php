@@ -16,7 +16,7 @@ return new class extends Migration
         Schema::create('permisos_faena', function (Blueprint $table) {
             $table->id();
 
-            // SU ÚNICA CLAVE. El cupo se alcanza por `carnets.aprovechamiento_id`:
+            // Su única clave. El cupo se alcanza por `carnets.aprovechamiento_id`:
             // con dos claves, un permiso podía apuntar a un cupo que no es el suyo.
             $table->foreignId('carnet_id')->constrained('carnets')->restrictOnDelete();
 
@@ -30,7 +30,7 @@ return new class extends Migration
             // en quince.
             $table->decimal('kilos_extraidos', 12, 2)->default(0);
 
-            // LOS RENGLONES DEL PAPEL. Nullable y texto libre: el formulario se
+            // Los renglones del papel. Nullable y texto libre: el formulario se
             // llena a mano y llega incompleto, y no hay padrón de embarcaciones.
             $table->string('embarcacion', 150)->nullable();
             $table->string('propietario', 150)->nullable();
@@ -44,7 +44,7 @@ return new class extends Migration
 
             $table->date('fecha_solicitud');
 
-            // LAS DOS LAS ESCRIBE LA APROBACIÓN: la salida es el día de la firma y
+            // Las dos las escribe la aprobación: la salida es el día de la firma y
             // el desembarque, salida + 30 días. En NULL mientras es una solicitud.
             $table->date('fecha_salida')->nullable();
             $table->date('fecha_desembarque')->nullable()->index()->comment('Techo: salida + 30 días');

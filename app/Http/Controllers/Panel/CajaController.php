@@ -27,7 +27,7 @@ class CajaController extends Controller
     public function __construct(private readonly CobrarService $servicio) {}
 
     /**
-     * LISTADO DE ABONOS — GET /panel/caja
+     * Listado de abonos — GET /panel/caja
      */
     public function index(Request $request): Response
     {
@@ -41,7 +41,7 @@ class CajaController extends Controller
 
         $pagos = Pago::query()
             /*
-             * UNA RELACIÓN POLIMÓRFICA NO SE PRECARGA CON `with('pagable.x')`.
+             * Una relación polimórfica no se precarga con `with('pagable.x')`.
              */
             ->with([
                 'recibo:id,numero_recibo,beneficiario_id',
@@ -60,7 +60,7 @@ class CajaController extends Controller
                     ->orWhereHas('beneficiario', fn ($b) => $b->buscar($termino)),
             ))
             /*
-             * EL RANGO SE FILTRA POR `created_at`, que es cuando entró la plata.
+             * El rango se filtra por `created_at`, que es cuando entró la plata.
              * `pagos` no tiene columna de fecha propia a propósito: una segunda
              * fecha solo agregaría la posibilidad de que las dos se
              * contradigan.
@@ -94,14 +94,14 @@ class CajaController extends Controller
             'opcionesPorPagina' => Paginacion::OPCIONES,
 
             /*
-             * EL ARQUEO DEL DÍA, siempre del día de HOY y no del rango filtrado.
+             * El arqueo del día, siempre del día de HOY y no del rango filtrado.
              */
             'arqueo' => $this->arqueoDelDia(),
         ]);
     }
 
     /**
-     * FORMULARIO DE COBRO — GET /panel/caja/cobrar
+     * Formulario de cobro — GET /panel/caja/cobrar
      *
      * Acepta `?beneficiario=7` para llegar desde la ficha de la persona.
      */
@@ -125,14 +125,14 @@ class CajaController extends Controller
     }
 
     /**
-     * COBRAR — POST /panel/caja
+     * Cobrar — POST /panel/caja
      */
     public function store(CobrarRequest $request): RedirectResponse
     {
         $datos = $request->validated();
 
         /*
-         *  LA BOLETA SE SUBE ANTES DE ABRIR LA TRANSACCIÓN
+         *  La boleta se sube antes de abrir la transacción
          */
         $comprobante = app(StorageController::class)->file($request->file('comprobante'), 'comprobantes');
 
@@ -237,7 +237,7 @@ class CajaController extends Controller
         $hoy = now()->toDateString();
 
         /*
-         * YA NO SE REPARTE POR MÉTODO: todo pago es un depósito bancario, así
+         * Ya no se reparte por método: todo pago es un depósito bancario, así
          * que el reparto tenía una sola columna. Lo que sí hace falta son las
          * DOS fechas, porque no son la misma pregunta:
          */

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- *  DÓNDE ESTÁ UN ARCHIVO GUARDADO, Y CÓMO SE ABRE
+ *  Dónde está un archivo guardado, y cómo se abre
  */
 class Archivos
 {
@@ -29,7 +29,7 @@ class Archivos
         }
 
         /*
-         * FILAS VIEJAS: las que se cargaron cuando el sistema guardaba la
+         * Filas viejas: las que se cargaron cuando el sistema guardaba la
          * dirección completa en vez de la ruta.
          */
         if (Str::startsWith($valor, ['http://', 'https://'])) {
@@ -40,7 +40,7 @@ class Archivos
     }
 
     /**
-     * EL CONTENIDO CRUDO de un archivo guardado. NULL si no hay nada, o si el
+     * El contenido crudo de un archivo guardado. NULL si no hay nada, o si el
      * archivo que la fila dice tener ya no está en el disco.
      */
     public static function contenido(?string $valor): ?string
@@ -64,7 +64,7 @@ class Archivos
         }
 
         /*
-         * LO VIEJO GUARDADO COMO DIRECCIÓN COMPLETA NO SE PUEDE BORRAR.
+         * Lo viejo guardado como dirección completa no se puede borrar.
          */
         if (Str::startsWith($valor, ['http://', 'https://'])) {
             Log::warning('Adjunto guardado como URL completa: no se puede borrar, queda ocupando lugar.', [

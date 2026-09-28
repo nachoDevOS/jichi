@@ -206,7 +206,7 @@ export default function IndiceCaja({
                                         <tbody className="divide-y divide-border">
                                             {pagos.data.map((p) => (
                                                 <tr key={p.id} className="hover:bg-secondary/50">
-                                                    {/* SIN ENLACE CUANDO TODAVÍA NO HAY
+                                                    {/* Sin enlace cuando todavía no hay
                                                         PAPEL: los depósitos de un
                                                         aprovechamiento se cargan antes de
                                                         que el recibo exista —sale uno solo

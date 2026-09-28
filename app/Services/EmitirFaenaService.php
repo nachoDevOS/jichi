@@ -62,7 +62,7 @@ class EmitirFaenaService
                 ->firstOrFail();
 
             /*
-             * SE PREGUNTA POR LA FECHA, NO POR `estaVigente()`.
+             * Se pregunta por la fecha, no por `estaVigente()`.
              */
             if (! $cupo->estaEnFecha()) {
                 throw PermisoOperativoException::sinCupoVigente();
@@ -74,14 +74,14 @@ class EmitirFaenaService
             }
 
             /*
-             * EL CUPO SIN COBRAR TIENE SU PROPIO MENSAJE, y hace falta.
+             * El cupo sin cobrar tiene su propio mensaje, y hace falta.
              */
             if ($cupo->estado === EstadoAprovechamiento::Pendiente) {
                 throw PermisoOperativoException::cupoPendienteDePago();
             }
 
             /*
-             * Y EL OTRO ESTADO QUE NO HABILITA: presentado y sin firmar.
+             * Y el otro estado que no habilita: presentado y sin firmar.
              */
             if ($cupo->estado === EstadoAprovechamiento::EnRevision) {
                 throw PermisoOperativoException::cupoEnRevision();
@@ -95,7 +95,7 @@ class EmitirFaenaService
 
             $faena = PermisoFaena::create([
                 'carnet_id' => $carnet->id,
-                // EL NÚMERO LO PONE EL SISTEMA, no el operador: correlativo
+                // El número lo pone el sistema, no el operador: correlativo
                 // global y continuo, como el talonario de papel.
                 'numero_faena' => $this->correlativos->siguienteContinuo(PermisoFaena::SERIE),
                 // Copia congelada del arancel: ver PermisoFaena::montoACobrar().
@@ -120,7 +120,7 @@ class EmitirFaenaService
     }
 
     /**
-     *  CORREGIR EL BORRADOR
+     *  Corregir el borrador
      *
      * El CARNET no se toca: cambiar de titular no es corregir una salida, es
      * emitir otra. Dejarlo editable movería un permiso de una persona a otra
@@ -179,7 +179,7 @@ class EmitirFaenaService
     }
 
     /**
-     *  ELIMINAR UNA FAENA CARGADA POR ERROR
+     *  Eliminar una faena cargada por error
      *
      * Devuelve sus kilos a la bolsa madre: una pendiente los tenía reservados.
      */

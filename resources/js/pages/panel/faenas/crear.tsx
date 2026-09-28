@@ -12,7 +12,7 @@ import { fecha } from '@/lib/utils';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 
 /**
- *  EMITIR UN PERMISO DE FAENA — paso 4 del flujo
+ *  Emitir un permiso de faena — paso 4 del flujo
  */
 export default function CrearFaena({
     beneficiario,
@@ -30,7 +30,7 @@ export default function CrearFaena({
     tarifa: number;
     /**
      * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor, y ES LO QUE DECIDE
-     * SI EL BOTÓN SE BLOQUEA.
+     * si el botón se bloquea.
      */
     modoEstricto: boolean;
 }) {

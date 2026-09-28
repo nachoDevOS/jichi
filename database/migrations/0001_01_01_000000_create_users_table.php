@@ -22,7 +22,7 @@ return new class extends Migration
         });
 
         /*
-         * NO HAY TABLA DE RECUPERACION DE CONTRASEÑA.
+         * No hay tabla de recuperacion de contraseña.
          */
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();

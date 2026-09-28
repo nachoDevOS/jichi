@@ -46,7 +46,7 @@ import type {
 } from '@/types/aprovechamientos';
 
 /**
- *  LA FICHA DE UN CUPO
+ *  La ficha de un cupo
  */
 export default function VerCupo({
     cupo,
@@ -63,7 +63,7 @@ export default function VerCupo({
     /** Los depósitos que pagaron este cupo, del más nuevo al más viejo. */
     pagos: PagoDelCupo[];
     /**
-     * EL RECIBO DEL TRÁMITE, uno solo. Llega en null mientras el cupo está
+     * El recibo del trámite, uno solo. Llega en null mientras el cupo está
      * pendiente: recién se emite al enviarlo a revisión.
      */
     recibo: ReciboDelCupo | null;
@@ -91,7 +91,7 @@ export default function VerCupo({
     const observacion = useForm({ motivo: '' });
 
     /*
-     * FORMULARIO PROPIO PARA EL RECHAZO, separado del borrado. Los dos tienen un
+     * Formulario propio para el rechazo, separado del borrado. Los dos tienen un
      * campo `motivo` pero distinto destino y distintas reglas: mezclados, el
      * error de uno se pintaría en la ventana del otro —las dos leen
      * `form.errors.motivo`— y el texto escrito para uno seguiría ahí al abrir el
@@ -105,7 +105,7 @@ export default function VerCupo({
     const borrado = useForm({ motivo: '' });
 
     /*
-     *  EL FORMULARIO ES UNA LISTA DE SECCIONES, NO UN PAGO
+     *  El formulario es una lista de secciones, no un pago
      */
     const seccionNueva = () => ({
         // `key` estable para React: sin ella, quitar la sección del medio
@@ -123,7 +123,7 @@ export default function VerCupo({
     const pago = useForm({
         pagos: [] as ReturnType<typeof seccionNueva>[],
         /*
-         * LA INTENCIÓN DE ENVIAR, que viaja con los depósitos.
+         * La intención de enviar, que viaja con los depósitos.
          */
         enviar: false,
     });
@@ -131,7 +131,7 @@ export default function VerCupo({
     const cobrando = pago.data.pagos.length > 0;
 
     /*
-     * LO QUE SUMAN LAS SECCIONES, para saber si con esto alcanza.
+     * Lo que suman las secciones, para saber si con esto alcanza.
      *
      * `Number('')` da 0 y no NaN, así que una sección recién agregada no rompe
      * la cuenta mientras el operador todavía no escribió el monto.
@@ -140,7 +140,7 @@ export default function VerCupo({
     const faltaDespues = Math.round((cupo.saldo_pendiente - sumaSecciones) * 100) / 100;
 
     /*
-     * ¿CON ESTO ALCANZA? Son DOS preguntas y estaban en una sola: cubrir el
+     * ¿Con esto alcanza? Son DOS preguntas y estaban en una sola: cubrir el
      * monto es lo que habilita REGISTRAR —los depósitos entran todos juntos,
      * no en cuotas— y enviar pide además el permiso. Mezcladas, a quien no
      * puede enviar se le apagaba el botón de cargar boletas.
@@ -200,7 +200,7 @@ export default function VerCupo({
     return (
         <LayoutPanel
             /*
-             * EL ENCABEZADO NO REPITE AL TITULAR. El nombre, la cédula y el
+             * El encabezado no repite al titular. El nombre, la cédula y el
              * tramo están en la tarjeta de abajo, con la foto al lado; acá
              * decían lo mismo sin la cara, y la pantalla abría con el nombre
              * escrito dos veces. Arriba quedan las acciones, que es lo que se
@@ -221,7 +221,7 @@ export default function VerCupo({
                         Ver al beneficiario
                     </Button>
 
-                    {/* LA AUTORIZACIÓN DE PESCA, en PDF. Sale recién con el cupo
+                    {/* La autorización de pesca, en PDF. Sale recién con el cupo
                         firmado, y abre una pestaña porque lo que vuelve es un
                         archivo: el visor del navegador es desde donde se imprime. */}
                     {puede('aprovechamientos.imprimir') && cupo.puede_imprimirse && (
@@ -236,7 +236,7 @@ export default function VerCupo({
                         </a>
                     )}
 
-                    {/* EL RECIBO TAMBIÉN SE IMPRIME DESDE ARRIBA. Estaba solo
+                    {/* El recibo también se imprime desde arriba. Estaba solo
                         dentro de «Pagos», al final de la ficha: el operador que
                         venía a reimprimir el comprobante tenía que bajar a
                         buscarlo. Misma condición y mismo PDF que el de allá. */}
@@ -634,7 +634,7 @@ export default function VerCupo({
                                         <div className="flex items-center justify-between gap-2">
                                             <p className="text-sm font-medium">Depósito {i + 1}</p>
 
-                                            {/* QUITAR ESTA SECCIÓN. Va por `key` y
+                                            {/* Quitar esta sección. Va por `key` y
                                                 no por índice: por índice, quitar
                                                 la del medio corre a las de abajo
                                                 y se llevan el archivo equivocado. */}
@@ -776,7 +776,7 @@ export default function VerCupo({
                                     </span>
                                 </div>
 
-                                {/* APAGADO MIENTRAS NO CUBRA. El servidor lo
+                                {/* Apagado mientras no cubra. El servidor lo
                                     rechaza igual —ver CobrarService— y un botón
                                     que promete y falla es peor que uno gris. */}
                                 <Button
@@ -1245,7 +1245,7 @@ export default function VerCupo({
                                                         {f.numero_legible}
                                                     </td>
 
-                                                    {/* DE QUÉ CARNET CUELGA. Un cupo puede
+                                                    {/* De qué carnet cuelga. Un cupo puede
                                                         respaldar más de una credencial, y esta es
                                                         la columna que dice cuál gastó esos kilos. */}
                                                     <td className="px-5 py-2.5 font-mono tabular-nums text-muted-foreground">

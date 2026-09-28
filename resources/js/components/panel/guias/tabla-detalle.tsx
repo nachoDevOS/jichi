@@ -17,7 +17,7 @@ export function filaVacia(): FilaDetalle {
 }
 
 /**
- *  EL CUADRO D — una fila por especie.
+ *  El cuadro D — una fila por especie.
  *
  * El talonario trae cinco renglones y acá no hay tope. El producto se elige del
  * catálogo y su precio por kilo NO se escribe: lo copia el servidor al guardar.

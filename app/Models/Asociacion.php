@@ -30,7 +30,7 @@ class Asociacion extends Model
     protected $table = 'asociaciones';
 
     /**
-     * LOS CAMPOS DE LA FICHA DEL GREMIO, y el rótulo con el que se muestran.
+     * Los campos de la ficha del gremio, y el rótulo con el que se muestran.
      *
      * Es la lista CERRADA de claves que admite la columna `datos`: el
      * formulario dibuja estos campos y el Request descarta cualquier otro. Con

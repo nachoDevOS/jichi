@@ -19,7 +19,7 @@ export function bs(monto: number | string | null | undefined, simbolo = 'Bs'): s
 }
 
 /**
- *  UNA FECHA SUELTA NO ES UN INSTANTE, Y CONFUNDIRLOS RESTA UN DÍA
+ *  Una fecha suelta no es un instante, y confundirlos resta un día
  */
 function aFechaLocal(valor: string | Date): Date {
     if (valor instanceof Date) {
@@ -121,7 +121,7 @@ export function hora(valor: string | Date | null | undefined): string {
 }
 
 /**
- *  CUÁNTO HACE — «hace 3 minutos», «ayer», «hace 2 meses»
+ *  Cuánto hace — «hace 3 minutos», «ayer», «hace 2 meses»
  */
 export function hace(valor: string | Date | null | undefined): string {
     if (!valor) return '';
@@ -134,9 +134,8 @@ export function hace(valor: string | Date | null | undefined): string {
 
     if (segundos < 60) return 'recién';
 
-    /*
-     * DOS FORMATOS, Y NO ES CAPRICHO.
-     */
+    // Dos formatos: «auto» dice «ayer» en vez de «hace 1 día», pero con meses
+    // diría «el mes pasado», que es impreciso; ahí va «always» («hace 1 mes»).
     const cercano = new Intl.RelativeTimeFormat('es-BO', { numeric: 'auto' });
     const lejano = new Intl.RelativeTimeFormat('es-BO', { numeric: 'always' });
 

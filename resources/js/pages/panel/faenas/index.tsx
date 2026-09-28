@@ -17,7 +17,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { FaenaFila } from '@/types/faenas';
 
 /**
- *  LISTADO DE PERMISOS DE FAENA
+ *  Listado de permisos de faena
  */
 export default function IndiceFaenas({
     faenas,
@@ -276,7 +276,7 @@ export default function IndiceFaenas({
                                                             </a>
                                                         )}
 
-                                                        {/* EL PERMISO EN PAPEL sale recién con la
+                                                        {/* El permiso en papel sale recién con la
                                                             faena aprobada: hasta la firma no hay
                                                             nada que autorizar. Abre pestaña porque
                                                             lo que vuelve es un PDF. */}
@@ -298,7 +298,7 @@ export default function IndiceFaenas({
                                                             </a>
                                                         )}
 
-                                                        {/* CORREGIR Y ELIMINAR SOLO SOBRE EL
+                                                        {/* Corregir y eliminar solo sobre el
                                                             BORRADOR: las dos banderas llegan
                                                             resueltas del servidor y miran el estado
                                                             Y que no haya entrado un peso. */}
@@ -328,7 +328,7 @@ export default function IndiceFaenas({
                                                             </Button>
                                                         )}
 
-                                                        {/* VER VA ÚLTIMO: es la acción más usada y
+                                                        {/* Ver va último: es la acción más usada y
                                                             queda pegada al borde de la fila, donde
                                                             cae el dedo sin tener que apuntar. */}
                                                         <Link href={route('faenas.show', f.id)}>
@@ -350,7 +350,7 @@ export default function IndiceFaenas({
                 </CardContent>
             </Card>
 
-            {/* MOTIVO OBLIGATORIO Y CASILLA DE CONSENTIMIENTO, igual que en el
+            {/* Motivo obligatorio y casilla de consentimiento, igual que en el
                 cupo: el número del talonario queda quemado y la serie con un
                 hueco, así que alguien va a tener que explicarlo. */}
             <ConfirmarConMotivo

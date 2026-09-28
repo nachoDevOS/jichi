@@ -14,12 +14,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  CATÁLOGO DE ASOCIACIONES — el gremio que certifica al beneficiario
+ *  Catálogo de asociaciones — el gremio que certifica al beneficiario
  */
 class AsociacionController extends Controller
 {
     /**
-     * LISTADO Y FORMULARIO — GET /panel/catalogos/asociaciones
+     * Listado y formulario — GET /panel/catalogos/asociaciones
      */
     public function index(Request $request): Response
     {
@@ -37,19 +37,8 @@ class AsociacionController extends Controller
                 $q->where(fn ($s) => $s
                     ->where('nombre', $operador, $like)
                     ->orWhere('sigla', $operador, $like)
-                    /*
-                     * También por la ficha: el representante o la personería
-                     * es lo que alguien recuerda cuando el nombre exacto del
-                     * gremio no.
-                     *
-                     * EL TÉRMINO VA JSON-ESCAPADO, y no es un detalle: Laravel
-                     * guarda el JSON con las tildes en `\uXXXX` y las barras
-                     * en `\/`, así que un LIKE con «Pérez» no encuentra
-                     * «P\u00e9rez» y la búsqueda falla EN SILENCIO justo con
-                     * los apellidos de acá. `json_encode` del término lo deja
-                     * escrito igual que en la columna; el `trim` saca las
-                     * comillas que agrega.
-                     */
+                    // También por la ficha. El término va JSON-escapado o un LIKE
+                    // con tildes no encuentra nada: ver «Trampas» en CLAUDE.md.
                     ->orWhere('datos', $operador, $this->comoEnElJson($buscar)));
             })
             /*
@@ -117,7 +106,7 @@ class AsociacionController extends Controller
     }
 
     /**
-     * EDICIÓN — PUT /panel/catalogos/asociaciones/{asociacion}
+     * Edición — PUT /panel/catalogos/asociaciones/{asociacion}
      */
     public function update(GuardarAsociacionRequest $request, Asociacion $asociacion): RedirectResponse
     {

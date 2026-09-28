@@ -21,7 +21,7 @@ import type {
 } from '@/types/publico';
 
 /**
- *  EL ACTA DE VERIFICACIÓN DE CUALQUIER DOCUMENTO
+ *  El acta de verificación de cualquier documento
  *
  *  El servidor manda renglones ya resueltos, así que sumar un tipo de documento
  *  no toca este archivo. Ver VerificacionController::datosPublicos().

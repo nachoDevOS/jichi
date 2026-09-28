@@ -8,7 +8,7 @@ use App\Models\AprovechamientoPesq;
 use Illuminate\Support\Facades\DB;
 
 /**
- *  EL CIRCUITO DE REVISIÓN DE UN APROVECHAMIENTO
+ *  El circuito de revisión de un aprovechamiento
  */
 class RevisarCupoService
 {
@@ -46,7 +46,7 @@ class RevisarCupoService
     }
 
     /**
-     * EN REVISIÓN ──▶ ACTIVO. Recién acá el cupo autoriza faenas.
+     * En revisión ──▶ ACTIVO. Recién acá el cupo autoriza faenas.
      */
     public function aprobar(AprovechamientoPesq $cupo): AprovechamientoPesq
     {
@@ -58,7 +58,7 @@ class RevisarCupoService
             }
 
             /*
-             * SE VUELVE A MIRAR EL MONTO, aunque el envío ya lo había mirado.
+             * Se vuelve a mirar el monto, aunque el envío ya lo había mirado.
              */
             if ($bloqueado->saldoPendiente() > 0.0) {
                 throw CupoInvalidoException::faltaCubrirElMonto($bloqueado->saldoPendiente());
@@ -88,7 +88,7 @@ class RevisarCupoService
     }
 
     /**
-     * EN REVISIÓN ──▶ PENDIENTE, con el motivo escrito.
+     * En revisión ──▶ PENDIENTE, con el motivo escrito.
      *
      * Los pagos NO se tocan: cuelgan del cupo y siguen ahí, así que ventanilla
      * corrige lo que haya que corregir y vuelve a presentarlo sin recargar nada.

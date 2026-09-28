@@ -8,7 +8,7 @@ import { iniciales } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
 /**
- *  EL ENCABEZADO DEL PANEL, EN DOS FRANJAS
+ *  El encabezado del panel, en dos franjas
  */
 export function BarraSuperior({
     titulo,

@@ -34,10 +34,10 @@ class CobrarRequest extends FormRequest
             'lineas.*.monto' => ['required', 'numeric', 'gt:0', 'max:99999999', 'decimal:0,2'],
 
             /*
-             *  LA BOLETA ES SIEMPRE OBLIGATORIA
+             *  La boleta es siempre obligatoria
              */
             'nro_transaccion' => [
-                // SOLO DÍGITOS, y va `digits_between` y no `numeric`: la boleta
+                // Solo dígitos, y va `digits_between` y no `numeric`: la boleta
                 // suele empezar con ceros y `numeric` se los comería.
                 'required', 'string', 'digits_between:1,60',
                 // Único entre los pagos VIVOS: impide cargar la misma boleta dos

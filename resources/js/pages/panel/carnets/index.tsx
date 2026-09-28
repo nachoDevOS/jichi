@@ -17,7 +17,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { CarnetFila } from '@/types/carnets';
 
 /**
- *  LISTADO DE CARNETS
+ *  Listado de carnets
  */
 export default function IndiceCarnets({
     carnets,
@@ -166,7 +166,7 @@ export default function IndiceCarnets({
                                 <table className="w-full text-sm">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            {/* EL NÚMERO DEL LIBRO, primero: es por donde se
+                                            {/* El número del libro, primero: es por donde se
                                                 busca un carnet en papel. Se llama «N° Registro»
                                                 y no «Registro» para no confundirlo con la
                                                 columna «Registrado», que es una fecha. */}
@@ -174,13 +174,12 @@ export default function IndiceCarnets({
                                             <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 font-medium">Actividad</th>
                                             <th className="px-5 py-2.5 font-medium">Asociación</th>
-                                            {/* <th className="px-5 py-2.5 text-right font-medium">Cobro</th> */}
                                             <th className="px-5 py-2.5 font-medium">Solicitado</th>
                                             {/* Vacío mientras no lo firmen. */}
                                             <th className="px-5 py-2.5 font-medium">Emitido</th>
                                             <th className="px-5 py-2.5 font-medium">Vence</th>
 
-                                            {/* CUÁNDO SE CARGÓ y en qué ESTADO quedó, juntos y
+                                            {/* Cuándo se cargó y en qué ESTADO quedó, juntos y
                                                 pegados a los botones: el estado decide cuáles
                                                 aparecen, y leerlo al lado explica por qué falta
                                                 alguno. */}
@@ -230,7 +229,7 @@ export default function IndiceCarnets({
                                                                 {c.documento ?? '—'}
                                                             </p>
 
-                                                            {/* EL CUPO EN LUGAR DEL CÓDIGO.
+                                                            {/* El cupo en lugar del código.
                                                                 Dieciséis caracteres al azar no
                                                                 le dicen nada a nadie en un
                                                                 listado —el código sirve para
@@ -267,17 +266,6 @@ export default function IndiceCarnets({
                                                 </td>
 
 
-                                                {/* <td className="px-5 py-2.5 text-right tabular-nums">
-                                                    {c.pagado ? (
-                                                        <span className="text-emerald-700 dark:text-emerald-400">
-                                                            Pagado
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-amber-700 dark:text-amber-400">
-                                                            debe {bs(c.saldo_pendiente, institucion.moneda)}
-                                                        </span>
-                                                    )}
-                                                </td> */}
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fecha(c.fecha_solicitud)}
@@ -335,7 +323,7 @@ export default function IndiceCarnets({
                                                                 </a>
                                                             )}
 
-                                                        {/* EL CARNET EN PDF: lo decide el servidor
+                                                        {/* El carnet en PDF: lo decide el servidor
                                                             (firmado, no revocado y con la
                                                             autorización viva). */}
                                                         {puede('carnets.imprimir') &&

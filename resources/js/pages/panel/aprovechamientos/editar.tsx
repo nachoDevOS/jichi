@@ -12,7 +12,7 @@ import type { PageProps } from '@/types';
 import type { TramoElegible } from '@/types/aprovechamientos';
 
 /**
- *  CORREGIR UN APROVECHAMIENTO QUE TODAVÍA ES BORRADOR
+ *  Corregir un aprovechamiento que todavía es borrador
  */
 export default function EditarCupo({
     cupo,

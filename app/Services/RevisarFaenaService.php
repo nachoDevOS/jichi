@@ -10,7 +10,7 @@ use App\Models\PermisoFaena;
 use Illuminate\Support\Facades\DB;
 
 /**
- *  EL CIRCUITO DE REVISIÓN DE UNA FAENA
+ *  El circuito de revisión de una faena
  *
  * Espejo de `RevisarCarnetService` y de `RevisarCupoService`: la salida de
  * pesca se cobra y se firma igual que los otros dos trámites, así que el
@@ -51,7 +51,7 @@ class RevisarFaenaService
     }
 
     /**
-     * EN REVISIÓN ──▶ APROBADO. Recién acá el permiso autoriza a salir.
+     * En revisión ──▶ APROBADO. Recién acá el permiso autoriza a salir.
      */
     public function aprobar(PermisoFaena $faena): PermisoFaena
     {
@@ -126,7 +126,7 @@ class RevisarFaenaService
     }
 
     /**
-     * EN REVISIÓN ──▶ PENDIENTE, con el motivo escrito.
+     * En revisión ──▶ PENDIENTE, con el motivo escrito.
      *
      * Los pagos NO se tocan y el recibo tampoco se anula: ese papel ya está en
      * manos de la persona, y un reenvío no emite un segundo.

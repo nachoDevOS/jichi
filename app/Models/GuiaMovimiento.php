@@ -54,7 +54,7 @@ class GuiaMovimiento extends Model
 
     protected $table = 'guias_movimiento';
 
-    /** VIGENCIA MÁXIMA de una guía, en días. Regla de la resolución, no del formulario. */
+    /** Vigencia máxima de una guía, en días. Regla de la resolución, no del formulario. */
     public const DIAS_VIGENCIA = 5;
 
     /** Lo que se descuenta al producto de criadero. 0.50 = la mitad del arancel. */
@@ -158,7 +158,7 @@ class GuiaMovimiento extends Model
     //  El circuito: cobrar, presentar y firmar
 
     /**
-     *  EL ÚNICO LUGAR DONDE VIVE EL DESCUENTO DE PISCICULTURA
+     *  El único lugar donde vive el descuento de piscicultura
      */
     public function factorArancel(): float
     {

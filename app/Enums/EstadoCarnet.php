@@ -67,7 +67,7 @@ enum EstadoCarnet: string
     }
 
     /**
-     *  EL CIRCUITO, igual que el del aprovechamiento
+     *  El circuito, igual que el del aprovechamiento
      *
      * Los cuatro métodos que siguen son los que deciden qué se puede hacer en
      * cada estado. Viven acá y NO en el controlador: el servicio pregunta, y

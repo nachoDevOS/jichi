@@ -54,7 +54,7 @@ class OtorgarCupoService
                 'categoria_aprov_id' => $tramo->id,
 
                 /*
-                 * EL VOLUMEN SALE DEL TECHO DEL TRAMO.
+                 * El volumen sale del techo del tramo.
                  */
                 'volumen_total_kg' => $tramo->kilos_max,
 
@@ -67,7 +67,7 @@ class OtorgarCupoService
                 'modalidad' => $tramo->modalidad,
 
                 /*
-                 * NACE PENDIENTE, y de ahí sale solo al cobrarse.
+                 * Nace pendiente, y de ahí sale solo al cobrarse.
                  */
                 'estado' => EstadoAprovechamiento::Pendiente,
 
@@ -87,7 +87,7 @@ class OtorgarCupoService
     }
 
     /**
-     *  CORREGIR UN CUPO QUE TODAVÍA ES BORRADOR
+     *  Corregir un cupo que todavía es borrador
      */
     public function editar(
         AprovechamientoPesq $cupo,
@@ -99,7 +99,7 @@ class OtorgarCupoService
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
             /*
-             * SE COMPRUEBA CON LA COPIA BLOQUEADA, no con la que llegó.
+             * Se comprueba con la copia bloqueada, no con la que llegó.
              */
             if (! $bloqueado->puedeEditarse()) {
                 throw CupoInvalidoException::noSePuedeEditar($bloqueado->estado->etiqueta());
@@ -126,7 +126,7 @@ class OtorgarCupoService
     }
 
     /**
-     *  ELIMINAR UN CUPO CARGADO POR ERROR
+     *  Eliminar un cupo cargado por error
      */
     public function eliminar(AprovechamientoPesq $cupo, string $motivo): void
     {
@@ -149,7 +149,7 @@ class OtorgarCupoService
             }
 
             /*
-             * EL MOTIVO SE DEJA EN EL MODELO Y SE BORRA: no se llama a
+             * El motivo se deja en el modelo y se borra: no se llama a
              * `registrarAuditoria()` a mano.
              */
             $bloqueado->motivoAuditoria = $motivo;

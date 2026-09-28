@@ -46,7 +46,7 @@ class Carnet extends Model
      * estado justo después del create().
      */
     protected $attributes = [
-        // NACE PENDIENTE: se activa al aprobarlo, con el arancel cobrado.
+        // Nace pendiente: se activa al aprobarlo, con el arancel cobrado.
         'estado' => EstadoCarnet::Pendiente->value,
     ];
 
@@ -133,7 +133,7 @@ class Carnet extends Model
     }
 
     /**
-     *  EL CIRCUITO DE REVISIÓN, resuelto en el modelo
+     *  El circuito de revisión, resuelto en el modelo
      *
      * Los cinco de abajo son los que el controlador manda a la pantalla en los
      * campos `puede_*`. Ninguno se vuelve a evaluar en React.

@@ -46,7 +46,7 @@ class RevisarGuiaService
     }
 
     /**
-     * EN REVISIÓN ──▶ ACTIVA. Recién acá la guía ampara el traslado.
+     * En revisión ──▶ ACTIVA. Recién acá la guía ampara el traslado.
      */
     public function aprobar(GuiaMovimiento $guia): GuiaMovimiento
     {
@@ -89,7 +89,7 @@ class RevisarGuiaService
     }
 
     /**
-     * EN REVISIÓN ──▶ PENDIENTE, con el motivo escrito.
+     * En revisión ──▶ PENDIENTE, con el motivo escrito.
      *
      * Los pagos NO se tocan y el recibo tampoco se anula: ese papel ya está en
      * manos de la persona, y un reenvío no emite un segundo.

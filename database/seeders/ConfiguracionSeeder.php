@@ -22,7 +22,7 @@ class ConfiguracionSeeder extends Seeder
 
             // Sistema
             ['sistema.nombre', 'Jichi', 'string', 'general', 'Nombre del sistema', true],
-            ['sistema.descripcion', 'Sistema de gestión de carnets, rubros y trámites del sector pesquero', 'string', 'general', 'Descripción', true],
+            ['sistema.descripcion', 'Carnets, autorizaciones de pesca, permisos de faena y guías de transporte del sector pesquero del Beni', 'string', 'general', 'Descripción', true],
             ['sistema.logo_path', 'institucional/logo-jichi.png', 'archivo', 'general', 'Logo de Jichi', true],
 
             // Documentos
@@ -36,7 +36,7 @@ class ConfiguracionSeeder extends Seeder
             ['documentos.dias_alerta_vencimiento', '30', 'number', 'documentos', 'Días de anticipación para alertar el cierre de gestión', false],
 
             /*
-             * QUIÉN FIRMA EL DORSO DEL CARNET. No es el firmante del recibo:
+             * Quién firma el dorso del carnet. No es el firmante del recibo:
              * ahí firma Recaudaciones y acá el Gobernador. El nombre va VACÍO a
              * propósito —hay que cargar el de la gestión en curso—; sin él, el
              * plástico imprime el recuadro de firma con el cargo y sin nombre.
@@ -45,7 +45,7 @@ class ConfiguracionSeeder extends Seeder
             ['carnet.firmante_cargo', 'GOBERNADOR DEL DEPARTAMENTO DEL BENI', 'string', 'documentos', 'Cargo de quien firma el dorso del carnet', false],
 
             /*
-             * ¿QUIEN CARGA UN DEPÓSITO PUEDE VALIDARLO ÉL MISMO?
+             * ¿Quien carga un depósito puede validarlo él mismo?
              */
             ['pagos.revisor_distinto', '0', 'boolean', 'general', 'Exigir que el depósito lo valide otra persona', false],
 

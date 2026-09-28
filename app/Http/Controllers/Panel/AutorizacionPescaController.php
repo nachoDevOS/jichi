@@ -11,7 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
 /**
- * AUTORIZACIÓN DE PESCA — el papel que se lleva el pescador.
+ * Autorización de pesca — el papel que se lleva el pescador.
  *
  * Calca el talonario del SEDAG y sale recién con el cupo APROBADO: hasta la
  * firma no hay nada que autorizar. Controlador aparte, como el del carnet:
@@ -20,7 +20,7 @@ use Illuminate\Http\Response;
 class AutorizacionPescaController extends Controller
 {
     /**
-     * LA TABLA DE TAMAÑOS MÍNIMOS, tal como está impresa en el papel.
+     * La tabla de tamaños mínimos, tal como está impresa en el papel.
      *
      * Sale del reglamento y no de la base: es texto preimpreso del talonario, y
      * si una resolución lo cambia se toca acá. Nombre común, científico, tamaño.
@@ -53,7 +53,7 @@ class AutorizacionPescaController extends Controller
     ];
 
     /**
-     * IMPRIMIR — GET /panel/aprovechamientos/{aprovechamiento}/autorizacion
+     * Imprimir — GET /panel/aprovechamientos/{aprovechamiento}/autorizacion
      *
      * Solo con el cupo APROBADO. Un vencido o agotado sí se reimprime: puede
      * hacer falta reponer el papel de una gestión cerrada.
@@ -95,7 +95,7 @@ class AutorizacionPescaController extends Controller
             // El QR y el código, para verificarlo desde el papel.
             'verificacion' => QrVerificacion::de($aprovechamiento),
         ])
-            // CARTA VERTICAL: 612 x 792 puntos = 8,5" x 11".
+            // Carta vertical: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])
             // Sin esto DomPDF mete las dos tipografías completas —unas 380 KB
             // cada una— en cada documento.
@@ -114,7 +114,7 @@ class AutorizacionPescaController extends Controller
         $b = $cupo->beneficiario;
 
         /*
-         * LA FECHA DEL PIE SALE DE `fecha_emision` Y NO DE HOY: una reimpresión
+         * La fecha del pie sale de `fecha_emision` Y NO DE HOY: una reimpresión
          * del mes que viene tiene que decir lo mismo que el papel entregado.
          */
         $fecha = $cupo->fecha_emision ?? $cupo->created_at;

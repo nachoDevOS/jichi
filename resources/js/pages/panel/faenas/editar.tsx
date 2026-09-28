@@ -10,7 +10,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import type { FaenaEnCorreccion } from '@/types/faenas';
 
 /**
- *  CORREGIR UN PERMISO DE FAENA EN BORRADOR
+ *  Corregir un permiso de faena en borrador
  *
  * Es el mismo formulario que la emisión SIN el buscador: el titular y el
  * carnet llegan fijos. Cambiar de titular no es corregir una salida, es emitir
@@ -69,7 +69,7 @@ export default function EditarFaena({
                     </CardHeader>
 
                     <CardContent className="space-y-5">
-                        {/* EL TITULAR, FIJO Y PARA MIRAR. Mismo bloque que el resto
+                        {/* El titular, fijo y para mirar. Mismo bloque que el resto
                             del sistema: cara, nombre, cédula y carnet. */}
                         <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/40 p-3">
                             <Retrato url={faena.foto_url} nombre={faena.beneficiario ?? 'Sin nombre'} />
@@ -85,7 +85,7 @@ export default function EditarFaena({
                             </div>
                         </div>
 
-                        {/* LOS RENGLONES DEL TALONARIO. Ninguno obligatorio: el papel
+                        {/* Los renglones del talonario. Ninguno obligatorio: el papel
                             llega incompleto, y corregir es justamente completarlo. */}
                         <div className="space-y-4 border-t border-border pt-5">
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

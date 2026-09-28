@@ -24,7 +24,6 @@ export const TONOS: Record<TipoActor, { tarjeta: string; suave: string; texto: s
 
 /**
  * La credencial en miniatura: los datos que se dictan en el mostrador.
- * No es la vista previa del plástico —esa es `vista-previa-carnet.tsx`—.
  */
 export function CredencialMini({ carnet, moneda }: { carnet: CarnetResumen; moneda: string }) {
     const tono = TONOS[carnet.tipo_actor];

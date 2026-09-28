@@ -1,9 +1,8 @@
 import { cn } from '@/lib/utils';
 
 /**
- * Los colores llegan desde los enums de PHP (EstadoTramite::color(),
- * TipoTramite::color(), EstadoCarnet::color()...), por eso el mapa está escrito
- * con clases COMPLETAS.
+ * Los colores llegan desde los enums de PHP (EstadoCarnet::color(),
+ * EstadoFaena::color()...), por eso el mapa está escrito con clases COMPLETAS.
  */
 const COLORES: Record<string, string> = {
     slate: 'bg-slate-100 text-slate-700 ring-slate-600/20 dark:bg-slate-500/15 dark:text-slate-300 dark:ring-slate-400/30',

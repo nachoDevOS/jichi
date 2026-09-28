@@ -20,7 +20,7 @@ function leerAngosto(): boolean {
 }
 
 /**
- *  EL MARCO DE TODAS LAS PANTALLAS DEL PANEL
+ *  El marco de todas las pantallas del panel
  */
 export default function LayoutPanel({
     children,

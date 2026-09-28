@@ -2,7 +2,7 @@ import { usePage } from '@inertiajs/react';
 import type { PageProps } from '@/types';
 
 /**
- *  EL LÍMITE DE LOS ARCHIVOS, UNO SOLO PARA TODO EL SISTEMA
+ *  El límite de los archivos, uno solo para todo el sistema
  */
 export function useArchivos() {
     const { archivos } = usePage<PageProps>().props;

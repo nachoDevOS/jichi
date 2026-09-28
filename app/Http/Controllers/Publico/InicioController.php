@@ -8,7 +8,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  PORTADA INSTITUCIONAL — la cara pública del sistema
+ *  Portada institucional — la cara pública del sistema
  *
  *  Todo lo que muestra sale de `configuraciones`: ningún dato de una persona ni
  *  del trabajo interno. Ver la regla 3 de CLAUDE.md.
@@ -51,7 +51,7 @@ class InicioController extends Controller
             'sistema' => Configuracion::obtener('sistema.nombre', 'Jichi'),
             'descripcion' => Configuracion::obtener(
                 'sistema.descripcion',
-                'Sistema de gestión de carnets, rubros y trámites del sector pesquero',
+                'Carnets, autorizaciones de pesca, permisos de faena y guías de transporte del sector pesquero del Beni',
             ),
         ];
     }

@@ -3,6 +3,7 @@ import { LoaderCircle, Search } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 // 16 caracteres en grupos de cuatro, igual que va impreso: «EFGT-96R4-CJ42-AHYJ».
 const LARGO_CODIGO = 16;
@@ -19,8 +20,9 @@ function formatearCodigo(valor: string): string {
 
 /**
  * Caja para escribir a mano el código de un documento.
+ * `claro` fija los colores: sobre la tarjeta blanca de la portada, el modo oscuro del teléfono la volvía negra.
  */
-export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | null }) {
+export function BuscadorCodigo({ codigoInicial, claro = false }: { codigoInicial?: string | null; claro?: boolean }) {
     const { data, setData, post, processing, errors } = useForm({
         codigo: formatearCodigo(codigoInicial ?? ''),
     });
@@ -36,7 +38,7 @@ export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | nul
                 Este buscador vive en dos sitios muy distintos —dentro de la hoja
                 blanca y sobre el fondo verde, debajo del acta— y un margen fijo
                 acá dejaba un hueco raro en uno de los dos. */}
-            <form onSubmit={enviar} className="mx-auto flex justify-center gap-2">
+            <form onSubmit={enviar} className={cn('mx-auto flex justify-center gap-2', claro && 'flex-col')}>
                 <Input
                     value={data.codigo}
                     // Los guiones los pone la caja: quien copia escribe solo los 16 caracteres.
@@ -49,10 +51,17 @@ export function BuscadorCodigo({ codigoInicial }: { codigoInicial?: string | nul
                     aria-label="Código del documento"
                     aria-invalid={Boolean(errors.codigo)}
                     // font-mono: no se confunden 0 con O. 26ch = los 19 caracteres con guiones, el espaciado y el relleno.
-                    className="w-[26ch] flex-none text-center font-mono tracking-wider"
+                    className={cn(
+                        'w-[26ch] min-w-0 flex-initial text-center font-mono tracking-wider',
+                        claro && 'h-12 w-full border-slate-300 bg-white text-base text-slate-900 placeholder:text-slate-400',
+                    )}
                 />
 
-                <Button type="submit" disabled={processing}>
+                <Button
+                    type="submit"
+                    disabled={processing}
+                    className={cn(claro && 'h-11 w-full bg-institucional-azul text-base text-white hover:bg-institucional-azul-claro')}
+                >
                     {processing ? (
                         <LoaderCircle className="size-4 animate-spin" />
                     ) : (

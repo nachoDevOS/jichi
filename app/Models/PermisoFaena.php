@@ -45,7 +45,7 @@ class PermisoFaena extends Model
     protected $table = 'permisos_faena';
 
     /**
-     * VIGENCIA MÁXIMA DE UNA FAENA, en días.
+     * Vigencia máxima de una faena, en días.
      */
     public const DIAS_VIGENCIA = 30;
 

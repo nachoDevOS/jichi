@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 /**
- *  LA ESCALA DE LOS BOTONES DE TODO EL SISTEMA
+ *  La escala de los botones de todo el sistema
  */
 const buttonVariants = cva(
     "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0",
@@ -18,7 +18,7 @@ const buttonVariants = cva(
                 ghost: 'hover:bg-secondary hover:text-secondary-foreground',
                 link: 'text-primary underline-offset-4 hover:underline',
 
-                // LAS TRES ACCIONES, iguales en toda pantalla —ficha y tabla—: el
+                // Las tres acciones, iguales en toda pantalla —ficha y tabla—: el
                 // color dice qué hace el botón antes de leerlo —celeste mira,
                 // ámbar cambia, rojo saca— y así no se inventa uno por pantalla.
                 ver: 'border border-sky-300 bg-card text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-500/40 dark:text-sky-300 dark:hover:bg-sky-500/10',

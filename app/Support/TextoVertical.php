@@ -3,7 +3,7 @@
 namespace App\Support;
 
 /**
- *  UN RÓTULO GIRADO 90°, DIBUJADO COMO IMAGEN
+ *  Un rótulo girado 90°, DIBUJADO COMO IMAGEN
  *
  * DomPDF no tiene `transform` ni `writing-mode`: lo escrito con ellas sale
  * horizontal y sin avisar. Los rótulos rotados del talonario —las diez casillas
@@ -65,7 +65,7 @@ class TextoVertical
         [$ancho, $alto, $izquierda, $arriba] = self::cajaEnPixeles($texto, $cuerpoPx);
 
         /*
-         * SE DIBUJA DERECHO Y DESPUÉS SE GIRA LA IMAGEN ENTERA, en vez de
+         * Se dibuja derecho y después se gira la imagen entera, en vez de
          * pasarle el ángulo a `imagettftext()`: con el ángulo, el origen que
          * espera GD es la base de la primera letra YA ROTADA, y calcularlo a
          * mano dejaba los rótulos fuera del lienzo —salían en blanco—.
@@ -75,7 +75,7 @@ class TextoVertical
         imagesavealpha($lienzo, true);
 
         /*
-         * FONDO TRANSPARENTE y no blanco: la celda del cuadro D tiene el suyo,
+         * Fondo transparente y no blanco: la celda del cuadro D tiene el suyo,
          * y un rectángulo blanco encima taparía el borde de la tabla justo
          * donde las dos se tocan.
          */

@@ -13,7 +13,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
 /**
- * GUÍA ÚNICA DE TRANSPORTE DE PRODUCTOS ICTÍCOLAS — el papel del camión.
+ * Guía única de transporte de productos ictícolas — el papel del camión.
  *
  * Calca el talonario del SEDAG y sale recién con la guía APROBADA: hasta la
  * firma no hay nada que ampare un traslado. Controlador aparte, como el del
@@ -32,7 +32,7 @@ class GuiaImpresionController extends Controller
     private const CUERPO_ROTULO = 6.0;
 
     /**
-     * IMPRIMIR — GET /panel/guias/{guia}/imprimir
+     * Imprimir — GET /panel/guias/{guia}/imprimir
      *
      * Una guía cerrada o vencida SÍ se reimprime: puede hacer falta reponer el
      * papel de un traslado ya cumplido.
@@ -60,7 +60,7 @@ class GuiaImpresionController extends Controller
             // El QR y el código, para verificarlo desde el papel.
             'verificacion' => QrVerificacion::de($guia),
         ])
-            // CARTA VERTICAL: 612 x 792 puntos = 8,5" x 11".
+            // Carta vertical: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])
             // Sin esto DomPDF mete las dos tipografías completas —unas 380 KB
             // cada una— en cada documento.
@@ -77,7 +77,7 @@ class GuiaImpresionController extends Controller
     private function datos(GuiaMovimiento $guia): array
     {
         /*
-         * LA FECHA DEL ENCABEZADO SALE DE `fecha_emision` Y NO DE HOY: una
+         * La fecha del encabezado sale de `fecha_emision` Y NO DE HOY: una
          * reimpresión del mes que viene tiene que decir lo mismo que el papel
          * que el comerciante ya tiene en la mano.
          */

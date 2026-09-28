@@ -4,7 +4,7 @@ import { FranjaTricolor } from '@/components/publico/institucional/franja-tricol
 import type { InstitucionPortada } from '@/types/publico';
 
 /**
- *  PIE INSTITUCIONAL
+ *  Pie institucional
  */
 export function Pie({ portada }: { portada: InstitucionPortada }) {
     return (
@@ -61,17 +61,17 @@ export function Pie({ portada }: { portada: InstitucionPortada }) {
                         <ul className="space-y-2 text-white/80">
                             <li>
                                 <Link href={route('verificar.show')} className="hover:text-white">
-                                    Verificar un carnet
+                                    Verificar un documento
                                 </Link>
                             </li>
                             <li>
-                                <a href="#servicios" className="hover:text-white">
-                                    Servicios
+                                <a href="#tramites" className="hover:text-white">
+                                    Trámites
                                 </a>
                             </li>
                             <li>
                                 <a href="#pasos" className="hover:text-white">
-                                    Cómo tramitar
+                                    Qué llevar a ventanilla
                                 </a>
                             </li>
                             <li>

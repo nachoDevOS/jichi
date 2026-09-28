@@ -3,12 +3,12 @@
 namespace App\Enums;
 
 /**
- *  LAS DOS VERTIENTES DEL APROVECHAMIENTO PESQUERO
+ *  Las dos vertientes del aprovechamiento pesquero
  */
 enum ModalidadAprovechamiento: string
 {
     /**
-     * ESCALAS GENERALES — el cupo acumulativo y consumible.
+     * Escalas generales — el cupo acumulativo y consumible.
      *
      * Rangos progresivos de peso, de 1 kg en adelante. Cada faena descuenta de
      * su volumen, y cuando se acaba el pescador tramita otro cupo.
@@ -16,7 +16,7 @@ enum ModalidadAprovechamiento: string
     case EscalaGeneral = 'escala_general';
 
     /**
-     * ESPECIES ESPECIALES — el cupo de gran porte, con tasación fija.
+     * Especies especiales — el cupo de gran porte, con tasación fija.
      */
     case EspecieEspecial = 'especie_especial';
 

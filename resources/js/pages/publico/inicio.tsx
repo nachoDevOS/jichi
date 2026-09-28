@@ -9,7 +9,7 @@ import LayoutInstitucional from '@/layouts/layout-institucional';
 import type { InstitucionPortada } from '@/types/publico';
 
 /**
- *  PORTADA INSTITUCIONAL
+ *  Portada institucional
  *
  *  Una sola página larga con anclas, que es lo que espera quien llega desde el
  *  teléfono: no hay nada que navegar, hay que leer de corrido.

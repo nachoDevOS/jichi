@@ -28,7 +28,7 @@ import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { CupoFila } from '@/types/aprovechamientos';
 
 /**
- *  LISTADO DE CUPOS DE PESCA
+ *  Listado de cupos de pesca
  */
 export default function IndiceCupos({
     cupos,
@@ -177,17 +177,16 @@ export default function IndiceCupos({
                                             <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 font-medium">Capacidad</th>
                                             <th className="px-5 py-2.5 font-medium">Saldo</th>
-                                            {/* <th className="px-5 py-2.5 text-right font-medium">Cobro</th> */}
                                             <th className="px-5 py-2.5 font-medium">Solicitado</th>
                                             {/* Vacío mientras no lo firmen: ver
                                                 `fecha_emision` en el MER. */}
                                             <th className="px-5 py-2.5 font-medium">Otorgado</th>
                                             <th className="px-5 py-2.5 font-medium">Vence</th>
-                                            {/* CUÁNDO SE CARGÓ, antes del estado: es lo que
+                                            {/* Cuándo se cargó, antes del estado: es lo que
                                                 ordena el trabajo del día —qué entró recién y qué
                                                 está esperando desde ayer—. */}
                                             <th className="px-5 py-2.5 font-medium">Registrado</th>
-                                            {/* ESTADO AL FINAL, pegado a los botones: es lo que
+                                            {/* Estado al final, pegado a los botones: es lo que
                                                 decide cuáles aparecen, y leerlo al lado de ellos
                                                 explica por qué falta el de imprimir. */}
                                             <th className="px-5 py-2.5 font-medium">Estado</th>
@@ -239,7 +238,7 @@ export default function IndiceCupos({
                                                     </div>
                                                 </td>
 
-                                                {/* SOLO EL RANGO, sin el número del tramo: es
+                                                {/* Solo el rango, sin el número del tramo: es
                                                     un dato interno del catálogo y en la columna
                                                     se leía como un id. «201 Kg Hasta 300 Kg» dice
                                                     lo mismo y se entiende sin la tabla al lado. */}
@@ -251,17 +250,6 @@ export default function IndiceCupos({
                                                     <BarraSaldo cupo={c} />
                                                 </td>
 
-                                                {/* <td className="px-5 py-2.5 text-right tabular-nums">
-                                                    {c.pagado ? (
-                                                        <span className="text-emerald-700 dark:text-emerald-400">
-                                                            Pagado
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-amber-700 dark:text-amber-400">
-                                                            debe {bs(c.saldo_pendiente, institucion.moneda)}
-                                                        </span>
-                                                    )}
-                                                </td> */}
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">
                                                     {fecha(c.fecha_solicitud)}
@@ -317,7 +305,7 @@ export default function IndiceCupos({
                                                                 </a>
                                                             )}
 
-                                                        {/* LA AUTORIZACIÓN EN PDF, sin pasar por la
+                                                        {/* La autorización en PDF, sin pasar por la
                                                             ficha: es el papel que la persona viene
                                                             a buscar. Sale con el cupo firmado, y
                                                             abre pestaña porque vuelve un archivo. */}
@@ -453,7 +441,7 @@ export default function IndiceCupos({
 }
 
 /**
- * EL AVISO DE MODO FLEXIBLE.
+ * El aviso de modo flexible.
  */
 function AvisoModoFlexible() {
     return (

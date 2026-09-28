@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Throwable;
 
 /**
- *  EL BLOQUE DE VERIFICACIÓN DE UN DOCUMENTO IMPRESO
+ *  El bloque de verificación de un documento impreso
  *
  *  Lo usan los cuatro PDF que se entregan. Vivía privado adentro de
  *  CarnetImpresionController; se sacó acá el 22/09/2026 cuando el recibo, la
@@ -30,17 +30,8 @@ class QrVerificacion
             return null;
         }
 
-        /*
-         * EL DOMINIO SALE DE `APP_URL`, Y HAY QUE FORZARLO.
-         *
-         * `route()` absoluta usa el host de LA PETICIÓN, no `app.url`: un
-         * operador que entre al panel por `http://192.168.1.50:8000` imprimiría
-         * carnets con el QR apuntando a esa IP, muerto para cualquier teléfono
-         * fuera de la red. Por eso se arma la ruta RELATIVA y se le pega el
-         * dominio configurado.
-         *
-         * OJO: lo que diga `APP_URL` queda IMPRESO en el papel.
-         */
+        // Ruta relativa + APP_URL: `route()` absoluta usaría el host de la petición
+        // y el QR saldría impreso con la IP del operador. Ver «Trampas» en CLAUDE.md.
         $url = rtrim((string) config('app.url'), '/').route('verificar.show', $codigo, false);
 
         return [

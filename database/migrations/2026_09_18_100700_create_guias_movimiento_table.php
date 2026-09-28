@@ -16,7 +16,7 @@ return new class extends Migration
         Schema::create('guias_movimiento', function (Blueprint $table) {
             $table->id();
 
-            // SU ÚNICA CLAVE HACIA LA PERSONA. Con un beneficiario suelto
+            // Su única clave hacia la persona. Con un beneficiario suelto
             // además, la guía podía quedar a nombre de otro. Igual que faenas.
             $table->foreignId('carnet_id')->constrained('carnets')->restrictOnDelete();
 
@@ -61,7 +61,7 @@ return new class extends Migration
             $table->date('fecha_solicitud');
 
             /*
-             * LAS DOS LAS ESCRIBE LA APROBACIÓN, y por eso son nullable: hasta
+             * Las dos las escribe la aprobación, y por eso son nullable: hasta
              * la firma no hay nada que venza.
              *
              * `dateTime` y no `date`: los cinco días corren desde la HORA de

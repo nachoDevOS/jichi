@@ -42,7 +42,7 @@ class OtorgarCupoRequest extends FormRequest
             ],
 
             /*
-             * LA FECHA EN QUE SE PIDIÓ, no la de otorgamiento: esa la escribe
+             * La fecha en que se pidió, no la de otorgamiento: esa la escribe
              * la aprobación. Futura no, porque todavía no ocurrió.
              */
             'fecha_solicitud' => ['required', 'date', 'before_or_equal:today'],

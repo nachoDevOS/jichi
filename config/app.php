@@ -65,7 +65,8 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Bolivia (UTC-4). En UTC, de 20:00 a medianoche «hoy» ya era mañana: fechas de emisión, faenas y arqueo corridos un día.
+    'timezone' => env('APP_TIMEZONE', 'America/La_Paz'),
 
     /*
     |--------------------------------------------------------------------------

@@ -11,7 +11,7 @@ use RuntimeException;
 class CarnetInvalidoException extends RuntimeException
 {
     /**
-     *  UNA CREDENCIAL VIGENTE POR ACTIVIDAD Y POR PERSONA
+     *  Una credencial vigente por actividad y por persona
      */
     public static function yaTieneCarnetVigente(string $persona, TipoActor $actor, string $codigo, string $vence): self
     {
@@ -75,7 +75,7 @@ class CarnetInvalidoException extends RuntimeException
 
     /** Revocar sin motivo escrito no deja nada que explicar después. */
     /**
-     *  LAS TRES DEL CIRCUITO DE REVISIÓN
+     *  Las tres del circuito de revisión
      */
     public static function noSePuedeEnviar(string $estado): self
     {
@@ -114,7 +114,7 @@ class CarnetInvalidoException extends RuntimeException
     }
 
     /**
-     *  CORREGIR Y ELIMINAR SOLO SOBRE EL BORRADOR
+     *  Corregir y eliminar solo sobre el borrador
      */
     public static function noSePuedeEditar(string $estado): self
     {

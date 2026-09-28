@@ -13,23 +13,23 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
 /**
- *  IMPRESIÓN DEL CARNET — la «cédula de pescador»
+ *  Impresión del carnet — la «cédula de pescador»
  */
 class CarnetImpresionController extends Controller
 {
     /**
-     * EL TAMAÑO DEL PLÁSTICO — CR80, la medida de cualquier tarjeta.
+     * El tamaño del plástico — CR80, la medida de cualquier tarjeta.
      */
     private const ANCHO = 243.0;
 
     private const ALTO = 153.0;
 
     /**
-     * IMPRIMIR — GET /panel/carnets/{carnet}/imprimir
+     * Imprimir — GET /panel/carnets/{carnet}/imprimir
      */
     public function imprimir(Carnet $carnet): Response|RedirectResponse
     {
-        // OJO CON PEDIR COLUMNAS SUELTAS: `aprovechamiento` va ENTERO porque
+        // Ojo con pedir columnas sueltas: `aprovechamiento` va ENTERO porque
         // `cupoImpreso()` lee `volumen_total_kg`. La que falte vuelve null sin
         // error, y el renglón CUPO sale vacío en un carnet válido.
         $carnet->load(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
@@ -45,7 +45,7 @@ class CarnetImpresionController extends Controller
         }
 
         /*
-         * UN CARNET REVOCADO NO SE IMPRIME.
+         * Un carnet revocado no se imprime.
          */
         if ($carnet->estado === EstadoCarnet::Revocado) {
             return back()->with('error', 'El carnet está revocado: no se puede imprimir.');
@@ -70,7 +70,7 @@ class CarnetImpresionController extends Controller
             ...$this->datos($carnet),
 
             /*
-             *  LAS IMÁGENES VAN EMBEBIDAS, Y EL FONDO VIENE HORNEADO
+             *  Las imágenes van embebidas, y el fondo viene horneado
              */
             'fondo' => $this->imagenEmbebida('image/carnet-fondo.png'),
 
@@ -78,12 +78,12 @@ class CarnetImpresionController extends Controller
             'escudo' => $this->imagenEmbebida('image/carnet-escudo.png'),
 
             /*
-             * LA FOTO DEL TITULAR, si la ficha tiene una cargada.
+             * La foto del titular, si la ficha tiene una cargada.
              */
             'foto' => $this->fotoEmbebida($beneficiario?->foto),
 
             /*
-             * LA CARILLA DE ATRÁS. Ver reverso().
+             * La carilla de atrás. Ver reverso().
              */
             'reverso' => $this->reverso($carnet),
         ])
@@ -100,7 +100,7 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  EL REGLAMENTO DEL DORSO — calcado del plástico de papel
+     *  El reglamento del dorso — calcado del plástico de papel
      *
      * Va como constante y no en la base porque es texto del reglamento, no un
      * dato que la unidad edite; mismo criterio que la tabla de tamaños mínimos
@@ -122,7 +122,7 @@ class CarnetImpresionController extends Controller
     ];
 
     /**
-     *  LO QUE VA EN LA CARILLA DE ATRÁS
+     *  Lo que va en la carilla de atrás
      *
      * El recuadro blanco de la firma sale SIEMPRE, con nombre o sin él: la
      * firma y el sello se ponen a mano sobre el plástico ya impreso, igual que
@@ -159,7 +159,7 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  LAS MEDIDAS DE LA COLUMNA DE DATOS
+     *  Las medidas de la columna de datos
      *
      * En puntos, y calzadas con las coordenadas del Blade. Ver las cuentas del
      * encabezado de esa plantilla.
@@ -167,17 +167,17 @@ class CarnetImpresionController extends Controller
     private const ANCHO_DATOS = 176.0;
 
     /**
-     * EL ANCHO ÚTIL DE LA TIRA DEL VALOR, en puntos.
+     * El ancho útil de la tira del valor, en puntos.
      */
     private const ANCHO_VALOR = 121.0;
 
     /**
-     * EL ANCHO UTIL DE CADA MITAD DEL RENGLON PARTIDO, en puntos.
+     * El ancho util de cada mitad del renglon partido, en puntos.
      */
     private const ANCHO_VALOR_ANGOSTO = 38.0;
 
     /**
-     * EL RENGLON PARTIDO EN TRES — REGISTRO + GESTION + CUPO.
+     * El renglon partido en tres — registro + GESTION + CUPO.
      */
     private const ANCHO_TRIPLE_REGISTRO = 20.0;
 
@@ -191,7 +191,7 @@ class CarnetImpresionController extends Controller
     private const CARACTERES_TITULO = 30;
 
     /**
-     * EL ANCHO UTIL DE LA TIRA DE LA CEDULA, y su cuerpo, en puntos.
+     * El ancho util de la tira de la cedula, y su cuerpo, en puntos.
      */
     private const ANCHO_CEDULA = 43.6;
 
@@ -208,7 +208,7 @@ class CarnetImpresionController extends Controller
     private const PIXELES_FOTO = 300;
 
     /**
-     *  LA JERARQUIA TIPOGRAFICA
+     *  La jerarquia tipografica
      */
     // 5,2 pt y no 6: es donde terminaba la ASOCIACIÓN, el renglón más largo y
     // el único que el encogido de `texto()` bajaba. Con 6 la tira se leía
@@ -236,7 +236,7 @@ class CarnetImpresionController extends Controller
     private const ENCOGIDO_MAXIMO = 0.7;
 
     /**
-     * LOS DATOS DE LA TARJETA, ya resueltos aca.
+     * Los datos de la tarjeta, ya resueltos aca.
      *
      * @return array<string, mixed>
      */
@@ -247,7 +247,7 @@ class CarnetImpresionController extends Controller
         $anchoValor = self::ANCHO_VALOR;
 
         /*
-         *  LOS SEIS RENGLONES DEL PLASTICO
+         *  Los seis renglones del plastico
          */
         $campos = [
             $this->campo('NOMBRE', $beneficiario?->nombreCompleto, 'Sin nombre en la ficha', $anchoValor),
@@ -255,7 +255,7 @@ class CarnetImpresionController extends Controller
             $this->campo('ASOCIACIÓN', $carnet->asociacion?->nombre, 'Sin asociación declarada', $anchoValor),
 
             /*
-                 * CIUDAD Y PROVINCIA VAN CADA UNA EN SU RENGLON, a pedido.
+                 * Ciudad y provincia van cada una en su renglon, a pedido.
                  */
             $this->campo('CIUDAD', $beneficiario?->ciudad, $sinCargar, $anchoValor),
             $this->campo('PROVINCIA', $beneficiario?->provincia, $sinCargar, $anchoValor),
@@ -263,20 +263,20 @@ class CarnetImpresionController extends Controller
             $this->campo('DIRECCIÓN', $beneficiario?->direccion, $sinCargar, $anchoValor),
 
             /*
-                 * EL CÓDIGO CIERRA LA LISTA, como en el plastico, Y LLEVA EL
-                 * CUPO AL LADO cuando la actividad se autoriza por volumen.
+                 * El código cierra la lista, como en el plastico, Y LLEVA EL
+                 * cupo al lado cuando la actividad se autoriza por volumen.
                  */
             $this->renglonRegistro($carnet),
         ];
 
         return [
             /*
-             * EL TITULO DE LA TARJETA, con la actividad adentro.
+             * El titulo de la tarjeta, con la actividad adentro.
              */
             'titulo' => $this->titulo($carnet),
 
             /*
-             * LA CEDULA PASA POR EL MISMO CALCULO QUE LOS RENGLONES.
+             * La cedula pasa por el mismo calculo que los renglones.
              */
             'documento' => $this->texto(
                 ($documento = trim((string) $beneficiario?->documento_identidad)) !== ''
@@ -292,14 +292,14 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  EL TITULO DE LA TARJETA Y EL CUERPO EN EL QUE ENTRA
+     *  El titulo de la tarjeta y el cuerpo en el que entra
      *
      * @return array{texto: string, clase: string}
      */
     private function titulo(Carnet $carnet): array
     {
         /*
-         * LA ACTIVIDAD SALE DEL ENUM Y NO DEL NOMBRE DEL TIPO DE CARNET.
+         * La actividad sale del enum y no del nombre del tipo de carnet.
          */
         $texto = mb_strtoupper('Cédula de '.$carnet->tipo_actor->etiqueta());
 
@@ -310,7 +310,7 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  EL CUPO, EN LA COLUMNA DE LA FOTO — o NADA, si la actividad no lleva
+     *  El cupo, en la columna de la foto — o NADA, si la actividad no lleva
      */
     private function cupo(Carnet $carnet): ?array
     {
@@ -331,7 +331,7 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  EL ULTIMO RENGLON — REGISTRO, GESTION Y, SI CORRESPONDE, EL CUPO
+     *  El ultimo renglon — registro, gestion y, si corresponde, el cupo
      *
      * @return array<string, mixed>
      */
@@ -340,7 +340,7 @@ class CarnetImpresionController extends Controller
         $cupo = $this->cupo($carnet);
 
         /*
-         *  LA GESTIÓN YA NO SE IMPRIME, Y NO ES UN OLVIDO
+         *  La gestión ya no se imprime, y no es un olvido
          */
         // «REGISTRO» con su número anual —«00001»— y no el código de 16: en el
         // plástico entra un número que se dicta y se busca en el libro. El
@@ -374,7 +374,7 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  UN TEXTO QUE NO ENTRA SE ACHICA; NO SE CORTA
+     *  Un texto que no entra se achica; no se corta
      *
      * @return array{valor: string, molde: string, cuerpo: float, lineas: int}
      */
@@ -400,7 +400,7 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  LA FOTO DEL TITULAR, RECORTADA A UN CUADRADO SIN DEFORMARSE
+     *  La foto del titular, recortada a un cuadrado sin deformarse
      *
      * @return array{datos: string, estilo: string}|null
      */

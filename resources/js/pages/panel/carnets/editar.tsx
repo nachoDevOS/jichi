@@ -15,7 +15,7 @@ import type { PageProps, TipoActor } from '@/types';
 import type { AsociacionElegible, CarnetEnCorreccion, CupoVigente, TipoElegible } from '@/types/carnets';
 
 /**
- *  CORREGIR UN CARNET PENDIENTE
+ *  Corregir un carnet pendiente
  *
  * Solo se llega acá con el borrador: el servidor lo comprueba con la fila
  * bloqueada. Lo que NO se corrige es de quién es el carnet ni qué actividad
@@ -78,7 +78,7 @@ export default function EditarCarnet({
                     </CardHeader>
 
                     <CardContent className="space-y-5">
-                        {/* EL TITULAR NO SE CORRIGE: se muestra. Cambiarlo no
+                        {/* El titular no se corrige: se muestra. Cambiarlo no
                             es una corrección, es otro carnet. */}
                         <div className="flex flex-wrap items-center gap-4 rounded-md border border-border bg-secondary/40 p-4">
                             <Retrato
@@ -183,7 +183,7 @@ export default function EditarCarnet({
                             </p>
                         )}
 
-                        {/* LOS ADJUNTOS SON OPCIONALES ACÁ: lo normal es no
+                        {/* Los adjuntos son opcionales acá: lo normal es no
                             volver a subir lo que ya está. Se muestra un enlace
                             al que hay, para poder mirarlo antes de reemplazarlo. */}
                         <div className="grid gap-4 sm:grid-cols-2">

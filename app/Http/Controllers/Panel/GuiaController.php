@@ -36,7 +36,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  GUÍAS DE MOVIMIENTO — un traslado de producto (paso 4, rama comercializador)
+ *  Guías de movimiento — un traslado de producto (paso 4, rama comercializador)
  *
  * Mismo circuito que la faena: nace PENDIENTE, se le cargan los depósitos, se
  * presenta a revisión —ahí sale el recibo— y recién con la firma ampara el
@@ -47,7 +47,7 @@ class GuiaController extends Controller
     public function __construct(private readonly EmitirGuiaService $servicio) {}
 
     /**
-     * LISTADO — GET /panel/guias
+     * Listado — GET /panel/guias
      */
     public function index(Request $request): Response
     {
@@ -113,7 +113,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * FORMULARIO — GET /panel/guias/crear
+     * Formulario — GET /panel/guias/crear
      */
     public function create(Request $request): Response
     {
@@ -155,7 +155,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * EMITIR — POST /panel/guias
+     * Emitir — POST /panel/guias
      */
     public function store(EmitirGuiaRequest $request): RedirectResponse
     {
@@ -183,7 +183,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * CORREGIR EL BORRADOR — GET /panel/guias/{guia}/editar
+     * Corregir el borrador — GET /panel/guias/{guia}/editar
      */
     public function edit(GuiaMovimiento $guia): Response|RedirectResponse
     {
@@ -225,7 +225,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * GUARDAR LA CORRECCIÓN — PATCH /panel/guias/{guia}
+     * Guardar la corrección — PATCH /panel/guias/{guia}
      */
     public function update(ActualizarGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
     {
@@ -247,7 +247,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * ELIMINAR — DELETE /panel/guias/{guia}
+     * Eliminar — DELETE /panel/guias/{guia}
      */
     public function destroy(EliminarGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
     {
@@ -337,7 +337,7 @@ class GuiaController extends Controller
     }
 
     /**
-     *  CARGAR LOS DEPÓSITOS — POST /panel/guias/{guia}/pagos
+     *  Cargar los depósitos — POST /panel/guias/{guia}/pagos
      *
      * Mismo circuito que el carnet, el cupo y la faena: las boletas entran
      * juntas, tienen que cubrir el arancel entero y, si el operador lo pide, la
@@ -414,7 +414,7 @@ class GuiaController extends Controller
         $guia->refresh();
         $cuantos = count($datos['pagos']);
 
-        //  REGISTRAR Y ENVIAR SON UN SOLO ACTO CUANDO EL ARANCEL QUEDA CUBIERTO
+        //  Registrar y enviar son un solo acto cuando el arancel queda cubierto
         $enviada = false;
 
         if (($datos['enviar'] ?? false) && $guia->puedeEnviarseARevision()) {
@@ -444,7 +444,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * ENVIAR A REVISIÓN — POST /panel/guias/{guia}/enviar
+     * Enviar a revisión — POST /panel/guias/{guia}/enviar
      */
     public function enviar(GuiaMovimiento $guia, RevisarGuiaService $revision): RedirectResponse
     {
@@ -461,7 +461,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * APROBAR — PATCH /panel/guias/{guia}/aprobar
+     * Aprobar — PATCH /panel/guias/{guia}/aprobar
      */
     public function aprobar(GuiaMovimiento $guia, RevisarGuiaService $revision): RedirectResponse
     {
@@ -480,7 +480,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * RECHAZAR — PATCH /panel/guias/{guia}/rechazar
+     * Rechazar — PATCH /panel/guias/{guia}/rechazar
      */
     public function rechazar(
         RechazarGuiaRequest $request,
@@ -500,7 +500,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * CERRAR — PATCH /panel/guias/{guia}/cerrar
+     * Cerrar — PATCH /panel/guias/{guia}/cerrar
      */
     public function cerrar(CerrarGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
     {
@@ -518,7 +518,7 @@ class GuiaController extends Controller
     }
 
     /**
-     * ANULAR — PATCH /panel/guias/{guia}/anular
+     * Anular — PATCH /panel/guias/{guia}/anular
      */
     public function anular(AnularGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
     {

@@ -7,7 +7,7 @@ use App\Models\Departamento;
 use Illuminate\Database\Seeder;
 
 /**
- * DATOS DE PRUEBA DEL PADRÓN — y son los ÚNICOS del sistema.
+ * Datos de prueba del padrón — y son los ÚNICOS del sistema.
  */
 class BeneficiarioSeeder extends Seeder
 {
@@ -75,7 +75,7 @@ class BeneficiarioSeeder extends Seeder
         ]);
 
         /*
-         *  EL RESTO SE COMPLETA HASTA EL OBJETIVO, NO SE CREA DE NUEVO
+         *  El resto se completa hasta el objetivo, no se crea de nuevo
          */
         $objetivo = 40;
         $faltan = max(0, $objetivo - Beneficiario::count());

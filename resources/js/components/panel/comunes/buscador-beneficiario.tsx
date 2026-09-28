@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 
 /**
- *  AUTOCOMPLETADO DE BENEFICIARIOS
+ *  Autocompletado de beneficiarios
  */
 export function BuscadorBeneficiario({
     seleccionado,

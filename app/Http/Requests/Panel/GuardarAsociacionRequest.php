@@ -28,7 +28,7 @@ class GuardarAsociacionRequest extends FormRequest
 
         return [
             /*
-             * DOS ASOCIACIONES NO PUEDEN LLAMARSE IGUAL.
+             * Dos asociaciones no pueden llamarse igual.
              */
             'nombre' => [
                 'required', 'string', 'max:160',
@@ -46,7 +46,7 @@ class GuardarAsociacionRequest extends FormRequest
             'sigla' => ['nullable', 'string', 'max:20'],
 
             /*
-             * LA FICHA DEL GREMIO. Las claves son las de `Asociacion::CAMPOS`
+             * La ficha del gremio. Las claves son las de `Asociacion::CAMPOS`
              * y nada más: `prepareForValidation()` descarta el resto, así que
              * lo que llegue de más del navegador no entra en la columna.
              */

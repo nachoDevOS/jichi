@@ -15,7 +15,7 @@ import type { OpcionEnum, Paginado } from '@/types';
 import type { AsociacionFila } from '@/types/catalogos';
 
 /**
- *  CATÁLOGO DE ASOCIACIONES — y el patrón de las tres pantallas de catálogo
+ *  Catálogo de asociaciones — y el patrón de las tres pantallas de catálogo
  */
 export default function CatalogoAsociaciones({
     asociaciones,
@@ -264,7 +264,7 @@ function FormularioAsociacionCard({
     const esAlta = asociacion === null;
 
     /*
-     * LA FICHA ARRANCA CON TODAS LAS CLAVES, en cadena vacía: un `undefined`
+     * La ficha arranca con todas las claves, en cadena vacía: un `undefined`
      * en `useForm` hace que el input pase de no-controlado a controlado al
      * escribir, y React avisa en consola y pierde el primer carácter.
      */

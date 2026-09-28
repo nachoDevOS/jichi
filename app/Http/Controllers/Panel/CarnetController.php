@@ -42,7 +42,7 @@ class CarnetController extends Controller
     public function __construct(private readonly EmitirCarnetService $servicio) {}
 
     /**
-     * LISTADO — GET /panel/carnets
+     * Listado — GET /panel/carnets
      */
     public function index(Request $request): Response
     {
@@ -54,7 +54,7 @@ class CarnetController extends Controller
         ];
 
         $carnets = Carnet::query()
-            // OJO CON PEDIR COLUMNAS SUELTAS: van las CINCO partes del nombre y
+            // Ojo con pedir columnas sueltas: van las CINCO partes del nombre y
             // `tipoCarnet` ENTERO, porque `montoACobrar()` lee `precio_bs`. La que
             // falte vuelve null y el método contesta cualquier cosa, sin error.
             ->with([
@@ -105,7 +105,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * FORMULARIO — GET /panel/carnets/crear
+     * Formulario — GET /panel/carnets/crear
      *
      * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
      * buscador ya resuelto.
@@ -179,7 +179,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * EMITIR — POST /panel/carnets
+     * Emitir — POST /panel/carnets
      */
     public function store(EmitirCarnetRequest $request): RedirectResponse
     {
@@ -371,7 +371,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * REVOCAR — PATCH /panel/carnets/{carnet}/revocar
+     * Revocar — PATCH /panel/carnets/{carnet}/revocar
      */
     public function revocar(RevocarCarnetRequest $request, Carnet $carnet): RedirectResponse
     {
@@ -387,7 +387,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * REPONER — PATCH /panel/carnets/{carnet}/reponer
+     * Reponer — PATCH /panel/carnets/{carnet}/reponer
      *
      * Revoca el actual y abre el formulario con los datos del anterior.
      */
@@ -405,7 +405,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * FORMULARIO DE CORRECCIÓN — GET /panel/carnets/{carnet}/editar
+     * Formulario de corrección — GET /panel/carnets/{carnet}/editar
      */
     public function edit(Carnet $carnet): Response
     {
@@ -463,7 +463,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * GUARDAR LA CORRECCIÓN — PUT /panel/carnets/{carnet}
+     * Guardar la corrección — PUT /panel/carnets/{carnet}
      */
     public function update(EditarCarnetRequest $request, Carnet $carnet): RedirectResponse
     {
@@ -505,7 +505,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * ELIMINAR — DELETE /panel/carnets/{carnet}
+     * Eliminar — DELETE /panel/carnets/{carnet}
      */
     public function destroy(EliminarCarnetRequest $request, Carnet $carnet): RedirectResponse
     {
@@ -523,7 +523,7 @@ class CarnetController extends Controller
     }
 
     /**
-     *  CARGAR LOS DEPÓSITOS — POST /panel/carnets/{carnet}/pagos
+     *  Cargar los depósitos — POST /panel/carnets/{carnet}/pagos
      *
      * Espejo de `AprovechamientoController::pagar()`: el carnet se cobra igual
      * que el cupo, con una sección por boleta y cubriendo el arancel entero.
@@ -601,7 +601,7 @@ class CarnetController extends Controller
         $carnet->refresh();
         $cuantos = count($datos['pagos']);
 
-        //  REGISTRAR Y ENVIAR SON UN SOLO ACTO CUANDO EL ARANCEL QUEDA CUBIERTO
+        //  Registrar y enviar son un solo acto cuando el arancel queda cubierto
         $enviado = false;
 
         if (($datos['enviar'] ?? false) && $carnet->puedeEnviarseARevision()) {
@@ -631,7 +631,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * ENVIAR A REVISIÓN — POST /panel/carnets/{carnet}/enviar
+     * Enviar a revisión — POST /panel/carnets/{carnet}/enviar
      */
     public function enviar(Carnet $carnet, RevisarCarnetService $revision): RedirectResponse
     {
@@ -648,7 +648,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * APROBAR — PATCH /panel/carnets/{carnet}/aprobar
+     * Aprobar — PATCH /panel/carnets/{carnet}/aprobar
      *
      * Recién acá la credencial habilita a trabajar y se puede imprimir.
      */
@@ -666,7 +666,7 @@ class CarnetController extends Controller
     }
 
     /**
-     * RECHAZAR — PATCH /panel/carnets/{carnet}/rechazar
+     * Rechazar — PATCH /panel/carnets/{carnet}/rechazar
      */
     public function rechazar(RechazarCarnetRequest $request, Carnet $carnet, RevisarCarnetService $revision): RedirectResponse
     {
@@ -775,7 +775,7 @@ class CarnetController extends Controller
             'pagado' => $carnet->estaPagado(),
 
             /*
-             * LAS DEL CIRCUITO DE REVISIÓN, resueltas en el servidor. React no
+             * Las del circuito de revisión, resueltas en el servidor. React no
              * vuelve a evaluar el estado: pregunta por estas.
              */
             'admite_pagos' => $carnet->admitePagos(),

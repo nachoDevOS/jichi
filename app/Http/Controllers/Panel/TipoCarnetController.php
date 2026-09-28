@@ -14,12 +14,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  CATÁLOGO DE TIPOS DE CARNET — cómo se llama cada credencial y cuánto sale
+ *  Catálogo de tipos de carnet — cómo se llama cada credencial y cuánto sale
  */
 class TipoCarnetController extends Controller
 {
     /**
-     * LISTADO Y FORMULARIO — GET /panel/catalogos/tipos-carnet
+     * Listado y formulario — GET /panel/catalogos/tipos-carnet
      */
     public function index(Request $request): Response
     {
@@ -61,7 +61,7 @@ class TipoCarnetController extends Controller
     }
 
     /**
-     * EDICIÓN — PUT /panel/catalogos/tipos-carnet/{tipo_carnet}
+     * Edición — PUT /panel/catalogos/tipos-carnet/{tipo_carnet}
      */
     public function update(GuardarTipoCarnetRequest $request, TipoCarnet $tipo_carnet): RedirectResponse
     {

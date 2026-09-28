@@ -17,7 +17,7 @@ import type { PageProps } from '@/types';
 import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
 
 /**
- * LA TARJETA DE PAGOS de un trámite que se cobra con depósitos.
+ * La tarjeta de pagos de un trámite que se cobra con depósitos.
  *
  * La usan el aprovechamiento y el carnet: los dos se cobran igual —una sección
  * por boleta, cubriendo el monto entero, y el recibo sale al presentar— así que
@@ -268,7 +268,7 @@ export function TarjetaPagos({
                             </div>
                         ))}
 
-                        {/* LA CUENTA A LA VISTA: de MÁS se admite —la boleta
+                        {/* La cuenta a la vista: de MÁS se admite —la boleta
                             dice lo que dice— y de menos no. */}
                         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-secondary/50 p-3 text-sm">
                             <span>
@@ -326,7 +326,7 @@ export function TarjetaPagos({
                     </form>
                 )}
 
-                {/* EL RECIBO VA UNA VEZ, arriba del detalle que ampara: en cada
+                {/* El recibo va una vez, arriba del detalle que ampara: en cada
                     fila se leía como «un recibo por depósito». */}
                 {pagos.length > 0 && (
                     <div className="mx-5 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-secondary/40 px-4 py-3">
@@ -507,7 +507,7 @@ export function TarjetaPagos({
                 )}
             </CardContent>
 
-            {/* REGISTRAR SE CONFIRMA: cuando cubre el monto, el botón hace DOS
+            {/* Registrar se confirma: cuando cubre el monto, el botón hace DOS
                 cosas y la segunda cierra la puerta —sale el recibo numerado—. */}
             <ConfirmarAccion
                 abierto={confirmando}
@@ -537,7 +537,7 @@ export function TarjetaPagos({
                 onConfirmar={registrar}
             />
 
-            {/* OBSERVAR PIDE MOTIVO: es lo único que le dice a ventanilla qué
+            {/* Observar pide motivo: es lo único que le dice a ventanilla qué
                 corregir. */}
             <ConfirmarConMotivo
                 abierto={observando !== null}

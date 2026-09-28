@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * LA BOLSA MADRE del pescador: el cupo anual en kilos, con fecha.
+ * La bolsa madre del pescador: el cupo anual en kilos, con fecha.
  *
  * @property-read string|null $faenas_que_consumen_sum_kilos_extraidos columna virtual que agrega withSum()
  * @property-read string|null $faenas_que_reservan_sum_kilos_extraidos columna virtual que agrega withSum()
@@ -46,7 +46,7 @@ class AprovechamientoPesq extends Model
      * preguntarle el estado en la línea siguiente contestaría null.
      */
     protected $attributes = [
-        // NACE PENDIENTE: se activa cuando se termina de cobrar. Ver
+        // Nace pendiente: se activa cuando se termina de cobrar. Ver
         // EstadoAprovechamiento y CobrarService::activarSiQuedoPagado().
         'estado' => EstadoAprovechamiento::Pendiente->value,
         'modalidad' => ModalidadAprovechamiento::EscalaGeneral->value,
@@ -230,7 +230,7 @@ class AprovechamientoPesq extends Model
     }
 
     /**
-     *  LOS KILOS QUE SE PASARON DEL CUPO
+     *  Los kilos que se pasaron del cupo
      */
     public function kilosExcedidos(): float
     {
@@ -270,7 +270,7 @@ class AprovechamientoPesq extends Model
     }
 
     /**
-     *  ¿SE PUEDE MANDAR A QUE ALGUIEN LO FIRME?
+     *  ¿Se puede mandar a que alguien lo firme?
      */
     public function puedeEnviarseARevision(): bool
     {
@@ -356,7 +356,7 @@ class AprovechamientoPesq extends Model
     }
 
     /**
-     *  ¿ESTÁ DENTRO DE SU PERÍODO? — sin mirar el estado
+     *  ¿Está dentro de su período? — sin mirar el estado
      */
     public function estaEnFecha(): bool
     {
@@ -373,7 +373,7 @@ class AprovechamientoPesq extends Model
     public function puedeEmitirFaena(?float $kilos = null): bool
     {
         /*
-         * LA FECHA MANDA EN LOS DOS MODOS. Un cupo vencido no habilita nada, y
+         * La fecha manda en los dos modos. Un cupo vencido no habilita nada, y
          * eso no lo afloja el modo flexible: lo que ese modo relaja es el TOPE
          * en kilos, no el calendario. Una faena colgada de un cupo del año
          * pasado sería un permiso sin ninguna autorización detrás.
@@ -388,7 +388,7 @@ class AprovechamientoPesq extends Model
         }
 
         /*
-         * EN MODO FLEXIBLE NO SE MIRA EL SALDO, y por eso tampoco se mira el
+         * En modo flexible no se mira el saldo, y por eso tampoco se mira el
          * ESTADO: un cupo `agotado` sigue emitiendo, que es exactamente lo que
          * ese modo significa. Preguntar por `estaVigente()` acá lo bloquearía
          * igual —`agotado` no habilita— y el modo no serviría de nada.
@@ -463,7 +463,7 @@ class AprovechamientoPesq extends Model
     }
 
     /**
-     *  LOS CUPOS QUE OCUPAN EL LUGAR DE UNA PERSONA HOY
+     *  Los cupos que ocupan el lugar de una persona hoy
      */
     public function scopeEnCurso(Builder $query): Builder
     {

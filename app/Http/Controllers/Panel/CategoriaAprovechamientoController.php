@@ -15,12 +15,12 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- *  LA ESCALA OFICIAL DE APROVECHAMIENTO — paso 2 del flujo del pescador
+ *  La escala oficial de aprovechamiento — paso 2 del flujo del pescador
  */
 class CategoriaAprovechamientoController extends Controller
 {
     /**
-     * LISTADO Y FORMULARIO — GET /panel/catalogos/categorias-aprovechamiento
+     * Listado y formulario — GET /panel/catalogos/categorias-aprovechamiento
      */
     public function index(Request $request): Response
     {
@@ -29,7 +29,7 @@ class CategoriaAprovechamientoController extends Controller
         $porPagina = Paginacion::filas($request);
 
         /*
-         * LA ESCALA ENTERA, aparte del listado: los huecos y el número que
+         * La escala entera, aparte del listado: los huecos y el número que
          * sigue se calculan sobre TODOS los tramos. Sacados de la página que
          * se está viendo, «Nuevo tramo» propondría un número ya usado y los
          * huecos aparecerían y desaparecerían al cambiar de página.
@@ -92,7 +92,7 @@ class CategoriaAprovechamientoController extends Controller
     }
 
     /**
-     * EDICIÓN — PUT /panel/catalogos/categorias-aprovechamiento/{categoria}
+     * Edición — PUT /panel/catalogos/categorias-aprovechamiento/{categoria}
      */
     public function update(
         GuardarCategoriaAprovechamientoRequest $request,

@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react';
 
 /**
- *  EL MARCO DE LAS PANTALLAS PÚBLICAS
+ *  El marco de las pantallas públicas
  */
 export default function LayoutPublico({ children }: PropsWithChildren) {
     return (

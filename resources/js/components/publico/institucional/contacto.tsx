@@ -4,7 +4,7 @@ import { Seccion } from '@/components/publico/institucional/seccion';
 import type { InstitucionPortada } from '@/types/publico';
 
 /**
- *  DÓNDE ATIENDEN — todo sale de `configuraciones`, editable sin tocar código
+ *  Dónde atienden — todo sale de `configuraciones`, editable sin tocar código
  */
 export function Contacto({ portada }: { portada: InstitucionPortada }) {
     const datos: { icono: LucideIcon; rotulo: string; valor: string | null; href?: string }[] = [

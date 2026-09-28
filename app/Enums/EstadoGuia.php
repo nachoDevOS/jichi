@@ -54,7 +54,7 @@ enum EstadoGuia: string
     }
 
     /**
-     *  EL CIRCUITO, el mismo de la faena
+     *  El circuito, el mismo de la faena
      *
      * Estos métodos deciden qué se puede hacer en cada estado. Viven acá y NO
      * en el controlador: el servicio pregunta, y React recibe la respuesta ya

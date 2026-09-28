@@ -129,7 +129,7 @@ export interface PagoDelCupo {
     cobrado_en: string | null;
 
     /**
-     *  EL CONTROL DE LA BOLETA, QUE NO ES EL ESTADO DEL PAGO
+     *  El control de la boleta, que no es el estado del pago
      */
     estado_validacion: 'pendiente' | 'validado' | 'observado';
     estado_validacion_etiqueta: string;
@@ -153,7 +153,7 @@ export interface PagoDelCupo {
 }
 
 /**
- * EL RECIBO DEL TRÁMITE: uno solo, con todos los depósitos adentro.
+ * El recibo del trámite: uno solo, con todos los depósitos adentro.
  */
 export interface ReciboDelCupo {
     id: number;

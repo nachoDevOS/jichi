@@ -4,7 +4,7 @@ import { Pie } from '@/components/publico/institucional/pie';
 import type { InstitucionPortada } from '@/types/publico';
 
 /**
- *  EL MARCO DEL SITIO INSTITUCIONAL
+ *  El marco del sitio institucional
  *
  *  No reemplaza a layout-publico: ese es el acta angosta e imprimible de la
  *  verificación por QR, y este es el sitio ancho. Mezclarlos rompería el papel.

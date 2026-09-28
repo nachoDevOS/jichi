@@ -1,12 +1,10 @@
 import type { Config as ZiggyConfig } from 'ziggy-js';
 
 /**
- *  TIPOS COMPARTIDOS POR TODO EL SISTEMA
+ *  Tipos compartidos por todo el sistema
  */
 
-/* ==========================================================================
-   PROPS COMPARTIDAS — llegan en TODAS las páginas
-   ========================================================================== */
+// Props compartidas: llegan en todas las páginas.
 
 /**
  * El usuario que tiene la sesión abierta.
@@ -72,9 +70,7 @@ export interface PageProps {
     [key: string]: unknown;
 }
 
-/* ==========================================================================
-   PAGINACIÓN
-   ========================================================================== */
+// Paginación.
 
 /**
  * Lo que devuelve ->paginate() de Laravel, ya convertido a JSON.
@@ -92,22 +88,7 @@ export interface Paginado<T> {
     to: number | null;
 }
 
-/* ==========================================================================
-   ESTADOS DEL DOMINIO
-   ========================================================================== */
-
-/**
- * Espejo de App\Enums\EstadoTramite.
- */
-export type EstadoTramite = 'pendiente' | 'en_revision' | 'aprobado' | 'rechazado';
-
-/**
- * Espejo de App\Enums\TipoTramite.
- *
- * No lo elige el operador: lo decide el sistema según la persona ya tenga o no
- * carnet DE ESE RUBRO en la gestión en curso.
- */
-export type TipoTramite = 'emision_inicial' | 'actualizacion';
+// Estados del dominio.
 
 /**
  * Espejo de App\Enums\EstadoCarnet.
@@ -152,14 +133,6 @@ export type EstadoGuia = 'pendiente' | 'en_revision' | 'aprobado' | 'cerrada' | 
 export type EstadoAsociacion = 'activo' | 'inactivo';
 
 /**
- * Espejo de App\Enums\EstadoRubro.
- *
- * ⚠️ Los rubros ya no existen en la base. El tipo queda mientras las pantallas
- * del modelo anterior sigan compilando; se va con ellas.
- */
-export type EstadoRubro = 'activo' | 'inactivo';
-
-/**
  * Una opción de catálogo tal como la devuelven los `::opciones()` de los enums
  * de PHP. La usan los selectores de filtro de todos los listados.
  */
@@ -169,9 +142,7 @@ export interface OpcionEnum {
     color: string;
 }
 
-/* ==========================================================================
-   DECLARACIONES GLOBALES
-   ========================================================================== */
+// Declaraciones globales.
 
 declare global {
     /**

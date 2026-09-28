@@ -423,6 +423,13 @@ RESTRICT trabaría la baja sin proteger nada que importe.
 **El código es único GLOBAL y no por tipo**: un control en ruta lee un código y
 tiene que llegar a UN documento, sin preguntar antes de qué tipo es.
 
+**`nro_registro` lleva índice y NO único.** Es el número impreso en el plástico:
+correlativo por gestión, compartido entre pescadores y comercializadores y
+asignado AL APROBAR (un pendiente no ocupa número y uno rechazado no gasta uno).
+El único sería «uno por año», y el año no es una columna —es el de
+`fecha_emision`—: expresarlo pediría un índice funcional, que solo existe en
+PostgreSQL. Lo garantiza `CorrelativoService`, que bloquea la fila del contador.
+
 **Qué se imprime y qué no.** Se imprime lo que NO cambia después de que el
 plástico sale de la impresora: el nombre, el tipo de actor, la asociación, el cupo
 y las fechas. **El ESTADO no se imprime**: un carnet se revoca después de impreso

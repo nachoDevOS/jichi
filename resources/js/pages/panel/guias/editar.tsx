@@ -13,7 +13,7 @@ import type { PageProps } from '@/types';
 import type { CatalogosGuia, FilaDetalle, FormularioGuia, GuiaEditable } from '@/types/guias';
 
 /**
- *  CORREGIR EL BORRADOR DE UNA GUÍA
+ *  Corregir el borrador de una guía
  *
  * La persona y el carnet llegan FIJOS, para mostrar: cambiar de titular no es
  * corregir un traslado, es emitir otro. Solo se abre en PENDIENTE y sin un

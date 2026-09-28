@@ -38,7 +38,7 @@ class AprovechamientoController extends Controller
     public function __construct(private readonly OtorgarCupoService $servicio) {}
 
     /**
-     * LISTADO — GET /panel/aprovechamientos
+     * Listado — GET /panel/aprovechamientos
      */
     public function index(Request $request): Response
     {
@@ -49,7 +49,7 @@ class AprovechamientoController extends Controller
         ];
 
         $cupos = AprovechamientoPesq::query()
-            // OJO CON PEDIR COLUMNAS SUELTAS: van las CINCO partes del nombre
+            // Ojo con pedir columnas sueltas: van las CINCO partes del nombre
             // porque `nombreCompleto` las lee todas. La que falte vuelve null y
             // el accesor contesta cualquier cosa, sin error.
             ->with([
@@ -88,14 +88,14 @@ class AprovechamientoController extends Controller
             'opcionesPorPagina' => Paginacion::OPCIONES,
 
             /*
-             * EL MODO SE MANDA A LA PANTALLA, y no es un detalle informativo.
+             * El modo se manda a la pantalla, y no es un detalle informativo.
              */
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
         ]);
     }
 
     /**
-     * FORMULARIO — GET /panel/aprovechamientos/crear
+     * Formulario — GET /panel/aprovechamientos/crear
      */
     public function create(Request $request): Response
     {
@@ -116,7 +116,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * OTORGAR — POST /panel/aprovechamientos
+     * Otorgar — POST /panel/aprovechamientos
      */
     public function store(OtorgarCupoRequest $request): RedirectResponse
     {
@@ -138,7 +138,7 @@ class AprovechamientoController extends Controller
         }
 
         /*
-         *  OTORGAR TERMINA EN LA FICHA DEL CUPO
+         *  Otorgar termina en la ficha del cupo
          */
         return redirect()
             ->route('aprovechamientos.show', $cupo)
@@ -201,7 +201,7 @@ class AprovechamientoController extends Controller
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
 
             /*
-             *  LOS DEPÓSITOS QUE PAGARON ESTE CUPO, CON SU BOLETA
+             *  Los depósitos que pagaron este cupo, con su boleta
              */
             'pagos' => $aprovechamiento->pagos()
                 // Precargados: si no, cinco depósitos son diez consultas.
@@ -317,7 +317,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * FORMULARIO DE CORRECCIÓN — GET /panel/aprovechamientos/{id}/editar
+     * Formulario de corrección — GET /panel/aprovechamientos/{id}/editar
      */
     public function edit(AprovechamientoPesq $aprovechamiento): Response|RedirectResponse
     {
@@ -353,7 +353,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * GUARDAR LA CORRECCIÓN — PUT /panel/aprovechamientos/{id}
+     * Guardar la corrección — PUT /panel/aprovechamientos/{id}
      */
     public function update(OtorgarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
     {
@@ -379,7 +379,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * ELIMINAR — DELETE /panel/aprovechamientos/{id}
+     * Eliminar — DELETE /panel/aprovechamientos/{id}
      */
     public function destroy(EliminarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
     {
@@ -397,7 +397,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     *  CARGAR LOS DEPÓSITOS — POST /panel/aprovechamientos/{id}/pagos
+     *  Cargar los depósitos — POST /panel/aprovechamientos/{id}/pagos
      */
     public function pagar(
         RegistrarDepositosRequest $request,
@@ -408,7 +408,7 @@ class AprovechamientoController extends Controller
         $datos = $request->validated();
         $aprovechamiento->loadMissing('beneficiario');
 
-        // EL ESTADO SE MIRA ANTES DE SUBIR NADA: descubrirlo después de escribir
+        // El estado se mira antes de subir nada: descubrirlo después de escribir
         // cinco archivos obligaría a borrarlos.
         if (! $aprovechamiento->admitePagos()) {
             return back()->withErrors([
@@ -477,7 +477,7 @@ class AprovechamientoController extends Controller
         $cuantos = count($datos['pagos']);
 
         /*
-         *  REGISTRAR Y ENVIAR SON UN SOLO ACTO CUANDO EL MONTO QUEDA CUBIERTO
+         *  Registrar y enviar son un solo acto cuando el monto queda cubierto
          */
         $enviado = false;
 
@@ -510,7 +510,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * ENVIAR A REVISIÓN — POST /panel/aprovechamientos/{id}/enviar
+     * Enviar a revisión — POST /panel/aprovechamientos/{id}/enviar
      */
     public function enviar(AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
     {
@@ -527,7 +527,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * APROBAR — PATCH /panel/aprovechamientos/{id}/aprobar
+     * Aprobar — PATCH /panel/aprovechamientos/{id}/aprobar
      *
      * Recién acá el cupo autoriza faenas.
      */
@@ -545,7 +545,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * RECHAZAR — PATCH /panel/aprovechamientos/{id}/rechazar
+     * Rechazar — PATCH /panel/aprovechamientos/{id}/rechazar
      *
      * Vuelve a PENDIENTE con el motivo escrito. Los pagos ya cargados siguen
      * ahí: ventanilla corrige y lo vuelve a presentar sin recargar nada.
@@ -564,7 +564,7 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * REVOCAR — PATCH /panel/aprovechamientos/{id}/revocar
+     * Revocar — PATCH /panel/aprovechamientos/{id}/revocar
      */
     public function revocar(RevocarCupoRequest $request, AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
     {
@@ -680,14 +680,14 @@ class AprovechamientoController extends Controller
             // Y si no se puede, POR QUÉ: un cupo pendiente no es uno vencido.
             'motivo_sin_faena' => $cupo->motivoSinFaena(),
             /*
-             * EDITAR Y ELIMINAR LLEGAN RESUELTAS, y no se deducen de `estado`
+             * Editar y eliminar llegan resueltas, y no se deducen de `estado`
              * en React.
              */
             'puede_editarse' => $cupo->puedeEditarse(),
             'puede_eliminarse' => $cupo->puedeEliminarse(),
 
             /*
-             * LAS TRES DEL CIRCUITO DE REVISIÓN, resueltas en el servidor.
+             * Las tres del circuito de revisión, resueltas en el servidor.
              */
             'admite_pagos' => $cupo->admitePagos(),
             'puede_enviarse' => $cupo->puedeEnviarseARevision(),

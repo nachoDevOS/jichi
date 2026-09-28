@@ -16,7 +16,7 @@ import type { OpcionEnum, PageProps, Paginado, TipoActor } from '@/types';
 import type { TipoCarnetFila } from '@/types/catalogos';
 
 /**
- *  CATÁLOGO DE TIPOS DE CARNET
+ *  Catálogo de tipos de carnet
  */
 export default function CatalogoTiposCarnet({
     tipos,

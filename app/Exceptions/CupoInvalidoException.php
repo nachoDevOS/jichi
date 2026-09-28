@@ -10,7 +10,7 @@ use RuntimeException;
 class CupoInvalidoException extends RuntimeException
 {
     /**
-     *  UNA PERSONA, UNA BOLSA MADRE VIGENTE A LA VEZ
+     *  Una persona, una bolsa madre vigente a la vez
      */
     public static function yaTieneCupoVigente(string $persona, float $saldo, string $vence): self
     {

@@ -145,7 +145,7 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     *  EL CIRCUITO DE LA FAENA: cobrar, presentar y firmar
+     *  El circuito de la faena: cobrar, presentar y firmar
      */
 
     /** Se quiso presentar una faena que no está PENDIENTE. */
@@ -213,7 +213,7 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     *  EL CIRCUITO DE LA GUÍA: el mismo de la faena, sobre otro papel
+     *  El circuito de la guía: el mismo de la faena, sobre otro papel
      */
 
     /** Se quiso presentar una guía que no está PENDIENTE. */

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 /**
- *  LA PANTALLA DE "VERIFICANDO..."
+ *  La pantalla de "verificando..."
  */
 export function SplashVerificacion() {
     const [oculto, setOculto] = useState(false);

@@ -7,15 +7,15 @@ import type { InstitucionPortada } from '@/types/publico';
 
 /** Las anclas de la página larga. El orden es el de las secciones. */
 const SECCIONES = [
-    { id: 'servicios', texto: 'Servicios' },
-    { id: 'pasos', texto: 'Cómo tramitar' },
-    { id: 'verificacion', texto: 'Verificar carnet' },
+    { id: 'tramites', texto: 'Trámites' },
+    { id: 'pasos', texto: 'En ventanilla' },
+    { id: 'verificacion', texto: 'Verificar documento' },
     { id: 'preguntas', texto: 'Preguntas' },
     { id: 'contacto', texto: 'Contacto' },
 ];
 
 /**
- *  CABECERA INSTITUCIONAL — barra de contacto, escudo y navegación
+ *  Cabecera institucional — barra de contacto, escudo y navegación
  */
 export function Cabecera({ portada }: { portada: InstitucionPortada }) {
     const { auth } = usePage<PageProps>().props;

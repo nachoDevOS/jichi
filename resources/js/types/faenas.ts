@@ -35,7 +35,7 @@ export interface FaenaFila {
     kilos_extraidos: number;
 
     /**
-     * LOS RENGLONES DEL TALONARIO DE PAPEL. Null porque el formulario se llena
+     * Los renglones del talonario de papel. Null porque el formulario se llena
      * a mano y llega incompleto: no hay padrón de embarcaciones ni de
      * comandantes, así que son texto libre.
      */
@@ -90,7 +90,7 @@ export interface FaenaFicha extends FaenaFila {
     asociacion: string | null;
 
     /**
-     * LAS DEL CIRCUITO DE REVISIÓN, resueltas en el servidor. React no vuelve
+     * Las del circuito de revisión, resueltas en el servidor. React no vuelve
      * a evaluar el estado: pregunta por estas.
      */
     puede_enviarse: boolean;
