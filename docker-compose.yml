@@ -1,0 +1,69 @@
+# Jichi en local con Docker: la app en http://localhost:8090 y su PostgreSQL.
+# APP_KEY sale del .env del proyecto (compose lo lee para interpolar).
+# Uso y primer arranque: docker.md; decisiones: docs/DOCKER-TECNICO.md.
+
+services:
+  app:
+    build: .
+    image: jichi:local
+    ports:
+      # 8080 suele estar ocupado en el equipo; DOCKER_APP_PORT lo cambia
+      - "${DOCKER_APP_PORT:-8090}:8080"
+    environment:
+      APP_NAME: Jichi
+      # production: el seeder no vacía el dominio ni pide Faker (no está instalado)
+      APP_ENV: production
+      APP_DEBUG: "${DOCKER_APP_DEBUG:-true}"
+      APP_KEY: "${APP_KEY:?Falta APP_KEY en el .env}"
+      APP_URL: "http://localhost:${DOCKER_APP_PORT:-8090}"
+      APP_LOCALE: es
+      APP_FALLBACK_LOCALE: es
+      LOG_CHANNEL: stderr
+
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: jichi
+      DB_USERNAME: jichi
+      DB_PASSWORD: jichi
+
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      FILESYSTEM_DISK: local
+
+      JICHI_SEED_PASSWORD: "${JICHI_SEED_PASSWORD:-password}"
+
+      # serversideup/php: al arrancar corre storage:link, migrate --force y los caches
+      AUTORUN_ENABLED: "true"
+      PHP_OPCACHE_ENABLE: "1"
+      # El carnet sube cédula, aval y foto en un solo POST, hasta 3 MB cada uno
+      PHP_UPLOAD_MAX_FILE_SIZE: 4M
+      PHP_POST_MAX_SIZE: 16M
+      HEALTHCHECK_PATH: /up
+    volumes:
+      - adjuntos:/var/www/html/storage/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: jichi
+      POSTGRES_USER: jichi
+      POSTGRES_PASSWORD: jichi
+    # 5433 para no chocar con el PostgreSQL local
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jichi -d jichi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  adjuntos:
+  pgdata:

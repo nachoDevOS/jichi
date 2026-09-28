@@ -1,0 +1,28 @@
+.git
+.github
+.vscode
+.idea
+.env
+.env.*
+!.env.example
+
+node_modules
+vendor
+
+# public/hot haría que la página pida los assets al servidor de Vite
+public/hot
+public/build
+public/storage
+public/fonts-manifest.dev.json
+
+# La imagen arma storage/ vacía; los adjuntos van en un volumen
+storage
+bootstrap/cache/*.php
+
+docs
+tests
+*.log
+docker-compose.yml
+docker.md
+Dockerfile
+.dockerignore
