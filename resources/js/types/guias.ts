@@ -12,6 +12,8 @@ export interface OpcionGuia {
 
 /** Las diez columnas de tilde del cuadro D. */
 export interface OpcionCondicion extends OpcionGuia {
+    /** Lo que va adentro del grupo: «Entero» bajo «Congelado». */
+    corta: string;
     /** El encabezado de grupo del papel. Vacío en las columnas sueltas. */
     grupo: string;
 }
@@ -19,6 +21,8 @@ export interface OpcionCondicion extends OpcionGuia {
 /** Un renglón del cuadro D, como lo devuelve el servidor. */
 export interface DetalleGuia {
     id: number;
+    producto_id: number;
+    /** Copia del nombre del producto al emitir. */
     especie: string;
     condicion: string;
     condicion_etiqueta: string;
@@ -31,10 +35,19 @@ export interface DetalleGuia {
 export interface FilaDetalle {
     /** `key` estable de React: sin ella, quitar la del medio remonta las de abajo. */
     key: string;
-    especie: string;
+    /** Del catálogo: nombre y precio los pone el servidor. */
+    producto_id: string;
     condicion: string;
     cantidad_kg: string;
-    precio_kg: string;
+}
+
+/** Un producto elegible en el cuadro D. */
+export interface ProductoGuia {
+    id: number;
+    nombre: string;
+    precio_kg: number;
+    /** false: fuera de uso, solo aparece porque la guía ya lo tenía. */
+    estado: boolean;
 }
 
 /** Los renglones del papel, compartidos por el formulario y la ficha. */
@@ -166,11 +179,11 @@ export type CampoGuia = Exclude<keyof FormularioGuia, 'detalles'>;
 
 /** Los catálogos que los dos formularios reciben del servidor. */
 export interface CatalogosGuia {
+    productos: ProductoGuia[];
     medios: OpcionGuia[];
     tiposTransporte: OpcionGuia[];
     condiciones: OpcionCondicion[];
     diasVigencia: number;
-    tarifaBase: number;
     descuentoPiscicultura: number;
 }
 

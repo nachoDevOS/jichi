@@ -23,9 +23,9 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Dice | Embarcación, propietario, comandante, matrícula, kardex, región y kilos | Origen y destino, medio y vehículo, y la carga especie por especie |
 | Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
 | Además exige | Autorización de pesca **aprobada**, en fecha y con kilos libres | Nada más que el carnet vigente |
-| Arancel | 15 Bs — `JICHI_FAENA_TARIFA_BASE`, copiado en `permisos_faena.monto` | 50 Bs — `JICHI_GUIA_TARIFA_BASE`, **la mitad si es piscicultura**, copiado en `guias_movimiento.monto` |
+| Arancel | 15 Bs — `JICHI_FAENA_TARIFA_BASE`, copiado en `permisos_faena.monto` | **El total del cuadro D** (kilos × tasa del producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
 | Número | `numero_faena`, correlativo continuo del sistema | `numero_guia`, correlativo continuo del sistema |
-| Tiene detalle | No | Sí, `guia_detalles`: una fila por especie |
+| Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
 | Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |
 | Vale | 30 días desde la firma | 5 días desde la firma (se cuentan con hora) |
 | Termina en | `aprobado` (no se registra la vuelta) | `cerrada` al llegar la carga, o `anulada` |
@@ -89,11 +89,10 @@ los campos `puede_*` de la ficha.
   (`guias.anular`) y no se revierte. **Anular no es eliminar**: eliminar es
   sobre el borrador, donde nunca hubo papel. Las dos queman el número.
 
-> ⚠️ **Inconsistencia abierta:** la ficha solo ofrece anular una guía
-> `aprobado` (`GuiaController`, `puede_anularse`), pero el servicio acepta
-> anular también una pendiente o en revisión —solo rechaza la anulada y la
-> cerrada—. Además esa bandera se calcula con un `===` en el controlador en vez
-> de un método del enum. Anotado en [PENDIENTES.md](../PENDIENTES.md).
+Cerrar y anular los dicen `EstadoGuia::permiteCierre()` y `permiteAnulacion()`
+—solo `aprobado`—, y los usan el servicio (también sobre la fila bloqueada) y la
+ficha. Hasta el 27/09/2026 el servicio aceptaba anular un borrador o una guía en
+revisión aunque la pantalla no lo ofreciera.
 
 **La faena no se anula**: no tiene ese estado. Una faena aprobada solo deja de
 valer por fecha (`vencido`) o porque revocaron su autorización (`revocado`).
@@ -205,10 +204,20 @@ porque es la llave de `/verificar`. Ver [MER.md](../MER.md), tabla `codigos`.
 ## 5. La carga de la guía
 
 Vive en `guia_detalles`, una fila por especie, y calca el **cuadro D** del
-talonario: especie (texto libre, no hay padrón), condición (`CondicionProducto`,
-las diez columnas de tilde del papel), kilos, y precio e importe **declarados**
-—lo que el comerciante pagó en origen, que solo se imprime; lo que cobra caja
-sale de `guias_movimiento.monto`—.
+talonario: producto, condición (`CondicionProducto`, las diez columnas de tilde
+del papel), kilos, precio e importe.
+
+**El producto sale del catálogo** `productos_hidrobiologicos` —nombre, precio
+por kilo y estado, en Catálogos → Productos— desde el 27/09/2026. El formulario
+manda solo `producto_id`, condición y kilos; `EmitirGuiaService::normalizarDetalle()`
+copia el nombre y el precio del producto y calcula el importe. Lo que llegue del
+formulario como precio se ignora. Un producto inactivo no se elige en una guía
+nueva, pero al corregir una guía que ya lo tenía se conserva.
+
+**El precio ES lo que se cobra** (27/09/2026): la guía cobra la suma de los
+importes de su cuadro D, con el descuento de piscicultura, y la guarda en
+`guias_movimiento.monto` al emitir o corregir (`EmitirGuiaService::importeDe()`).
+El catálogo exige 0,20 Bs/kg como mínimo: en cero, la guía saldría gratis.
 
 `peso_total_kg` de la guía es la suma del cuadro D, guardada. Al corregir el
 borrador el detalle se **reemplaza entero**. La FK es CASCADE, pero la baja
@@ -239,6 +248,12 @@ En el menú lateral los dos van en el grupo **Ventanilla**, como «Faenas» y
 «Guías», junto a Beneficiarios, Aprov. Pesquero y Carnets. La faena también se
 emite desde la ficha de la autorización, que ya trae el carnet aprobado.
 
+**La ficha del carnet lista sus papeles, y desde ahí se emite el siguiente**: el
+de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitidas»
+(27/09/2026), cada una con su botón. El de la guía abre el formulario con
+`?carnet=`, que preelige a la persona y el carnet si está vigente
+(`GuiaController::create()`).
+
 ---
 
 ## 7. Lo que hay que saber antes de tocar el módulo
@@ -253,10 +268,20 @@ emite desde la ficha de la autorización, que ya trae el carnet aprobado.
 - **No se registra la vuelta de la faena** (retirado el 25/09/2026): termina en
   `aprobado` y sus kilos cuentan como consumidos. `Completado` sigue en el enum,
   pero hoy nada lleva a ese estado.
-- **Revocar el carnet NO toca sus faenas ni sus guías**: lo ya aprobado sigue
-  valiendo hasta su propia fecha. `PermisoFaena::estaVigente()` mira solo su
-  estado y su desembarque. **Revocar la AUTORIZACIÓN sí** revoca las faenas
-  aprobadas y vigentes —ver [REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md), Regla 5—.
+- **Revocar el carnet NO reescribe sus faenas ni sus guías, pero dejan de valer
+  mientras el titular no tenga OTRO carnet vigente de la actividad** (27/09/2026):
+  figuran «Sin efecto» y vuelven a valer solas cuando se aprueba el nuevo. Lo
+  decide `Carnet::amparaSusPapeles()` —el carnet propio vigente, o cualquier otro
+  del titular— y lo usan `estaVigente()`, `sinEfecto()` y `scopeVigentes()` de
+  `PermisoFaena` y `GuiaMovimiento` (en SQL, `Carnet::conCarnetVigenteDelTitular()`).
+  **Toda consulta que muestre el estado de una faena o una guía trae el carnet
+  con `estado` y `fecha_vencimiento` en el select**: sin ellos, `estaVigente()` del
+  carnet lee null y la pantalla se cae. **Revocar la AUTORIZACIÓN** no
+  reescribe las faenas: quedan `aprobado` pero **sin efecto** —no vigentes, no se
+  imprimen— porque su vigencia mira al padre. Ver
+  [REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md), Regla 5. Las consultas de faenas que
+  muestren el estado precargan `carnet.aprovechamiento` —con `aprovechamiento_id`
+  en el select del carnet— o «sin efecto» da falso en silencio.
 - **Los valores por defecto van también en `protected $attributes`** del modelo:
   un `default` de la base no llega al objeto que devuelve `create()`.
 - **Pedir columnas sueltas en un `with()` rompe los métodos del modelo en
@@ -283,7 +308,9 @@ emite desde la ficha de la autorización, que ya trae el carnet aprobado.
 | `app/Services/RevisarGuiaService.php` | Enviar, aprobar y rechazar la guía |
 | `app/Http/Controllers/Panel/FaenaController.php` / `GuiaController.php` | Listado, formulario, ficha y circuito |
 | `resources/js/pages/panel/faenas/`, `resources/js/pages/panel/guias/` | Las pantallas |
+| `app/Models/ProductoHidrobiologico.php`, `ProductoHidrobiologicoController.php` | El catálogo del cuadro D |
 | `tests/Feature/Aprovechamientos/ReservaFaenaTest.php` | La reserva de kilos, 6 casos |
+| `tests/Feature/Comercializador/`, `tests/Unit/ReglasGuiaTest.php` | El módulo del comercializador, 45 casos |
 
 ---
 

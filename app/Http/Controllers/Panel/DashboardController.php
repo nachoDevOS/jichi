@@ -271,6 +271,7 @@ class DashboardController extends Controller
                 'beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'asociacion:id,nombre,sigla',
                 'tipoCarnet',
+                'aprovechamiento:id,estado',
             ])
             ->withSum('pagos', 'monto_parcial')
             ->latest('fecha_emision')
@@ -285,8 +286,8 @@ class DashboardController extends Controller
                 'tipo_actor_etiqueta' => $c->tipo_actor->etiqueta(),
                 'tipo_actor_color' => $c->tipo_actor->color(),
                 'estado' => $c->estado->value,
-                'estado_etiqueta' => $c->estado->etiqueta(),
-                'estado_color' => $c->estado->color(),
+                'estado_etiqueta' => $c->etiquetaEstado(),
+                'estado_color' => $c->colorEstado(),
                 'monto' => $c->montoACobrar(),
                 'saldo_pendiente' => $c->saldoPendiente(),
                 // Es un DÍA, no un instante: va con toDateString(). Mandado como

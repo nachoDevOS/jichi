@@ -79,13 +79,11 @@ class EmitirGuiaRequest extends FormRequest
              *  ampara nada y solo gastaría una hoja del talonario.
              */
             'detalles' => ['required', 'array', 'min:1', 'max:20'],
-            'detalles.*.especie' => ['required', 'string', 'max:120'],
+            // Nombre y precio NO vienen del formulario: los copia el servicio del
+            // catálogo. Que esté activo lo decide EmitirGuiaService.
+            'detalles.*.producto_id' => ['required', 'integer', Rule::exists('productos_hidrobiologicos', 'id')->whereNull('deleted_at')],
             'detalles.*.condicion' => ['required', Rule::enum(CondicionProducto::class)],
             'detalles.*.cantidad_kg' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
-            // El precio SÍ puede ser cero: es dato declarativo de lo que el
-            // comerciante pagó en origen, y a veces no lo informa.
-            'detalles.*.precio_kg' => ['nullable', 'numeric', 'min:0', 'max:9999999999', 'decimal:0,2'],
-            'detalles.*.importe_total' => ['nullable', 'numeric', 'min:0', 'max:9999999999', 'decimal:0,2'],
         ];
     }
 
@@ -103,7 +101,8 @@ class EmitirGuiaRequest extends FormRequest
             'fecha_solicitud.before_or_equal' => 'La fecha de solicitud no puede ser futura.',
             'detalles.required' => 'Cargue al menos una especie en el detalle.',
             'detalles.min' => 'Cargue al menos una especie en el detalle.',
-            'detalles.*.especie.required' => 'Escriba la especie de este renglón.',
+            'detalles.*.producto_id.required' => 'Elija el producto de este renglón.',
+            'detalles.*.producto_id.exists' => 'Ese producto no está en el catálogo.',
             'detalles.*.condicion.required' => 'Indique cómo viaja esta especie.',
             'detalles.*.cantidad_kg.required' => 'Indique los kilos de este renglón.',
             'detalles.*.cantidad_kg.gt' => 'Los kilos tienen que ser mayores que cero.',
@@ -116,11 +115,11 @@ class EmitirGuiaRequest extends FormRequest
         /*
          * LAS FILAS VACÍAS SE DESCARTAN ACÁ. El formulario manda los cinco
          * renglones del papel y el operador llena los que usa; sin esto, las
-         * vacías se validarían y el submit fallaría pidiendo una especie que
-         * nadie quiso escribir.
+         * vacías se validarían y el submit fallaría pidiendo un producto que
+         * nadie quiso elegir.
          */
         $detalles = collect((array) $this->input('detalles', []))
-            ->filter(fn ($fila): bool => is_array($fila) && trim((string) ($fila['especie'] ?? '')) !== '')
+            ->filter(fn ($fila): bool => is_array($fila) && ! empty($fila['producto_id']))
             ->values()
             ->all();
 

@@ -111,6 +111,9 @@ vez de esconderlos y dejar al operador preguntándose qué pasó.
 
 ## 3. ¿Quien carga puede validar? — es CONFIGURABLE
 
+> ⚠️ **Al 27/09/2026 la clave existe pero NINGÚN código la lee**: encenderla no
+> cambia nada. Ver [PENDIENTES.md](../PENDIENTES.md).
+
 `registrado_por` y `validado_por` son dos columnas distintas, así que **siempre
 queda registrado** quién hizo cada cosa. Lo que se puede encender o apagar es si
 el sistema EXIGE que sean personas distintas:

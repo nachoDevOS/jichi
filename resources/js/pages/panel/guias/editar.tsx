@@ -23,9 +23,9 @@ export default function EditarGuia({
     guia,
     medios,
     tiposTransporte,
+    productos,
     condiciones,
     diasVigencia,
-    tarifaBase,
     descuentoPiscicultura,
 }: CatalogosGuia & { guia: GuiaEditable }) {
     // `general` no es un campo del formulario, así que no está en form.errors:
@@ -61,10 +61,9 @@ export default function EditarGuia({
                 ? guia.detalles.map(
                       (d): FilaDetalle => ({
                           key: `d-${d.id}`,
-                          especie: d.especie,
+                          producto_id: String(d.producto_id),
                           condicion: d.condicion,
                           cantidad_kg: String(d.cantidad_kg),
-                          precio_kg: String(d.precio_kg),
                       }),
                   )
                 : [filaVacia()],
@@ -75,14 +74,21 @@ export default function EditarGuia({
         form.patch(route('guias.update', guia.id));
     }
 
-    const monto = form.data.es_piscicultura ? tarifaBase * (1 - descuentoPiscicultura) : tarifaBase;
+    // Se cobra el total del cuadro D: kilos × precio del catálogo. El servidor lo recalcula al guardar.
+    const importe = form.data.detalles.reduce(
+        (suma, f) =>
+            suma +
+            Number(f.cantidad_kg || 0) * (productos.find((p) => String(p.id) === f.producto_id)?.precio_kg ?? 0),
+        0,
+    );
+    const monto = form.data.es_piscicultura ? importe * (1 - descuentoPiscicultura) : importe;
     const kilos = form.data.detalles.reduce((suma, f) => suma + Number(f.cantidad_kg || 0), 0);
 
     const completo =
         form.data.origen.trim() !== '' &&
         form.data.destino.trim() !== '' &&
         form.data.detalles.some(
-            (f) => f.especie.trim() !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
+            (f) => f.producto_id !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
         );
 
     return (
@@ -148,6 +154,7 @@ export default function EditarGuia({
                         <CardContent>
                             <TablaDetalle
                                 filas={form.data.detalles}
+                                productos={productos}
                                 condiciones={condiciones}
                                 errores={form.errors}
                                 onCambiar={(filas) => form.setData('detalles', filas)}
@@ -173,7 +180,7 @@ export default function EditarGuia({
                             {form.data.es_piscicultura && (
                                 <p className="text-xs text-muted-foreground">
                                     Con el descuento de piscicultura. Sin él serían{' '}
-                                    {bs(tarifaBase, institucion.moneda)}.
+                                    {bs(importe, institucion.moneda)}.
                                 </p>
                             )}
                         </div>

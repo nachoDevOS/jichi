@@ -19,6 +19,7 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
+use App\Models\GuiaMovimiento;
 use App\Models\Pago;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
@@ -322,18 +323,39 @@ class CarnetController extends Controller
             'faenas' => $carnet->faenas()
                 ->latest('numero_faena')
                 ->get()
+                ->each(fn (PermisoFaena $f) => $f->setRelation('carnet', $carnet))
                 ->map(fn (PermisoFaena $f): array => [
                     'id' => $f->id,
                     'numero_legible' => $f->numero_legible,
                     'kilos_extraidos' => (float) $f->kilos_extraidos,
-                    'estado_etiqueta' => $f->estado->etiqueta(),
-                    'estado_color' => $f->estado->color(),
+                    'estado_etiqueta' => $f->etiquetaEstado(),
+                    'estado_color' => $f->colorEstado(),
                     'vigente' => $f->estaVigente(),
                     'region_desde' => $f->region_desde,
                     'region_hasta' => $f->region_hasta,
                     'fecha_solicitud' => $f->fecha_solicitud?->toDateString(),
                     'fecha_salida' => $f->fecha_salida?->toDateString(),
                     'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
+                ])
+                ->all(),
+
+            // Los traslados emitidos con ESTE carnet. Al revocarlo siguen valiendo.
+            'guias' => $carnet->guias()
+                ->latest('numero_guia')
+                ->get()
+                ->map(fn (GuiaMovimiento $g): array => [
+                    'id' => $g->id,
+                    'numero_legible' => $g->numero_legible,
+                    'estado_etiqueta' => $g->etiquetaEstado(),
+                    'estado_color' => $g->colorEstado(),
+                    'vigente' => $g->estaVigente(),
+                    'origen' => $g->origen,
+                    'destino' => $g->destino,
+                    'peso_total_kg' => (float) $g->peso_total_kg,
+                    'es_piscicultura' => (bool) $g->es_piscicultura,
+                    // MOMENTOS: los cinco días se cuentan con hora.
+                    'fecha_emision' => $g->fecha_emision?->toIso8601String(),
+                    'fecha_vencimiento' => $g->fecha_vencimiento?->toIso8601String(),
                 ])
                 ->all(),
 
@@ -730,9 +752,11 @@ class CarnetController extends Controller
             'recibo_numero' => $recibo?->numero_recibo,
 
             'estado' => $carnet->estado->value,
-            'estado_etiqueta' => $carnet->estado->etiqueta(),
-            'estado_color' => $carnet->estado->color(),
+            'estado_etiqueta' => $carnet->etiquetaEstado(),
+            'estado_color' => $carnet->colorEstado(),
             'vigente' => $carnet->estaVigente(),
+            'sin_efecto' => $carnet->sinEfecto(),
+            'puede_imprimirse' => $carnet->puedeImprimirse(),
             'dias_para_vencer' => $carnet->diasParaVencer(),
 
             'puede_emitir_faenas' => $carnet->puedeEmitirFaenas(),

@@ -107,6 +107,21 @@ enum EstadoGuia: string
      * ⚠️ NO ES PERMISO DE TRASLADO —para eso está `habilita()`— ni de
      * escritura: eso lo dicen `permiteEdicion()` y `permiteEliminacion()`.
      */
+    /** ¿Se registra que la carga llegó? Solo la firmada. */
+    public function permiteCierre(): bool
+    {
+        return $this === self::Aprobada;
+    }
+
+    /**
+     * ¿Se anula? Solo la FIRMADA, cuyo papel está en la calle: el borrador se
+     * elimina y la presentada se rechaza. La cerrada ya cumplió.
+     */
+    public function permiteAnulacion(): bool
+    {
+        return $this === self::Aprobada;
+    }
+
     public function estaAbierto(): bool
     {
         return $this === self::Pendiente || $this === self::EnRevision;

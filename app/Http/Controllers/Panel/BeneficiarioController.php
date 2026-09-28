@@ -171,6 +171,7 @@ class BeneficiarioController extends Controller
             // Lo que cuelga de cada carnet: las salidas del pescador y los
             // traslados del comercializador. Ver la pestaña de cada actividad.
             'faenas' => $beneficiario->faenas()
+                ->with('carnet.aprovechamiento:id,estado')
                 ->withSum('pagos', 'monto_parcial')
                 ->orderByDesc('permisos_faena.numero_faena')
                 ->get()
@@ -180,8 +181,8 @@ class BeneficiarioController extends Controller
                     'numero_legible' => $f->numero_legible,
                     'kilos_extraidos' => (float) $f->kilos_extraidos,
                     'estado' => $f->estado->value,
-                    'estado_etiqueta' => $f->estado->etiqueta(),
-                    'estado_color' => $f->estado->color(),
+                    'estado_etiqueta' => $f->etiquetaEstado(),
+                    'estado_color' => $f->colorEstado(),
                     'vigente' => $f->estaVigente(),
                     'caducada' => $f->estaCaducada(),
                     'monto' => $f->montoACobrar(),
@@ -213,8 +214,8 @@ class BeneficiarioController extends Controller
                     'ruta' => $g->ruta,
                     'peso_total_kg' => (float) $g->peso_total_kg,
                     'estado' => $g->estado->value,
-                    'estado_etiqueta' => $g->estado->etiqueta(),
-                    'estado_color' => $g->estado->color(),
+                    'estado_etiqueta' => $g->etiquetaEstado(),
+                    'estado_color' => $g->colorEstado(),
                     'vigente' => $g->estaVigente(),
                     'caducada' => $g->estaCaducada(),
                     'monto' => $g->montoACobrar(),
@@ -480,8 +481,8 @@ class BeneficiarioController extends Controller
             'dias_para_vencer' => $carnet->diasParaVencer(),
             'fecha_solicitud' => $carnet->fecha_solicitud?->toDateString(),
             'estado' => $carnet->estado->value,
-            'estado_etiqueta' => $carnet->estado->etiqueta(),
-            'estado_color' => $carnet->estado->color(),
+            'estado_etiqueta' => $carnet->etiquetaEstado(),
+            'estado_color' => $carnet->colorEstado(),
             'vigente' => $carnet->estaVigente(),
             'monto' => $carnet->montoACobrar(),
             'saldo_pendiente' => $carnet->saldoPendiente(),

@@ -239,7 +239,78 @@ class Carnet extends Model
     {
         return $this->estado->habilita()
             && $this->fecha_vencimiento !== null
-            && $this->fecha_vencimiento->endOfDay()->isFuture();
+            && $this->fecha_vencimiento->endOfDay()->isFuture()
+            && ! $this->autorizacionRevocada();
+    }
+
+    /**
+     * ¿Su autorización fue revocada? Revocarla NO reescribe el carnet: queda
+     * `aprobado`, pero sin efecto. La vigencia se calcula mirando al padre.
+     */
+    public function autorizacionRevocada(): bool
+    {
+        return $this->aprovechamiento_id !== null
+            && $this->aprovechamiento?->estado === EstadoAprovechamiento::Revocado;
+    }
+
+    /**
+     * ¿Este carnet —o el que lo reemplazó— ampara HOY los papeles que emitió?
+     * La faena o la guía de un carnet perdido y revocado sigue valiendo solo si
+     * el titular ya tiene otro carnet aprobado y vigente de la misma actividad.
+     */
+    public function amparaSusPapeles(): bool
+    {
+        return $this->estaVigente()
+            || self::query()
+                ->vigentes()
+                ->deTipo($this->tipo_actor)
+                ->where('beneficiario_id', $this->beneficiario_id)
+                ->exists();
+    }
+
+    /**
+     * La misma pregunta en SQL, para los `scopeVigentes()` de faenas y guías:
+     * el carnet del papel pertenece a alguien con un carnet vigente de esa actividad.
+     */
+    public static function conCarnetVigenteDelTitular(Builder $carnets, TipoActor $actor): Builder
+    {
+        return $carnets->whereIn(
+            'carnets.beneficiario_id',
+            self::query()->vigentes()->deTipo($actor)->select('carnets.beneficiario_id'),
+        );
+    }
+
+    /** El texto de «sin efecto» para el QR y las fichas, o null. */
+    public function motivoSinEfecto(): ?string
+    {
+        return $this->sinEfecto()
+            ? 'Su Autorización de Pesca para Aprovechamiento Pesquero fue revocada.'
+            : null;
+    }
+
+    /** Aprobado pero con la autorización revocada: se muestra así en todo el panel. */
+    public function sinEfecto(): bool
+    {
+        return $this->estado === EstadoCarnet::Aprobado && $this->autorizacionRevocada();
+    }
+
+    /** La etiqueta de estado que ven las pantallas: «Sin efecto» manda sobre «Aprobado». */
+    public function etiquetaEstado(): string
+    {
+        return $this->sinEfecto() ? 'Sin efecto' : $this->estado->etiqueta();
+    }
+
+    public function colorEstado(): string
+    {
+        return $this->sinEfecto() ? 'rose' : $this->estado->color();
+    }
+
+    /** ¿Se imprime el plástico? Firmado, no revocado y con la autorización viva. */
+    public function puedeImprimirse(): bool
+    {
+        return $this->yaFueAprobado()
+            && $this->estado !== EstadoCarnet::Revocado
+            && ! $this->autorizacionRevocada();
     }
 
     /**
@@ -268,6 +339,8 @@ class Carnet extends Model
             $this->estado === EstadoCarnet::EnRevision => 'El carnet está presentado y esperando '
                 .'la firma de quien lo aprueba.',
             $this->estado === EstadoCarnet::Revocado => 'El carnet está revocado.',
+            $this->autorizacionRevocada() => 'Sin efecto: su Autorización de Pesca para Aprovechamiento '
+                .'Pesquero fue revocada. Hace falta una autorización nueva y un carnet nuevo.',
             ! $this->estaVigente() => 'El carnet venció: hay que emitir el de la gestión en curso.',
             default => null,
         };
@@ -373,7 +446,10 @@ class Carnet extends Model
     {
         return $query
             ->where($this->qualifyColumn('estado'), EstadoCarnet::Aprobado)
-            ->whereDate($this->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString());
+            ->whereDate($this->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString())
+            // Sin efecto no ocupa el lugar: si no, la persona no podría sacar el carnet nuevo.
+            ->whereDoesntHave('aprovechamiento', fn (Builder $a) => $a
+                ->where('aprovechamientos_pesq.estado', EstadoAprovechamiento::Revocado));
     }
 
     public function scopeDeTipo(Builder $query, TipoActor $tipo): Builder

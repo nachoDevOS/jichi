@@ -38,6 +38,12 @@ class EmitirFaenaService
             throw PermisoOperativoException::actorNoEmite('permisos de faena', $carnet->tipo_actor);
         }
 
+        // Antes que la vigencia: sin efecto, el carnet dice «aprobado» y el mensaje
+        // genérico hablaría de una fecha que no es el problema.
+        if ($carnet->autorizacionRevocada()) {
+            throw PermisoOperativoException::cupoRevocado();
+        }
+
         if (! $carnet->estaVigente()) {
             throw PermisoOperativoException::carnetNoVigente($carnet->estado);
         }

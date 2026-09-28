@@ -53,8 +53,12 @@ export interface CarnetFila {
     /** Corregir y eliminar: solo sobre el borrador, y sin plata cargada. */
     puede_editarse: boolean;
     puede_eliminarse: boolean;
-    /** Si pasó por la firma. Es lo que habilita imprimir el carnet. */
+    /** Si pasó por la firma. */
     ya_fue_aprobado: boolean;
+    /** Aprobado, pero su autorización fue revocada: no habilita nada. */
+    sin_efecto: boolean;
+    /** Firmado, no revocado y con la autorización viva. */
+    puede_imprimirse: boolean;
     /** Negativo si ya venció. Null si no tiene fecha. */
     dias_para_vencer: number | null;
 
@@ -88,6 +92,22 @@ export interface FaenaDelCarnet {
     fecha_solicitud: string | null;
     fecha_salida: string | null;
     fecha_desembarque: string | null;
+}
+
+/** Una guía en la ficha del carnet de comercializador. */
+export interface GuiaDelCarnet {
+    id: number;
+    numero_legible: string;
+    estado_etiqueta: string;
+    estado_color: string;
+    vigente: boolean;
+    origen: string;
+    destino: string;
+    peso_total_kg: number;
+    es_piscicultura: boolean;
+    /** Momentos, no días: los cinco días se cuentan con hora. */
+    fecha_emision: string | null;
+    fecha_vencimiento: string | null;
 }
 
 export interface CarnetFicha extends CarnetFila {

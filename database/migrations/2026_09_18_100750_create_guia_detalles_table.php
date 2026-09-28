@@ -24,7 +24,9 @@ return new class extends Migration
              */
             $table->foreignId('guia_movimiento_id')->index()->constrained('guias_movimiento')->cascadeOnDelete();
 
-            // Texto libre: no hay padrón de especies del Beni.
+            // Del catálogo, y además COPIADOS: el papel entregado no cambia si
+            // mañana se corrige el nombre o el precio del producto.
+            $table->foreignId('producto_id')->index()->constrained('productos_hidrobiologicos')->restrictOnDelete();
             $table->string('especie', 120);
 
             // Las DIEZ columnas de tilde del cuadro, en una sola. Ver el enum.
@@ -32,10 +34,9 @@ return new class extends Migration
 
             $table->decimal('cantidad_kg', 12, 2)->default(0)->comment('CANT. ADQUIRIDA');
 
-            // DECLARATIVOS: lo que el comerciante pagó en origen, no el arancel
-            // del SEDAG, que sale de `guias_movimiento.monto`.
-            $table->decimal('precio_kg', 12, 2)->default(0);
-            $table->decimal('importe_total', 12, 2)->default(0);
+            // La tasa del producto al emitir; la suma de importes es `guias_movimiento.monto`.
+            $table->decimal('precio_kg', 12, 2)->default(0)->comment('Copia del producto');
+            $table->decimal('importe_total', 12, 2)->default(0)->comment('cantidad_kg × precio_kg');
 
             $table->timestamps();
             $table->softDeletes();

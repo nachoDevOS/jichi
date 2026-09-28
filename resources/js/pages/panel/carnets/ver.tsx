@@ -26,10 +26,10 @@ import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn, fecha } from '@/lib/utils';
+import { bs, cn, fecha, fechaHora } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
-import type { CarnetFicha, FaenaDelCarnet } from '@/types/carnets';
+import type { CarnetFicha, FaenaDelCarnet, GuiaDelCarnet } from '@/types/carnets';
 
 /**
  *  LA FICHA DE UN CARNET
@@ -39,11 +39,13 @@ export default function VerCarnet({
     pagos,
     recibo,
     faenas,
+    guias,
 }: {
     carnet: CarnetFicha;
     pagos: PagoDelCupo[];
     recibo: ReciboDelCupo | null;
     faenas: FaenaDelCarnet[];
+    guias: GuiaDelCarnet[];
 }) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
@@ -157,7 +159,7 @@ export default function VerCarnet({
                     )}
 
                     {/* El plástico sale recién con el carnet firmado. */}
-                    {puede('carnets.imprimir') && carnet.ya_fue_aprobado && (
+                    {puede('carnets.imprimir') && carnet.puede_imprimirse && (
                         <a href={route('carnets.imprimir', carnet.id)} target="_blank" rel="noopener">
                             <Button variant="outline">
                                 <Printer className="size-4" />
@@ -182,18 +184,6 @@ export default function VerCarnet({
                         </a>
                     )}
 
-                    {puede('guias.crear') && carnet.puede_emitir_guias && (
-                        <Button
-                            onClick={() =>
-                                router.visit(
-                                    route('guias.create', { beneficiario: carnet.beneficiario_id }),
-                                )
-                            }
-                        >
-                            <Truck className="size-4" />
-                            Emitir guía
-                        </Button>
-                    )}
                 </div>
             }
         >
@@ -554,6 +544,77 @@ export default function VerCarnet({
                                             <td className="px-5 py-2.5 text-muted-foreground">{fecha(f.fecha_salida)}</td>
                                             <td className="px-5 py-2.5 text-muted-foreground">
                                                 {fecha(f.fecha_desembarque)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </CardContent>
+                    )}
+                </Card>
+            )}
+
+            {/* LOS TRASLADOS DE ESTE CARNET, espejo de las faenas. Revocarlo no los anula. */}
+            {carnet.tipo_actor === 'comercializador' && carnet.ya_fue_aprobado && (
+                <Card className="mt-6 min-w-0">
+                    <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+                        <CardTitle>Guías emitidas</CardTitle>
+
+                        {/* `puede_emitir_guias` exige el carnet vigente. */}
+                        {puede('guias.crear') && carnet.puede_emitir_guias && (
+                            <Button
+                                size="sm"
+                                onClick={() => router.visit(route('guias.create', { carnet: carnet.id }))}
+                            >
+                                <Truck className="size-4" />
+                                Emitir guía
+                            </Button>
+                        )}
+                    </CardHeader>
+
+                    {guias.length === 0 ? (
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">Todavía no se emitió ninguna guía con este carnet.</p>
+                        </CardContent>
+                    ) : (
+                        <CardContent className="overflow-x-auto p-0">
+                            <table className="w-full text-sm">
+                                <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                    <tr>
+                                        <th className="px-5 py-2.5 font-medium">N°</th>
+                                        <th className="px-5 py-2.5 font-medium">Estado</th>
+                                        <th className="px-5 py-2.5 font-medium">Ruta</th>
+                                        <th className="px-5 py-2.5 text-right font-medium">Peso</th>
+                                        <th className="px-5 py-2.5 font-medium">Emitida</th>
+                                        <th className="px-5 py-2.5 font-medium">Vence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {guias.map((g) => (
+                                        <tr key={g.id} className="border-b border-border last:border-0">
+                                            <td className="px-5 py-2.5">
+                                                <Link
+                                                    href={route('guias.show', g.id)}
+                                                    className="font-mono text-primary hover:underline"
+                                                >
+                                                    {g.numero_legible}
+                                                </Link>
+                                            </td>
+                                            <td className="px-5 py-2.5">
+                                                <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
+                                            </td>
+                                            <td className="px-5 py-2.5 text-muted-foreground">
+                                                {g.origen} → {g.destino}
+                                                {g.es_piscicultura && (
+                                                    <Badge color="sky" className="ml-2">
+                                                        Piscicultura
+                                                    </Badge>
+                                                )}
+                                            </td>
+                                            <td className="px-5 py-2.5 text-right tabular-nums">{g.peso_total_kg} kg</td>
+                                            <td className="px-5 py-2.5 text-muted-foreground">{fechaHora(g.fecha_emision)}</td>
+                                            <td className="px-5 py-2.5 text-muted-foreground">
+                                                {fechaHora(g.fecha_vencimiento)}
                                             </td>
                                         </tr>
                                     ))}

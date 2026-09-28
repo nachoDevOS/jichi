@@ -229,7 +229,8 @@ una fecha en NULL dice «todavía no pasó» sin posibilidad de contradicción.
 >
 > **QUIÉN CARGÓ Y QUIÉN VALIDÓ SE GUARDAN SIEMPRE**, en dos columnas distintas.
 > Que el sistema EXIJA que sean personas distintas es configurable
-> —`pagos.revisor_distinto`, apagado por defecto—: encendido con un solo usuario
+> —`pagos.revisor_distinto`, apagado por defecto y **todavía no implementado**,
+> ver PENDIENTES—: encendido con un solo usuario
 > deja el circuito trabado, porque la misma cuenta carga y no puede validar.
 >
 > **El control es parte de la REVISIÓN**: solo se valida con el trámite EN
@@ -514,27 +515,23 @@ El procedimiento detallado está en
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
+php artisan test        # las 200 pruebas, ~30 s
 ```
 
-> ⚠️ **CASI NO HAY PRUEBAS AUTOMÁTICAS.** `tests/Feature/` se vació el 14/09/2026
-> por pedido del responsable del proyecto. Eran 143 y cubrían el backend entero.
-> Desde el 27/09/2026 hay dos: `RevocacionTest` (19 casos de la revocación de la
-> autorización) y `ReservaFaenaTest` (6 casos de la reserva de kilos de la faena
-> pendiente). Correr `php artisan test` antes de tocar esas reglas.
+> **LAS PRUEBAS VOLVIERON el 27/09/2026: 200, sobre SQLite en memoria.** Cubren
+> los siete pasos de REGLAS-NEGOCIO: beneficiarios, autorización (circuito,
+> revocación, agotado), carnets (pescador, comercializador, reposición), faenas
+> (circuito, reserva de kilos), guías y productos, caja, recibos y control de
+> boletas, catálogos, permisos de cada pantalla y verificación pública, más las
+> reglas puras en `tests/Unit/`. El mapa está en
+> [docs/MAPA-ARCHIVOS.md](docs/MAPA-ARCHIVOS.md#tests). **Una regla nueva va con
+> su prueba**, y se comprueba que la prueba sirve rompiendo la regla a propósito
+> y viendo que falla. El camino armado de ventanilla —otorgar, cobrar, enviar,
+> validar, aprobar— está en `tests/Concerns/ArmaEscenarios.php`.
 >
-> **Consecuencia práctica, y hay que tenerla presente en cada cambio:** nada
-> avisa si se rompe una regla de negocio. Que se apruebe un trámite sin cobrar,
-> que se emitan dos carnets a la misma persona en un año, que un recibo
-> reimpreso salga con otro número, que alguien suba un archivo salteando
-> `StorageController` — todo eso pasaba a rojo en 18 segundos y ahora **solo se
-> descubre en ventanilla**.
->
-> Por eso, mientras no vuelvan: **todo cambio se verifica abriendo la pantalla en
-> el navegador y probando el caso a mano**, incluidos los bordes. Los tres
-> comandos de arriba revisan tipos y formato; de la lógica no dicen nada.
->
-> El respaldo de las que había está anotado en
-> [docs/PENDIENTES.md](docs/PENDIENTES.md).
+> **Y siguen sin cubrir** las pantallas por dentro (React no tiene pruebas) y
+> que `StorageController` sea el único que sube archivos. Por eso **todo cambio
+> de pantalla se verifica además en el navegador**.
 
 Los cuatro tienen que pasar.
 
@@ -785,6 +782,21 @@ Los cuatro tienen que pasar.
   `sincronizarEstadoPorSaldo()` la habría REVIVIDO a `aprobado` al anular una
   faena. Además de los scopes, revisar **todo método que salte el estado a
   propósito** y todo `update` a un estado fijo.
+- **La vigencia de un carnet o una faena de pescador MIRA A SU AUTORIZACIÓN**
+  (27/09/2026). Revocar la autorización no reescribe a los hijos: quedan
+  `aprobado` pero «sin efecto». Por eso `estaVigente()`, `sinEfecto()` y
+  `etiquetaEstado()` leen `aprovechamiento.estado`, y **toda consulta que los use
+  precarga la autorización** —en la faena, `carnet.aprovechamiento` con
+  `aprovechamiento_id` en el select del carnet—, o dan falso en silencio. Y un
+  `where('estado', 'aprobado')` suelto NO es «vigente»: se usa el scope
+  `vigentes()`, que excluye a los que quedaron sin efecto.
+
+  **Y la faena y la guía miran además a su CARNET** (27/09/2026): valen solo si
+  el titular tiene un carnet vigente de la actividad —el suyo o el que lo
+  reemplazó—, ver `Carnet::amparaSusPapeles()`. Por eso todo `with('carnet:…')`
+  de faenas o guías lleva `estado`, `fecha_vencimiento`, `beneficiario_id`,
+  `tipo_actor` y `aprovechamiento_id`; sin `estado`, el carnet devuelve null y
+  `estaVigente()` revienta.
 - **Un método que «revive» un registro puede activar lo que nunca se autorizó.**
   El viejo `ampliar()` —retirado el 19/09/2026— escribía `estado = Activo` a
   secas para revivir un cupo agotado; cuando apareció `pendiente`, ampliar pasó a

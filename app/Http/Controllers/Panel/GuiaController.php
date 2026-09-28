@@ -22,6 +22,7 @@ use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
 use App\Models\Pago;
+use App\Models\ProductoHidrobiologico;
 use App\Models\Recibo;
 use App\Services\CobrarService;
 use App\Services\EmitirGuiaService;
@@ -64,7 +65,7 @@ class GuiaController extends Controller
             // cinco partes del nombre y las tres de la cédula, porque
             // `nombreCompleto` y `documento_identidad` las concatenan.
             ->with([
-                'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision',
+                'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
                 'carnet.codigo',
                 'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'asociacion:id,nombre,sigla',
@@ -116,8 +117,15 @@ class GuiaController extends Controller
      */
     public function create(Request $request): Response
     {
-        $beneficiario = $request->integer('beneficiario')
-            ? Beneficiario::query()->find($request->integer('beneficiario'))
+        // `?carnet=` llega desde la ficha del carnet: resuelve también a la persona.
+        $carnetElegido = $request->integer('carnet')
+            ? Carnet::query()->find($request->integer('carnet'))
+            : null;
+
+        $beneficiarioId = $carnetElegido?->beneficiario_id ?? $request->integer('beneficiario');
+
+        $beneficiario = $beneficiarioId
+            ? Beneficiario::query()->find($beneficiarioId)
             : null;
 
         return Inertia::render('panel/guias/crear', [
@@ -138,6 +146,9 @@ class GuiaController extends Controller
                     ->values()
                     ->all(),
             ] : null,
+
+            // Se preelige solo si figura entre los vigentes: el formulario no lo valida.
+            'carnetElegido' => $carnetElegido?->id,
 
             ...$this->catalogosDelFormulario(),
         ]);
@@ -185,7 +196,7 @@ class GuiaController extends Controller
         }
 
         $guia->load([
-            'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision',
+            'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'detalles',
@@ -208,7 +219,8 @@ class GuiaController extends Controller
                 'detalles' => $this->resumirDetalle($guia),
             ],
 
-            ...$this->catalogosDelFormulario(),
+            // Los que la guía ya usa siguen en la lista aunque hoy estén fuera de uso.
+            ...$this->catalogosDelFormulario($guia->detalles->pluck('producto_id')->all()),
         ]);
     }
 
@@ -259,7 +271,7 @@ class GuiaController extends Controller
     public function show(GuiaMovimiento $guia): Response
     {
         $guia->load([
-            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,nro_registro,fecha_emision',
+            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,nro_registro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'asociacion:id,nombre,sigla',
@@ -531,14 +543,24 @@ class GuiaController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function catalogosDelFormulario(): array
+    private function catalogosDelFormulario(array $ademas = []): array
     {
         return [
+            'productos' => ProductoHidrobiologico::query()
+                ->where(fn ($q) => $q->where('estado', true)->orWhereIn('id', $ademas))
+                ->orderBy('nombre')
+                ->get(['id', 'nombre', 'precio_kg', 'estado'])
+                ->map(fn (ProductoHidrobiologico $p): array => [
+                    'id' => $p->id,
+                    'nombre' => $p->nombre,
+                    'precio_kg' => (float) $p->precio_kg,
+                    'estado' => (bool) $p->estado,
+                ])
+                ->all(),
             'medios' => MedioTransporte::opciones(),
             'tiposTransporte' => TipoTransporte::opciones(),
             'condiciones' => CondicionProducto::opciones(),
             'diasVigencia' => GuiaMovimiento::DIAS_VIGENCIA,
-            'tarifaBase' => GuiaMovimiento::tarifaVigente(),
             'descuentoPiscicultura' => GuiaMovimiento::DESCUENTO_PISCICULTURA,
         ];
     }
@@ -601,6 +623,7 @@ class GuiaController extends Controller
         return $guia->detalles
             ->map(fn (GuiaDetalle $d): array => [
                 'id' => $d->id,
+                'producto_id' => $d->producto_id,
                 'especie' => $d->especie,
                 'condicion' => $d->condicion->value,
                 'condicion_etiqueta' => $d->condicion->etiqueta(),
@@ -648,8 +671,8 @@ class GuiaController extends Controller
             'factor_arancel' => $guia->factorArancel(),
 
             'estado' => $guia->estado->value,
-            'estado_etiqueta' => $guia->estado->etiqueta(),
-            'estado_color' => $guia->estado->color(),
+            'estado_etiqueta' => $guia->etiquetaEstado(),
+            'estado_color' => $guia->colorEstado(),
             'vigente' => $guia->estaVigente(),
             'caducada' => $guia->estaCaducada(),
             'horas_restantes' => $guia->horasRestantes(),
@@ -658,8 +681,8 @@ class GuiaController extends Controller
             // Se resuelven acá para que la pantalla no las recalcule.
             'puede_editarse' => $guia->puedeEditarse(),
             'puede_eliminarse' => $guia->puedeEliminarse(),
-            'puede_cerrarse' => $guia->estado === EstadoGuia::Aprobada,
-            'puede_anularse' => $guia->estado === EstadoGuia::Aprobada,
+            'puede_cerrarse' => $guia->estado->permiteCierre(),
+            'puede_anularse' => $guia->estado->permiteAnulacion(),
             'ya_fue_aprobada' => $guia->yaFueAprobada(),
             'admite_pagos' => $guia->admitePagos(),
             // Por qué todavía no ampara. Se resuelve en el servidor: React no

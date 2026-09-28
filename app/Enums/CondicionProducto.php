@@ -39,6 +39,17 @@ enum CondicionProducto: string
         };
     }
 
+    /** Lo que va adentro del grupo en el desplegable: «Entero» bajo «Congelado». */
+    public function subetiqueta(): string
+    {
+        return match ($this) {
+            self::FrescoEntero, self::CongeladoEntero => 'Entero',
+            self::FrescoEviscerado, self::CongeladoEviscerado => 'Eviscerado',
+            self::CongeladoFileteado => 'Fileteado',
+            default => $this->etiqueta(),
+        };
+    }
+
     /** El encabezado de grupo del cuadro. Vacío en las columnas sueltas. */
     public function grupo(): string
     {
@@ -50,13 +61,14 @@ enum CondicionProducto: string
     }
 
     /**
-     * @return array<int, array{value: string, label: string, grupo: string}>
+     * @return array<int, array{value: string, label: string, corta: string, grupo: string}>
      */
     public static function opciones(): array
     {
         return array_map(fn (self $e): array => [
             'value' => $e->value,
             'label' => $e->etiqueta(),
+            'corta' => $e->subetiqueta(),
             'grupo' => $e->grupo(),
         ], self::cases());
     }

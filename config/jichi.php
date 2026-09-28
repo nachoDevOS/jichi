@@ -69,20 +69,10 @@ return [
         // veces: `dev/dev/tramites/...`.
     ],
 
-    /*
-    | UN solo valor para todas las guías: una tabla de una fila sería una
-    | pantalla que nadie abre y una consulta por guía emitida.
-    |
-    | El DESCUENTO de piscicultura NO está acá sino en
-    | `GuiaMovimiento::DESCUENTO_PISCICULTURA`: la tarifa es un número que la
-    | unidad ajusta, el descuento es una REGLA de la resolución. En
-    | configuración, alguien lo apaga y nadie sabe quién.
-    */
-    'guias' => [
-        'tarifa_base' => (float) env('JICHI_GUIA_TARIFA_BASE', 50),
-    ],
+    // La guía NO tiene tarifa fija desde el 27/09/2026: se cobra el total del
+    // cuadro D, con los precios del catálogo de productos. Ver GuiaMovimiento.
 
-    // Mismo criterio que la guía: un número que se ajusta por resolución.
+    // Un número que se ajusta por resolución.
     'faenas' => [
         'tarifa_base' => (float) env('JICHI_FAENA_TARIFA_BASE', 15),
     ],

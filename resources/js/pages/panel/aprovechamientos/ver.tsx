@@ -1476,12 +1476,11 @@ export default function VerCupo({
                         <ul className="list-disc space-y-1 pl-5">
                             <li>No se emiten más carnets ni faenas con ella.</li>
                             <li>
-                                Sus carnets <strong>aprobados y vigentes</strong> se revocan con ella.
+                                Sus carnets y faenas aprobados <strong>quedan sin efecto</strong>: siguen
+                                registrados como estaban, pero ya no están vigentes, el QR lo informa y no se
+                                imprimen. La salida en curso se corta.
                             </li>
-                            <li>
-                                Sus faenas <strong>aprobadas y vigentes</strong> se revocan: la salida se corta.
-                            </li>
-                            <li>Lo ya vencido o cerrado queda como está.</li>
+                            <li>Los que están pendientes o en revisión ya no se pueden aprobar.</li>
                             <li>La persona puede tramitar una autorización nueva.</li>
                         </ul>
                         <p>

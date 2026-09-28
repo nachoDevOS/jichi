@@ -250,6 +250,8 @@ class AprovechamientoController extends Controller
                 ->with('tipoCarnet:id,nombre')
                 ->latest('created_at')
                 ->get()
+                // El padre ya está en memoria: sin esto, «sin efecto» consulta por fila.
+                ->each(fn (Carnet $c) => $c->setRelation('aprovechamiento', $aprovechamiento))
                 ->map(fn (Carnet $c): array => [
                     'id' => $c->id,
                     'codigo' => $c->codigo_legible,
@@ -257,12 +259,13 @@ class AprovechamientoController extends Controller
                     'tipo' => $c->tipoCarnet?->nombre,
                     'tipo_actor_etiqueta' => $c->tipo_actor->etiqueta(),
                     'tipo_actor_color' => $c->tipo_actor->color(),
-                    'estado_etiqueta' => $c->estado->etiqueta(),
-                    'estado_color' => $c->estado->color(),
+                    'estado_etiqueta' => $c->etiquetaEstado(),
+                    'estado_color' => $c->colorEstado(),
                     'ya_fue_aprobado' => $c->yaFueAprobado(),
-                    // Mismo corte que CarnetImpresionController: firmado y no revocado.
-                    'puede_imprimirse' => $c->yaFueAprobado() && $c->estado !== EstadoCarnet::Revocado,
-                    'puede_reponerse' => $c->estado->permiteRevocacion(),
+                    // Mismo corte que CarnetImpresionController: firmado, no revocado y con la autorización viva.
+                    'puede_imprimirse' => $c->puedeImprimirse(),
+                    // Reponer usa ESTA autorización: revocada, no hay con qué emitir el nuevo.
+                    'puede_reponerse' => $c->estado->permiteRevocacion() && ! $c->autorizacionRevocada(),
                     'fecha_solicitud' => $c->fecha_solicitud?->toDateString(),
                     'fecha_emision' => $c->fecha_emision?->toDateString(),
                     'fecha_vencimiento' => $c->fecha_vencimiento?->toDateString(),
@@ -283,9 +286,10 @@ class AprovechamientoController extends Controller
                 // Con `nro_registro` y `fecha_emision`: de esas dos columnas
                 // salen los accesores del número del carnet, y sin ellas
                 // devuelven null sin ningún error.
-                ->with(['carnet:id,nro_registro,fecha_emision', 'carnet.codigo'])
+                ->with(['carnet:id,nro_registro,fecha_emision,beneficiario_id,tipo_actor,aprovechamiento_id,estado,fecha_vencimiento', 'carnet.codigo'])
                 ->orderByDesc('numero_faena')
                 ->get()
+                ->each(fn (PermisoFaena $f) => $f->carnet?->setRelation('aprovechamiento', $aprovechamiento))
                 ->map(fn (PermisoFaena $f): array => [
                     'id' => $f->id,
                     'numero_faena' => $f->numero_faena,
@@ -299,8 +303,8 @@ class AprovechamientoController extends Controller
                     'carnet_registro' => $f->carnet?->registro_legible,
                     'kilos_extraidos' => (float) $f->kilos_extraidos,
                     'estado' => $f->estado->value,
-                    'estado_etiqueta' => $f->estado->etiqueta(),
-                    'estado_color' => $f->estado->color(),
+                    'estado_etiqueta' => $f->etiquetaEstado(),
+                    'estado_color' => $f->colorEstado(),
                     // Una faena vencida LIBERA su volumen: la pantalla lo marca
                     // para que el saldo cuadre a la vista.
                     'consume_cupo' => $f->consumeCupo(),

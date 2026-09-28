@@ -14,6 +14,7 @@ use App\Http\Controllers\Panel\GuiaController;
 use App\Http\Controllers\Panel\GuiaImpresionController;
 use App\Http\Controllers\Panel\PagoController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
+use App\Http\Controllers\Panel\ProductoHidrobiologicoController;
 use App\Http\Controllers\Panel\ReciboController;
 use App\Http\Controllers\Panel\TipoCarnetController;
 use Illuminate\Support\Facades\Route;
@@ -402,6 +403,19 @@ Route::middleware('auth')->prefix('panel')->group(function () {
         Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
             ->middleware('permiso:catalogos.gestionar')
             ->name('tipos-carnet.update');
+
+        // --- Productos hidrobiológicos (cuadro D de la guía)
+        Route::get('/productos', [ProductoHidrobiologicoController::class, 'index'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('productos.index');
+
+        Route::middleware('permiso:catalogos.gestionar')->group(function () {
+            Route::post('/productos', [ProductoHidrobiologicoController::class, 'store'])
+                ->name('productos.store');
+
+            Route::put('/productos/{producto}', [ProductoHidrobiologicoController::class, 'update'])
+                ->name('productos.update');
+        });
     });
 
     /*

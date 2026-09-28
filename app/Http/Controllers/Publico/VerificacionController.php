@@ -122,8 +122,13 @@ class VerificacionController extends Controller
             // La cédula va ENMASCARADA: solo los últimos tres dígitos.
             'documento_titular' => $this->enmascarar((string) $beneficiario?->ci),
 
-            'estado_etiqueta' => $documento->estado?->etiqueta() ?? 'Emitido',
-            'estado_color' => $documento->estado?->color() ?? 'neutro',
+            // Carnet y faena: «Sin efecto» si su autorización fue revocada.
+            'estado_etiqueta' => $this->conSinEfecto($documento)
+                ? $documento->etiquetaEstado()
+                : ($documento->estado?->etiqueta() ?? 'Emitido'),
+            'estado_color' => $this->conSinEfecto($documento)
+                ? $documento->colorEstado()
+                : ($documento->estado?->color() ?? 'neutro'),
 
             'vigente' => $this->estaVigente($documento),
             'mensaje' => $this->mensaje($documento),
@@ -156,6 +161,7 @@ class VerificacionController extends Controller
             $documento instanceof Carnet,
             $documento instanceof AprovechamientoPesq => ['Emitido', $documento->fecha_emision, 'Vence', $documento->fecha_vencimiento],
             $documento instanceof PermisoFaena => ['Salida', $documento->fecha_salida, 'Desembarque', $documento->fecha_desembarque],
+            $documento instanceof GuiaMovimiento => ['Emitida', $documento->fecha_emision, 'Vence', $documento->fecha_vencimiento],
             default => [null, null, null, null],
         };
 
@@ -224,6 +230,14 @@ class VerificacionController extends Controller
         };
     }
 
+    /** Los tres documentos que pueden quedar «sin efecto» sin cambiar su estado guardado. */
+    private function conSinEfecto(Model $documento): bool
+    {
+        return $documento instanceof Carnet
+            || $documento instanceof PermisoFaena
+            || $documento instanceof GuiaMovimiento;
+    }
+
     /**
      * La frase que lee el inspector.
      */
@@ -237,6 +251,11 @@ class VerificacionController extends Controller
 
         if ($this->estaVigente($documento)) {
             return "Documento auténtico y vigente: {$que} emitido por la Gobernación del Beni.";
+        }
+
+        // Sin efecto: aprobado, pero su autorización fue revocada o su titular no tiene carnet vigente.
+        if ($this->conSinEfecto($documento) && ($porque = $documento->motivoSinEfecto()) !== null) {
+            return "Este documento existe en el registro, pero NO está vigente: {$porque} No habilita ninguna actividad.";
         }
 
         return 'Este documento existe en el registro, pero NO está vigente: figura como '.

@@ -51,6 +51,12 @@ class CarnetImpresionController extends Controller
             return back()->with('error', 'El carnet está revocado: no se puede imprimir.');
         }
 
+        // Sin efecto: el plástico diría que habilita algo que ya no habilita.
+        if ($carnet->autorizacionRevocada()) {
+            return back()->with('error', 'El carnet quedó sin efecto porque su Autorización de Pesca '.
+                'para Aprovechamiento Pesquero fue revocada: no se puede imprimir.');
+        }
+
         return $this->pdf($carnet);
     }
 

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
+use App\Enums\TipoActor;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
@@ -178,10 +180,64 @@ class PermisoFaena extends Model
         return ! $this->estado->estaAbierto();
     }
 
-    /** ¿Se imprime el permiso? Firmado y no revocado, como el carnet y la autorización. */
+    /** ¿Se imprime el permiso? Firmado, no revocado y con la autorización viva. */
     public function puedeImprimirse(): bool
     {
-        return $this->yaFueAprobada() && $this->estado !== EstadoFaena::Revocado;
+        return $this->yaFueAprobada()
+            && $this->estado !== EstadoFaena::Revocado
+            && ! $this->autorizacionRevocada();
+    }
+
+    /**
+     * ¿La autorización de su carnet fue revocada? La faena NO se reescribe:
+     * queda `aprobado`, pero sin efecto. Precargar `carnet.aprovechamiento`.
+     */
+    public function autorizacionRevocada(): bool
+    {
+        return $this->cupo()?->estado === EstadoAprovechamiento::Revocado;
+    }
+
+    /**
+     * ¿Hay un carnet de pescador que la ampare? El suyo o el que lo reemplazó:
+     * sin ninguno vigente, la faena de un carnet revocado no vale.
+     */
+    public function tieneCarnetQueLaAmpare(): bool
+    {
+        return $this->carnet?->amparaSusPapeles() === true;
+    }
+
+    /** En fecha y aprobada, pero sin respaldo: autorización revocada o sin carnet vigente. */
+    public function sinEfecto(): bool
+    {
+        return $this->estado === EstadoFaena::Aprobado
+            && ($this->autorizacionRevocada() || ($this->estaEnFecha() && ! $this->tieneCarnetQueLaAmpare()));
+    }
+
+    /** El texto de «sin efecto» para el QR y las fichas, o null. */
+    public function motivoSinEfecto(): ?string
+    {
+        return match (true) {
+            ! $this->sinEfecto() => null,
+            $this->autorizacionRevocada() => 'Su Autorización de Pesca para Aprovechamiento Pesquero fue revocada.',
+            default => 'El titular no tiene un carnet de pescador vigente que la ampare.',
+        };
+    }
+
+    /** ¿Está dentro de sus 30 días? Sin mirar el estado ni el carnet. */
+    public function estaEnFecha(): bool
+    {
+        return $this->fecha_desembarque !== null && $this->fecha_desembarque->endOfDay()->isFuture();
+    }
+
+    /** La etiqueta de estado que ven las pantallas: «Sin efecto» manda sobre «Aprobado». */
+    public function etiquetaEstado(): string
+    {
+        return $this->sinEfecto() ? 'Sin efecto' : $this->estado->etiqueta();
+    }
+
+    public function colorEstado(): string
+    {
+        return $this->sinEfecto() ? 'rose' : $this->estado->color();
     }
 
     /** ¿Se pueden CONTROLAR sus boletas? Solo con la faena presentada. */
@@ -209,6 +265,10 @@ class PermisoFaena extends Model
         }
 
         return match (true) {
+            $this->autorizacionRevocada() => 'Sin efecto: su Autorización de Pesca para Aprovechamiento '.
+                'Pesquero fue revocada, así que ya no autoriza la salida.',
+            $this->sinEfecto() => 'Sin efecto: su carnet fue revocado y el titular todavía no tiene otro '.
+                'carnet de pescador vigente. Vuelve a valer cuando se apruebe el carnet nuevo.',
             $this->estado === EstadoFaena::Pendiente => 'La faena está PENDIENTE: falta cubrir el '.
                 'arancel y enviarla a revisión.',
             $this->estado === EstadoFaena::EnRevision => 'La faena está presentada y esperando la '.
@@ -216,6 +276,7 @@ class PermisoFaena extends Model
             $this->estado === EstadoFaena::Completado => 'La salida ya se cerró: los kilos quedaron '.
                 'firmes contra el cupo.',
             $this->estado === EstadoFaena::Vencido => 'Pasó su fecha de desembarque sin cerrarse.',
+            // Estado histórico: hasta el 27/09/2026 la revocación lo escribía en cascada.
             $this->estado === EstadoFaena::Revocado => 'Fue revocada junto con su Autorización de Pesca '.
                 'para Aprovechamiento Pesquero: ya no autoriza la salida.',
             default => 'Pasó su fecha de desembarque.',
@@ -240,7 +301,10 @@ class PermisoFaena extends Model
     {
         return $this->estado->habilita()
             && $this->fecha_desembarque !== null
-            && $this->fecha_desembarque->endOfDay()->isFuture();
+            && $this->fecha_desembarque->endOfDay()->isFuture()
+            && ! $this->autorizacionRevocada()
+            // Lo más caro al final: puede consultar si el carnet propio no vale.
+            && $this->tieneCarnetQueLaAmpare();
     }
 
     /** ¿Se pasó de fecha sin cerrarse? Es lo que busca el comando diario. */
@@ -268,6 +332,9 @@ class PermisoFaena extends Model
     {
         return $query
             ->where($this->qualifyColumn('estado'), EstadoFaena::Aprobado)
-            ->whereDate($this->qualifyColumn('fecha_desembarque'), '>=', now()->toDateString());
+            ->whereDate($this->qualifyColumn('fecha_desembarque'), '>=', now()->toDateString())
+            ->whereDoesntHave('carnet.aprovechamiento', fn (Builder $a) => $a
+                ->where('aprovechamientos_pesq.estado', EstadoAprovechamiento::Revocado))
+            ->whereHas('carnet', fn (Builder $c) => Carnet::conCarnetVigenteDelTitular($c, TipoActor::Pescador));
     }
 }

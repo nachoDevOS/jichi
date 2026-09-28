@@ -30,6 +30,8 @@ class PermisoOperativoException extends RuntimeException
     public static function carnetNoVigente(EstadoCarnet $estado): self
     {
         $detalle = match ($estado) {
+            EstadoCarnet::Pendiente => 'Está PENDIENTE: falta cobrar su arancel y enviarlo a revisión.',
+            EstadoCarnet::EnRevision => 'Está EN REVISIÓN: falta que lo aprueben.',
             EstadoCarnet::Revocado => 'Está REVOCADO, y eso no se revierte: hay que emitir uno nuevo.',
             EstadoCarnet::Vencido => 'Está VENCIDO. Hay que emitir el carnet de la gestión en curso '.
                 'antes de poder emitir este papel.',
@@ -273,6 +275,25 @@ class PermisoOperativoException extends RuntimeException
             'Quedan %d boleta(s) sin controlar. Validelas —o corrija lo observado— antes de '.
             'aprobar la guía.',
             $cuantas,
+        ));
+    }
+
+    /** Anular es para la guía firmada; el borrador se elimina y la presentada se rechaza. */
+    public static function guiaNoSeAnula(string $estado): self
+    {
+        return new self(
+            "Una guía {$estado} no se anula: anular es para la guía ya aprobada. ".
+            'Un borrador se elimina y una guía en revisión se rechaza.',
+        );
+    }
+
+    /** El producto elegido no está en el catálogo, o está fuera de uso. */
+    public static function productoNoDisponible(string $nombre): self
+    {
+        return new self(sprintf(
+            'El producto «%s» del detalle no está disponible en el catálogo de productos '.
+            'hidrobiológicos. Elija otro o actívelo en Catálogos.',
+            $nombre,
         ));
     }
 

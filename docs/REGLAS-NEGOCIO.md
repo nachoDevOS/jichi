@@ -73,26 +73,32 @@ autoriza nada: ninguna de las tres se revoca.
 - **No se imprime** la autorización (mismo criterio que el carnet revocado).
 - La verificación pública la muestra como **no vigente: revocada**.
 
-**Regla 5 — Revocar arrastra lo que todavía vale** *(decidido el 27/09/2026)*.
-En la misma operación, con el mismo motivo, se revocan:
+**Regla 5 — Revocar la autorización NO reescribe sus carnets ni sus faenas:
+los deja SIN EFECTO** *(decidido el 27/09/2026; reemplaza a la cascada que se
+había implementado ese mismo día)*.
 
-- sus **carnets `aprobado` y vigentes** (fecha de vencimiento de hoy en
-  adelante) → pasan a `revocado`;
-- sus **faenas `aprobado` y vigentes** (desembarque de hoy en adelante), de
-  cualquier carnet de esa autorización, también de uno repuesto antes → pasan a
-  `revocado` y la salida se corta.
+Revocar cambia **una sola fila**: la de la autorización. Sus carnets y faenas
+conservan el estado que tenían —`aprobado`—, pero **dejan de estar vigentes**
+porque su vigencia se calcula mirando al padre:
 
-**Lo que NO se toca**, porque ya no autoriza nada: carnets o faenas vencidos,
-cerrados o ya revocados. Revocar lo vencido no tendría sentido. Los carnets
-`pendiente` / `en_revision` de esa autorización tampoco se revocan (revocar es
-solo para lo firmado), pero **ya no se pueden aprobar**: ventanilla los elimina
-o los rechaza. Las faenas `pendiente` / `en_revision`, igual.
+> Un carnet o una faena vale hoy si **su propio estado y su fecha** lo permiten
+> **y** su Autorización de Pesca para Aprovechamiento Pesquero **no está
+> revocada**.
 
-La auditoría de cada fila arrastrada dice «Revocado junto con su Autorización
-de Pesca para Aprovechamiento Pesquero: *motivo*». Los kilos de una faena
-revocada vuelven al saldo, como los de una vencida (`consumeCupo()` no la
-cuenta); sobre una autorización revocada ese saldo ya no se puede usar. Los
-pagos quedan como estaban. Ni la faena ni el carnet revocados se imprimen.
+Un documento así figura en todo el sistema como **«Sin efecto»** (en rojo): en
+la ficha, en los listados y en la verificación pública, que dice «NO está
+vigente: su Autorización de Pesca para Aprovechamiento Pesquero fue revocada».
+No se imprime, no emite faenas y no ocupa el lugar de «un carnet vigente por
+actividad» —si lo ocupara, la persona no podría sacar el carnet nuevo—.
+
+**Revocar SOLO EL CARNET sigue sin tocar sus faenas** (una reposición por
+pérdida): la faena aprobada vale hasta su desembarque, porque su autorización
+sigue viva. Lo único que deja sin efecto a todo es revocar la bolsa madre.
+
+Las faenas y carnets **pendientes o en revisión** de una autorización revocada
+no se pueden aprobar: ventanilla los elimina o los rechaza. Los pagos quedan
+como estaban. El motivo queda **una sola vez**, en la auditoría de la
+autorización.
 
 **Regla 6 — Volver a pescar.** Hace falta una autorización **nueva** y un
 carnet **nuevo** colgado de ella. Como el carnet viejo ya quedó revocado, no
@@ -104,19 +110,25 @@ traba la regla de «un carnet vigente por actividad».
    **rechazada**: «ya tiene un aprovechamiento vigente… hay que esperar a que
    venza o revocarlo».
 2. La de 2026 venció el 31/12. El 10/01/2027 pide la de 2027 → **se otorga**.
-3. El 20/10/2026 revocan la de 300 kg (vigente hasta el 31/12). En ese momento
-   tiene el carnet N° 00001 aprobado y la faena 000001 en el agua hasta el
-   27/10 → los **tres** quedan revocados. Una faena 000000 que desembarcó el
-   30/09 queda **aprobado** como estaba: ya había terminado.
-4. Con la revocada, ventanilla intenta emitir un carnet o una faena →
+3. Pierde el carnet N° 00004 con la faena 000007 en el agua hasta el 20/10 →
+   se revoca el 00004: la faena queda **«Sin efecto»** hasta que se **apruebe**
+   el 00006, emitido con la misma autorización. Desde ese momento la 000007
+   **vuelve a estar vigente** sola, sin tocarla.
+4. El 20/10/2026 revocan la de 300 kg. El carnet N° 00006 y la faena 000008 (en
+   el agua hasta el 27/10) **siguen diciendo «aprobado» en la base**, pero
+   figuran como **«Sin efecto»**: el QR dice que no están vigentes, no se
+   imprimen y no emiten nada. Una faena que desembarcó el 30/09 figura como
+   vencida, como antes.
+5. Con la revocada, ventanilla intenta emitir un carnet o una faena →
    **rechazado**.
-5. Ese mismo día pide una autorización **nueva** → se otorga; la paga, la
-   firman, y emite un carnet nuevo sobre ella → se permite.
+6. Ese mismo día pide una autorización **nueva** → se otorga; la paga, la
+   firman, y emite un carnet nuevo sobre ella → se permite, porque el 00006 sin
+   efecto ya no ocupa el lugar.
 
 **Dónde vive:** `EstadoAprovechamiento::Revocado` y `permiteRevocacion()`,
 `RevisarCupoService::revocar()`, `RevocarCupoRequest`, la ruta
 `PATCH /panel/aprovechamientos/{id}/revocar`, y los controles en
-`RevisarCupoService::revocarLoQueCuelga()` (la cascada), `EstadoFaena::Revocado`,
+`Carnet::autorizacionRevocada()` / `PermisoFaena::autorizacionRevocada()` y los scopes `vigentes()` (la vigencia que mira al padre),
 los controles en `OtorgarCupoService` (scope `enCurso()`),
 `EmitirCarnetService::cupoUtilizable()`, `RevisarCarnetService::aprobar()`,
 `EmitirFaenaService`, `RevisarFaenaService::aprobar()`,
@@ -142,9 +154,16 @@ dentro de una transacción deshecha con `rollBack()`.
 - **Revocar** es dar de baja un carnet `aprobado` antes de su vencimiento, con
   motivo escrito (queda en la auditoría). No se revierte. Al escanearlo, la
   verificación pública lo informa como **no vigente**. *(25/09/2026)*
-- **Revocar el carnet NO toca sus permisos de faena ni sus guías:** lo ya
-  emitido y aprobado sigue valiendo hasta su propia fecha. Lo que se da de baja
-  es la credencial, no las salidas que ya autorizó. *(25/09/2026)*
+- **Revocar el carnet NO reescribe sus permisos de faena ni sus guías, pero
+  estos valen solo si el titular tiene un carnet VIGENTE de esa actividad** —el
+  suyo o el que lo reemplazó— *(27/09/2026; antes valían siempre)*. Es el caso
+  de la reposición: se revoca el carnet perdido o dañado y, mientras el nuevo no
+  esté **aprobado**, sus faenas o guías figuran **«Sin efecto»** y el QR dice
+  «no vigente: el titular no tiene un carnet vigente que la ampare». Aprobado el
+  nuevo, vuelven a valer solas hasta su propia fecha. Vale también en el cambio
+  de año: una guía firmada el 30/12 que vence el 04/01 no vale del 1 al 4 hasta
+  que se apruebe el carnet de la gestión nueva. Anular una guía, al revés, no
+  toca el carnet. Ver `Carnet::amparaSusPapeles()`.
 - **Una persona no tiene dos carnets vigentes de la misma actividad.** Para
   reponer uno perdido o dañado se revoca el actual y se emite otro con **la
   misma autorización de pesca**: no hace falta tramitar un cupo nuevo, y los
@@ -161,7 +180,8 @@ dentro de una transacción deshecha con `rollBack()`.
 - Vigencia **máxima de 30 días** por salida: al aprobarla, `fecha_salida` es
   ese día y `fecha_desembarque` salida + 30. Estados `pendiente`,
   `en_revision`, `aprobado`, `completado`, `vencido` o `revocado` (este último
-  solo lo escribe la revocación de su autorización; ver Regla 5).
+  es histórico: desde el 27/09/2026 revocar la autorización ya no lo escribe;
+  la faena queda «sin efecto», ver Regla 5).
 - **Calca el talonario «PERMISO POR FAENA».** El Área de Fiscalización y
   Control de la Actividad Pesquera autoriza a: la embarcación, de propiedad de,
   comandante de barco, matrícula naval N°, N° kardex, la región desde / hasta y
@@ -225,8 +245,27 @@ dentro de una transacción deshecha con `rollBack()`.
   comercializador (`carnet_id`) y a su respectiva asociación (`asociacion_id`).
 - Controla las rutas especificando `origen`, `destino`, `peso_total_kg` y un
   indicador booleano de si proviene de **piscicultura**.
+- **Una guía aprobada vale si está en fecha y el titular tiene un carnet de
+  comercializador vigente** (el suyo o el que lo reemplazó). Ejemplo: Juan
+  pierde el carnet 00010 con la guía 000308 en ruta → se revoca el 00010 y la
+  guía queda «Sin efecto»; se registra y se **aprueba** el 00012 → la 000308
+  vuelve a estar vigente. Si Juan no saca otro carnet, la guía no vale. Ver el
+  paso 3.
 - Vigencia de transporte de **máximo 5 días**, con los estados `pendiente`,
-  `en_revision`, `aprobado`, `cerrada` o `anulada`.
+  `en_revision`, `aprobado`, `cerrada` o `anulada`. **Anular** es solo para la
+  guía aprobada; un borrador se elimina y una en revisión se rechaza.
+- **Productos hidrobiológicos parametrizados** *(27/09/2026)*. El cuadro D ya no
+  se escribe a mano: cada renglón elige un producto del catálogo
+  `productos_hidrobiologicos` —**nombre, precio por kilo y estado**—, que la
+  unidad administra en Catálogos → Productos. El precio es la **tasa por kilo**
+  —de **0,20 Bs en adelante**— y el importe de cada renglón es kilos × precio.
+- **Lo que se cobra por la guía es el TOTAL del importe del cuadro D**
+  *(27/09/2026; antes era una tarifa fija de 50 Bs)*. Si es de **piscicultura**,
+  la mitad. Ejemplo: 200 kg de surubí a 0,50 + 100 kg de sábalo a 0,20 =
+  100 + 20 = **120 Bs** (60 Bs si es de criadero). Nombre, precio y monto se
+  copian a la guía al emitirla: cambiar el catálogo no mueve lo que se cobró ni
+  el papel entregado; corregir el borrador sí recalcula. Un producto inactivo no
+  se elige en una guía nueva.
 
 ## Paso 6 — El ciclo financiero y contable (Recibos y Pagos)
 
@@ -363,8 +402,8 @@ el formulario solo si ese carnet ya está revocado.
 | Una autorización vigente por persona | `OtorgarCupoService` con el scope `enCurso()` (pendiente, en revisión o aprobada, en fecha) |
 | Solo se revoca una autorización aprobada o agotada | `EstadoAprovechamiento::permiteRevocacion()` + `RevisarCupoService::revocar()` |
 | Autorización revocada: ni carnets ni faenas | `enCurso()` / `habilita()`, `EmitirFaenaService`, `RevisarFaenaService::aprobar()`, `RevisarCarnetService::aprobar()`, `puedeEmitirFaena()` |
-| Revocar la autorización revoca sus carnets y faenas aprobados y vigentes | `RevisarCupoService::revocarLoQueCuelga()` |
-| Revocar no toca las faenas | `PermisoFaena::estaVigente()` mira su estado y su fecha, no el carnet |
+| Revocar la autorización deja sin efecto sus carnets y faenas, sin reescribirlos | `Carnet::estaVigente()`, `PermisoFaena::estaVigente()` y sus `scopeVigentes()`, que miran la autorización |
+| Revocar el carnet no reescribe faenas ni guías; valen si el titular tiene un carnet vigente de la actividad | `Carnet::amparaSusPapeles()`, usado por `estaVigente()` y `scopeVigentes()` de `PermisoFaena` y `GuiaMovimiento` |
 | Código de verificación | `CodigoService` (generación) + `VerificacionController` (lo que se muestra) |
 | Qué carnet emite la próxima faena desde el cupo | `AprovechamientoController::show()` → `carnetParaFaena` |
 

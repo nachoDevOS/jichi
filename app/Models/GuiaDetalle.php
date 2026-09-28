@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 #[Fillable([
     'guia_movimiento_id',
+    'producto_id',
     'especie',
     'condicion',
     'cantidad_kg',
@@ -48,12 +49,15 @@ class GuiaDetalle extends Model
         return $this->belongsTo(GuiaMovimiento::class, 'guia_movimiento_id');
     }
 
+    /** El producto del catálogo. Nombre y precio se leen de las COPIAS de la fila. */
+    public function producto(): BelongsTo
+    {
+        return $this->belongsTo(ProductoHidrobiologico::class, 'producto_id')->withTrashed();
+    }
+
     /**
-     * Lo que suma este renglón: kilos × precio.
-     *
-     * Se GUARDA además de calcularse porque es dato declarado, no derivado: el
-     * comerciante puede haber pagado un redondeo distinto al que sale de
-     * multiplicar, y el papel lleva lo que él declaró.
+     * Lo que suma este renglón: kilos × precio del catálogo. Se guarda para
+     * que el papel no cambie si el precio del producto cambia después.
      */
     public static function importeDe(float $cantidad, float $precio): float
     {

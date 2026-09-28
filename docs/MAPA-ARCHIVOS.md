@@ -76,6 +76,7 @@ decisiones que acá solo se nombran.
 | --- | --- | --- |
 | `FaenaController.php` | 400 | Listado, alta, ficha, cobro y circuito de revisión, más **corregir y eliminar el BORRADOR** (21/09/2026): solo en PENDIENTE y sin un peso cargado, porque el número lo pone el sistema y el papel sale recién al aprobar. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario. `edit()` manda el saldo del cupo **con los kilos de esta faena sumados de vuelta**, o el formulario diría que no entra lo que ya entró; y `libre_kg`, lo libre más lo que ella misma reservaba (27/09/2026) |
 | `GuiaController.php` | 745 | Listado, alta, ficha, corrección del borrador, cobro y circuito de revisión, más cerrar y anular. `resumir()` usa el `withSum` del listado para no calcular el saldo por fila, y `reciboDe()` lo resuelve desde los pagos ya precargados. El buscador OMITE la condición del número cuando el término no trae dígitos: un `like '%%'` traería la tabla entera |
+| `ProductoHidrobiologicoController.php` | 80 | Catálogo de productos hidrobiológicos: listado, alta y corrección, sin baja. `catalogosDelFormulario()` de `GuiaController` le pasa a la guía los activos más los que la guía ya usa |
 | `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario. Suma faenas y guías con el mismo corte que Caja (`admitePagos()`); antes olvidaba las faenas |
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
 | `Tramite.php` | 310 | Cuelga del **carnet**. `montoPagado()` reusa `pagos_sum_monto` si el listado hizo `withSum`. Las 5 fechas van en `#[Fillable]` aunque ningún formulario las mande — `update()` las descartaría |
@@ -83,7 +84,8 @@ decisiones que acá solo se nombran.
 | `Pago.php` | 243 | **`pagable()` es un `morphTo`**: el depósito cubre un trámite, una faena o una guía. Sin morphMap — en la columna va el nombre completo de la clase. La columna del archivo es **`urlFile`**, el accesor es `comprobante_url`. No se anulan ni se borran |
 | `Faena.php` | 288 | Cuelga del **carnet**, no del beneficiario. `$attributes` declara `estado` por defecto **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `diasAutorizados()` suma uno — salir y desembarcar el mismo día es un día, no cero. `estaVigente()` mira TRES cosas, y la que se olvida es el carnet |
 | `GuiaMovimiento.php` | 350 | Cuelga del **carnet**, no del beneficiario; la carga está en `GuiaDetalle`. **`montoACobrar()` lee la COLUMNA**, no `config()`: el arancel se congela al emitir. `factorArancel()` es el único lugar donde vive el 50% de piscicultura. `$attributes` declara `estado`, `monto` y `peso_total_kg` **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `beneficiarioId` es un accesor —no una columna— para que `CobrarService` le hable igual que al carnet |
-| `GuiaDetalle.php` | 65 | Un renglón del cuadro D. `condicion` es UN enum de diez casos y no dos columnas: partirlo en estado × presentación dejaría combinaciones que el talonario no tiene. `precio_kg` e `importe_total` son **declarativos** —lo que el comerciante pagó en origen— y no el arancel |
+| `GuiaDetalle.php` | 70 | Un renglón del cuadro D. `condicion` es UN enum de diez casos y no dos columnas: partirlo en estado × presentación dejaría combinaciones que el talonario no tiene. Desde el 27/09/2026 apunta a `producto_id` y guarda **copias** de nombre y precio: el papel no cambia si el catálogo cambia. `precio_kg` es lo pagado en origen, no el arancel |
+| `ProductoHidrobiologico.php` | 45 | El catálogo del cuadro D: nombre, tasa por kilo (mínimo 0,20) y estado; la guía cobra la suma de su cuadro D. `vigentes()` es lo que se elige en una guía nueva. Sin baja: uno usado se pone inactivo |
 | `Rubro.php` | 70 | `Auditable` pero **sin** `SoftDeletes`: no se borra, se inactiva |
 | `Configuracion.php` | 63 | Cache `rememberForever`, invalidada en `saved`/`deleted` |
 | `Correlativo.php` | 18 | Solo la tabla del contador |
@@ -194,11 +196,30 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `lib/rueda-numerica.ts` | `bloquearRuedaEnNumericos()` | Se llama una vez en `app.tsx`. Quita el foco al `<input type="number">` cuando le giran la rueda encima: sin foco el navegador no cambia el valor y la página se desplaza igual |
 | `types/` | La forma de lo que manda Laravel | Hay que actualizarlos al cambiar un controlador |
 
-## `tests/` — CASI VACÍO
+## `tests/`
 
-Desde el 27/09/2026 hay dos: `Feature/Aprovechamientos/RevocacionTest.php` (19
-casos) y `Feature/Aprovechamientos/ReservaFaenaTest.php` (6 casos: la faena
-pendiente o en revisión reserva sus kilos). Además de `TestCase.php`, la clase base. `tests/Feature/` se vació el
+Desde el 27/09/2026 hay **200 pruebas**, además de `TestCase.php`. El camino
+armado de ventanilla —otorgar, cobrar, enviar, validar, aprobar— vive en
+`Concerns/ArmaEscenarios.php`, para que cada prueba se ocupe solo de su regla.
+
+| Archivo | Casos | Qué protege |
+| --- | --: | --- |
+| `Unit/CircuitoEstadosTest.php` | 20 | La tabla de cada estado de autorización, carnet y faena (qué permite, reserva y consumo) |
+| `Unit/ReglasPurasTest.php` | 4 | Alfabeto del código, limpieza de lo tipeado, relleno de correlativos, 30 días de la faena |
+| `Unit/ReglasGuiaTest.php` | 11 | Estados de la guía, arancel, importe, 5 días, mensajes de carnet, grupos de condición |
+| `Feature/Beneficiarios/BeneficiarioTest.php` | 8 | Alta, cédula única entre vigentes, baja lógica que la libera, búsqueda, pantallas |
+| `Feature/Aprovechamientos/AutorizacionCircuitoTest.php` | 10 | Hereda la escala, borrador, cobro y recibo, firma, rechazo, agotado, impresión |
+| `Feature/Aprovechamientos/RevocacionTest.php` | 21 | Una por persona, revocar deja sin efecto sin reescribir, reposición |
+| `Feature/Aprovechamientos/ReservaFaenaTest.php` | 6 | La faena pendiente o en revisión reserva sus kilos |
+| `Feature/Carnets/CarnetPescadorTest.php` | 12 | Exige autorización, registro consecutivo, circuito, uno por actividad, reposición, plástico |
+| `Feature/Faenas/FaenaCircuitoTest.php` | 11 | Arancel, número, fechas de la firma, 30 días, quién emite, rechazo, baja, impresión |
+| `Feature/Caja/CobroYControlTest.php` | 12 | Un recibo por varios trámites, correlativo, no cobrar de más, validar/observar/corregir |
+| `Feature/Catalogos/CatalogosTest.php` | 5 | Asociaciones, escala sin solapes, tipos de carnet |
+| `Feature/Sistema/PermisosYPantallasTest.php` | 39 | Cada pantalla abre, sin sesión va al login, sin permiso 403, rutas sin alta |
+| `Feature/Publico/VerificacionTest.php` | 7 | QR de los cinco documentos, cédula enmascarada, código único e idempotente |
+| `Feature/Comercializador/GuiaTest.php` | 13 | El cuadro D sale del catálogo, cobra su total, quién emite, circuito, anular |
+| `Feature/Comercializador/GuiaCircuitoTest.php` | 12 | Rechazo y reenvío, boleta observada, 5 días, corrección, baja, HTTP, PDF, QR |
+| `Feature/Comercializador/CarnetComercializadorTest.php` | 9 | Sin autorización, circuito, la guía de un carnet revocado vale con el nuevo, cambio de año |
 **14/09/2026** por pedido del responsable del proyecto.
 
 Eran 143 pruebas y cubrían el backend entero. Lo que comprobaban, y que hoy **no

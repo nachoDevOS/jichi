@@ -132,26 +132,44 @@ class RevocacionTest extends TestCase
     }
 
     #[Test]
-    public function revocar_arrastra_carnets_y_faenas_aprobados_y_vigentes_con_el_motivo(): void
+    public function revocar_no_reescribe_carnets_ni_faenas_pero_los_deja_sin_efecto(): void
     {
         $cupo = $this->cupo(EstadoAprovechamiento::Aprobado);
         $carnet = $this->carnet($cupo, EstadoCarnet::Aprobado);
         $faena = $this->faena($carnet, EstadoFaena::Aprobado, desembarque: now()->addDays(10)->toDateString());
+        $this->assertTrue($carnet->estaVigente());
+        $this->assertTrue($faena->fresh()->estaVigente());
 
         app(RevisarCupoService::class)->revocar($cupo, 'Resolución de prueba: pesca en veda');
 
         $this->assertSame(EstadoAprovechamiento::Revocado, $cupo->fresh()->estado);
-        $this->assertSame(EstadoCarnet::Revocado, $carnet->fresh()->estado);
-        $this->assertSame(EstadoFaena::Revocado, $faena->fresh()->estado);
 
-        // UNA fila de auditoría por documento, con el motivo: `Auditable` no debe duplicarla.
+        // El estado guardado NO cambia: la vigencia se calcula mirando al padre.
+        $carnet = $carnet->fresh();
+        $faena = $faena->fresh();
+        $this->assertSame(EstadoCarnet::Aprobado, $carnet->estado);
+        $this->assertSame(EstadoFaena::Aprobado, $faena->estado);
+
+        $this->assertFalse($carnet->estaVigente());
+        $this->assertFalse($faena->estaVigente());
+        $this->assertTrue($carnet->sinEfecto());
+        $this->assertTrue($faena->sinEfecto());
+        $this->assertSame('Sin efecto', $carnet->etiquetaEstado());
+        $this->assertSame('Sin efecto', $faena->etiquetaEstado());
+        $this->assertStringContainsString('fue revocada', (string) $carnet->motivoSinPermisos());
+        $this->assertStringContainsString('fue revocada', (string) $faena->motivoSinAutorizar());
+
+        // Tampoco cuentan como vigentes en las consultas.
+        $this->assertFalse(Carnet::query()->vigentes()->whereKey($carnet->id)->exists());
+        $this->assertFalse(PermisoFaena::query()->vigentes()->whereKey($faena->id)->exists());
+
+        // Nada se escribió en ellos: la auditoría solo tiene la revocación de la autorización.
         foreach ([$carnet, $faena] as $doc) {
-            $filas = DB::table('auditorias')
+            $this->assertSame(0, DB::table('auditorias')
                 ->where('auditable_type', $doc->getMorphClass())
                 ->where('auditable_id', $doc->id)
-                ->where('descripcion', 'like', 'Revocado junto con su Autorización%pesca en veda')
-                ->count();
-            $this->assertSame(1, $filas, class_basename($doc).' sin su fila de auditoría');
+                ->where('evento', '!=', 'creado')
+                ->count(), class_basename($doc).' fue reescrito');
         }
     }
 
@@ -175,15 +193,68 @@ class RevocacionTest extends TestCase
     }
 
     #[Test]
-    public function arrastra_la_faena_vigente_de_un_carnet_repuesto_antes(): void
+    public function la_faena_de_un_carnet_repuesto_antes_tambien_queda_sin_efecto(): void
     {
         $cupo = $this->cupo(EstadoAprovechamiento::Aprobado);
         $repuesto = $this->carnet($cupo, EstadoCarnet::Revocado);
         $faena = $this->faena($repuesto, EstadoFaena::Aprobado, desembarque: now()->addDays(5)->toDateString());
+        // El carnet que lo reemplazó, con la misma autorización: ampara la faena.
+        $this->carnet($cupo, EstadoCarnet::Aprobado);
+        $this->assertTrue($faena->fresh()->estaVigente(), 'con el carnet nuevo, la faena del repuesto vale');
 
         app(RevisarCupoService::class)->revocar($cupo, 'Motivo de prueba suficiente');
 
-        $this->assertSame(EstadoFaena::Revocado, $faena->fresh()->estado);
+        $this->assertSame(EstadoFaena::Aprobado, $faena->fresh()->estado);
+        $this->assertFalse($faena->fresh()->estaVigente());
+    }
+
+    #[Test]
+    public function el_qr_de_un_carnet_o_una_faena_sin_efecto_dice_que_no_esta_vigente(): void
+    {
+        $cupo = $this->cupo(EstadoAprovechamiento::Aprobado);
+        $carnet = $this->carnet($cupo, EstadoCarnet::Aprobado);
+        $faena = $this->faena($carnet, EstadoFaena::Aprobado, desembarque: now()->addDays(5)->toDateString());
+        $carnet->asignarCodigo();
+        $faena->asignarCodigo();
+
+        app(RevisarCupoService::class)->revocar($cupo, 'Motivo de prueba suficiente');
+        auth()->logout();
+
+        foreach ([$carnet, $faena] as $doc) {
+            $this->get(route('verificar.show', ['codigo' => $doc->fresh()->codigo_legible]))
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->where('documento.vigente', false)
+                    ->where('documento.estado_etiqueta', 'Sin efecto')
+                    ->where('documento.mensaje', fn ($m) => str_contains($m, 'fue revocada')));
+        }
+    }
+
+    #[Test]
+    public function la_faena_de_un_carnet_perdido_vale_solo_cuando_se_aprueba_el_carnet_nuevo(): void
+    {
+        $cupo = $this->cupo(EstadoAprovechamiento::Aprobado);
+        $perdido = $this->carnet($cupo, EstadoCarnet::Aprobado);
+        $faena = $this->faena($perdido, EstadoFaena::Aprobado, desembarque: now()->addDays(10)->toDateString());
+        $this->assertTrue($faena->fresh()->estaVigente());
+
+        // Se revoca el carnet perdido y todavía no hay otro.
+        app(EmitirCarnetService::class)->revocar($perdido, 'Reposición: carnet extraviado');
+        $faena = $faena->fresh();
+        $this->assertSame(EstadoFaena::Aprobado, $faena->estado, 'no se reescribe');
+        $this->assertFalse($faena->estaVigente());
+        $this->assertTrue($faena->sinEfecto());
+        $this->assertStringContainsString('carnet de pescador vigente', (string) $faena->motivoSinEfecto());
+        $this->assertFalse(PermisoFaena::query()->vigentes()->whereKey($faena->id)->exists());
+
+        // El nuevo registrado pero sin aprobar todavía no ampara.
+        $nuevo = $this->carnet($cupo, EstadoCarnet::Pendiente);
+        $this->assertFalse($faena->fresh()->estaVigente());
+
+        // Aprobado el nuevo, la faena vuelve a valer sola.
+        $nuevo->update(['estado' => EstadoCarnet::Aprobado]);
+        $this->assertTrue($faena->fresh()->estaVigente());
+        $this->assertTrue(PermisoFaena::query()->vigentes()->whereKey($faena->id)->exists());
     }
 
     //  Lo que ya no se puede hacer con una revocada

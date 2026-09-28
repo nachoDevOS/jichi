@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\ModalidadAprovechamiento;
 use App\Models\Asociacion;
 use App\Models\CategoriaAprovechamiento;
+use App\Models\ProductoHidrobiologico;
 use App\Models\TipoCarnet;
 use Illuminate\Database\Seeder;
 
@@ -61,6 +62,20 @@ class CatalogoSeeder extends Seeder
         ['nombre' => 'Carnet Comercializador', 'tipo_actor' => 'comercializador', 'precio_bs' => 100.00],
     ];
 
+    /**
+     * Los productos del cuadro D de la guía y su tasa por kilo. Los NOMBRES son
+     * los de la tabla de tamaños mínimos del talonario de la autorización; los
+     * PRECIOS son PLANTILLA, desde 0,20 Bs/kg. REVISAR contra la resolución.
+     *
+     * @var array<string, float>
+     */
+    private const PRODUCTOS = [
+        'Surubí' => 0.50, 'Pacú' => 0.45, 'Tambaqui' => 0.45, 'Chuncuina' => 0.50,
+        'Tucunaré' => 0.30, 'General' => 0.40, 'Corvina' => 0.30, 'Dorado (escama)' => 0.35,
+        'Sábalo' => 0.20, 'Yatorana' => 0.25, 'Blanquillo' => 0.30, 'Giro' => 0.25,
+        'Muturo' => 0.40,
+    ];
+
     public function run(): void
     {
         foreach (self::ASOCIACIONES as $fila) {
@@ -81,6 +96,10 @@ class CatalogoSeeder extends Seeder
                 ['nombre' => $fila['nombre']],
                 collect($fila)->except('nombre')->all(),
             );
+        }
+
+        foreach (self::PRODUCTOS as $nombre => $precio) {
+            ProductoHidrobiologico::firstOrCreate(['nombre' => $nombre], ['precio_kg' => $precio]);
         }
 
         $this->command?->warn(

@@ -3,7 +3,7 @@
 Sistema de credenciales y permisos de pesca del Gobierno Autónomo Departamental
 del Beni. **PostgreSQL 18** (corre igual en SQLite).
 
-Describe el núcleo rehecho el **18/09/2026**. Las once tablas del dominio se
+Describe el núcleo rehecho el **18/09/2026**. Las doce tablas del dominio se
 crean en `database/migrations/2026_09_18_*`; **las migraciones quedaron cortas a
 propósito y el porqué de cada decisión vive acá.**
 
@@ -46,10 +46,10 @@ propósito y el porqué de cada decisión vive acá.**
     │ recibos  │──────< │ pagos  (polimórfico: pagable_type) │
     └──────────┘        └───────┬────────────────────────────┘
                                 │
-                  ┌─────────────┼─────────────┐
-                  ▼             ▼             ▼
-               carnets   aprovechamientos   guias
-                              _pesq       _movimiento
+          ┌─────────────┬───────┴─────┬─────────────┐
+          ▼             ▼             ▼             ▼
+       carnets   aprovechamientos  permisos_      guias
+                      _pesq         faena      _movimiento
 
     La llave pública, para los CINCO documentos que se entregan:
     ┌─────────────────────────────────────────┐
@@ -62,6 +62,7 @@ propósito y el porqué de cada decisión vive acá.**
 
     Catálogos que alimentan lo de arriba:
       asociaciones · categorias_aprovechamiento · tipos_carnet
+      · productos_hidrobiologicos (el cuadro D de la guía)
 ```
 
 **El orden de ventanilla, que es el que explica las dependencias:**
@@ -301,7 +302,9 @@ PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO
 
 **`revocado` (27/09/2026)** no agrega columnas: el motivo va a `auditorias`, como
 en el carnet revocado. No autoriza carnets ni faenas, libera el lugar para
-otorgar otra y arrastra sus carnets y faenas aprobados y vigentes. Las reglas completas están en
+otorgar otra y deja **sin efecto** a sus carnets y faenas **sin reescribirlos**: su
+vigencia mira a la autorización (`Carnet::estaVigente()`, `PermisoFaena::estaVigente()`
+y los `scopeVigentes()`). Las reglas completas están en
 [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#una-autorización-vigente-por-persona-y-la-revocación--27092026).
 
 **Se llamaba `activo` y pasó a `aprobado` el 20/09/2026**, a pedido: en este
@@ -496,10 +499,10 @@ que el carnet y el cupo—.
 aprobada queda así: los kilos autorizados cuentan como consumidos desde la firma.
 `EstadoFaena::Completado` sigue en el enum, pero hoy nada lleva a ese estado.
 
-**`revocado` (27/09/2026)** lo escribe solo la revocación de su autorización,
-sobre una faena `aprobado` con el desembarque de hoy en adelante. No consume
-cupo ni se imprime; el motivo va a `auditorias`. Ver
-[REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#una-autorización-vigente-por-persona-y-la-revocación--27092026).
+**`revocado` es un estado HISTÓRICO de la faena.** Durante el 27/09/2026 lo
+escribía en cascada la revocación de su autorización; ya nada lo escribe: una faena cuya autorización se revocó queda `aprobado` y figura
+**«Sin efecto»** (`PermisoFaena::sinEfecto()`). Se conserva en el enum por si
+quedó alguna fila así.
 
 `PermisoFaena` usa el trait `Pagable`, el arancel sale de
 `config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`, **15 Bs** por
@@ -590,7 +593,7 @@ salida no ocurrió.
 | `carnet_id` | FK RESTRICT | **La única**: de él cuelga la guía |
 | `asociacion_id` | FK RESTRICT | El aval impreso, COPIADO del carnet |
 | `numero_guia` | unsigned, único **global** | Correlativo **continuo**: `000308` |
-| `monto` | decimal(10,2) | Copia congelada del arancel |
+| `monto` | decimal(10,2) | Total del cuadro D al emitir, con el descuento |
 | `origen` / `destino` | string(160) | Bloque B del papel |
 | `origen_*` / `destino_*` | string(100), nullable | Departamento, provincia, distrito o cuenca |
 | `medio_transporte` | string(20), nullable | `MedioTransporte`: el casillero 10 |
@@ -624,10 +627,11 @@ PENDIENTE y hasta la firma no ampara nada, así que no hay nada que venza:
 borrador le comería al camión los días que el expediente estuvo esperando en
 ventanilla.
 
-**`monto` es una COPIA, no la tarifa de hoy.** Se escribe al emitir con el
-descuento de piscicultura ya aplicado, por lo mismo que en `permisos_faena`: una
-suba por resolución no puede mover lo que dice un papel entregado. Por eso
-`GuiaMovimiento::montoACobrar()` lee la columna y no `config()`.
+**`monto` es el TOTAL DEL CUADRO D al emitir** —kilos × precio de cada producto,
+con el descuento de piscicultura ya aplicado— *(27/09/2026; antes era una tarifa
+fija de 50 Bs en `config('jichi.guias.tarifa_base')`, retirada)*. Corregir el
+borrador lo recalcula; cambiar el catálogo después no lo mueve. Por eso
+`GuiaMovimiento::montoACobrar()` lee la columna.
 
 **CUELGA DEL CARNET DE COMERCIALIZADOR Y DE NADA MÁS** —cambiado el 20/09/2026,
 mismo criterio que `permisos_faena`—. Tuvo un `beneficiario_com_id` propio, y el
@@ -678,15 +682,44 @@ cambiaría lo que se cobró.
 
 ---
 
+### `productos_hidrobiologicos` — el catálogo del cuadro D *(27/09/2026)*
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `nombre` | string(120) | «Surubí». Único entre los vivos (lo exige el Request) |
+| `precio_kg` | decimal(10,2) | La **tasa por kilo** que se cobra. Mínimo 0,20 (lo exige el Request) |
+| `estado` | boolean | Inactivo: no se elige en una guía nueva |
+
+**Existe para que la especie deje de ser texto libre**: «Surubí», «surubi» y
+«SURUBI» eran tres especies distintas para cualquier reporte. Lo carga la
+unidad desde Catálogos → Productos. Sin baja: uno usado en una guía se pone
+inactivo. El seeder trae los 13 nombres de la tabla de tamaños mínimos del
+talonario de la autorización, con precios de **plantilla** desde 0,20 Bs/kg.
+
+**`precio_kg` ES LO QUE SE COBRA** *(27/09/2026)*: la guía cobra la suma de
+kilos × precio de su cuadro D, con el descuento de piscicultura. Se copia a
+`guia_detalles.precio_kg` y el total a `guias_movimiento.monto` al emitir.
+
+---
+
 ### `guia_detalles` — el cuadro D, una fila por especie
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `guia_movimiento_id` | FK **CASCADE** | La excepción del dominio: ver abajo |
-| `especie` | string(120) | Texto libre: no hay padrón |
+| `producto_id` | FK RESTRICT | El producto del catálogo |
+| `especie` | string(120) | **Copia** del nombre del producto al emitir |
 | `condicion` | string(30) | `CondicionProducto`: las DIEZ columnas de tilde |
 | `cantidad_kg` | decimal(12,2) | CANT. ADQUIRIDA |
-| `precio_kg` / `importe_total` | decimal(12,2) | **Declarativos**, ver abajo |
+| `precio_kg` | decimal(12,2) | **Copia** del precio del producto al emitir |
+| `importe_total` | decimal(12,2) | `cantidad_kg × precio_kg`, guardado |
+
+**EL NOMBRE Y EL PRECIO SE COPIAN, además de guardar `producto_id`.** El papel
+entregado no puede cambiar si mañana se corrige el catálogo: la guía guarda lo
+que decía el producto el día que se emitió. El formulario manda solo el producto,
+la condición y los kilos; nombre, precio e importe los pone
+`EmitirGuiaService::normalizarDetalle()`, que además rechaza un producto
+inactivo — salvo al corregir una guía que ya lo tenía.
 
 **UN SOLO ENUM Y NO DOS COLUMNAS.** El cuadro del papel tiene diez casillas de
 tilde: «Fresco o Refrigerado» se subdivide en entero y eviscerado, «Congelado»
@@ -695,10 +728,8 @@ Granel y Otros sueltas. Partirlo en estado × presentación dejaría combinacion
 que en el talonario no existen —«seco fileteado»— así que va un enum de diez
 casos que mapea 1:1 con las columnas impresas.
 
-**`precio_kg` e `importe_total` NO son el arancel del SEDAG**: son lo que el
-comerciante declara haber pagado por el pescado en origen, y solo se imprimen.
-Lo que cobra caja sale de `guias_movimiento.monto`. Confundirlos haría que una
-carga cara pagara más tasa que una barata, que no es la regla.
+**La suma de `importe_total` ES lo que se cobra por la guía** —con el descuento
+de piscicultura— y queda en `guias_movimiento.monto` *(27/09/2026)*.
 
 **La FK es CASCADE y no RESTRICT, al revés que todo el resto del dominio**,
 porque el detalle no tiene vida propia: es el cuerpo de la guía, no un documento
@@ -821,7 +852,7 @@ adivina cualquiera probando el siguiente.
 | `recibo_id` | FK **CASCADE**, **nullable** | En NULL hasta que el trámite emite su recibo |
 | `registrado_por` | FK users, nullable | Quién lo cargó en el mostrador |
 | `validado_por` | FK users, nullable | Quién controló la boleta |
-| `pagable_type` / `pagable_id` | morphs | Carnet, cupo o guía |
+| `pagable_type` / `pagable_id` | morphs | Carnet, cupo, faena o guía |
 | `monto_parcial` | decimal(12,2) | **Este abono**, no el total |
 | `nro_transaccion` | string(60), **único** | El número de la boleta del banco |
 | `fecha_deposito` | date | La que dice la boleta, no la de carga |
@@ -970,7 +1001,7 @@ que primero acota.
 
 ---
 
-## 3. Borrado lógico: las once tablas lo tienen
+## 3. Borrado lógico: las doce tablas lo tienen
 
 **Todas** las tablas del dominio llevan `softDeletes()` y su modelo usa el trait.
 Nada del dominio se borra de verdad: se da de baja, la fila queda con
@@ -992,6 +1023,7 @@ o queda quemado:
 | `asociaciones.nombre` | **parcial** | Catálogo: dada de baja, el nombre se libera |
 | `categorias_aprovechamiento.nro_escala` | **parcial** | Ídem: la escala 3 tiene que poder volver a cargarse |
 | `tipos_carnet.nombre` | **parcial** | Ídem |
+| `productos_hidrobiologicos.nombre` | **parcial** (en el Request) | Ídem |
 | `beneficiarios.ci` | **parcial** | Una ficha dada de baja libera la cédula |
 | `carnets.codigo_carnet` | **global** | El plástico ya salió y está en la calle |
 | `guias_movimiento (numero_guia)` | **global** | La hoja del talonario se gastó |

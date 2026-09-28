@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoGuia;
 use App\Enums\MedioTransporte;
+use App\Enums\TipoActor;
 use App\Enums\TipoTransporte;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
@@ -164,27 +165,22 @@ class GuiaMovimiento extends Model
         return $this->es_piscicultura ? 1.0 - self::DESCUENTO_PISCICULTURA : 1.0;
     }
 
-    /** Lo que sale esta guía a la tarifa dada, con el descuento ya aplicado. */
-    public function arancelCalculado(float $tarifaBase): float
+    /**
+     * Lo que se cobra sobre un importe, con el descuento ya aplicado. El importe
+     * es el total del cuadro D: kilos × precio del catálogo, fila por fila.
+     */
+    public function arancelCalculado(float $importeTotal): float
     {
-        return round($tarifaBase * $this->factorArancel(), 2);
+        return round($importeTotal * $this->factorArancel(), 2);
     }
 
     /**
-     * Lo que se cobra por ESTA guía. Exigido por el trait Pagable.
-     *
-     * Sale de la COLUMNA y no de la config: el arancel se copia al emitir, así
-     * que una suba por resolución no mueve el monto de un papel entregado.
+     * Lo que se cobra por ESTA guía. Exigido por el trait Pagable. Sale de la
+     * COLUMNA, calculada al emitir: cambiar el catálogo no mueve un papel entregado.
      */
     public function montoACobrar(): float
     {
-        return (float) ($this->monto ?? $this->arancelCalculado(self::tarifaVigente()));
-    }
-
-    /** Lo que se cobra HOY por una guía nueva. La copia la hace el servicio. */
-    public static function tarifaVigente(): float
-    {
-        return (float) config('jichi.guias.tarifa_base', 0);
+        return (float) $this->monto;
     }
 
     /** ¿Se le pueden cargar depósitos hoy? Exigido por el trait Pagable. */
@@ -254,6 +250,8 @@ class GuiaMovimiento extends Model
         }
 
         return match (true) {
+            $this->sinEfecto() => 'Sin efecto: su carnet fue revocado y el titular todavía no tiene otro '.
+                'carnet de comercializador vigente. Vuelve a valer cuando se apruebe el carnet nuevo.',
             $this->estado === EstadoGuia::Pendiente => 'La guía está PENDIENTE: falta cubrir el '.
                 'arancel y enviarla a revisión.',
             $this->estado === EstadoGuia::EnRevision => 'La guía está presentada y esperando la '.
@@ -282,9 +280,47 @@ class GuiaMovimiento extends Model
      */
     public function estaVigente(): bool
     {
+        return $this->estaEnFecha() && $this->tieneCarnetQueLaAmpare();
+    }
+
+    /** Aprobada y dentro de sus 5 días, sin mirar el carnet. */
+    public function estaEnFecha(): bool
+    {
         return $this->estado->habilita()
             && $this->fecha_vencimiento !== null
             && $this->fecha_vencimiento->isFuture();
+    }
+
+    /**
+     * ¿Hay un carnet de comercializador que la ampare? El suyo o el que lo
+     * reemplazó: sin ninguno vigente, la guía de un carnet revocado no vale.
+     */
+    public function tieneCarnetQueLaAmpare(): bool
+    {
+        return $this->carnet?->amparaSusPapeles() === true;
+    }
+
+    /** Aprobada y en fecha, pero sin un carnet vigente del titular. No se reescribe. */
+    public function sinEfecto(): bool
+    {
+        return $this->estaEnFecha() && ! $this->tieneCarnetQueLaAmpare();
+    }
+
+    /** El texto de «sin efecto» para el QR y las fichas, o null. */
+    public function motivoSinEfecto(): ?string
+    {
+        return $this->sinEfecto() ? 'El titular no tiene un carnet de comercializador vigente que la ampare.' : null;
+    }
+
+    /** La etiqueta de estado que ven las pantallas: «Sin efecto» manda sobre «Aprobada». */
+    public function etiquetaEstado(): string
+    {
+        return $this->sinEfecto() ? 'Sin efecto' : $this->estado->etiqueta();
+    }
+
+    public function colorEstado(): string
+    {
+        return $this->sinEfecto() ? 'rose' : $this->estado->color();
     }
 
     /** ¿Se pasó de fecha sin cerrarse? Es lo que busca el comando diario. */
@@ -314,6 +350,7 @@ class GuiaMovimiento extends Model
     {
         return $query
             ->where($this->qualifyColumn('estado'), EstadoGuia::Aprobada)
-            ->where($this->qualifyColumn('fecha_vencimiento'), '>=', now());
+            ->where($this->qualifyColumn('fecha_vencimiento'), '>=', now())
+            ->whereHas('carnet', fn (Builder $c) => Carnet::conCarnetVigenteDelTitular($c, TipoActor::Comercializador));
     }
 }

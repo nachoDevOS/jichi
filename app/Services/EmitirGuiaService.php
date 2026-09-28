@@ -8,6 +8,7 @@ use App\Exceptions\PermisoOperativoException;
 use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
+use App\Models\ProductoHidrobiologico;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -83,9 +84,9 @@ class EmitirGuiaService
                 'fecha_solicitud' => $solicitud->toDateString(),
             ]);
 
-            // Después del create(): el factor de piscicultura lo calcula el
-            // modelo leyendo su columna, que recién existe con la fila escrita.
-            $guia->update(['monto' => $guia->arancelCalculado(GuiaMovimiento::tarifaVigente())]);
+            // Lo que se cobra es el total del cuadro D, con el descuento de
+            // piscicultura. Después del create(): el factor lee la columna.
+            $guia->update(['monto' => $guia->arancelCalculado($this->importeDe($renglones))]);
 
             $this->guardarDetalle($guia, $renglones);
 
@@ -106,7 +107,8 @@ class EmitirGuiaService
      */
     public function editar(GuiaMovimiento $guia, array $datos, array $detalles): GuiaMovimiento
     {
-        $renglones = $this->normalizarDetalle($detalles);
+        // Un producto que la guía ya tenía se conserva aunque hoy esté fuera de uso.
+        $renglones = $this->normalizarDetalle($detalles, array_map('intval', $guia->detalles()->pluck('producto_id')->all()));
 
         if ($renglones === []) {
             throw PermisoOperativoException::guiaSinDetalle();
@@ -135,11 +137,10 @@ class EmitirGuiaService
                 'peso_total_kg' => $this->kilosDe($renglones),
             ]);
 
-            // El arancel se vuelve a copiar: la piscicultura pudo cambiar, y
-            // con ella la mitad del monto.
+            // El monto se vuelve a calcular: cambiaron la carga o la piscicultura.
             $bloqueada->refresh();
             $bloqueada->update([
-                'monto' => $bloqueada->arancelCalculado(GuiaMovimiento::tarifaVigente()),
+                'monto' => $bloqueada->arancelCalculado($this->importeDe($renglones)),
             ]);
 
             // El detalle se reemplaza ENTERO: casar fila por fila sin un id
@@ -193,7 +194,7 @@ class EmitirGuiaService
      */
     public function cerrar(GuiaMovimiento $guia, ?float $pesoReal = null): GuiaMovimiento
     {
-        if ($guia->estado !== EstadoGuia::Aprobada) {
+        if (! $guia->estado->permiteCierre()) {
             throw PermisoOperativoException::noSePuedeCerrar(mb_strtolower($guia->estado->etiqueta()));
         }
 
@@ -232,8 +233,17 @@ class EmitirGuiaService
             throw PermisoOperativoException::cerradaNoSeAnula();
         }
 
+        if (! $guia->estado->permiteAnulacion()) {
+            throw PermisoOperativoException::guiaNoSeAnula(mb_strtolower($guia->estado->etiqueta()));
+        }
+
         return DB::transaction(function () use ($guia, $motivo): GuiaMovimiento {
             $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
+
+            // Otra ventanilla pudo cerrarla o anularla mientras tanto.
+            if (! $bloqueada->estado->permiteAnulacion()) {
+                throw PermisoOperativoException::guiaNoSeAnula(mb_strtolower($bloqueada->estado->etiqueta()));
+            }
 
             // El motivo se deja ANTES de guardar: el trait Auditable lo lee en el
             // evento `updated`. Sin él la auditoría diría QUÉ cambió pero no POR
@@ -261,32 +271,43 @@ class EmitirGuiaService
     }
 
     /**
-     * El cuadro D, limpio: se descartan los renglones sin especie, que son los
-     * que el operador no llenó de las cinco filas fijas del papel.
+     * El cuadro D con nombre y precio tomados del CATÁLOGO, no del formulario:
+     * el operador elige el producto y el sistema copia lo que dice hoy. Se
+     * descartan los renglones sin producto, que el operador no llenó.
      *
      * @param  array<int, array<string, mixed>>  $detalles
+     * @param  array<int, int>  $yaUsados  Productos que la guía ya tenía (al corregir)
      * @return array<int, array<string, mixed>>
      */
-    private function normalizarDetalle(array $detalles): array
+    private function normalizarDetalle(array $detalles, array $yaUsados = []): array
     {
-        return collect($detalles)
-            ->filter(fn (array $d): bool => trim((string) ($d['especie'] ?? '')) !== '')
-            ->map(function (array $d): array {
+        $filas = collect($detalles)->filter(fn (array $d): bool => ! empty($d['producto_id']));
+
+        $productos = ProductoHidrobiologico::query()
+            ->whereKey($filas->pluck('producto_id')->unique()->all())
+            ->get()
+            ->keyBy('id');
+
+        return $filas
+            ->map(function (array $d) use ($productos, $yaUsados): array {
+                $producto = $productos->get((int) $d['producto_id']);
+
+                if ($producto === null || (! $producto->estado && ! in_array($producto->id, $yaUsados, true))) {
+                    throw PermisoOperativoException::productoNoDisponible($producto?->nombre ?? '#'.$d['producto_id']);
+                }
+
                 $cantidad = round((float) ($d['cantidad_kg'] ?? 0), 2);
-                $precio = round((float) ($d['precio_kg'] ?? 0), 2);
+                $precio = round((float) $producto->precio_kg, 2);
 
                 return [
-                    'especie' => trim((string) $d['especie']),
+                    'producto_id' => $producto->id,
+                    'especie' => $producto->nombre,
                     'condicion' => $d['condicion'] instanceof CondicionProducto
                         ? $d['condicion']
                         : CondicionProducto::from((string) $d['condicion']),
                     'cantidad_kg' => $cantidad,
                     'precio_kg' => $precio,
-                    // Se acepta el importe declarado si vino; si no, se
-                    // multiplica. Ver GuiaDetalle::importeDe().
-                    'importe_total' => isset($d['importe_total']) && $d['importe_total'] !== ''
-                        ? round((float) $d['importe_total'], 2)
-                        : GuiaDetalle::importeDe($cantidad, $precio),
+                    'importe_total' => GuiaDetalle::importeDe($cantidad, $precio),
                 ];
             })
             ->values()
@@ -303,6 +324,16 @@ class EmitirGuiaService
             // de Eloquent, y una inserción masiva no dispara ninguno.
             $guia->detalles()->create($renglon);
         }
+    }
+
+    /**
+     * El total del cuadro D: es lo que se cobra por la guía.
+     *
+     * @param  array<int, array<string, mixed>>  $renglones
+     */
+    private function importeDe(array $renglones): float
+    {
+        return round(array_sum(array_column($renglones, 'importe_total')), 2);
     }
 
     /**

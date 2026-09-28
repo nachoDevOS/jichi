@@ -22,7 +22,7 @@ en memoria).
 | Dato | Valor |
 | --- | --- |
 | Líneas de código | ~37.000 (`app/` + `resources/js/`) |
-| Pruebas | 25, en `tests/Feature/Aprovechamientos/` (ver §8) |
+| Pruebas | 200, de todos los módulos (ver §9) |
 | Idioma del código | Español, sin excepciones salvo `components/ui/` |
 | Pendiente | Reportes y Configuración (en gris en el menú) |
 
@@ -103,7 +103,8 @@ PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO
 - **Rechazar devuelve a pendiente**, con el motivo en `auditorias`. No hay un
   estado «rechazado» final.
 - **Revocar** (autorización y carnet) es de supervisión, con motivo, y no se
-  revierte. Revocar la autorización arrastra sus carnets y faenas vigentes.
+  revierte. Revocar la autorización deja **sin efecto** a sus carnets y faenas
+  sin reescribirlos: su vigencia mira al padre.
 - La **guía** además se **cierra** al llegar la carga o se **anula**; la
   **autorización** además se **agota** cuando lo consumido llega al total.
 
@@ -165,7 +166,7 @@ El esquema completo, con el porqué de cada columna e índice, está en
 | `recibos` | El comprobante | Correlativo continuo; monto y concepto congelados |
 | `pagos` | Cada depósito y su control | Polimórfica; `recibo_id` nullable hasta que el trámite emite su recibo |
 | `codigos` | La llave pública de los cinco documentos | Polimórfica; único completo, un código impreso queda quemado |
-| `asociaciones`, `categorias_aprovechamiento`, `tipos_carnet`, `departamentos` | Catálogos | Los edita la unidad desde el panel |
+| `asociaciones`, `categorias_aprovechamiento`, `tipos_carnet`, `productos_hidrobiologicos`, `departamentos` | Catálogos | Los edita la unidad desde el panel. Los productos llenan el cuadro D de la guía |
 
 Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 `correlativos` y las tablas de `spatie/laravel-permission`.
@@ -200,7 +201,7 @@ en un redirect.
 | Servicio | Qué hace |
 | --- | --- |
 | `OtorgarCupoService` | Otorgar, corregir y eliminar la autorización |
-| `RevisarCupoService` | Enviar, aprobar, rechazar y **revocar** la autorización (con la cascada) |
+| `RevisarCupoService` | Enviar, aprobar, rechazar y **revocar** la autorización (sin cascada: ver REGLAS-NEGOCIO, Regla 5) |
 | `EmitirCarnetService` | Emitir, corregir, eliminar, revocar y reponer el carnet |
 | `RevisarCarnetService` | Enviar, aprobar y rechazar el carnet |
 | `EmitirFaenaService` / `RevisarFaenaService` | Lo mismo para la faena; controla los kilos libres |
@@ -262,7 +263,8 @@ copia en vez de leerse por relación:
 
 | Dónde | Qué congela |
 | --- | --- |
-| `permisos_faena.monto`, `guias_movimiento.monto` | El arancel del día en que se emitió (con el descuento de piscicultura) |
+| `permisos_faena.monto` | El arancel del día en que se emitió |
+| `guias_movimiento.monto`, `guia_detalles.precio_kg` | El total del cuadro D y la tasa de cada producto al emitir (con el descuento de piscicultura) |
 | `recibos.monto_total`, `recibos.concepto` | Lo que dice el papel entregado |
 | `guias_movimiento.asociacion_id` | El aval impreso en la guía |
 | `aprovechamientos_pesq.volumen_total_kg`, `modalidad` | Lo que se otorgó, aunque la escala cambie |
@@ -326,8 +328,8 @@ un botón con `usePermisos()` es solo comodidad; siempre van los dos.
 > ⚠️ **Hoy existe un solo rol, `administrador`, con todos los permisos**: la
 > misma persona puede cargar y aprobar. Las rutas ya están separadas, así que
 > agregar el rol de ventanilla es una línea en `RolSistema`. Además
-> `pagos.revisor_distinto` (configurable, apagado por defecto) exige que quien
-> valida una boleta no sea quien la cargó.
+> `pagos.revisor_distinto` debería exigir que quien valida una boleta no sea
+> quien la cargó, pero **todavía no está implementado**: ver PENDIENTES.md.
 
 **Login:** con `IBARE_ACTIVO=true` se entra con la cuenta del GAD por OAuth2
 (Ibare) y el login por correo queda solo para administradores. Ver
@@ -364,14 +366,14 @@ permiso.
 | Carnets | ✅ | `CarnetController`, `EmitirCarnetService` | [modulos/CARNETS.md](modulos/CARNETS.md) |
 | Faenas y guías | ✅ | `FaenaController`, `GuiaController` | [modulos/PERMISOS-OPERATIVOS.md](modulos/PERMISOS-OPERATIVOS.md) |
 | Caja, recibos y pagos | ✅ | `CajaController`, `ReciboController`, `PagoController`, `CobrarService` | [modulos/PAGOS.md](modulos/PAGOS.md), [modulos/RECIBOS.md](modulos/RECIBOS.md) |
-| Catálogos | ✅ | `AsociacionController`, `CategoriaAprovechamientoController`, `TipoCarnetController` | — |
+| Catálogos | ✅ | `AsociacionController`, `CategoriaAprovechamientoController`, `TipoCarnetController`, `ProductoHidrobiologicoController` | — |
 | Verificación pública | ✅ | `VerificacionController` | [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md), paso 7 |
 | Reportes | ❌ No existe | — | [PENDIENTES.md](PENDIENTES.md) |
 | Configuración | ❌ No existe (la tabla sí) | — | [PENDIENTES.md](PENDIENTES.md) |
 
 El menú lateral agrupa: **Ventanilla** (Beneficiarios, Aprov. Pesquero, Carnets,
 Faenas, Guías), **Caja** (Cobros, Recibos), **Catálogos** (Asociaciones, Escala,
-Tipos de carnet) y **Administración** (Reportes, Configuración). Vive en
+Tipos de carnet, Productos) y **Administración** (Reportes, Configuración). Vive en
 `components/panel/layout/navegacion.ts`.
 
 ### El patrón a copiar
@@ -391,14 +393,16 @@ verdad —no solo un CRUD—, copiar además el par `EmitirFaenaService` +
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
-php artisan test        # las 25 pruebas
+php artisan test        # las 200 pruebas
 ```
 
-**Las pruebas cubren poco**: la revocación de la autorización (19 casos) y la
-reserva de kilos de la faena (6). `tests/Feature/` se vació el 14/09/2026 por
-pedido del responsable; el resto de las reglas no lo comprueba nada
-automáticamente. **Todo cambio se prueba además abriendo la pantalla en el
-navegador**, incluidos los casos borde.
+**Qué cubren las pruebas** (200, 27/09/2026): los siete pasos de REGLAS-NEGOCIO
+—beneficiarios, autorización, carnets, faenas, guías y productos, caja y
+control de boletas, verificación pública—, los catálogos, los permisos de cada
+pantalla y las reglas puras (`tests/Unit/`). El detalle por archivo está en
+[MAPA-ARCHIVOS.md](MAPA-ARCHIVOS.md). Lo que NO cubren: las pantallas por
+dentro —React no tiene pruebas— y que todo archivo pase por `StorageController`.
+**Todo cambio de pantalla se prueba además en el navegador.**
 
 Al agregar una migración, un permiso a `RolSistema` o una clave a
 `ConfiguracionSeeder`, hay que correr a mano `php artisan migrate` y

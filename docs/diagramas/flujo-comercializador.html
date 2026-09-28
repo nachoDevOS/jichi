@@ -210,7 +210,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--li
                     <rect class="nd" x="530" y="80" width="200" height="96" rx="10"/>
                     <text class="t-sm" x="630" y="112" text-anchor="middle">Guía única de transporte</text>
                     <text class="s" x="630" y="134" text-anchor="middle">Una por traslado</text>
-                    <text class="s" x="630" y="150" text-anchor="middle">5 días · 50 Bs</text>
+                    <text class="s" x="630" y="150" text-anchor="middle">5 días · cobra su cuadro D</text>
 
                     <path class="e" d="M730 128 H806" marker-end="url(#f)"/>
                     <text class="lab" x="768" y="120" text-anchor="middle">lleva</text>
@@ -228,7 +228,7 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--li
                     <text class="s" x="490" y="282" text-anchor="middle">Un recibo por trámite, al enviar a revisión</text>
                 </svg>
             </div>
-            <figcaption>La guía de pescado de piscicultura paga la mitad del arancel, porque no sale del río. Carnet, guía y recibo llevan un código de 16 caracteres y su QR para verificarlos en <code>/verificar</code>.</figcaption>
+            <figcaption>La guía cobra el total de su cuadro D; si el pescado es de piscicultura, la mitad, porque no sale del río. Carnet, guía y recibo llevan un código de 16 caracteres y su QR para verificarlos en <code>/verificar</code>.</figcaption>
         </figure>
     </section>
 
@@ -339,12 +339,17 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--li
             </div>
             <div class="regla">
                 <h3>Carga</h3>
-                <p>Una fila por especie, con su condición (fresco, congelado, seco, sal preso, vivos…) y los kilos. El peso total de la guía es la suma de esas filas.</p>
+                <p>Una fila por producto, elegido del catálogo de productos hidrobiológicos, con su condición (fresco, congelado, seco, sal preso, vivos…) y los kilos. El peso total de la guía es la suma de esas filas.</p>
+            </div>
+            <div class="regla">
+                <h3>Lo que se cobra</h3>
+                <p>Cada producto tiene su tasa por kilo en el catálogo (desde 0,20 Bs). La guía cobra la suma de kilos × precio de su cuadro D. Ejemplo: 200 kg de surubí a 0,50 más 100 kg de sábalo a 0,20 son 120 Bs.</p>
+                <div class="dato"><span class="chip">total del cuadro D</span></div>
             </div>
             <div class="regla">
                 <h3>Piscicultura</h3>
-                <p>Si el pescado viene de criadero, el arancel se cobra al 50%. El monto queda copiado en la guía: una suba posterior no cambia lo que se cobró.</p>
-                <div class="dato"><span class="chip">50 Bs</span><span class="chip">25 Bs piscicultura</span></div>
+                <p>Si el pescado viene de criadero, se cobra la mitad del total. El monto queda guardado en la guía: cambiar el catálogo después no mueve lo que se cobró.</p>
+                <div class="dato"><span class="chip">120 Bs → 60 Bs</span></div>
             </div>
             <div class="regla">
                 <h3>Vigencia</h3>
@@ -354,6 +359,11 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--li
             <div class="regla">
                 <h3>Cierre</h3>
                 <p>Cuando la carga llega a destino, la guía se cierra. Al cerrarla se puede corregir el peso con el de la balanza.</p>
+            </div>
+            <div class="regla">
+                <h3>Catálogo de productos</h3>
+                <p>Nombre, precio por kilo y estado, en Catálogos → Productos. Un producto inactivo no se elige en una guía nueva; cambiar el catálogo no toca las guías ya emitidas.</p>
+                <div class="dato"><span class="chip">parametrizado</span></div>
             </div>
         </div>
     </section>
@@ -376,12 +386,12 @@ footer { color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--li
             </div>
             <div class="regla">
                 <h3>Guía única de transporte</h3>
-                <p>Solo desde un carnet de comercializador vigente. El número lo pone el sistema, continuo como el talonario. No controla kilos contra ningún cupo.</p>
+                <p>Solo desde un carnet de comercializador vigente, y vale mientras el titular tenga uno. El número lo pone el sistema, continuo como el talonario. No controla kilos contra ningún cupo. Anular es solo para la guía aprobada, y no toca el carnet.</p>
                 <div class="dato"><span class="chip">N° correlativo</span></div>
             </div>
             <div class="regla">
                 <h3>Revocar el carnet</h3>
-                <p>Da de baja la credencial, con motivo. Las guías ya aprobadas siguen valiendo hasta su fecha. Para reponer un carnet perdido se revoca y se emite otro.</p>
+                <p>Da de baja la credencial, con motivo, sin reescribir sus guías. Pero una guía vale solo si el titular tiene un carnet vigente: hasta que se apruebe el carnet nuevo, figura «Sin efecto». Aprobado el nuevo, vuelve a valer sola hasta su fecha.</p>
             </div>
             <div class="regla">
                 <h3>Recibo</h3>

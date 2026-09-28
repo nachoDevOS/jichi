@@ -22,21 +22,27 @@ import type { CatalogosGuia, FormularioGuia } from '@/types/guias';
  */
 export default function CrearGuia({
     beneficiario,
+    carnetElegido,
     medios,
     tiposTransporte,
+    productos,
     condiciones,
     diasVigencia,
-    tarifaBase,
     descuentoPiscicultura,
 }: CatalogosGuia & {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
+    /** `?carnet=`: llega desde la ficha del carnet con el carnet ya elegido. */
+    carnetElegido: number | null;
 }) {
     const { institucion } = usePage<PageProps>().props;
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
-    const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(null);
+    // Solo si está entre los vigentes y puede emitir guías: si no, se elige a mano.
+    const inicial =
+        beneficiario?.carnets_vigentes.find((c) => c.id === carnetElegido && c.puede_emitir_guias) ?? null;
+    const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(inicial);
 
     const form = useForm<FormularioGuia & { carnet_id: number | null }>({
-        carnet_id: null,
+        carnet_id: inicial?.id ?? null,
 
         origen: '',
         origen_departamento: '',
@@ -81,7 +87,14 @@ export default function CrearGuia({
         form.post(route('guias.store'));
     }
 
-    const monto = form.data.es_piscicultura ? tarifaBase * (1 - descuentoPiscicultura) : tarifaBase;
+    // Se cobra el total del cuadro D: kilos × precio del catálogo. El servidor lo recalcula al guardar.
+    const importe = form.data.detalles.reduce(
+        (suma, f) =>
+            suma +
+            Number(f.cantidad_kg || 0) * (productos.find((p) => String(p.id) === f.producto_id)?.precio_kg ?? 0),
+        0,
+    );
+    const monto = form.data.es_piscicultura ? importe * (1 - descuentoPiscicultura) : importe;
     const kilos = form.data.detalles.reduce((suma, f) => suma + Number(f.cantidad_kg || 0), 0);
 
     const completo =
@@ -89,7 +102,7 @@ export default function CrearGuia({
         form.data.origen.trim() !== '' &&
         form.data.destino.trim() !== '' &&
         form.data.detalles.some(
-            (f) => f.especie.trim() !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
+            (f) => f.producto_id !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
         );
 
     return (
@@ -179,6 +192,7 @@ export default function CrearGuia({
                                 <CardContent>
                                     <TablaDetalle
                                         filas={form.data.detalles}
+                                        productos={productos}
                                         condiciones={condiciones}
                                         errores={form.errors}
                                         onCambiar={(filas) => form.setData('detalles', filas)}
@@ -214,7 +228,7 @@ export default function CrearGuia({
                                     {form.data.es_piscicultura && (
                                         <p className="text-xs text-muted-foreground">
                                             Con el descuento de piscicultura. Sin él serían{' '}
-                                            {bs(tarifaBase, institucion.moneda)}.
+                                            {bs(importe, institucion.moneda)}.
                                         </p>
                                     )}
                                 </div>

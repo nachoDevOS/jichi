@@ -107,3 +107,14 @@ export interface FormularioTipoCarnet {
     precio_bs: number | string;
     estado: boolean;
 }
+
+/** Una fila del catálogo de productos hidrobiológicos. */
+export interface ProductoFila {
+    id: number;
+    nombre: string;
+    /** La tasa por kilo: la guía cobra kilos × precio de su cuadro D. */
+    precio_kg: number;
+    estado: boolean;
+    /** Renglones de guía que lo usan: por eso no hay papelera. */
+    detalles_count: number;
+}

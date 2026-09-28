@@ -335,13 +335,11 @@ export default function IndiceCarnets({
                                                                 </a>
                                                             )}
 
-                                                        {/* EL CARNET EN PDF, desde que está
-                                                            firmado. Un revocado no se imprime
-                                                            —el controlador lo rechaza igual— así
-                                                            que tampoco se ofrece. */}
+                                                        {/* EL CARNET EN PDF: lo decide el servidor
+                                                            (firmado, no revocado y con la
+                                                            autorización viva). */}
                                                         {puede('carnets.imprimir') &&
-                                                            c.ya_fue_aprobado &&
-                                                            c.estado !== 'revocado' && (
+                                                            c.puede_imprimirse && (
                                                                 <a
                                                                     href={route(
                                                                         'carnets.imprimir',

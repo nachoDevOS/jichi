@@ -52,7 +52,9 @@ class FaenaController extends Controller
             // el método contesta cualquier cosa, sin error.
             ->with([
                 'codigo',
-                'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision',
+                // Con `aprovechamiento_id`: «sin efecto» mira la autorización del carnet.
+                'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision,estado,fecha_vencimiento',
+                'carnet.aprovechamiento:id,estado',
                 'carnet.codigo',
                 'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             ])
@@ -187,7 +189,7 @@ class FaenaController extends Controller
         }
 
         $faena->load([
-            'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.aprovechamiento' => fn ($a) => $a->withSum('faenasQueConsumen', 'kilos_extraidos')
@@ -285,7 +287,7 @@ class FaenaController extends Controller
     {
         $faena->load([
             'codigo',
-            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,aprovechamiento_id,nro_registro,fecha_emision',
+            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,aprovechamiento_id,nro_registro,fecha_emision,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.asociacion:id,nombre,sigla',
@@ -579,8 +581,8 @@ class FaenaController extends Controller
             'region_hasta' => $faena->region_hasta,
 
             'estado' => $faena->estado->value,
-            'estado_etiqueta' => $faena->estado->etiqueta(),
-            'estado_color' => $faena->estado->color(),
+            'estado_etiqueta' => $faena->etiquetaEstado(),
+            'estado_color' => $faena->colorEstado(),
             'vigente' => $faena->estaVigente(),
             // Una faena vencida LIBERA su volumen: la salida no ocurrió.
             'consume_cupo' => $faena->consumeCupo(),
