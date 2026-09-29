@@ -80,6 +80,11 @@ export function Pie({ portada }: { portada: InstitucionPortada }) {
                                 </a>
                             </li>
                             <li>
+                                <Link href={route('portal.ingresar')} className="hover:text-white">
+                                    Mi cuenta (pescadores y comercializadores)
+                                </Link>
+                            </li>
+                            <li>
                                 <Link href={route('login')} className="hover:text-white">
                                     Acceso para funcionarios
                                 </Link>

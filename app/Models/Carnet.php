@@ -354,6 +354,9 @@ class Carnet extends Model
             $this->aprovechamiento === null => 'No tiene una Autorización de Pesca para Aprovechamiento Pesquero asociada.',
             $this->aprovechamiento->estado === EstadoAprovechamiento::Revocado => 'La Autorización de Pesca para Aprovechamiento Pesquero '
                 .'fue revocada: no autoriza faenas.',
+            // Antes que `habilita()`: agotada no es «todavía no», es «ya no».
+            $this->aprovechamiento->estado === EstadoAprovechamiento::Agotado => 'La Autorización de Pesca para Aprovechamiento '
+                .'Pesquero se quedó sin kilos. Hay que tramitar otra.',
             ! $this->aprovechamiento->estado->habilita() => 'La Autorización de Pesca para Aprovechamiento Pesquero está '
                 .mb_strtolower($this->aprovechamiento->estado->etiqueta()).': todavía no autoriza faenas.',
             ! $this->aprovechamiento->estaEnFecha() => 'La Autorización de Pesca para Aprovechamiento Pesquero venció.',

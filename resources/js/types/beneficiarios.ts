@@ -32,6 +32,15 @@ export interface BeneficiarioFila {
 /**
  * La ficha completa.
  */
+/** Su cuenta del portal /mi-cuenta. Null si nunca se la dieron. */
+export interface AccesoPortal {
+    activo: boolean;
+    /** Todavía con la clave temporal de ventanilla. */
+    debe_cambiar_password: boolean;
+    ultimo_acceso: string | null;
+    creada: string | null;
+}
+
 export interface BeneficiarioFicha {
     id: number;
     ci: string;

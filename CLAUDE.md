@@ -115,16 +115,21 @@ controlador ni en React.**
    a [docs/NOTAS-CODIGO.md](docs/NOTAS-CODIGO.md) —ahí está lo que se podó, por
    archivo—. En el código queda el resumen y, si hace falta, «ver X».
 
-3. **Panel y público no se mezclan.** El sistema tiene dos mitades separadas en
-   carpetas paralelas, en el backend y en el frontend:
+3. **Panel, público y portal no se mezclan.** El sistema tiene tres mitades
+   separadas en carpetas paralelas, en el backend y en el frontend:
 
-   | | Panel (con sesión) | Público (sin sesión) |
-   | --- | --- | --- |
-   | Rutas | `routes/panel.php`, prefijo `/panel` | `routes/publico.php` |
-   | Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` |
-   | Pantallas | `resources/js/pages/panel/` | `resources/js/pages/publico/` |
-   | Componentes | `components/panel/` | `components/publico/` |
-   | Layout | `layouts/layout-panel.tsx` | `layouts/layout-publico.tsx` |
+   | | Panel (funcionarios) | Público (sin sesión) | Portal (beneficiario) |
+   | --- | --- | --- | --- |
+   | Rutas | `routes/panel.php`, prefijo `/panel` | `routes/publico.php` | `routes/portal.php`, prefijo `/mi-cuenta` |
+   | Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` | `Http/Controllers/Portal/` |
+   | Pantallas | `resources/js/pages/panel/` | `resources/js/pages/publico/` | `resources/js/pages/portal/` |
+   | Componentes | `components/panel/` | `components/publico/` | `components/portal/` |
+   | Layout | `layouts/layout-panel.tsx` | `layouts/layout-publico.tsx` | `layouts/layout-portal.tsx` |
+
+   **Una cuenta de `users` con `beneficiario_id` es del portal y NUNCA entra al
+   panel.** Lo sostienen los middleware `funcionario` y `beneficiario` en el
+   grupo entero de rutas, y que esas cuentas no lleven roles. Ver
+   [docs/modulos/PORTAL.md](docs/modulos/PORTAL.md).
 
    La vista pública no puede exponer datos personales completos ni pistas de la
    estructura interna. Ver `VerificacionController::datosPublicos()`.
@@ -604,8 +609,10 @@ Los tres tienen que pasar.
   la página.** Inertia compara la versión del manifiesto de assets y responde
   `409 Conflict` con `X-Inertia-Location` cuando no coincide —que es siempre, si
   el número se inventa—. **Se pide sin ninguna cabecera de Inertia:** las props
-  viajan igual, adentro del atributo `data-page` del HTML, y se leen con un
-  `grep` del nombre de la clave. Un 409 acá NO es un error de la pantalla.
+  viajan igual, en el HTML, y se leen con un `grep` del nombre de la clave.
+  **Con Inertia 2 NO van en el atributo `data-page`**: van en
+  `<script data-page="app" type="application/json">`. Un parser que busque el
+  atributo lee «app» y revienta con «is not valid JSON». Un 409 acá NO es un error de la pantalla.
 - **Una bandera de configuración que apaga una validación tiene que llegar a la
   PANTALLA, o la pantalla miente.** Con `APROVECHAMIENTO_ESTRICTO=false` el
   servidor acepta una faena que se pasa del cupo, y el formulario la seguía

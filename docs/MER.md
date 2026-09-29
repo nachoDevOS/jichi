@@ -1074,6 +1074,20 @@ sin poder recibir otro nunca más.
 `configuraciones`, `auditorias`, `accesos`. Más las de Laravel y las de
 `spatie/laravel-permission`.
 
+**`users` guarda también las cuentas del portal** (28/09/2026): con
+`beneficiario_id` lleno la fila es de un beneficiario y solo entra a
+`/mi-cuenta`. Tres decisiones:
+
+- `beneficiario_id` **no tiene FK**: la columna está en la migración de campos
+  institucionales, que corre antes de que exista `beneficiarios`. Lo cuida
+  `CuentaPortalService`, y como `beneficiarios` nunca se borra de verdad, no hay
+  fila que pueda quedar huérfana.
+- Su único es **parcial** (`users_beneficiario_unico`, `WHERE deleted_at IS
+  NULL`): una cuenta por beneficiario, y la baja lógica libera el lugar.
+- `email` pasó a **nullable**: el beneficiario entra con su C.I. El único sigue
+  valiendo, porque en SQL `NULL` no choca con `NULL`.
+- `debe_cambiar_password` marca la clave temporal de ventanilla.
+
 ---
 
 ## 5. Dónde está cada cosa

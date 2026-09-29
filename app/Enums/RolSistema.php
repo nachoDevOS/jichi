@@ -51,6 +51,8 @@ enum RolSistema: string
         $operacion = [
             'beneficiarios.crear',
             'beneficiarios.editar',
+            // Dar acceso al portal /mi-cuenta y resetear su clave, en ventanilla.
+            'beneficiarios.portal',
 
             'aprovechamientos.crear',
             'aprovechamientos.editar',

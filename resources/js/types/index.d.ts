@@ -13,8 +13,11 @@ import type { Config as ZiggyConfig } from 'ziggy-js';
 export interface Usuario {
     id: number;
     name: string;
-    email: string;
+    /** Null en las cuentas del portal: el beneficiario entra con su C.I. */
+    email: string | null;
     cargo: string | null;
+    /** Cuenta del portal /mi-cuenta: nunca entra al panel. */
+    es_beneficiario: boolean;
     /** Nombres de rol. Por ahora el sistema tiene uno solo: 'administrador'. */
     roles: string[];
     /** Permisos ya expandidos: 'beneficiarios.crear', 'pagos.registrar'... */
@@ -50,6 +53,15 @@ export interface Flash {
     exito: string | null;
     error: string | null;
     info: string | null;
+    /** La clave temporal del portal, recién creada o reseteada. Llega UNA vez. */
+    cuenta_portal: CredencialPortal | null;
+}
+
+export interface CredencialPortal {
+    nombre: string;
+    usuario: string;
+    clave: string;
+    url: string;
 }
 
 /**

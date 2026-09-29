@@ -3,7 +3,6 @@ import {
     Ban,
     CalendarX,
     Check,
-    CheckCheck,
     Clock,
     IdCard,
     Pencil,
@@ -18,11 +17,9 @@ import {
 import { useState, type ReactNode } from 'react';
 import { TarjetaPagos } from '@/components/panel/pagos/tarjeta-pagos';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
-import { Input } from '@/components/ui/input';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha, fechaHora } from '@/lib/utils';

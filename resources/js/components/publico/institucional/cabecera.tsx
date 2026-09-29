@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { LayoutDashboard, LogIn, Mail, Menu, Phone, X } from 'lucide-react';
+import { LayoutDashboard, LogIn, Mail, Menu, Phone, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
 import { FranjaTricolor } from '@/components/publico/institucional/franja-tricolor';
 import type { PageProps } from '@/types';
@@ -87,7 +87,8 @@ export function Cabecera({ portada }: { portada: InstitucionPortada }) {
                         ))}
                     </nav>
 
-                    <BotonAcceso autenticado={auth.user !== null} />
+                    <BotonMiCuenta />
+                    {!auth.user?.es_beneficiario && <BotonAcceso autenticado={auth.user !== null} />}
 
                     <button
                         type="button"
@@ -126,7 +127,7 @@ export function Cabecera({ portada }: { portada: InstitucionPortada }) {
 function BotonAcceso({ autenticado }: { autenticado: boolean }) {
     const destino = autenticado ? route('dashboard') : route('login');
     const Icono = autenticado ? LayoutDashboard : LogIn;
-    const texto = autenticado ? 'Ir al panel' : 'Acceso al sistema';
+    const texto = autenticado ? 'Ir al panel' : 'Funcionarios';
 
     return (
         // aria-label aunque el texto esté al lado: en el teléfono se esconde y
@@ -138,6 +139,23 @@ function BotonAcceso({ autenticado }: { autenticado: boolean }) {
         >
             <Icono className="size-4" />
             <span className="hidden sm:inline">{texto}</span>
+        </Link>
+    );
+}
+
+/** El portal del beneficiario: con sesión abierta de beneficiario va directo a su cuenta. */
+function BotonMiCuenta() {
+    const { auth } = usePage<PageProps>().props;
+    const destino = auth.user?.es_beneficiario ? route('portal.inicio') : route('portal.ingresar');
+
+    return (
+        <Link
+            href={destino}
+            aria-label="Mi cuenta"
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-institucional-dorado px-3 py-2 text-xs font-semibold text-rio-profundo shadow-sm transition-colors hover:bg-institucional-dorado-oscuro sm:text-sm"
+        >
+            <UserRound className="size-4" />
+            <span className="hidden sm:inline">Mi cuenta</span>
         </Link>
     );
 }

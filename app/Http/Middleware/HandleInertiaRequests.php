@@ -42,6 +42,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $usuario->name,
                     'email' => $usuario->email,
                     'cargo' => $usuario->cargo,
+                    'es_beneficiario' => $usuario->esBeneficiario(),
                     'roles' => $usuario->getRoleNames(),
                     'permisos' => $usuario->getAllPermissions()->pluck('name'),
                 ] : null,
@@ -71,6 +72,8 @@ class HandleInertiaRequests extends Middleware
                 'exito' => fn () => $request->session()->get('exito'),
                 'error' => fn () => $request->session()->get('error'),
                 'info' => fn () => $request->session()->get('info'),
+                // La clave temporal del portal: se muestra UNA vez, para dictarla o imprimirla.
+                'cuenta_portal' => fn () => $request->session()->get('cuenta_portal'),
             ],
 
             'ziggy' => fn (): array => [

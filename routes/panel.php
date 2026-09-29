@@ -8,6 +8,7 @@ use App\Http\Controllers\Panel\CajaController;
 use App\Http\Controllers\Panel\CarnetController;
 use App\Http\Controllers\Panel\CarnetImpresionController;
 use App\Http\Controllers\Panel\CategoriaAprovechamientoController;
+use App\Http\Controllers\Panel\CuentaPortalController;
 use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\FaenaController;
 use App\Http\Controllers\Panel\GuiaController;
@@ -23,7 +24,8 @@ use Illuminate\Support\Facades\Route;
 | Panel de administración — requiere sesión iniciada
 */
 
-Route::middleware('auth')->prefix('panel')->group(function () {
+// `funcionario`: una cuenta del portal nunca entra acá, tenga el rol que tenga.
+Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
     /*
     | Panel principal
@@ -65,6 +67,18 @@ Route::middleware('auth')->prefix('panel')->group(function () {
     Route::delete('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'destroy'])
         ->middleware('permiso:beneficiarios.eliminar')
         ->name('beneficiarios.destroy');
+
+    // Su cuenta del portal /mi-cuenta. Los tres devuelven a la ficha.
+    Route::middleware('permiso:beneficiarios.portal')->group(function () {
+        Route::post('/beneficiarios/{beneficiario}/portal', [CuentaPortalController::class, 'store'])
+            ->name('beneficiarios.portal.store');
+
+        Route::patch('/beneficiarios/{beneficiario}/portal/resetear', [CuentaPortalController::class, 'resetear'])
+            ->name('beneficiarios.portal.resetear');
+
+        Route::patch('/beneficiarios/{beneficiario}/portal/desactivar', [CuentaPortalController::class, 'desactivar'])
+            ->name('beneficiarios.portal.desactivar');
+    });
 
     // ÚLTIMA del bloque: {beneficiario} se tragaría 'crear' y 'buscar'.
     Route::get('/beneficiarios/{beneficiario}', [BeneficiarioController::class, 'show'])

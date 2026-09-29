@@ -468,5 +468,6 @@
 
 </div>
 
+@include('documentos.partes.marca-no-valido', ['ancho' => 612, 'alto' => 792])
 </body>
 </html>

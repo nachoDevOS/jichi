@@ -308,6 +308,24 @@ dentro de una transacción deshecha con `rollBack()`.
 - El **correlativo** (N° de faena, N° de recibo, N° de registro) sigue existiendo
   aparte: es el que Contabilidad audita por huecos. Conviven, no compiten.
 
+## Paso 8 — El portal del beneficiario (`/mi-cuenta`) — 28/09/2026
+
+- En ventanilla se le puede **dar acceso** a un beneficiario: entra con su
+  **C.I.** y una contraseña **temporal** que el sistema genera, y al primer
+  ingreso está obligado a cambiarla.
+- **Solo consulta:** papeles vigentes y en trámite, recibos y deuda, y sus datos.
+  No hace trámites ni corrige datos (se hace en ventanilla con la cédula).
+- **Descarga en PDF lo que está vigente hoy** —autorización, faena y guía—, el
+  mismo documento que sale en ventanilla. **El carnet no:** si se pierde, se hace la
+  reposición en ventanilla. Lo vencido, revocado o sin efecto no se
+  imprime. «Pagar con QR» es solo una simulación.
+- **Recuperar la contraseña es en ventanilla** («Resetear contraseña»): muchos
+  pescadores no tienen correo. También se puede **desactivar** el acceso.
+- Una cuenta del portal **nunca** entra al panel, y un funcionario que además
+  pesca necesita dos cuentas.
+- Cumple el derecho del **Art. 13** del reglamento a «recibir un informe
+  económico anual de los aportes realizados».
+
 ## Nombres de los estados
 
 Un documento **firmado** se guarda como `aprobado` en los cuatro: autorización

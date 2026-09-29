@@ -118,16 +118,21 @@ React.**
    esperado: `SolicitudCarnetService`, `ArchivoTramiteService`,
    `app/Support/Sql.php`, la migración `2026_09_10_100200_create_carnets_table`.
 
-3. **Panel y público no se mezclan.** El sistema tiene dos mitades separadas en
-   carpetas paralelas, en el backend y en el frontend:
+3. **Panel, público y portal no se mezclan.** El sistema tiene tres mitades
+   separadas en carpetas paralelas, en el backend y en el frontend:
 
-   | | Panel (con sesión) | Público (sin sesión) |
-   | --- | --- | --- |
-   | Rutas | `routes/panel.php`, prefijo `/panel` | `routes/publico.php` |
-   | Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` |
-   | Pantallas | `resources/js/pages/panel/` | `resources/js/pages/publico/` |
-   | Componentes | `components/panel/` | `components/publico/` |
-   | Layout | `layouts/layout-panel.tsx` | `layouts/layout-publico.tsx` |
+   | | Panel (funcionarios) | Público (sin sesión) | Portal (beneficiario) |
+   | --- | --- | --- | --- |
+   | Rutas | `routes/panel.php`, prefijo `/panel` | `routes/publico.php` | `routes/portal.php`, prefijo `/mi-cuenta` |
+   | Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` | `Http/Controllers/Portal/` |
+   | Pantallas | `resources/js/pages/panel/` | `resources/js/pages/publico/` | `resources/js/pages/portal/` |
+   | Componentes | `components/panel/` | `components/publico/` | `components/portal/` |
+   | Layout | `layouts/layout-panel.tsx` | `layouts/layout-publico.tsx` | `layouts/layout-portal.tsx` |
+
+   **Una cuenta de `users` con `beneficiario_id` es del portal y NUNCA entra al
+   panel.** Lo sostienen los middleware `funcionario` y `beneficiario` en el
+   grupo entero de rutas, y que esas cuentas no lleven roles. Ver
+   [docs/modulos/PORTAL.md](docs/modulos/PORTAL.md).
 
    La vista pública no puede exponer datos personales completos ni pistas de la
    estructura interna. Ver `VerificacionController::datosPublicos()`.

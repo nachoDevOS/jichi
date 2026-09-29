@@ -108,6 +108,8 @@ decisiones que acá solo se nombran.
 | `Panel/AutorizacionPescaController.php` | 187 | La autorización de pesca en PDF. Carta vertical. Sale recién con el cupo **aprobado**; la tabla de tamaños mínimos y las reglas de redes van como constantes —son texto del reglamento, no de la base— |
 | `Panel/DashboardController.php` | 223 | Trabajo pendiente (borradores y por firmar, con URL filtradas), cuatro números, recaudación de 12 meses, avisos y últimos carnets. Cada bloque en `fn()` para las visitas parciales |
 | `Publico/VerificacionController.php` | 265 | Atiende los CINCO documentos, no solo el carnet: una consulta a `codigos` y `morphTo`. Devuelve **renglones ya resueltos**, así que sumar un tipo no toca React. Cédula enmascarada, sin ids internos |
+| `Panel/CuentaPortalController.php` | 80 | Dar acceso al portal, resetear y desactivar, desde la ficha. La clave temporal vuelve por flash y se ve UNA vez |
+| `Portal/*` | — | El portal `/mi-cuenta`: `AccesoController`, `InicioController`, `PapelesController`, `PagosController` y `PerfilController`. **Ninguno recibe un id**: todo sale de `$request->user()->beneficiario`. Ver `docs/modulos/PORTAL.md` |
 | `Publico/InicioController.php` | 52 | La portada institucional. **No consulta el dominio**: todo sale de `configuraciones`, con valor por defecto para que se dibuje en una base sin seeder. Manda la prop como `portada` y no `institucion` porque esa clave ya la ocupa una prop compartida, y una de página con el mismo nombre la tapa sin avisar |
 
 ## `app/Http/Requests/Panel/`
@@ -148,6 +150,8 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `Codificable.php` | 66 | El código de 16 de los CINCO documentos que se entregan. `$doc->codigo_legible` para mostrar, `$doc->asignarCodigo()` para emitir. **Toda consulta que lo muestre necesita `with('codigo')`** o hace N+1 en silencio |
 | `SituacionCarnet.php` | 149 | Lo comparten el autocompletado y el formulario. Es **para la pantalla**, no la regla |
 | `Paginacion.php` | 62 | Lista blanca de tamaños: el número llega por la URL |
+| `ExpedienteBeneficiario.php` | 85 | Las consultas del expediente de una persona, con sus `with()`. Las comparten la ficha del panel y el portal: arreglar un N+1 acá lo arregla en los dos |
+| `ResumenPortal.php` | 130 | Lo que el portal muestra de cada documento: sin ids ni banderas de funcionario. `clase` dice qué documento es |
 | `Auditable.php` | 83 | Bitácora automática. **No se entera de `attach()` ni de los DELETE en cascada** |
 
 ## `resources/views/documentos/`
@@ -169,6 +173,7 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `panel.php` | `/panel/...` — con sesión y con `permiso:` en cada ruta |
 | `publico.php` | `/` (portada) y `/verificar/{codigo?}` — sin sesión, con `throttle` |
 | `auth.php` | `/login`, `/logout`. Las rutas de Ibare NO están acá: ver `app/AuthIbare/rutas.php` |
+| `portal.php` | `/mi-cuenta/...` — el portal del beneficiario, con `auth` + `beneficiario`. Ninguna ruta recibe un id |
 
 > **El orden importa:** `/beneficiarios/crear` y `/beneficiarios/buscar` van
 > ANTES de `/beneficiarios/{beneficiario}`, o esas palabras se toman como id.
@@ -188,6 +193,7 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `components/panel/layout/` | Barra lateral, encabezado, menú | El ancho de la barra está escrito **dos veces** —`w-16`/`w-64` en la barra y `lg:pl-16`/`lg:pl-64` en el layout— y los dos se mueven juntos. `moduloActual()` de `navegacion.ts` es lo ÚNICO que decide qué módulo está abierto: lo usan el menú y las migas |
 | `components/panel/dashboard/` | Gráfico de recaudación, avisos y últimos carnets | El gráfico se carga con `lazy()`. Los avisos solo listan lo que tiene algo, y enlazan al listado filtrado |
 | `components/publico/` | Hoja oficial, ficha, buscador | `buscador-codigo.tsx` vive en TRES sitios —el acta, su fondo verde y la portada— y por eso no lleva margen propio |
+| `pages/portal/`, `components/portal/`, `layouts/layout-portal.tsx` | El portal del beneficiario | Claro siempre, como la portada: `piezas.tsx` tiene sus propios chips e inputs porque `Badge` e `Input` cambian en modo oscuro. `fila-papel.tsx` es la fila de un papel aprobado, en el inicio y en «Mis papeles» |
 | `components/publico/institucional/` | Las seis secciones de la portada, su cabecera y su pie | Los textos de servicios, pasos y preguntas salen de `docs/REGLAS-NEGOCIO.md`: si la regla cambia, cambian con ella. `seccion.tsx` lleva `scroll-mt` porque la cabecera es sticky y sin eso el ancla deja el título tapado |
 | `hooks/use-permisos.ts` | `puede('x.y')` | **Comodidad, no seguridad** |
 | `ui/confirmar-accion.tsx` · `ui/confirmar-con-motivo.tsx` | Las ventanas de confirmación | La prop `confirmacion` agrega una CASILLA que hay que marcar, y apaga el botón hasta entonces. Se usa solo en lo irreversible y en lo que es una declaración: marcada sin leer no protege nada. Se limpia al cerrar |

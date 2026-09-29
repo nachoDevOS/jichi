@@ -9,6 +9,7 @@ use App\Models\Configuracion;
 use App\Support\Archivos;
 use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as ArchivoPdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
@@ -57,11 +58,18 @@ class CarnetImpresionController extends Controller
                 'para Aprovechamiento Pesquero fue revocada: no se puede imprimir.');
         }
 
-        return $this->pdf($carnet);
+        // `stream` y no `download`: se abre en el visor del navegador, que es
+        // desde donde el operador aprieta imprimir.
+        return $this->documento($carnet)->stream("carnet-{$carnet->codigo?->codigo}.pdf");
     }
 
-    private function pdf(Carnet $carnet): Response
+    /**
+     * El PDF armado, SIN controles de estado: los hace `imprimir()`. El portal lo
+     * pide con `$marcaAgua` para la vista previa «NO VÁLIDO» de un trámite abierto.
+     */
+    public function documento(Carnet $carnet, ?string $marcaAgua = null): ArchivoPdf
     {
+        $carnet->loadMissing(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
         $beneficiario = $carnet->beneficiario;
 
         $pdf = Pdf::loadView('documentos.carnet-pescador', [
@@ -86,6 +94,8 @@ class CarnetImpresionController extends Controller
              * La carilla de atrás. Ver reverso().
              */
             'reverso' => $this->reverso($carnet),
+
+            'marcaAgua' => $marcaAgua,
         ])
             ->setPaper([0, 0, self::ANCHO, self::ALTO])
 
@@ -93,10 +103,7 @@ class CarnetImpresionController extends Controller
             // DejaVu completas, ~380 KB cada una, en cada carnet.
             ->setOption('enable_font_subsetting', true);
 
-        // `stream` y no `download`: se abre en el visor del navegador, que es
-        // desde donde el operador aprieta imprimir. Un archivo descargado
-        // obligaría a buscarlo en la carpeta de descargas y abrirlo aparte.
-        return $pdf->stream("carnet-{$carnet->codigo?->codigo}.pdf");
+        return $pdf;
     }
 
     /**

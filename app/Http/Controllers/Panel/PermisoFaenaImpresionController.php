@@ -7,6 +7,7 @@ use App\Models\Configuracion;
 use App\Models\PermisoFaena;
 use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as ArchivoPdf;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -42,6 +43,15 @@ class PermisoFaenaImpresionController extends Controller
             return back()->with('error', 'La faena está revocada: el permiso no se imprime.');
         }
 
+        return $this->documento($faena)->stream("permiso-faena-{$faena->numero_legible}.pdf");
+    }
+
+    /**
+     * El PDF armado, SIN controles de estado: los hace `imprimir()`. El portal lo
+     * pide con `$marcaAgua` para la vista previa «NO VÁLIDO» de un trámite abierto.
+     */
+    public function documento(PermisoFaena $faena, ?string $marcaAgua = null): ArchivoPdf
+    {
         $faena->loadMissing(['codigo', 'carnet.beneficiario']);
 
         $pdf = Pdf::loadView('documentos.permiso-faena', [
@@ -63,6 +73,7 @@ class PermisoFaenaImpresionController extends Controller
 
             // El QR y el código, para verificarlo desde el papel.
             'verificacion' => QrVerificacion::de($faena),
+            'marcaAgua' => $marcaAgua,
         ])
             // Carta vertical: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])
@@ -70,7 +81,7 @@ class PermisoFaenaImpresionController extends Controller
             // cada una— en cada documento.
             ->setOption('enable_font_subsetting', true);
 
-        return $pdf->stream("permiso-faena-{$faena->numero_legible}.pdf");
+        return $pdf;
     }
 
     /**

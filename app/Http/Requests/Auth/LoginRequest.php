@@ -69,6 +69,17 @@ class LoginRequest extends FormRequest
 
         RateLimiter::clear($this->throttleKey());
 
+        if ($this->user()->esBeneficiario()) {
+            $userId = $this->user()->id;
+            Auth::guard('web')->logout();
+
+            $this->registrarAcceso('fallido', $userId);
+
+            throw ValidationException::withMessages([
+                'email' => 'Las credenciales no coinciden con ningún usuario activo del sistema.',
+            ]);
+        }
+
         // Con Ibare encendido, el correo es solo el acceso de emergencia del administrador.
         if (config('jichi.ibare.activo') && ! $this->user()->esAdministrador()) {
             $userId = $this->user()->id;

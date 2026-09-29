@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /*
@@ -144,6 +145,12 @@ class Beneficiario extends Model
     public function departamento(): BelongsTo
     {
         return $this->belongsTo(Departamento::class);
+    }
+
+    /** Su cuenta del portal /mi-cuenta, si se la dieron en ventanilla. */
+    public function cuenta(): HasOne
+    {
+        return $this->hasOne(User::class);
     }
 
     /** Sus credenciales: puede tener una de pescador y otra de comercializador. */

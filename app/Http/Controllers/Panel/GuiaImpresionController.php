@@ -9,6 +9,7 @@ use App\Models\GuiaMovimiento;
 use App\Support\QrVerificacion;
 use App\Support\TextoVertical;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as ArchivoPdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
@@ -45,6 +46,15 @@ class GuiaImpresionController extends Controller
             return back()->with('error', 'La guía sale recién con el traslado aprobado.');
         }
 
+        return $this->documento($guia)->stream("guia-transporte-{$guia->numero_legible}.pdf");
+    }
+
+    /**
+     * El PDF armado, SIN controles de estado: los hace `imprimir()`. El portal lo
+     * pide con `$marcaAgua` para la vista previa «NO VÁLIDO» de un trámite abierto.
+     */
+    public function documento(GuiaMovimiento $guia, ?string $marcaAgua = null): ArchivoPdf
+    {
         $guia->loadMissing(['codigo', 'carnet.beneficiario', 'detalles']);
 
         $pdf = Pdf::loadView('documentos.guia-transporte', [
@@ -59,6 +69,7 @@ class GuiaImpresionController extends Controller
 
             // El QR y el código, para verificarlo desde el papel.
             'verificacion' => QrVerificacion::de($guia),
+            'marcaAgua' => $marcaAgua,
         ])
             // Carta vertical: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])
@@ -66,7 +77,7 @@ class GuiaImpresionController extends Controller
             // cada una— en cada documento.
             ->setOption('enable_font_subsetting', true);
 
-        return $pdf->stream("guia-transporte-{$guia->numero_legible}.pdf");
+        return $pdf;
     }
 
     /**

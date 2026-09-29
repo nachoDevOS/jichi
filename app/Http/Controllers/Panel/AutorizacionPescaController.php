@@ -7,6 +7,7 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Configuracion;
 use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as ArchivoPdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 
@@ -74,6 +75,15 @@ class AutorizacionPescaController extends Controller
             return back()->with('error', 'La autorización está revocada: no se imprime.');
         }
 
+        return $this->documento($aprovechamiento)->stream("autorizacion-{$aprovechamiento->numeroLegible()}.pdf");
+    }
+
+    /**
+     * El PDF armado, SIN controles de estado: los hace `imprimir()`. El portal lo
+     * pide con `$marcaAgua` para la vista previa «NO VÁLIDO» de un trámite abierto.
+     */
+    public function documento(AprovechamientoPesq $aprovechamiento, ?string $marcaAgua = null): ArchivoPdf
+    {
         $aprovechamiento->loadMissing(['codigo', 'beneficiario', 'categoria']);
 
         $pdf = Pdf::loadView('documentos.autorizacion-pesca', [
@@ -94,6 +104,7 @@ class AutorizacionPescaController extends Controller
 
             // El QR y el código, para verificarlo desde el papel.
             'verificacion' => QrVerificacion::de($aprovechamiento),
+            'marcaAgua' => $marcaAgua,
         ])
             // Carta vertical: 612 x 792 puntos = 8,5" x 11".
             ->setPaper([0, 0, 612, 792])
@@ -101,7 +112,7 @@ class AutorizacionPescaController extends Controller
             // cada una— en cada documento.
             ->setOption('enable_font_subsetting', true);
 
-        return $pdf->stream("autorizacion-{$aprovechamiento->numeroLegible()}.pdf");
+        return $pdf;
     }
 
     /**

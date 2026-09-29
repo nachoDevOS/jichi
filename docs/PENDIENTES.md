@@ -6,6 +6,34 @@
 
 ---
 
+## 🔴 Hay que volver a migrar para el portal — 28/09/2026
+
+El portal del beneficiario agregó columnas a `users` DENTRO de las migraciones
+existentes (regla 12): `beneficiario_id`, `debe_cambiar_password` y `email`
+nullable. **La base de trabajo no las tiene hasta rearmarla** con
+`php artisan migrate:fresh --seed`, y mientras tanto el botón «Dar acceso al
+portal» responde con `column "beneficiario_id" does not exist`. Verificado sobre
+una SQLite descartable. Ver [modulos/PORTAL.md](modulos/PORTAL.md).
+
+## 🟠 Portal del beneficiario: lo que quedó afuera a propósito — 28/09/2026
+
+- **Imprime desde casa lo vigente** (autorización, faena y guía; el carnet no, se repone en ventanilla). La copia
+  impresa no se distingue del papel de ventanilla: si la unidad quiere, se le
+  agrega una marca «COPIA DEL TITULAR».
+- **Sin trámites:** el portal solo consulta.
+- **Sin «olvidé mi contraseña»:** se resetea en ventanilla.
+- Las tarjetas se probaron con datos reales solo del lado del servidor
+  (`ResumenPortal`). Después de migrar, conviene recorrer el portal de un
+  beneficiario con carnet, faena y guía.
+
+## 🔴 «Pagar con QR» del portal es una demostración — 28/09/2026
+
+La pantalla dice que el pago se registra solo, pero **no hay banco detrás y no
+se registra nada**. Está encendido solo en local (`jichi.portal.pago_qr`). Antes
+de encenderlo en producción hay que conectarlo a un cobro QR real (el banco
+avisa el pago y el sistema lo carga como depósito validado). Ver
+[modulos/PORTAL.md](modulos/PORTAL.md).
+
 ## 🔴 Separación de funciones: hoy la misma persona carga y aprueba
 
 - **Hay un solo rol, `administrador`, con todos los permisos.** Es una decisión

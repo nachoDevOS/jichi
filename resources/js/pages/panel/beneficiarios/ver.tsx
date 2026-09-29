@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
+import { AccesoPortal } from '@/components/panel/beneficiarios/acceso-portal';
 import { PestanaComercializador } from '@/components/panel/beneficiarios/pestana-comercializador';
 import { PestanaPagos } from '@/components/panel/beneficiarios/pestana-pagos';
 import { PestanaPescador } from '@/components/panel/beneficiarios/pestana-pescador';
@@ -26,6 +27,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { cn, edadEnAnios, fecha, fechaHora, hace } from '@/lib/utils';
 import type { PageProps, TipoActor } from '@/types';
 import type {
+    AccesoPortal as Acceso,
     BeneficiarioFicha,
     CarnetResumen,
     CupoResumen,
@@ -41,6 +43,7 @@ export default function VerBeneficiario({
     beneficiario,
     gestion,
     deuda,
+    acceso_portal,
     carnets,
     cupos,
     faenas,
@@ -50,6 +53,7 @@ export default function VerBeneficiario({
     beneficiario: BeneficiarioFicha;
     gestion: number;
     deuda: number;
+    acceso_portal: Acceso | null;
     /** Sus credenciales. Pueden ser DOS vigentes: pescador y comercializador. */
     carnets: CarnetResumen[];
     /** Sus bolsas madre, de todas las gestiones. */
@@ -148,7 +152,12 @@ export default function VerBeneficiario({
                 {pestana === 'pagos' && (
                     <PestanaPagos beneficiarioId={beneficiario.id} recibos={recibos} deuda={deuda} moneda={institucion.moneda} />
                 )}
-                {pestana === 'datos' && <DatosPersonales beneficiario={beneficiario} />}
+                {pestana === 'datos' && (
+                    <>
+                        <DatosPersonales beneficiario={beneficiario} />
+                        <AccesoPortal beneficiarioId={beneficiario.id} acceso={acceso_portal} />
+                    </>
+                )}
             </div>
 
             <ConfirmarAccion

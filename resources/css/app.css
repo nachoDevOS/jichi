@@ -478,6 +478,11 @@
         display: none !important;
     }
 
+    /* La vista previa «NO VÁLIDO» del portal no sale en papel desde el navegador. */
+    .sin-imprimir {
+        display: none !important;
+    }
+
     /*
      * El degradado del fondo va en un atributo `style` —es un radial con
      * varias paradas, no una utilidad de Tailwind— y un atributo gana a

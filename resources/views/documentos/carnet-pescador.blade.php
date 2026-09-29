@@ -626,5 +626,6 @@
 
 </div>
 
+@include('documentos.partes.marca-no-valido', ['ancho' => 243, 'alto' => 153, 'cubrir' => true])
 </body>
 </html>

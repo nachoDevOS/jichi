@@ -13,6 +13,7 @@ use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use App\Support\Archivos;
+use App\Support\ExpedienteBeneficiario;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -145,36 +146,24 @@ class BeneficiarioController extends Controller
             // Lo que debe en total, sumando carnets, cupos y guías sin cubrir.
             'deuda' => $beneficiario->deudaTotal(),
 
+            // Su cuenta del portal /mi-cuenta. Sin `cuenta_portal` de nombre: esa es la del flash.
+            'acceso_portal' => ($cuenta = $beneficiario->cuenta()->first()) ? [
+                'activo' => $cuenta->activo,
+                'debe_cambiar_password' => $cuenta->debe_cambiar_password,
+                'ultimo_acceso' => $cuenta->ultimo_acceso_at?->toIso8601String(),
+                'creada' => $cuenta->created_at?->toIso8601String(),
+            ] : null,
+
             /*
              *  Sus credenciales — el paso 3 del flujo
              */
-            'carnets' => $beneficiario->carnets()
-                // El cupo con su saldo precargado: `motivoSinPermisos()` y
-                // `puedeEmitirFaenas()` lo leen, y sin esto son dos consultas por carnet.
-                ->with([
-                    'codigo',
-                    'asociacion:id,nombre,sigla',
-                    'tipoCarnet',
-                    'aprovechamiento' => fn ($a) => $a
-                        ->with('categoria')
-                        ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                        ->withSum('faenasQueReservan', 'kilos_extraidos'),
-                ])
-                ->withSum('pagos', 'monto_parcial')
-                // Por id y no por emisión: la emisión es NULL hasta la firma, y
-                // cada motor ordena los NULL en otra punta.
-                ->orderByDesc('id')
-                ->get()
+            'carnets' => ExpedienteBeneficiario::carnets($beneficiario)
                 ->map($this->resumirCarnet(...))
                 ->all(),
 
             // Lo que cuelga de cada carnet: las salidas del pescador y los
             // traslados del comercializador. Ver la pestaña de cada actividad.
-            'faenas' => $beneficiario->faenas()
-                ->with('carnet.aprovechamiento:id,estado')
-                ->withSum('pagos', 'monto_parcial')
-                ->orderByDesc('permisos_faena.numero_faena')
-                ->get()
+            'faenas' => ExpedienteBeneficiario::faenas($beneficiario)
                 ->map(fn (PermisoFaena $f): array => [
                     'id' => $f->id,
                     'carnet_id' => $f->carnet_id,
@@ -203,10 +192,7 @@ class BeneficiarioController extends Controller
                 ])
                 ->all(),
 
-            'guias' => $beneficiario->guias()
-                ->withSum('pagos', 'monto_parcial')
-                ->orderByDesc('guias_movimiento.numero_guia')
-                ->get()
+            'guias' => ExpedienteBeneficiario::guias($beneficiario)
                 ->map(fn (GuiaMovimiento $g): array => [
                     'id' => $g->id,
                     'carnet_id' => $g->carnet_id,
@@ -227,11 +213,7 @@ class BeneficiarioController extends Controller
                 ->all(),
 
             // Los comprobantes que se llevó, del más nuevo al más viejo.
-            'recibos' => Recibo::query()
-                ->where('beneficiario_id', $beneficiario->id)
-                ->withCount('pagos')
-                ->orderByDesc('id')
-                ->get()
+            'recibos' => ExpedienteBeneficiario::recibos($beneficiario)
                 ->map(fn (Recibo $r): array => [
                     'id' => $r->id,
                     'numero' => $r->numero_recibo,
@@ -245,14 +227,7 @@ class BeneficiarioController extends Controller
             /*
              *  Sus bolsas madre — el paso 2, y el que explica las faenas
              */
-            'cupos' => $beneficiario->aprovechamientos()
-                ->with('categoria')
-                ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                ->withSum('faenasQueReservan', 'kilos_extraidos')
-                ->withSum('pagos', 'monto_parcial')
-                // Por la SOLICITUD: la emisión está en NULL hasta la firma.
-                ->orderByDesc('fecha_solicitud')
-                ->get()
+            'cupos' => ExpedienteBeneficiario::aprovechamientos($beneficiario)
                 ->map(fn (AprovechamientoPesq $a): array => [
                     'id' => $a->id,
                     'escala' => $a->categoria?->nro_escala,

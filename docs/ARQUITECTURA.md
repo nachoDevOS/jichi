@@ -273,14 +273,19 @@ copia en vez de leerse por relación:
 > del recibo se lee del padrón al imprimir: corregir un apellido cambia la
 > reimpresión. Ver [MER.md](MER.md), tabla `recibos`.
 
-### 4.7 Panel y público no se mezclan
+### 4.7 Panel, público y portal no se mezclan
 
-| | Panel (con sesión) | Público (sin sesión) |
-| --- | --- | --- |
-| Rutas | `routes/panel.php`, prefijo `/panel` | `routes/publico.php` |
-| Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` |
-| Pantallas | `pages/panel/` | `pages/publico/` (`inicio`, `verificar`) |
-| Componentes | `components/panel/` | `components/publico/` |
+| | Panel (funcionarios) | Público (sin sesión) | Portal (beneficiario) |
+| --- | --- | --- | --- |
+| Rutas | `routes/panel.php`, prefijo `/panel` | `routes/publico.php` | `routes/portal.php`, prefijo `/mi-cuenta` |
+| Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` | `Http/Controllers/Portal/` |
+| Pantallas | `pages/panel/` | `pages/publico/` (`inicio`, `verificar`) | `pages/portal/` |
+| Componentes | `components/panel/` | `components/publico/` | `components/portal/` |
+
+El **portal** (28/09/2026) es de solo lectura: el beneficiario entra con su C.I.
+y consulta sus papeles y pagos. Su cuenta es una fila de `users` con
+`beneficiario_id`, y eso la deja fuera del panel. Ver
+[modulos/PORTAL.md](modulos/PORTAL.md).
 
 La mitad pública tiene dos pantallas: la **portada** (`/`), cuyo texto sale de
 `configuraciones`, y la **verificación** (`/verificar/{codigo?}`). No puede
@@ -366,6 +371,7 @@ permiso.
 | Caja, recibos y pagos | ✅ | `CajaController`, `ReciboController`, `PagoController`, `CobrarService` | [modulos/PAGOS.md](modulos/PAGOS.md), [modulos/RECIBOS.md](modulos/RECIBOS.md) |
 | Catálogos | ✅ | `AsociacionController`, `CategoriaAprovechamientoController`, `TipoCarnetController`, `ProductoHidrobiologicoController` | — |
 | Verificación pública | ✅ | `VerificacionController` | [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md), paso 7 |
+| Portal del beneficiario (`/mi-cuenta`) | ✅ | `Controllers/Portal/`, `CuentaPortalService` | [modulos/PORTAL.md](modulos/PORTAL.md) |
 | Reportes | ❌ No existe | — | [PENDIENTES.md](PENDIENTES.md) |
 | Configuración | ❌ No existe (la tabla sí) | — | [PENDIENTES.md](PENDIENTES.md) |
 
