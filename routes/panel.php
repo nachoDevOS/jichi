@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Panel\AprovechamientoController;
+use App\Http\Controllers\Panel\ArancelSirebController;
 use App\Http\Controllers\Panel\AsociacionController;
 use App\Http\Controllers\Panel\AutorizacionPescaController;
 use App\Http\Controllers\Panel\BeneficiarioController;
@@ -420,6 +421,14 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:catalogos.ver')
             ->name('tipos-carnet.index');
 
+        Route::get('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'show'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('tipos-carnet.show');
+
+        Route::get('/tipos-carnet/{tipo_carnet}/editar', [TipoCarnetController::class, 'edit'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('tipos-carnet.edit');
+
         // SIN alta: la lista sale de la resolución. Sacar el botón no alcanza,
         // la ruta seguía aceptando un POST armado a mano.
         Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
@@ -431,12 +440,42 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:catalogos.ver')
             ->name('productos.index');
 
+        // ANTES de /{producto}: si no, «crear» se toma como id.
+        Route::get('/productos/crear', [ProductoHidrobiologicoController::class, 'create'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('productos.create');
+
+        Route::get('/productos/{producto}/editar', [ProductoHidrobiologicoController::class, 'edit'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('productos.edit');
+
+        Route::get('/productos/{producto}', [ProductoHidrobiologicoController::class, 'show'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('productos.show');
+
         Route::middleware('permiso:catalogos.gestionar')->group(function () {
             Route::post('/productos', [ProductoHidrobiologicoController::class, 'store'])
                 ->name('productos.store');
 
             Route::put('/productos/{producto}', [ProductoHidrobiologicoController::class, 'update'])
                 ->name('productos.update');
+        });
+
+        // --- Aranceles de SIREB (hoy, la faena). SIN alta ni baja: una fila por concepto.
+        Route::get('/aranceles', [ArancelSirebController::class, 'index'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('aranceles.index');
+
+        Route::get('/aranceles/{arancel}', [ArancelSirebController::class, 'show'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('aranceles.show');
+
+        Route::middleware('permiso:catalogos.gestionar')->group(function () {
+            Route::get('/aranceles/{arancel}/editar', [ArancelSirebController::class, 'edit'])
+                ->name('aranceles.edit');
+
+            Route::put('/aranceles/{arancel}', [ArancelSirebController::class, 'update'])
+                ->name('aranceles.update');
         });
     });
 

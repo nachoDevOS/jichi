@@ -69,13 +69,8 @@ return [
         // veces: `dev/dev/tramites/...`.
     ],
 
-    // La guía NO tiene tarifa fija desde el 27/09/2026: se cobra el total del
-    // cuadro D, con los precios del catálogo de productos. Ver GuiaMovimiento.
-
-    // Un número que se ajusta por resolución.
-    'faenas' => [
-        'tarifa_base' => (float) env('JICHI_FAENA_TARIFA_BASE', 15),
-    ],
+    // Los precios de la faena y de la guía NO viven acá: los pone SIREB
+    // (Catálogos › Aranceles y › Productos). Ver docs/modulos/SIREB.md.
 
     /*
     | ESTRICTO: el cupo es un LÍMITE. Al emitir una faena se comprueba que los

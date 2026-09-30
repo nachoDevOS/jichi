@@ -4,13 +4,13 @@ namespace App\Models;
 
 use App\Enums\ModalidadAprovechamiento;
 use App\Traits\Auditable;
+use App\Traits\HistorialSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * Un tramo de la ESCALA OFICIAL de aprovechamiento pesquero.
@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Auth;
 ])]
 class CategoriaAprovechamiento extends Model
 {
-    use Auditable, SoftDeletes;
+    use Auditable, HistorialSireb, SoftDeletes;
 
     /**
      * Explícito: de «CategoriaAprovechamiento» Laravel deduce
@@ -37,20 +37,6 @@ class CategoriaAprovechamiento extends Model
 
     /** El historial ya ES el registro del cambio: auditarlo lo duplicaría. */
     protected $noAuditable = ['sireb_historial'];
-
-    /**
-     * Al cambiar el servicio o la tarifa, el par anterior se anota en
-     * `sireb_historial`. En el modelo y no en el controlador: así vale para
-     * cualquier camino que edite el tramo.
-     */
-    protected static function booted(): void
-    {
-        static::updating(function (self $tramo): void {
-            if ($tramo->isDirty(['servicio_sireb', 'tarifa_sireb'])) {
-                $tramo->anotarSirebAnterior();
-            }
-        });
-    }
 
     /** Ver el comentario de Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [
@@ -69,27 +55,6 @@ class CategoriaAprovechamiento extends Model
             'modalidad' => ModalidadAprovechamiento::class,
             'sireb_historial' => 'array',
         ];
-    }
-
-    /**
-     * Agrega al historial el servicio y la tarifa que el tramo tenía ANTES de
-     * este cambio. «Desde» es el fin de la entrada anterior o, si es la primera,
-     * el alta del tramo.
-     */
-    private function anotarSirebAnterior(): void
-    {
-        $historial = $this->sireb_historial ?? [];
-        $anterior = end($historial) ?: null;
-
-        $historial[] = [
-            'servicio_sireb' => $this->getOriginal('servicio_sireb'),
-            'tarifa_sireb' => $this->getOriginal('tarifa_sireb'),
-            'desde' => $anterior['hasta'] ?? $this->created_at?->toIso8601String(),
-            'hasta' => now()->toIso8601String(),
-            'cambiado_por' => Auth::id(),
-        ];
-
-        $this->sireb_historial = $historial;
     }
 
     //  Relaciones

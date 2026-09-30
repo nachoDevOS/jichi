@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\Auditable;
+use App\Traits\HistorialSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -10,27 +11,29 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Una especie del cuadro D de la guía y la tasa por kilo que se cobra al
- * trasladarla: «Surubí, 0,50 Bs/kg». La guía cobra la suma de su cuadro D.
+ * Una especie del cuadro D de la guía: «Surubí». Su precio por kilo lo pone
+ * SIREB con `tarifa_sireb`, y cada guía lo congela al emitirse.
  */
-#[Fillable(['nombre', 'precio_kg', 'estado'])]
+#[Fillable(['nombre', 'servicio_sireb', 'tarifa_sireb', 'estado'])]
 class ProductoHidrobiologico extends Model
 {
-    use Auditable, SoftDeletes;
+    use Auditable, HistorialSireb, SoftDeletes;
 
     protected $table = 'productos_hidrobiologicos';
 
+    /** El historial ya ES el registro del cambio: auditarlo lo duplicaría. */
+    protected $noAuditable = ['sireb_historial'];
+
     /** Ver Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [
-        'precio_kg' => 0,
         'estado' => true,
     ];
 
     protected function casts(): array
     {
         return [
-            'precio_kg' => 'decimal:2',
             'estado' => 'boolean',
+            'sireb_historial' => 'array',
         ];
     }
 

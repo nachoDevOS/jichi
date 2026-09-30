@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Panel;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\EstadoFaena;
 use App\Exceptions\CobroInvalidoException;
 use App\Exceptions\PermisoOperativoException;
@@ -13,6 +14,7 @@ use App\Http\Requests\Panel\EmitirFaenaRequest;
 use App\Http\Requests\Panel\RechazarFaenaRequest;
 use App\Http\Requests\Panel\RegistrarDepositosRequest;
 use App\Models\AprovechamientoPesq;
+use App\Models\ArancelSireb;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\Pago;
@@ -21,6 +23,7 @@ use App\Models\Recibo;
 use App\Services\CobrarService;
 use App\Services\EmitirFaenaService;
 use App\Services\RevisarFaenaService;
+use App\Sireb\VistaSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -134,7 +137,8 @@ class FaenaController extends Controller
 
             'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
 
-            'tarifa' => PermisoFaena::tarifaVigente(),
+            // De referencia: el que vale lo congela la emisión. null sin tarifa o sin SIREB.
+            'tarifa' => $this->tarifaDeReferencia(),
 
             // En modo FLEXIBLE el formulario no frena, así que tampoco puede decir
             // que va a frenar: el aviso pasa a «va a quedar por encima».
@@ -525,6 +529,14 @@ class FaenaController extends Controller
     }
 
     //  Auxiliares
+
+    /** El precio de hoy de la fila `faena` de Aranceles, o null sin tarifa o sin SIREB. */
+    private function tarifaDeReferencia(): ?float
+    {
+        $tarifa = ArancelSireb::de(ConceptoArancel::Faena)?->tarifa_sireb;
+
+        return $tarifa === null ? null : (app(VistaSireb::class)->preciosPorTarifa()[$tarifa] ?? null);
+    }
 
     /**
      * El recibo del trámite, sin disparar una consulta por fila.

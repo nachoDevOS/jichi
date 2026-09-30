@@ -2,6 +2,7 @@ import {
     BadgeCheck,
     BarChart3,
     Building2,
+    Coins,
     Fish,
     LayoutDashboard,
     ReceiptText,
@@ -60,6 +61,7 @@ export const NAVEGACION: ItemNavegacion[] = [
     { titulo: 'Tipos de carnet', ruta: 'tipos-carnet.index', icono: Tags, permiso: 'catalogos.ver', grupo: 'Catálogos' },
     { titulo: 'Productos', tituloCompleto: 'Productos hidrobiológicos', ruta: 'productos.index', icono: Fish, permiso: 'catalogos.ver', grupo: 'Catálogos' },
     { titulo: 'Escala', tituloCompleto: 'Escala de aprovechamiento', ruta: 'categorias-aprovechamiento.index', icono: Ruler, permiso: 'catalogos.ver', grupo: 'Catálogos' },
+    { titulo: 'Aranceles', tituloCompleto: 'Aranceles de SIREB', ruta: 'aranceles.index', icono: Coins, permiso: 'catalogos.ver', grupo: 'Catálogos' },
 
     { titulo: 'Reportes', ruta: 'reportes.index', icono: BarChart3, permiso: 'reportes.ver', grupo: 'Administración' },
 ];

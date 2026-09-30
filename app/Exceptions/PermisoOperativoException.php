@@ -255,6 +255,18 @@ class PermisoOperativoException extends RuntimeException
         );
     }
 
+    /** Sin precio de SIREB para la salida no se emite la faena. */
+    public static function faenaSinPrecio(string $motivo): self
+    {
+        return new self("No se puede emitir el permiso de faena: el arancel {$motivo} Revíselo en Catálogos › Aranceles.");
+    }
+
+    /** Sin precio de SIREB para un producto no se emite la guía. */
+    public static function productoSinPrecio(string $nombre, string $motivo): self
+    {
+        return new self("El producto «{$nombre}» {$motivo} Revíselo en Catálogos › Productos.");
+    }
+
     /** El producto elegido no está en el catálogo, o está fuera de uso. */
     public static function productoNoDisponible(string $nombre): self
     {

@@ -10,6 +10,8 @@ use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\TipoCarnet;
+use App\Sireb\PrecioSireb;
+use App\Sireb\SinPrecioException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +20,8 @@ use Illuminate\Support\Facades\DB;
  */
 class EmitirCarnetService
 {
+    public function __construct(private PrecioSireb $precios) {}
+
     /**
      * Emite la credencial.
      */
@@ -34,8 +38,10 @@ class EmitirCarnetService
         ?string $archivoAsociacion = null,
     ): Carnet {
         $emision ??= now();
+        // Fuera de la transacción: una llamada a SIREB no debe tener filas bloqueadas.
+        $precio = $this->precioDe($tipo);
 
-        return DB::transaction(function () use ($beneficiario, $asociacion, $tipo, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion): Carnet {
+        return DB::transaction(function () use ($beneficiario, $asociacion, $tipo, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
             // Releer con lockForUpdate() devuelve OTRA instancia: acá solo sirve
             // para tomar el candado, no se escribe sobre ella.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
@@ -93,6 +99,8 @@ class EmitirCarnetService
                 // no se autoriza por volumen.
                 'aprovechamiento_id' => $cupo?->id,
                 'tipo_actor' => $actor,
+                'monto' => $precio['monto'],
+                'sireb_tarifa_id' => $precio['tarifa_id'],
 
                 // Los respaldos de la emisión.
                 'archivo_ci' => $archivoCi,
@@ -132,7 +140,10 @@ class EmitirCarnetService
         ?string $archivoCi = null,
         ?string $archivoAsociacion = null,
     ): Carnet {
-        return DB::transaction(function () use ($carnet, $asociacion, $tipo, $emision, $cupoElegido, $archivoCi, $archivoAsociacion): Carnet {
+        // Corregir el borrador vuelve a pedir el precio, igual que la autorización.
+        $precio = $this->precioDe($tipo);
+
+        return DB::transaction(function () use ($carnet, $asociacion, $tipo, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
             $bloqueado = Carnet::query()->whereKey($carnet->id)->lockForUpdate()->firstOrFail();
 
             // Con la copia BLOQUEADA: entre abrir el formulario y guardar, otra
@@ -178,6 +189,8 @@ class EmitirCarnetService
                 'asociacion_id' => $asociacion->id,
                 'tipo_carnet_id' => $tipo->id,
                 'aprovechamiento_id' => $cupo?->id,
+                'monto' => $precio['monto'],
+                'sireb_tarifa_id' => $precio['tarifa_id'],
                 'fecha_solicitud' => $emision->toDateString(),
                 'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
 
@@ -278,6 +291,21 @@ class EmitirCarnetService
     }
 
     //  Auxiliares
+
+    /**
+     * El precio del tipo según SIREB. Sin él no se emite: ninguna tarifa se
+     * escribe a mano. Ver docs/modulos/SIREB.md.
+     *
+     * @return array{monto: float, tarifa_id: string}
+     */
+    private function precioDe(TipoCarnet $tipo): array
+    {
+        try {
+            return $this->precios->de($tipo->servicio_sireb, $tipo->tarifa_sireb);
+        } catch (SinPrecioException $e) {
+            throw CarnetInvalidoException::sinPrecio($tipo->nombre, $e->getMessage().' Revíselo en Catálogos › Tipos de carnet.');
+        }
+    }
 
     /**
      * Los catálogos se releen DENTRO de la transacción.

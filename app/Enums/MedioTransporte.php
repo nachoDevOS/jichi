@@ -20,16 +20,6 @@ enum MedioTransporte: string
         };
     }
 
-    /** La letra del casillero: a, b, c. La usa la maqueta del PDF. */
-    public function letra(): string
-    {
-        return match ($this) {
-            self::Fluvial => 'a',
-            self::Aerea => 'b',
-            self::Terrestre => 'c',
-        };
-    }
-
     /**
      * @return array<int, array{value: string, label: string}>
      */

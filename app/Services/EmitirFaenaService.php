@@ -2,12 +2,16 @@
 
 namespace App\Services;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
+use App\Models\ArancelSireb;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
+use App\Sireb\PrecioSireb;
+use App\Sireb\SinPrecioException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -15,7 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 class EmitirFaenaService
 {
-    public function __construct(private readonly CorrelativoService $correlativos) {}
+    public function __construct(
+        private readonly CorrelativoService $correlativos,
+        private readonly PrecioSireb $precios,
+    ) {}
 
     /**
      * Registra la solicitud de una salida. NACE PENDIENTE: no autoriza nada
@@ -52,7 +59,10 @@ class EmitirFaenaService
             throw PermisoOperativoException::sinCupoVigente();
         }
 
-        return DB::transaction(function () use ($carnet, $kilos, $papel): PermisoFaena {
+        // Fuera de la transacción: una llamada a SIREB no debe tener el cupo bloqueado.
+        $precio = $this->precioDeLaFaena();
+
+        return DB::transaction(function () use ($carnet, $kilos, $papel, $precio): PermisoFaena {
             // La fila del cupo es la que contiene el recurso escaso: es la que
             // se bloquea. Releerla devuelve OTRA instancia, y acá se usa esa a
             // propósito — es la que tiene el saldo al día.
@@ -98,8 +108,9 @@ class EmitirFaenaService
                 // El número lo pone el sistema, no el operador: correlativo
                 // global y continuo, como el talonario de papel.
                 'numero_faena' => $this->correlativos->siguienteContinuo(PermisoFaena::SERIE),
-                // Copia congelada del arancel: ver PermisoFaena::montoACobrar().
-                'monto' => PermisoFaena::tarifaVigente(),
+                // Copia congelada del precio de SIREB: ver PermisoFaena::montoACobrar().
+                'monto' => $precio['monto'],
+                'sireb_tarifa_id' => $precio['tarifa_id'],
                 'kilos_extraidos' => $kilos,
                 ...$this->renglonesDelPapel($papel),
                 // PENDIENTE, como el carnet y el cupo: la emisión la escribe
@@ -218,6 +229,23 @@ class EmitirFaenaService
                 $this->sincronizarEstadoDelCupo($cupo->fresh());
             }
         });
+    }
+
+    /**
+     * El precio de la salida según SIREB, de la fila `faena` de Aranceles. Sin
+     * él no se emite: ninguna tarifa se escribe a mano.
+     *
+     * @return array{monto: float, tarifa_id: string}
+     */
+    private function precioDeLaFaena(): array
+    {
+        $arancel = ArancelSireb::de(ConceptoArancel::Faena);
+
+        try {
+            return $this->precios->de($arancel?->servicio_sireb, $arancel?->tarifa_sireb);
+        } catch (SinPrecioException $e) {
+            throw PermisoOperativoException::faenaSinPrecio($e->getMessage());
+        }
     }
 
     /**

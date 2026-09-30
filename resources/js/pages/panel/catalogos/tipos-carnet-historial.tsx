@@ -7,15 +7,15 @@ import { cn } from '@/lib/utils';
 import type { TarifaAnterior, TarifaHistorial } from '@/types/catalogos';
 
 /**
- *  Qué servicio y tarifa de SIREB tuvo un tramo de la escala, la actual arriba
+ *  Qué servicio y tarifa de SIREB tuvo un tipo de carnet, la actual arriba
  */
-export default function EscalaHistorial({
-    tramo,
+export default function TiposCarnetHistorial({
+    tipo,
     actual,
     anteriores,
     sirebDisponible,
 }: {
-    tramo: { descripcion_kg: string; kilos_min: number; kilos_max: number };
+    tipo: { nombre: string };
     actual: TarifaHistorial;
     anteriores: TarifaAnterior[];
     sirebDisponible: boolean;
@@ -23,15 +23,15 @@ export default function EscalaHistorial({
     return (
         <LayoutPanel
             titulo="Historial de SIREB"
-            descripcion={`${tramo.descripcion_kg} · ${tramo.kilos_min} – ${tramo.kilos_max} kg`}
+            descripcion={tipo.nombre}
             acciones={
-                <Link href={route('categorias-aprovechamiento.index')} className={cn(buttonVariants({ variant: 'outline' }))}>
+                <Link href={route('tipos-carnet.index')} className={cn(buttonVariants({ variant: 'outline' }))}>
                     <ArrowLeft className="size-4" />
-                    Volver a la escala
+                    Volver a tipos de carnet
                 </Link>
             }
         >
-            <Head title={`Historial de SIREB — ${tramo.descripcion_kg}`} />
+            <Head title={`Historial de SIREB — ${tipo.nombre}`} />
 
             <HistorialSireb actual={actual} anteriores={anteriores} sirebDisponible={sirebDisponible} />
         </LayoutPanel>

@@ -1,14 +1,15 @@
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import type { FormEvent } from 'react';
+import { SelectorTarifaSireb } from '@/components/panel/catalogos/selector-tarifa-sireb';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn } from '@/lib/utils';
-import type { ModalidadAprovechamiento, OpcionEnum, PageProps } from '@/types';
+import { cn } from '@/lib/utils';
+import type { ModalidadAprovechamiento, OpcionEnum } from '@/types';
 import type { ServicioSireb, TramoFormulario } from '@/types/catalogos';
 
 /**
@@ -26,11 +27,10 @@ export default function EscalaFormulario({
     modalidades: OpcionEnum[];
     /** null = SIREB no respondió: el select de tarifa queda deshabilitado. */
     serviciosSireb: ServicioSireb[] | null;
-    /** Id de tarifa → n° de la escala que ya la usa. */
-    tarifasUsadas: Record<string, number>;
+    /** Id de tarifa → qué tramo ya la usa. */
+    tarifasUsadas: Record<string, string>;
 }) {
     const esAlta = tramo === null;
-    const { institucion } = usePage<PageProps>().props;
 
     // Sin `nro_escala`: lo asigna el servidor al dar de alta.
     const form = useForm({
@@ -44,23 +44,6 @@ export default function EscalaFormulario({
         tarifa_sireb: tramo?.tarifa_sireb ?? '',
         estado: tramo?.estado ?? true,
     });
-
-    // La tarifa guardada ya no llega de SIREB (o SIREB no responde): se ofrece
-    // igual, para que editar otro campo no la borre sin avisar.
-    const tarifaActualAusente =
-        tramo !== null &&
-        !(serviciosSireb ?? []).some((s) => s.tarifas.some((t) => t.id === tramo.tarifa_sireb));
-
-    // Una sola elección llena los dos ids: la tarifa y el servicio de su grupo.
-    function elegirTarifa(tarifaId: string) {
-        const servicio = serviciosSireb?.find((s) => s.tarifas.some((t) => t.id === tarifaId));
-
-        form.setData((d) => ({
-            ...d,
-            tarifa_sireb: tarifaId,
-            servicio_sireb: servicio?.id ?? tramo?.servicio_sireb ?? '',
-        }));
-    }
 
     function enviar(e: FormEvent) {
         e.preventDefault();
@@ -153,53 +136,17 @@ export default function EscalaFormulario({
                             </Campo>
 
                             <div className="sm:col-span-2">
-                                <Campo
-                                    etiqueta="Tarifa SIREB"
-                                    htmlFor="tarifa_sireb"
+                                <SelectorTarifaSireb
+                                    tarifa={form.data.tarifa_sireb}
+                                    tarifaGuardada={tramo?.tarifa_sireb ?? null}
+                                    servicioGuardado={tramo?.servicio_sireb ?? null}
+                                    serviciosSireb={serviciosSireb}
+                                    tarifasUsadas={tarifasUsadas}
                                     error={form.errors.tarifa_sireb ?? form.errors.servicio_sireb}
-                                    ayuda={
-                                        serviciosSireb === null
-                                            ? 'Recaudaciones (SIREB) no responde: no se puede elegir la tarifa ahora.'
-                                            : 'De ahí sale el precio, que se congela al otorgar el cupo.'
+                                    onElegir={(tarifa, servicio) =>
+                                        form.setData((d) => ({ ...d, tarifa_sireb: tarifa, servicio_sireb: servicio }))
                                     }
-                                    obligatorio
-                                >
-                                    <Select
-                                        id="tarifa_sireb"
-                                        value={form.data.tarifa_sireb}
-                                        onChange={(e) => elegirTarifa(e.target.value)}
-                                        disabled={serviciosSireb === null}
-                                        aria-invalid={Boolean(form.errors.tarifa_sireb ?? form.errors.servicio_sireb)}
-                                    >
-                                        <option value="">Elija una tarifa…</option>
-
-                                        {tarifaActualAusente && (
-                                            <option value={tramo.tarifa_sireb}>
-                                                Tarifa actual{serviciosSireb === null ? '' : ' (no está en SIREB)'}
-                                            </option>
-                                        )}
-
-                                        {(serviciosSireb ?? []).map((s) => (
-                                            <optgroup
-                                                key={s.id}
-                                                label={`${s.nombre}${s.codigo ? ` (${s.codigo})` : ''}${s.activo ? '' : ' — de baja'}`}
-                                            >
-                                                {s.tarifas.map((t) => {
-                                                    const usadaPor = tarifasUsadas[t.id];
-                                                    // La propia tarifa del tramo no cuenta como ocupada.
-                                                    const ocupada = usadaPor !== undefined && t.id !== tramo?.tarifa_sireb;
-
-                                                    return (
-                                                        <option key={t.id} value={t.id} disabled={!s.activo || ocupada}>
-                                                            {t.etiqueta || 'Sin etiqueta'} — {bs(t.monto, institucion.moneda)}
-                                                            {ocupada ? ` (escala ${usadaPor})` : ''}
-                                                        </option>
-                                                    );
-                                                })}
-                                            </optgroup>
-                                        ))}
-                                    </Select>
-                                </Campo>
+                                />
                             </div>
 
                             <Campo etiqueta="Vigente" htmlFor="estado" error={form.errors.estado}>

@@ -29,6 +29,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'archivo_ci',
     'archivo_asociacion',
     'tipo_actor',
+    'monto',
+    'sireb_tarifa_id',
     'nro_registro',
     'estado',
     'fecha_solicitud',
@@ -48,12 +50,14 @@ class Carnet extends Model
     protected $attributes = [
         // Nace pendiente: se activa al aprobarlo, con el arancel cobrado.
         'estado' => EstadoCarnet::Pendiente->value,
+        'monto' => 0,
     ];
 
     protected function casts(): array
     {
         return [
             'tipo_actor' => TipoActor::class,
+            'monto' => 'decimal:2',
             'estado' => EstadoCarnet::class,
             'fecha_solicitud' => 'date',
             'fecha_emision' => 'date',
@@ -125,11 +129,11 @@ class Carnet extends Model
     //  Reglas de negocio
 
     /**
-     * Lo que sale esta credencial: el precio de su tipo.
+     * Lo que sale esta credencial: el precio de SIREB congelado al emitirla.
      */
     public function montoACobrar(): float
     {
-        return (float) ($this->tipoCarnet?->precio_bs ?? 0.0);
+        return (float) $this->monto;
     }
 
     /**

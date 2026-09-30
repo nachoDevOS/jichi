@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'condicion',
     'cantidad_kg',
     'precio_kg',
+    'sireb_tarifa_id',
     'importe_total',
 ])]
 class GuiaDetalle extends Model

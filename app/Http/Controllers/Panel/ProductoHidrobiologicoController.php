@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\GuardarProductoHidrobiologicoRequest;
 use App\Models\ProductoHidrobiologico;
+use App\Sireb\VistaSireb;
 use App\Support\Paginacion;
 use App\Support\Sql;
 use Illuminate\Http\RedirectResponse;
@@ -15,13 +16,13 @@ use Inertia\Response;
 /**
  *  Catálogo de productos hidrobiológicos — el cuadro D de la guía
  *
- * Nombre, tasa por kilo que se cobra en la guía y si se puede elegir. Sin baja: un
- * producto usado en una guía se pone fuera de uso, no se borra.
+ * Nombre, tarifa por kilo en SIREB y si se puede elegir. Sin baja: un producto
+ * usado en una guía se pone fuera de uso, no se borra.
  */
 class ProductoHidrobiologicoController extends Controller
 {
     /**
-     * Listado y formulario — GET /panel/catalogos/productos
+     * Listado — GET /panel/catalogos/productos
      */
     public function index(Request $request): Response
     {
@@ -42,7 +43,8 @@ class ProductoHidrobiologicoController extends Controller
             ->through(fn (ProductoHidrobiologico $p): array => [
                 'id' => $p->id,
                 'nombre' => $p->nombre,
-                'precio_kg' => (float) $p->precio_kg,
+                'servicio_sireb' => $p->servicio_sireb,
+                'tarifa_sireb' => $p->tarifa_sireb,
                 'estado' => (bool) $p->estado,
                 'detalles_count' => $p->detalles_count,
             ]);
@@ -52,6 +54,33 @@ class ProductoHidrobiologicoController extends Controller
             'filtros' => ['buscar' => $buscar, 'por_pagina' => $porPagina],
             'opcionesPorPagina' => Paginacion::OPCIONES,
         ]);
+    }
+
+    /**
+     * Historial de SIREB — GET /panel/catalogos/productos/{producto}
+     */
+    public function show(ProductoHidrobiologico $producto, VistaSireb $vista): Response
+    {
+        return Inertia::render('panel/catalogos/productos-historial', [
+            'producto' => ['nombre' => $producto->nombre],
+            ...$vista->historial($producto),
+        ]);
+    }
+
+    /**
+     * Formulario de alta — GET /panel/catalogos/productos/crear
+     */
+    public function create(VistaSireb $vista): Response
+    {
+        return $this->formulario(null, $vista);
+    }
+
+    /**
+     * Formulario de edición — GET /panel/catalogos/productos/{producto}/editar
+     */
+    public function edit(ProductoHidrobiologico $producto, VistaSireb $vista): Response
+    {
+        return $this->formulario($producto, $vista);
     }
 
     /**
@@ -76,5 +105,28 @@ class ProductoHidrobiologicoController extends Controller
         return redirect()
             ->route('productos.index')
             ->with('exito', "Producto «{$producto->nombre}» actualizado.");
+    }
+
+    /** La misma pantalla para alta (sin producto) y edición. */
+    private function formulario(?ProductoHidrobiologico $producto, VistaSireb $vista): Response
+    {
+        return Inertia::render('panel/catalogos/productos-formulario', [
+            'producto' => $producto === null ? null : [
+                'id' => $producto->id,
+                'nombre' => $producto->nombre,
+                'servicio_sireb' => $producto->servicio_sireb,
+                'tarifa_sireb' => $producto->tarifa_sireb,
+                'estado' => (bool) $producto->estado,
+            ],
+            // Para el select de tarifa: null si SIREB no responde, y la pantalla abre igual.
+            'serviciosSireb' => $vista->serviciosParaSelect(),
+            // Se pueden compartir: el select solo avisa qué productos la usan.
+            'tarifasUsadas' => ProductoHidrobiologico::query()
+                ->whereNotNull('tarifa_sireb')
+                ->orderBy('nombre')
+                ->get(['nombre', 'tarifa_sireb'])
+                ->groupBy('tarifa_sireb')
+                ->map(fn ($grupo) => $grupo->pluck('nombre')->join(', ')),
+        ]);
     }
 }

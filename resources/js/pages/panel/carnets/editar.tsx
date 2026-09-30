@@ -113,7 +113,8 @@ export default function EditarCarnet({
                             >
                                 {tiposDelActor.map((t) => (
                                     <option key={t.id} value={t.id}>
-                                        {t.nombre} — {bs(t.precio_bs, institucion.moneda)}
+                                        {t.nombre}
+                                        {t.precio !== null && ` — ${bs(t.precio, institucion.moneda)}`}
                                     </option>
                                 ))}
                             </Select>
@@ -302,7 +303,7 @@ export default function EditarCarnet({
                                     A cobrar
                                 </p>
                                 <p className="text-2xl font-semibold tabular-nums">
-                                    {bs(tipo.precio_bs, institucion.moneda)}
+                                    {tipo.precio !== null ? bs(tipo.precio, institucion.moneda) : '—'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     Cambiar el tipo cambia el arancel. Se puede porque todavía no

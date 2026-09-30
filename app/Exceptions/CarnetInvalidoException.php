@@ -27,6 +27,14 @@ class CarnetInvalidoException extends RuntimeException
     }
 
     /**
+     * Sin precio de SIREB no se emite: ninguna tarifa se escribe a mano.
+     */
+    public static function sinPrecio(string $tipo, string $motivo): self
+    {
+        return new self("No se puede emitir un «{$tipo}»: {$motivo}");
+    }
+
+    /**
      * Un carnet de pescador sin bolsa madre detrás.
      */
     public static function pescadorSinCupo(string $persona): self

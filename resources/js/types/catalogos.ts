@@ -106,21 +106,42 @@ export interface TipoCarnetFila {
     tipo_actor: TipoActor;
     tipo_actor_etiqueta: string;
     tipo_actor_color: string;
-    /**
-     * El arancel de HOY, para armar un cobro nuevo.
-     */
-    precio_bs: number;
+    /** Ids de SIREB, de donde sale el precio; null hasta que alguien elige la tarifa. */
+    servicio_sireb: string | null;
+    tarifa_sireb: string | null;
     estado: boolean;
     carnets_count: number;
 }
+
+/** Lo que la pantalla de edición necesita de un tipo de carnet. */
+export type TipoCarnetFormulario = Pick<
+    TipoCarnetFila,
+    'id' | 'nombre' | 'tipo_actor' | 'servicio_sireb' | 'tarifa_sireb' | 'estado'
+>;
 
 /** Una fila del catálogo de productos hidrobiológicos. */
 export interface ProductoFila {
     id: number;
     nombre: string;
-    /** La tasa por kilo: la guía cobra kilos × precio de su cuadro D. */
-    precio_kg: number;
+    /** Ids de SIREB, de donde sale el precio por kilo; null hasta que alguien elige la tarifa. */
+    servicio_sireb: string | null;
+    tarifa_sireb: string | null;
     estado: boolean;
     /** Renglones de guía que lo usan: por eso no hay papelera. */
     detalles_count: number;
 }
+
+/** Una fila de Aranceles de SIREB: un cobro que no cuelga de un catálogo. */
+export interface ArancelFila {
+    id: number;
+    concepto: string;
+    etiqueta: string;
+    descripcion: string;
+    servicio_sireb: string | null;
+    tarifa_sireb: string | null;
+    /** Precio de referencia en SIREB; null sin tarifa o sin SIREB. */
+    precio: number | null;
+}
+
+/** Lo que la pantalla de alta/edición necesita de un producto. */
+export type ProductoFormulario = Pick<ProductoFila, 'id' | 'nombre' | 'servicio_sireb' | 'tarifa_sireb' | 'estado'>;

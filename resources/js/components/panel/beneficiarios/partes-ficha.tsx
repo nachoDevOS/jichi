@@ -7,7 +7,7 @@ import type { TipoActor } from '@/types';
 import type { CarnetResumen } from '@/types/beneficiarios';
 
 /** Los colores de cada actividad, escritos enteros: Tailwind no ve clases armadas. */
-export const TONOS: Record<TipoActor, { tarjeta: string; suave: string; texto: string; punto: string }> = {
+const TONOS: Record<TipoActor, { tarjeta: string; suave: string; texto: string; punto: string }> = {
     pescador: {
         tarjeta: 'bg-gradient-to-br from-sky-600 to-sky-800 dark:from-sky-700 dark:to-sky-950',
         suave: 'bg-sky-50 dark:bg-sky-500/10',

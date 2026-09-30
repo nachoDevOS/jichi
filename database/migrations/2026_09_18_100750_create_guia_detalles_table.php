@@ -34,8 +34,9 @@ return new class extends Migration
 
             $table->decimal('cantidad_kg', 12, 2)->default(0)->comment('CANT. ADQUIRIDA');
 
-            // La tasa del producto al emitir; la suma de importes es `guias_movimiento.monto`.
-            $table->decimal('precio_kg', 12, 2)->default(0)->comment('Copia del producto');
+            // El precio de SIREB al emitir, congelado; la suma de importes es `guias_movimiento.monto`.
+            $table->decimal('precio_kg', 12, 2)->default(0)->comment('Copia del precio de SIREB');
+            $table->uuid('sireb_tarifa_id')->nullable()->comment('Tarifa de SIREB de ese precio');
             $table->decimal('importe_total', 12, 2)->default(0)->comment('cantidad_kg × precio_kg');
 
             $table->timestamps();

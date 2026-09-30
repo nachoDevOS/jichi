@@ -24,16 +24,6 @@ enum TipoTransporte: string
         };
     }
 
-    /** El renglón del bloque C: a, b, c. */
-    public function letra(): string
-    {
-        return match ($this) {
-            self::Embarcacion => 'a',
-            self::ChataAbsorbente => 'b',
-            self::Automotriz => 'c',
-        };
-    }
-
     /**
      * @return array<int, array{value: string, label: string}>
      */

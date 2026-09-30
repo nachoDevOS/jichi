@@ -4,28 +4,31 @@ namespace App\Models;
 
 use App\Enums\TipoActor;
 use App\Traits\Auditable;
+use App\Traits\HistorialSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Una clase de credencial y su arancel: «Carnet de Pescador», 80 Bs.
+ * Una clase de credencial: «Carnet de Pescador». Su precio lo pone SIREB con
+ * `tarifa_sireb`, y cada carnet lo congela al emitirse.
  */
-#[Fillable(['nombre', 'tipo_actor', 'precio_bs', 'estado'])]
+#[Fillable(['nombre', 'tipo_actor', 'servicio_sireb', 'tarifa_sireb', 'estado'])]
 class TipoCarnet extends Model
 {
-    use Auditable, SoftDeletes;
+    use Auditable, HistorialSireb, SoftDeletes;
 
     /** «TipoCarnet» pluraliza como «tipo_carnets», que no es la tabla. */
     protected $table = 'tipos_carnet';
 
+    /** El historial ya ES el registro del cambio: auditarlo lo duplicaría. */
+    protected $noAuditable = ['sireb_historial'];
+
     /** Ver el comentario de Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [
         'tipo_actor' => TipoActor::Pescador->value,
-        'precio_bs' => 0,
         'estado' => true,
     ];
 
@@ -33,8 +36,8 @@ class TipoCarnet extends Model
     {
         return [
             'tipo_actor' => TipoActor::class,
-            'precio_bs' => 'decimal:2',
             'estado' => 'boolean',
+            'sireb_historial' => 'array',
         ];
     }
 
@@ -43,18 +46,6 @@ class TipoCarnet extends Model
     public function carnets(): HasMany
     {
         return $this->hasMany(Carnet::class);
-    }
-
-    //  Lectura
-
-    /** «Carnet de Pescador — 80,00 Bs», como se lee en el desplegable. */
-    protected function etiqueta(): Attribute
-    {
-        return Attribute::get(fn (): string => sprintf(
-            '%s — %s Bs',
-            $this->nombre,
-            number_format((float) $this->precio_bs, 2, ',', '.'),
-        ));
     }
 
     //  Scopes

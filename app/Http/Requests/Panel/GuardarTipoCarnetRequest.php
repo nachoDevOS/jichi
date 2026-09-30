@@ -42,7 +42,12 @@ class GuardarTipoCarnetRequest extends FormRequest
              */
             'tipo_actor' => ['required', Rule::enum(TipoActor::class)],
 
-            'precio_bs' => ['required', 'numeric', 'min:0', 'max:99999999', 'decimal:0,2'],
+            // Una tarifa por tipo: dos tipos con la misma cobrarían lo mismo.
+            'servicio_sireb' => ['required', 'uuid'],
+            'tarifa_sireb' => [
+                'required', 'uuid',
+                Rule::unique('tipos_carnet', 'tarifa_sireb')->whereNull('deleted_at')->ignore($idActual),
+            ],
 
             'estado' => ['required', 'boolean'],
         ];
@@ -57,9 +62,11 @@ class GuardarTipoCarnetRequest extends FormRequest
             'nombre.required' => 'El nombre del tipo de carnet es obligatorio.',
             'nombre.unique' => 'Ya existe un tipo de carnet con ese nombre.',
             'tipo_actor.required' => 'Indique si el tipo es de pescador o de comercializador.',
-            'precio_bs.required' => 'Indique el precio en bolivianos.',
-            'precio_bs.decimal' => 'El precio lleva como máximo dos decimales.',
-            'precio_bs.min' => 'El precio no puede ser negativo.',
+            'servicio_sireb.required' => 'Elija la tarifa de SIREB del tipo de carnet.',
+            'servicio_sireb.uuid' => 'El id del servicio no tiene el formato de SIREB.',
+            'tarifa_sireb.required' => 'Elija la tarifa de SIREB del tipo de carnet.',
+            'tarifa_sireb.uuid' => 'El id de la tarifa no tiene el formato de SIREB.',
+            'tarifa_sireb.unique' => 'Esa tarifa ya la usa otro tipo de carnet.',
         ];
     }
 
@@ -67,6 +74,9 @@ class GuardarTipoCarnetRequest extends FormRequest
     {
         $this->merge([
             'nombre' => trim((string) $this->input('nombre')),
+            // SIREB manda los ids en minúscula: así se comparan tal cual.
+            'servicio_sireb' => mb_strtolower(trim((string) $this->input('servicio_sireb'))),
+            'tarifa_sireb' => mb_strtolower(trim((string) $this->input('tarifa_sireb'))),
             // El checkbox llega ausente cuando está destildado, y sin este
             // boolean() la regla lo vería como null.
             'estado' => $this->boolean('estado', true),

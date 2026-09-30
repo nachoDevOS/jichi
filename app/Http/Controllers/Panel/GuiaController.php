@@ -26,6 +26,7 @@ use App\Models\Recibo;
 use App\Services\CobrarService;
 use App\Services\EmitirGuiaService;
 use App\Services\RevisarGuiaService;
+use App\Sireb\VistaSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use App\Support\Sql;
@@ -526,15 +527,18 @@ class GuiaController extends Controller
      */
     private function catalogosDelFormulario(array $ademas = []): array
     {
+        $precios = app(VistaSireb::class)->preciosPorTarifa() ?? [];
+
         return [
             'productos' => ProductoHidrobiologico::query()
                 ->where(fn ($q) => $q->where('estado', true)->orWhereIn('id', $ademas))
                 ->orderBy('nombre')
-                ->get(['id', 'nombre', 'precio_kg', 'estado'])
+                ->get(['id', 'nombre', 'tarifa_sireb', 'estado'])
                 ->map(fn (ProductoHidrobiologico $p): array => [
                     'id' => $p->id,
                     'nombre' => $p->nombre,
-                    'precio_kg' => (float) $p->precio_kg,
+                    // De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa.
+                    'precio_kg' => $precios[$p->tarifa_sireb] ?? null,
                     'estado' => (bool) $p->estado,
                 ])
                 ->all(),

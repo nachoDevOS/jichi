@@ -129,7 +129,7 @@ la misma sintaxis.
 | `kilos_min` / `kilos_max` | decimal(12,2) | |
 | `servicio_sireb` | uuid | Id del servicio en Recaudaciones (SIREB). Lo comparten todos los tramos |
 | `tarifa_sireb` | uuid | Id de la tarifa del tramo dentro de ese servicio: de ahí sale el precio. Única entre las filas vivas (lo exige el Request) |
-| `sireb_historial` | json, nullable | Los pares servicio/tarifa **anteriores**, cada uno con `desde`, `hasta` y `cambiado_por`. El actual vive en las dos columnas de arriba. Lo escribe el evento `updating` del modelo al cambiar cualquiera de las dos; no pasa por `#[Fillable]` ni por la auditoría (30/09/2026) |
+| `sireb_historial` | json, nullable | (Igual en `tipos_carnet`, ver abajo.) Los pares servicio/tarifa **anteriores**, cada uno con `desde`, `hasta` y `cambiado_por`. El actual vive en las dos columnas de arriba. Lo escribe el evento `updating` del modelo al cambiar cualquiera de las dos; no pasa por `#[Fillable]` ni por la auditoría (30/09/2026) |
 | `estado` | boolean | Vigente o derogada |
 
 **Por qué no tiene precio** *(29/09/2026)*. El precio lo fija Recaudaciones
@@ -184,7 +184,8 @@ mintiendo—.
 | --- | --- | --- |
 | `nombre` | string(120), único | |
 | `tipo_actor` | string(20) | Para qué actividad sirve |
-| `precio_bs` | decimal(10,2) | El arancel de HOY |
+| `servicio_sireb` / `tarifa_sireb` | uuid, nullable | Servicio y tarifa de SIREB del tipo: de ahí sale el precio. **Ya no hay `precio_bs`** (30/09/2026). Nullable porque los tipos sembrados nacen sin ellos —y sin tarifa ese tipo no emite—; el Request los exige al editar, y la tarifa es única entre las filas vivas |
+| `sireb_historial` | json, nullable | Los pares anteriores, igual que en la escala: trait `HistorialSireb` |
 | `estado` | boolean | |
 
 **El precio se copia al cobrar, no se lee de acá al imprimir.** Un carnet emitido
@@ -407,6 +408,8 @@ bajo su nombre.
 | `beneficiario_id`, `asociacion_id`, `tipo_carnet_id` | FK RESTRICT | |
 | `aprovechamiento_id` | FK **nullable**, nullOnDelete | Solo el pescador |
 | `tipo_actor` | string(20) | `TipoActor`: pescador / comercializador |
+| `monto` | decimal(10,2) | **Copia congelada** del precio de SIREB al emitir (y al corregir el borrador). Es lo que lee `montoACobrar()`: un cambio de tarifa después no toca lo ya emitido (30/09/2026) |
+| `sireb_tarifa_id` | uuid, nullable | La tarifa de SIREB de ese precio |
 | `estado` | string(20) | `EstadoCarnet` |
 
 **EL CÓDIGO YA NO ES UNA COLUMNA DE ESTA TABLA.** Vivía en `codigo_carnet` y se
@@ -462,13 +465,31 @@ se tocan. Un pendiente se elimina y uno en revisión se rechaza — ver
 
 ---
 
+### `aranceles_sireb` — los cobros que no cuelgan de un catálogo *(30/09/2026)*
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `concepto` | string(30), **único** | `ConceptoArancel`: hoy solo `faena`. Una fila por concepto |
+| `servicio_sireb` / `tarifa_sireb` | uuid, null | Servicio y tarifa en SIREB; nacen en null hasta que alguien la elige |
+| `sireb_historial` | json, null | Los pares anteriores: trait `HistorialSireb` |
+
+Una tabla genérica y no `tarifa_faena`: un cobro fijo nuevo es un caso más del
+enum y una fila, sin migración. Las filas las pone `CatalogoSeeder` (una por
+caso del enum) y no se dan de baja, por eso el único es a secas y no parcial.
+Se editan en Catálogos › Aranceles. La fila `faena` fija el precio de cada
+permiso. **La guía no tiene fila**: cobra por kilo con la tarifa de cada
+producto.
+
+---
+
 ### `permisos_faena` — una salida
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `carnet_id` | FK RESTRICT | **La única**: de él cuelga la faena |
 | `numero_faena` | int | Correlativo **global y continuo**. Lo pone el sistema |
-| `monto` | decimal(10,2) | Copia congelada del arancel al emitir |
+| `monto` | decimal(10,2) | Copia congelada del precio de SIREB al emitir |
+| `sireb_tarifa_id` | uuid, null | La tarifa de SIREB de ese precio (30/09/2026) |
 | `kilos_extraidos` | decimal(12,2) | |
 | `embarcacion`, `propietario`, `comandante_barco` | string, **null** | Renglones del papel |
 | `matricula_naval`, `nro_kardex` | string, **null** | Renglones del papel |
@@ -497,8 +518,8 @@ fecha, porque la salida es ese mismo día.
 
 **`monto` es una COPIA CONGELADA**, como en `recibos`: una suba por resolución
 no puede mover lo que dice un papel ya entregado. `PermisoFaena::montoACobrar()`
-lee la columna; `tarifaVigente()` lee la config y solo la usa el servicio al
-emitir.
+lee la columna. El precio lo pide `EmitirFaenaService` a SIREB al emitir, con la
+fila `faena` de `aranceles_sireb` (30/09/2026; antes salía del `.env`).
 
 **LA FAENA SE COBRA Y SE FIRMA, igual que el carnet y el cupo —20/09/2026—.**
 Antes nacía ACTIVA y autorizaba en el acto: se emitía el papel sin que hubiera
@@ -522,9 +543,8 @@ escribía en cascada la revocación de su autorización; ya nada lo escribe: una
 **«Sin efecto»** (`PermisoFaena::sinEfecto()`). Se conserva en el enum por si
 quedó alguna fila así.
 
-`PermisoFaena` usa el trait `Pagable`, el arancel sale de
-`config('jichi.faenas.tarifa_base')` —`JICHI_FAENA_TARIFA_BASE`, **15 Bs** por
-defecto, que es lo que dice el talonario— y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
+`PermisoFaena` usa el trait `Pagable`, el arancel sale de SIREB (fila `faena` de
+`aranceles_sireb`; sin tarifa o sin SIREB no se emite) y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
 en los otros dos. El circuito vive en `RevisarFaenaService`.
 
 **Los kilos se DESCUENTAN desde la firma y se RESERVAN desde el registro.**
@@ -706,18 +726,21 @@ cambiaría lo que se cobró.
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `nombre` | string(120) | «Surubí». Único entre los vivos (lo exige el Request) |
-| `precio_kg` | decimal(10,2) | La **tasa por kilo** que se cobra. Mínimo 0,20 (lo exige el Request) |
+| `servicio_sireb` / `tarifa_sireb` | uuid, nullable | Servicio y tarifa **por kilo** de SIREB. **Ya no hay `precio_kg`** (30/09/2026). Nullable porque los sembrados nacen sin ellos —y sin tarifa el producto no entra en una guía—. A diferencia de la escala y los tipos de carnet, **la tarifa se puede compartir**: dos especies pueden cobrar igual el kilo |
+| `sireb_historial` | json, nullable | Los pares anteriores: trait `HistorialSireb` |
 | `estado` | boolean | Inactivo: no se elige en una guía nueva |
 
 **Existe para que la especie deje de ser texto libre**: «Surubí», «surubi» y
 «SURUBI» eran tres especies distintas para cualquier reporte. Lo carga la
 unidad desde Catálogos → Productos. Sin baja: uno usado en una guía se pone
 inactivo. El seeder trae los 13 nombres de la tabla de tamaños mínimos del
-talonario de la autorización, con precios de **plantilla** desde 0,20 Bs/kg.
+talonario de la autorización, sin tarifa.
 
-**`precio_kg` ES LO QUE SE COBRA** *(27/09/2026)*: la guía cobra la suma de
-kilos × precio de su cuadro D, con el descuento de piscicultura. Se copia a
-`guia_detalles.precio_kg` y el total a `guias_movimiento.monto` al emitir.
+**EL PRECIO POR KILO LO PONE SIREB** *(30/09/2026)*: la guía cobra la suma de
+kilos × precio de su cuadro D, con el descuento de piscicultura. Al emitir (y al
+corregir) `EmitirGuiaService` pide el precio de cada producto a SIREB con
+`PrecioSireb` y lo congela en `guia_detalles.precio_kg`; el total va a
+`guias_movimiento.monto`.
 
 ---
 
@@ -730,7 +753,8 @@ kilos × precio de su cuadro D, con el descuento de piscicultura. Se copia a
 | `especie` | string(120) | **Copia** del nombre del producto al emitir |
 | `condicion` | string(30) | `CondicionProducto`: las DIEZ columnas de tilde |
 | `cantidad_kg` | decimal(12,2) | CANT. ADQUIRIDA |
-| `precio_kg` | decimal(12,2) | **Copia** del precio del producto al emitir |
+| `precio_kg` | decimal(12,2) | **Copia** del precio por kilo de SIREB al emitir |
+| `sireb_tarifa_id` | uuid, nullable | La tarifa de SIREB de ese precio (30/09/2026) |
 | `importe_total` | decimal(12,2) | `cantidad_kg × precio_kg`, guardado |
 
 **EL NOMBRE Y EL PRECIO SE COPIAN, además de guardar `producto_id`.** El papel

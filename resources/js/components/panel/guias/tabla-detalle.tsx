@@ -53,7 +53,9 @@ export function TablaDetalle({
     }, []);
     const grupoDe = (valor: string) => condiciones.find((c) => c.value === valor)?.grupo ?? '';
 
-    const precioDe = (f: FilaDetalle) => productos.find((p) => String(p.id) === f.producto_id)?.precio_kg ?? 0;
+    // null = el producto no tiene tarifa o SIREB no responde: al guardar, el servidor dice cuál.
+    const precioSireb = (f: FilaDetalle) => productos.find((p) => String(p.id) === f.producto_id)?.precio_kg ?? null;
+    const precioDe = (f: FilaDetalle) => precioSireb(f) ?? 0;
 
     const totalKg = filas.reduce((suma, f) => suma + Number(f.cantidad_kg || 0), 0);
     const totalBs = filas.reduce((suma, f) => suma + Number(f.cantidad_kg || 0) * precioDe(f), 0);
@@ -141,13 +143,15 @@ export function TablaDetalle({
                                     />
                                 </td>
 
-                                {/* Del catálogo, solo lectura: el servidor lo copia al guardar. */}
+                                {/* De SIREB, solo lectura: el servidor lo copia al guardar. */}
                                 <td className="py-2 pr-2 pt-4 text-right tabular-nums text-muted-foreground">
-                                    {fila.producto_id ? precioDe(fila).toFixed(2) : '—'}
+                                    {precioSireb(fila) !== null ? precioDe(fila).toFixed(2) : '—'}
                                 </td>
 
                                 <td className="py-2 pr-2 pt-4 text-right tabular-nums text-muted-foreground">
-                                    {(Number(fila.cantidad_kg || 0) * precioDe(fila)).toFixed(2)}
+                                    {precioSireb(fila) !== null
+                                        ? (Number(fila.cantidad_kg || 0) * precioDe(fila)).toFixed(2)
+                                        : '—'}
                                 </td>
 
                                 <td className="py-2 text-right">

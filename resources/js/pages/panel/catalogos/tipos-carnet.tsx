@@ -1,9 +1,8 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Pencil, Search, Tags, X } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { History, Pencil, Search, Tags } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Campo } from '@/components/ui/campo';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
@@ -11,8 +10,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs } from '@/lib/utils';
-import type { OpcionEnum, PageProps, Paginado, TipoActor } from '@/types';
+import { cn } from '@/lib/utils';
+import type { OpcionEnum, Paginado } from '@/types';
 import type { TipoCarnetFila } from '@/types/catalogos';
 
 /**
@@ -30,14 +29,7 @@ export default function CatalogoTiposCarnet({
     opcionesPorPagina: number[];
 }) {
     const { puede } = usePermisos();
-    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
-
-    /*
-     * Solo EDICIÓN: los tipos de carnet salen de la resolución, así que el
-     * catálogo se corrige pero no se le agregan filas desde la pantalla.
-     */
-    const [editando, setEditando] = useState<TipoCarnetFila | null>(null);
 
     function filtrar(valores: Record<string, string | number | null> = {}) {
         router.get(
@@ -50,21 +42,11 @@ export default function CatalogoTiposCarnet({
     return (
         <LayoutPanel
             titulo="Tipos de carnet"
-            descripcion="El nombre de cada credencial y su arancel. Se corrigen; no se agregan."
+            descripcion="El nombre de cada credencial y su tarifa en Recaudaciones (SIREB). Se corrigen; no se agregan."
         >
             <Head title="Tipos de carnet" />
 
             <div className="space-y-6">
-                {editando !== null && puede('catalogos.gestionar') && (
-                    <FormularioTipo
-                        // Ver el comentario de la `key` en asociaciones.tsx.
-                        key={editando.id}
-                        tipo={editando}
-                        actores={actores}
-                        onCerrar={() => setEditando(null)}
-                    />
-                )}
-
                 <Card className="min-w-0">
                     <CardHeader>
                         <CardTitle>Registrados</CardTitle>
@@ -148,8 +130,8 @@ export default function CatalogoTiposCarnet({
                                             <tr>
                                                 <th className="px-5 py-2.5 font-medium">Tipo</th>
                                                 <th className="px-5 py-2.5 font-medium">Actividad</th>
-                                                <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
                                                 <th className="px-5 py-2.5 text-right font-medium">Emitidos</th>
+                                                <th className="px-5 py-2.5 font-medium">SIREB</th>
                                                 <th className="px-5 py-2.5" />
                                             </tr>
                                         </thead>
@@ -175,10 +157,6 @@ export default function CatalogoTiposCarnet({
                                                         </Badge>
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-right tabular-nums">
-                                                        {bs(t.precio_bs, institucion.moneda)}
-                                                    </td>
-
                                                     {/*
                                                         Es lo que explica por qué no hay papelera: con
                                                         carnets emitidos colgando, borrar la fila los
@@ -188,17 +166,42 @@ export default function CatalogoTiposCarnet({
                                                         {t.carnets_count || '—'}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-right">
-                                                        {puede('catalogos.gestionar') && (
-                                                            <Button
-                                                                variant="editar"
-                                                                size="sm"
-                                                                title="Editar"
-                                                                onClick={() => setEditando(t)}
-                                                            >
-                                                                <Pencil className="size-4" />
-                                                            </Button>
+                                                    <td className="px-5 py-2.5">
+                                                        {t.tarifa_sireb ? (
+                                                            <>
+                                                                <p className="font-mono text-xs">
+                                                                    <span className="text-muted-foreground">Tarifa </span>
+                                                                    {t.tarifa_sireb}
+                                                                </p>
+                                                                <p className="font-mono text-xs text-muted-foreground">
+                                                                    Servicio {t.servicio_sireb}
+                                                                </p>
+                                                            </>
+                                                        ) : (
+                                                            <Badge color="amber">Sin tarifa</Badge>
                                                         )}
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <Link
+                                                                href={route('tipos-carnet.show', t.id)}
+                                                                className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
+                                                                title="Historial de SIREB"
+                                                            >
+                                                                <History className="size-4" />
+                                                            </Link>
+
+                                                            {puede('catalogos.gestionar') && (
+                                                                <Link
+                                                                    href={route('tipos-carnet.edit', t.id)}
+                                                                    className={cn(buttonVariants({ variant: 'editar', size: 'sm' }))}
+                                                                    title="Editar"
+                                                                >
+                                                                    <Pencil className="size-4" />
+                                                                </Link>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -214,124 +217,5 @@ export default function CatalogoTiposCarnet({
 
             </div>
         </LayoutPanel>
-    );
-}
-
-/** CORRECCIÓN de un tipo. No hay alta: el catálogo sale de la resolución. */
-function FormularioTipo({
-    tipo,
-    actores,
-    onCerrar,
-}: {
-    tipo: TipoCarnetFila;
-    actores: OpcionEnum[];
-    onCerrar: () => void;
-}) {
-    const form = useForm({
-        nombre: tipo.nombre,
-        tipo_actor: tipo.tipo_actor,
-        precio_bs: String(tipo.precio_bs),
-        estado: tipo.estado,
-    });
-
-    function enviar(e: FormEvent) {
-        e.preventDefault();
-
-        form.put(route('tipos-carnet.update', tipo.id), {
-            preserveScroll: true,
-            onSuccess: () => onCerrar(),
-        });
-    }
-
-    return (
-        <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                <CardTitle>Editar tipo</CardTitle>
-
-                <Button variant="ghost" size="sm" onClick={onCerrar} aria-label="Cerrar">
-                    <X className="size-4" />
-                </Button>
-            </CardHeader>
-
-            <CardContent>
-                <form onSubmit={enviar} className="space-y-4">
-                    {/* A lo ancho los tres campos entran en una fila. */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Campo etiqueta="Nombre" htmlFor="nombre" error={form.errors.nombre} obligatorio>
-                        <Input
-                            id="nombre"
-                            value={form.data.nombre}
-                            onChange={(e) => form.setData('nombre', e.target.value)}
-                            aria-invalid={Boolean(form.errors.nombre)}
-                            placeholder="Carnet de Pescador"
-                        />
-                    </Campo>
-
-                    <Campo
-                        etiqueta="Actividad"
-                        htmlFor="tipo_actor"
-                        error={form.errors.tipo_actor}
-                        ayuda="Define en qué carnets se puede elegir este tipo."
-                        obligatorio
-                    >
-                        <Select
-                            id="tipo_actor"
-                            value={form.data.tipo_actor}
-                            onChange={(e) => form.setData('tipo_actor', e.target.value as TipoActor)}
-                            aria-invalid={Boolean(form.errors.tipo_actor)}
-                        >
-                            <option value="">Elija una actividad…</option>
-                            {actores.map((a) => (
-                                <option key={a.value} value={a.value}>
-                                    {a.label}
-                                </option>
-                            ))}
-                        </Select>
-                    </Campo>
-
-                    <Campo
-                        etiqueta="Arancel (Bs)"
-                        htmlFor="precio_bs"
-                        error={form.errors.precio_bs}
-                        ayuda="Cambiarlo NO toca lo ya cobrado, pero sí el saldo de los carnets que aún no están pagados."
-                        obligatorio
-                    >
-                        <Input
-                            id="precio_bs"
-                            type="number"
-                            step="0.01"
-                            min={0}
-                            value={form.data.precio_bs}
-                            onChange={(e) => form.setData('precio_bs', e.target.value)}
-                            aria-invalid={Boolean(form.errors.precio_bs)}
-                        />
-                    </Campo>
-
-                    <Campo etiqueta="Vigente" htmlFor="estado" error={form.errors.estado}>
-                        <label className="flex items-center gap-2 text-sm">
-                            <input
-                                id="estado"
-                                type="checkbox"
-                                checked={form.data.estado}
-                                onChange={(e) => form.setData('estado', e.target.checked)}
-                                className="size-4 rounded border-input"
-                            />
-                            Se puede elegir al emitir un carnet
-                        </label>
-                    </Campo>
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                        <Button type="submit" disabled={form.processing}>
-                            Guardar cambios
-                        </Button>
-
-                        <Button type="button" variant="outline" onClick={onCerrar}>
-                            Cancelar
-                        </Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
     );
 }

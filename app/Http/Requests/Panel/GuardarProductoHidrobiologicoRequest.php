@@ -32,8 +32,9 @@ class GuardarProductoHidrobiologicoRequest extends FormRequest
                 Rule::unique('productos_hidrobiologicos', 'nombre')->ignore($idActual)->whereNull('deleted_at'),
             ],
 
-            // Es la tasa que se cobra por kilo: en cero, la guía saldría gratis.
-            'precio_kg' => ['required', 'numeric', 'min:0.20', 'max:99999999', 'decimal:0,2'],
+            // Varios productos pueden compartir tarifa: SIREB puede cobrar igual el kilo de dos especies.
+            'servicio_sireb' => ['required', 'uuid'],
+            'tarifa_sireb' => ['required', 'uuid'],
 
             'estado' => ['required', 'boolean'],
         ];
@@ -47,9 +48,10 @@ class GuardarProductoHidrobiologicoRequest extends FormRequest
         return [
             'nombre.required' => 'El nombre del producto es obligatorio.',
             'nombre.unique' => 'Ya existe un producto con ese nombre.',
-            'precio_kg.required' => 'Indique el precio por kilo en bolivianos.',
-            'precio_kg.decimal' => 'El precio lleva como máximo dos decimales.',
-            'precio_kg.min' => 'El precio por kilo es de 0,20 Bs en adelante.',
+            'servicio_sireb.required' => 'Elija la tarifa de SIREB del producto.',
+            'servicio_sireb.uuid' => 'El id del servicio no tiene el formato de SIREB.',
+            'tarifa_sireb.required' => 'Elija la tarifa de SIREB del producto.',
+            'tarifa_sireb.uuid' => 'El id de la tarifa no tiene el formato de SIREB.',
         ];
     }
 
@@ -57,6 +59,9 @@ class GuardarProductoHidrobiologicoRequest extends FormRequest
     {
         $this->merge([
             'nombre' => trim((string) $this->input('nombre')),
+            // SIREB manda los ids en minúscula: así se comparan tal cual.
+            'servicio_sireb' => mb_strtolower(trim((string) $this->input('servicio_sireb'))),
+            'tarifa_sireb' => mb_strtolower(trim((string) $this->input('tarifa_sireb'))),
             // El checkbox llega ausente cuando está destildado.
             'estado' => $this->boolean('estado', true),
         ]);

@@ -45,7 +45,8 @@ export interface FilaDetalle {
 export interface ProductoGuia {
     id: number;
     nombre: string;
-    precio_kg: number;
+    /** Precio de SIREB de referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa. */
+    precio_kg: number | null;
     /** false: fuera de uso, solo aparece porque la guía ya lo tenía. */
     estado: boolean;
 }

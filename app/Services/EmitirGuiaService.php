@@ -9,6 +9,8 @@ use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
 use App\Models\ProductoHidrobiologico;
+use App\Sireb\PrecioSireb;
+use App\Sireb\SinPrecioException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -26,7 +28,10 @@ class EmitirGuiaService
         'observaciones',
     ];
 
-    public function __construct(private readonly CorrelativoService $correlativos) {}
+    public function __construct(
+        private readonly CorrelativoService $correlativos,
+        private readonly PrecioSireb $precios,
+    ) {}
 
     /**
      * Nace PENDIENTE: no ampara nada hasta que se cobre y alguien la firme.
@@ -240,9 +245,10 @@ class EmitirGuiaService
     }
 
     /**
-     * El cuadro D con nombre y precio tomados del CATÁLOGO, no del formulario:
-     * el operador elige el producto y el sistema copia lo que dice hoy. Se
-     * descartan los renglones sin producto, que el operador no llenó.
+     * El cuadro D con el nombre del CATÁLOGO y el precio de SIREB, no del
+     * formulario: el operador elige el producto y el sistema copia lo de hoy.
+     * Corre fuera de la transacción: la llamada a SIREB no debe tener filas
+     * bloqueadas. Se descartan los renglones sin producto.
      *
      * @param  array<int, array<string, mixed>>  $detalles
      * @param  array<int, int>  $yaUsados  Productos que la guía ya tenía (al corregir)
@@ -265,8 +271,14 @@ class EmitirGuiaService
                     throw PermisoOperativoException::productoNoDisponible($producto?->nombre ?? '#'.$d['producto_id']);
                 }
 
+                try {
+                    $sireb = $this->precios->de($producto->servicio_sireb, $producto->tarifa_sireb);
+                } catch (SinPrecioException $e) {
+                    throw PermisoOperativoException::productoSinPrecio($producto->nombre, $e->getMessage());
+                }
+
                 $cantidad = round((float) ($d['cantidad_kg'] ?? 0), 2);
-                $precio = round((float) $producto->precio_kg, 2);
+                $precio = round($sireb['monto'], 2);
 
                 return [
                     'producto_id' => $producto->id,
@@ -276,6 +288,7 @@ class EmitirGuiaService
                         : CondicionProducto::from((string) $d['condicion']),
                     'cantidad_kg' => $cantidad,
                     'precio_kg' => $precio,
+                    'sireb_tarifa_id' => $sireb['tarifa_id'],
                     'importe_total' => GuiaDetalle::importeDe($cantidad, $precio),
                 ];
             })

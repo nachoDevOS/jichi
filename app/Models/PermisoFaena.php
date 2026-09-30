@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
     'carnet_id',
     'numero_faena',
     'monto',
+    'sireb_tarifa_id',
     'kilos_extraidos',
     'embarcacion',
     'propietario',
@@ -122,20 +123,12 @@ class PermisoFaena extends Model
     //  El circuito: cobrar, presentar y firmar
 
     /**
-     * Lo que sale ESTE permiso. Exigido por el trait Pagable.
-     *
-     * Sale de la COLUMNA y no de la config: el arancel se copia al emitir,
-     * así que una suba por resolución no mueve el monto de un papel entregado.
+     * Lo que sale ESTE permiso. Exigido por el trait Pagable. Es el precio de
+     * SIREB congelado al emitir: un cambio de tarifa no mueve un papel entregado.
      */
     public function montoACobrar(): float
     {
-        return (float) ($this->monto ?? self::tarifaVigente());
-    }
-
-    /** Lo que se cobra HOY por una salida nueva. La copia la hace el servicio. */
-    public static function tarifaVigente(): float
-    {
-        return (float) config('jichi.faenas.tarifa_base', 0);
+        return (float) $this->monto;
     }
 
     /** ¿Se le pueden cargar depósitos hoy? Exigido por el trait Pagable. */

@@ -26,8 +26,8 @@ export default function CrearFaena({
     carnetElegido: number | null;
     /** El plazo de la resolución. Llega del servidor para que no haya dos copias. */
     diasVigencia: number;
-    /** El arancel de hoy. Se copia congelado en la fila al emitir. */
-    tarifa: number;
+    /** El precio de hoy en SIREB, de referencia: el que vale lo congela la emisión. null sin tarifa o sin SIREB. */
+    tarifa: number | null;
     /**
      * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor, y ES LO QUE DECIDE
      * si el botón se bloquea.
@@ -352,11 +352,12 @@ export default function CrearFaena({
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                         Arancel
                                     </p>
+                                    {/* Sin precio: sin tarifa en Aranceles o SIREB caído. Al emitir, el servidor dice cuál. */}
                                     <p className="text-xl font-semibold tabular-nums">
-                                        {tarifa.toFixed(2)}
-                                        <span className="ml-1 text-sm font-normal text-muted-foreground">
-                                            Bs
-                                        </span>
+                                        {tarifa !== null ? tarifa.toFixed(2) : '—'}
+                                        {tarifa !== null && (
+                                            <span className="ml-1 text-sm font-normal text-muted-foreground">Bs</span>
+                                        )}
                                     </p>
                                 </div>
 

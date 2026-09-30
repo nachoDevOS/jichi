@@ -23,7 +23,7 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Dice | Embarcación, propietario, comandante, matrícula, kardex, región y kilos | Origen y destino, medio y vehículo, y la carga especie por especie |
 | Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
 | Además exige | Autorización de pesca **aprobada**, en fecha y con kilos libres | Nada más que el carnet vigente |
-| Arancel | 15 Bs — `JICHI_FAENA_TARIFA_BASE`, copiado en `permisos_faena.monto` | **El total del cuadro D** (kilos × tasa del producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
+| Arancel | Precio de SIREB (fila `faena` de Catálogos › Aranceles), copiado en `permisos_faena.monto` | **El total del cuadro D** (kilos × precio por kilo de SIREB de cada producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
 | Número | `numero_faena`, correlativo continuo del sistema | `numero_guia`, correlativo continuo del sistema |
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
 | Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |

@@ -2,7 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\ModalidadAprovechamiento;
+use App\Models\ArancelSireb;
 use App\Models\Asociacion;
 use App\Models\CategoriaAprovechamiento;
 use App\Models\ProductoHidrobiologico;
@@ -50,28 +52,26 @@ class CatalogoSeeder extends Seeder
     ];
 
     /**
-     * Las credenciales y su arancel. Los NOMBRES son los oficiales; los
-     * PRECIOS son plantilla. REVISAR.
+     * Las credenciales, con los nombres oficiales. Sin tarifa de SIREB: se elige
+     * desde la pantalla, y hasta entonces ese tipo no puede emitir carnets.
      *
-     * @var list<array{nombre: string, precio_bs: float}>
+     * @var list<array{nombre: string, tipo_actor: string}>
      */
     private const TIPOS_CARNET = [
-        ['nombre' => 'Carnet de Pescador', 'tipo_actor' => 'pescador', 'precio_bs' => 80.00],
-        ['nombre' => 'Carnet Comercializador', 'tipo_actor' => 'comercializador', 'precio_bs' => 100.00],
+        ['nombre' => 'Carnet de Pescador', 'tipo_actor' => 'pescador'],
+        ['nombre' => 'Carnet Comercializador', 'tipo_actor' => 'comercializador'],
     ];
 
     /**
-     * Los productos del cuadro D de la guía y su tasa por kilo. Los NOMBRES son
-     * los de la tabla de tamaños mínimos del talonario de la autorización; los
-     * PRECIOS son PLANTILLA, desde 0,20 Bs/kg. REVISAR contra la resolución.
+     * Los productos del cuadro D de la guía, con los nombres de la tabla de tamaños
+     * mínimos del talonario. Sin tarifa de SIREB: se elige desde la pantalla, y
+     * hasta entonces ese producto no puede ir en una guía.
      *
-     * @var array<string, float>
+     * @var list<string>
      */
     private const PRODUCTOS = [
-        'Surubí' => 0.50, 'Pacú' => 0.45, 'Tambaqui' => 0.45, 'Chuncuina' => 0.50,
-        'Tucunaré' => 0.30, 'General' => 0.40, 'Corvina' => 0.30, 'Dorado (escama)' => 0.35,
-        'Sábalo' => 0.20, 'Yatorana' => 0.25, 'Blanquillo' => 0.30, 'Giro' => 0.25,
-        'Muturo' => 0.40,
+        'Surubí', 'Pacú', 'Tambaqui', 'Chuncuina', 'Tucunaré', 'General', 'Corvina',
+        'Dorado (escama)', 'Sábalo', 'Yatorana', 'Blanquillo', 'Giro', 'Muturo',
     ];
 
     public function run(): void
@@ -96,8 +96,13 @@ class CatalogoSeeder extends Seeder
             );
         }
 
-        foreach (self::PRODUCTOS as $nombre => $precio) {
-            ProductoHidrobiologico::firstOrCreate(['nombre' => $nombre], ['precio_kg' => $precio]);
+        foreach (self::PRODUCTOS as $nombre) {
+            ProductoHidrobiologico::firstOrCreate(['nombre' => $nombre]);
+        }
+
+        // Una fila por concepto, sin tarifa: se elige en Catálogos › Aranceles.
+        foreach (ConceptoArancel::cases() as $concepto) {
+            ArancelSireb::firstOrCreate(['concepto' => $concepto->value]);
         }
 
         $this->command?->warn(

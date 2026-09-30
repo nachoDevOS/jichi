@@ -24,7 +24,8 @@ return new class extends Migration
             // parcial: la hoja del talonario se gastó.
             $table->unsignedInteger('numero_faena')->unique()->comment('Del talonario: 000001');
 
-            $table->decimal('monto', 10, 2)->default(15.00)->comment('Copia congelada del arancel');
+            $table->decimal('monto', 10, 2)->default(0)->comment('Precio de SIREB congelado al emitir');
+            $table->uuid('sireb_tarifa_id')->nullable()->comment('Tarifa de SIREB de ese precio');
 
             // Decimal: treinta faenas redondeando medio kilo desajustan el cupo
             // en quince.

@@ -21,7 +21,11 @@ return new class extends Migration
             // podía mirar contra el NOMBRE, que la unidad edita.
             $table->string('tipo_actor', 20)->default(TipoActor::Pescador->value);
 
-            $table->decimal('precio_bs', 10, 2)->default(0);
+            // El precio NO vive acá: lo pone SIREB y se congela en cada carnet. Ver docs/modulos/SIREB.md.
+            // Nullable: los tipos sembrados no traen tarifa hasta que alguien la elige.
+            $table->uuid('servicio_sireb')->nullable()->comment('Id del servicio en SIREB');
+            $table->uuid('tarifa_sireb')->nullable()->comment('Id de la tarifa del tipo dentro del servicio');
+            $table->json('sireb_historial')->nullable()->comment('Servicio y tarifa que tuvo antes, con desde/hasta');
             $table->boolean('estado')->default(true);
 
             $table->timestamps();

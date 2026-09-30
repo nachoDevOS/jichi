@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 /*
 | Productos hidrobiológicos — el catálogo del cuadro D de la guía: qué especie
-| viaja y la tasa por kilo que se cobra. Ver docs/MER.md.
+| viaja y su tarifa por kilo en SIREB. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -17,9 +17,11 @@ return new class extends Migration
 
             $table->string('nombre', 120);
 
-            // La tasa por kilo: la guía cobra la suma de kilos × precio de su
-            // cuadro D (guias_movimiento.monto). Mínimo 0,20, lo exige el Request.
-            $table->decimal('precio_kg', 10, 2)->default(0);
+            // El precio por kilo NO vive acá: lo pone SIREB y la guía lo congela en su cuadro D.
+            // Nullable: los productos sembrados no traen tarifa hasta que alguien la elige.
+            $table->uuid('servicio_sireb')->nullable()->comment('Id del servicio en SIREB');
+            $table->uuid('tarifa_sireb')->nullable()->comment('Id de la tarifa por kilo del producto');
+            $table->json('sireb_historial')->nullable()->comment('Servicio y tarifa que tuvo antes, con desde/hasta');
 
             $table->boolean('estado')->default(true)->comment('Inactivo: no se elige en una guía nueva');
 

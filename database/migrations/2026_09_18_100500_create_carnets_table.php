@@ -32,6 +32,10 @@ return new class extends Migration
 
             $table->string('tipo_actor', 20)->comment('pescador | comercializador');
 
+            // Copia congelada: un cambio de precio en SIREB no toca lo ya emitido.
+            $table->decimal('monto', 10, 2)->default(0)->comment('Precio de SIREB al emitir');
+            $table->uuid('sireb_tarifa_id')->nullable()->comment('Tarifa de SIREB de ese precio');
+
             // Correlativo por gestión, asignado al aprobar. Índice y no único:
             // lo garantiza CorrelativoService. Ver MER.md.
             $table->unsignedInteger('nro_registro')->nullable()->index()->comment('Correlativo anual, al aprobar');

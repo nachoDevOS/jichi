@@ -195,13 +195,14 @@ export interface AsociacionElegible {
     sigla: string | null;
 }
 
-/** Un tipo de carnet elegible, con su arancel. */
+/** Un tipo de carnet elegible, con su precio de SIREB. */
 export interface TipoElegible {
     id: number;
     nombre: string;
     /** Con qué actividad es coherente: la lista se filtra con esto. */
     tipo_actor: TipoActor;
-    precio_bs: number;
+    /** De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa. */
+    precio: number | null;
 }
 
 /**

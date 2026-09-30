@@ -27,6 +27,7 @@ use App\Models\TipoCarnet;
 use App\Services\CobrarService;
 use App\Services\EmitirCarnetService;
 use App\Services\RevisarCarnetService;
+use App\Sireb\VistaSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -54,9 +55,8 @@ class CarnetController extends Controller
         ];
 
         $carnets = Carnet::query()
-            // Ojo con pedir columnas sueltas: van las CINCO partes del nombre y
-            // `tipoCarnet` ENTERO, porque `montoACobrar()` lee `precio_bs`. La que
-            // falte vuelve null y el método contesta cualquier cosa, sin error.
+            // Ojo con pedir columnas sueltas: van las CINCO partes del nombre. La
+            // que falte vuelve null y el método contesta cualquier cosa, sin error.
             ->with([
                 // `codigo_legible` va en #[Appends]: sin precargar la relación,
                 // serializar el listado dispara una consulta por fila.
@@ -110,8 +110,10 @@ class CarnetController extends Controller
      * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
      * buscador ya resuelto.
      */
-    public function create(Request $request): Response
+    public function create(Request $request, VistaSireb $vista): Response
     {
+        $precios = $vista->preciosPorTarifa() ?? [];
+
         // `?reemplaza=` llega de «Reponer»: solo vale sobre un carnet ya revocado.
         $reemplaza = $request->integer('reemplaza')
             ? Carnet::query()->where('estado', EstadoCarnet::Revocado)->find($request->integer('reemplaza'))
@@ -172,7 +174,8 @@ class CarnetController extends Controller
                     // Con qué actividad es coherente. La pantalla filtra la
                     // lista con esto, y el servidor lo exige igual.
                     'tipo_actor' => $t->tipo_actor->value,
-                    'precio_bs' => (float) $t->precio_bs,
+                    // De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa.
+                    'precio' => $precios[$t->tarifa_sireb] ?? null,
                 ])
                 ->all(),
         ]);
@@ -407,9 +410,10 @@ class CarnetController extends Controller
     /**
      * Formulario de corrección — GET /panel/carnets/{carnet}/editar
      */
-    public function edit(Carnet $carnet): Response
+    public function edit(Carnet $carnet, VistaSireb $vista): Response
     {
         $carnet->load(['codigo', 'beneficiario', 'asociacion', 'tipoCarnet', 'aprovechamiento.categoria']);
+        $precios = $vista->preciosPorTarifa() ?? [];
 
         return Inertia::render('panel/carnets/editar', [
             'carnet' => [
@@ -456,7 +460,7 @@ class CarnetController extends Controller
                     'id' => $t->id,
                     'nombre' => $t->nombre,
                     'tipo_actor' => $t->tipo_actor->value,
-                    'precio_bs' => (float) $t->precio_bs,
+                    'precio' => $precios[$t->tarifa_sireb] ?? null,
                 ])
                 ->all(),
         ]);

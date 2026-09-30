@@ -764,9 +764,9 @@
    al mismo tiempo: quien pesca y además comercializa. El rol es del
    documento (`tipo_actor`), no de la ficha, y por eso acá no hay que
    elegir «cuál es el carnet» de nadie.
-   OJO CON PEDIR COLUMNAS SUELTAS EN EL with(): `tipoCarnet` va
-   ENTERO porque `Carnet::montoACobrar()` lee `precio_bs`, y si esa
-   columna no viene el saldo sale mal sin ningún error.
+   OJO CON PEDIR COLUMNAS SUELTAS EN EL with(): la columna que un método
+   lea y no venga en el select contesta null sin ningún error. (Desde el
+   30/09/2026 `Carnet::montoACobrar()` lee su propio `monto`, no el tipo.)
 
 ### SUS BOLSAS MADRE — el paso 2, y el que explica las faenas
 
@@ -1526,10 +1526,10 @@
    ninguna decisión, y por eso se puede editar libremente desde acá: el mismo
    documento figura como «Carnet de Pescador» o «Pescador Artesanal» según quién
    lo cargó, y un `match` sobre ese texto se rompería en silencio.
-   CAMBIAR EL PRECIO NO TOCA LO YA COBRADO
-   `precio_bs` es el arancel de HOY, para armar un cobro nuevo. Lo que se cobró
-   de verdad vive en `pagos` y no se recalcula nunca, así que un carnet emitido
-   en marzo a 80 Bs sigue diciendo 80 Bs en agosto aunque el arancel haya subido.
+   EL PRECIO LO PONE SIREB (30/09/2026): el tipo guarda `tarifa_sireb` y cada
+   carnet congela su `monto` al emitirse, así que un carnet emitido en marzo a
+   80 Bs sigue diciendo 80 Bs en agosto aunque la tarifa haya subido.
+   (Lo que sigue describe el `precio_bs` que había antes.)
    Lo que SÍ cambia al subir el precio es el saldo pendiente de los carnets que
    no estén cubiertos: `Carnet::montoACobrar()` lee esta columna. Es lo correcto
    —lo que se debe se debe a la tarifa vigente— pero conviene saberlo antes de
@@ -6381,9 +6381,8 @@
 
 ### Tipos de carnet — el catálogo de credenciales y su arancel.
 
-   `precio_bs` es el precio de HOY, para armar un cobro nuevo. Lo cobrado de
-   verdad queda en `pagos` y no se recalcula: un carnet emitido a 80 Bs sigue
-   diciendo 80 aunque el arancel suba.
+   Ya no tiene `precio_bs` (30/09/2026): guarda `servicio_sireb`/`tarifa_sireb`
+   y cada carnet congela el precio de SIREB en `carnets.monto` al emitirse.
    NO confundir con `carnets.tipo_actor`: eso es la REGLA —qué habilita el
    documento— y vive en un enum. Esto es el CATÁLOGO —cómo se llama y cuánto
    sale— y nunca se decide nada con un match sobre este nombre.

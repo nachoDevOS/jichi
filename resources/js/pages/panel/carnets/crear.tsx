@@ -203,7 +203,8 @@ export default function CrearCarnet({
                                         >
                                             {delActor.map((t) => (
                                                 <option key={t.id} value={t.id}>
-                                                    {t.nombre} — {bs(t.precio_bs, institucion.moneda)}
+                                                    {t.nombre}
+                                                    {t.precio !== null && ` — ${bs(t.precio, institucion.moneda)}`}
                                                 </option>
                                             ))}
                                         </optgroup>
@@ -434,8 +435,9 @@ export default function CrearCarnet({
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                     A cobrar
                                 </p>
+                                {/* Sin precio: sin tarifa elegida o SIREB caído. Al emitir, el servidor dice cuál. */}
                                 <p className="text-2xl font-semibold tabular-nums">
-                                    {bs(tipo.precio_bs, institucion.moneda)}
+                                    {tipo.precio !== null ? bs(tipo.precio, institucion.moneda) : '—'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     Se cobra después, en la ficha: el carnet queda PENDIENTE hasta

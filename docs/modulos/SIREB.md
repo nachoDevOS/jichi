@@ -134,6 +134,70 @@ los resuelve el servidor con `serviciosSiResponde()`; si ya no está en SIREB
 dice «Ya no está en SIREB». Es una vista y no un panel sobre la tabla porque el
 formulario de alta/edición ya ocupa ese lugar y los dos se pisaban.
 
+### Tipos de carnet
+
+*(30/09/2026)* Tienen lo mismo que la escala, salvo el alta, que no existe a
+propósito (la lista sale de la resolución): `servicio_sireb` y `tarifa_sireb`
+(nullable: los sembrados nacen sin tarifa y la tabla lo marca «Sin tarifa»),
+historial, edición en `tipos-carnet-formulario.tsx` y vista de historial en
+`tipos-carnet-historial.tsx`.
+
+**El precio del carnet ya viene de SIREB** (30/09/2026): `tipos_carnet` no tiene
+`precio_bs`. `EmitirCarnetService::precioDe()` pide `servicio($servicio_sireb)`
+—**fuera** de la transacción— y congela el monto en `carnets.monto` junto con
+`sireb_tarifa_id`, al emitir y al corregir el borrador. `Carnet::montoACobrar()`
+lee esa columna, así que Caja, el tablero y las fichas no llaman a SIREB.
+
+| Situación | Qué pasa al emitir |
+| --- | --- |
+| El tipo no tiene tarifa | No se emite: «Elíjala en Catálogos › Tipos de carnet» |
+| SIREB no responde | No se emite: «Recaudaciones no responde» |
+| El servicio no existe o está de baja | No se emite |
+| La tarifa ya no está en ese servicio | No se emite |
+| Todo bien | Se emite con el monto de SIREB, congelado |
+
+Las pantallas de crear/editar carnet muestran el precio de referencia con
+`VistaSireb::preciosPorTarifa()` («—» si no hay); el que vale es el que congela
+la emisión.
+
+### Productos hidrobiológicos
+
+*(30/09/2026)* Igual que la escala —con alta, edición e historial en pantallas
+aparte (`productos-formulario.tsx`, `productos-historial.tsx`)— y sin
+`precio_kg`: la tarifa **por kilo** sale de SIREB. Dos diferencias: la tarifa
+**se puede compartir** entre productos (el select avisa «también: …» pero no la
+bloquea), y el precio lo congela la **guía**: `EmitirGuiaService` lo pide por
+producto con `PrecioSireb` y lo guarda en `guia_detalles.precio_kg` +
+`sireb_tarifa_id`. Sin precio de algún producto, la guía no se emite. El
+formulario de la guía muestra el precio de referencia con
+`VistaSireb::preciosPorTarifa()`, o «—».
+
+### Aranceles: la faena
+
+*(30/09/2026)* Los cobros que no cuelgan de un catálogo tienen su fila en
+`aranceles_sireb`, una por `ConceptoArancel` —hoy solo `faena`—, y se editan en
+**Catálogos › Aranceles** (sin alta ni baja: las filas las pone el seeder). Cada
+una lleva el select de tarifa y el historial de siempre.
+
+- **Faena:** `EmitirFaenaService` pide el precio con `PrecioSireb` sobre la fila
+  `faena`, **fuera** de la transacción, y lo congela en `permisos_faena.monto` +
+  `sireb_tarifa_id`. Sin tarifa o sin SIREB no se emite. Se retiró
+  `JICHI_FAENA_TARIFA_BASE` y `PermisoFaena::tarifaVigente()`.
+- **La guía no tiene fila:** cobra por kilo con la tarifa de SIREB de cada
+  producto (ver «Productos hidrobiológicos»).
+
+**`App\Sireb\PrecioSireb`** es la consulta de precio al emitir, compartida por
+carnet y guía: pide `servicio()` una vez por servicio en la petición, exige el
+servicio `activo` y la tarifa dentro de él, y si algo falla lanza
+`SinPrecioException` con el motivo, que cada servicio envuelve en su excepción.
+
+**Lo compartido entre los catálogos:** el trait `App\Traits\HistorialSireb`
+(anota el cambio), `App\Sireb\VistaSireb` (arma el select y el historial) y los
+componentes `components/panel/catalogos/selector-tarifa-sireb.tsx` e
+`historial-sireb.tsx`. Un catálogo nuevo con tarifa de SIREB usa estas cuatro
+piezas y no copia nada. Un período «sin tarifa» también queda en el historial,
+con sus fechas.
+
 ## Al otorgar
 
 `OtorgarCupoService::otorgar()` y `editar()` piden el precio con
@@ -158,8 +222,8 @@ sale de la tarifa `tarifa_sireb` dentro de `servicio($servicio_sireb)`.
 
 ## Lo que falta
 
-- Carnet (`tipos_carnet.precio_bs`), faena (`JICHI_FAENA_TARIFA_BASE`) y guía
-  (`productos_hidrobiologicos.precio_kg`) con el mismo esquema.
+- La autorización de pesca: `OtorgarCupoService::precioDe()` sigue «en ajuste»;
+  se conecta con `PrecioSireb` sobre `servicio_sireb`/`tarifa_sireb` del tramo.
 - El cobro sigue en Jichi (pagos, boletas, recibo). Registrar la liquidación en
   SIREB y usar su `codigo_publico` es otra etapa: ver el análisis de las
   diferencias (una boleta por liquidación, vencimiento, quién valida).
