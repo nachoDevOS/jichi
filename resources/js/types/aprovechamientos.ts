@@ -219,7 +219,9 @@ export interface TramoElegible {
      * El techo del rango, que es EL VOLUMEN QUE SE VA A OTORGAR.
      */
     kilos_max: number;
-    valor_bs: number;
+    servicio_sireb: string;
+    /** Precio de referencia de SIREB; null si no respondió. El que vale se congela al guardar. */
+    monto: number | null;
     /** El régimen del tramo, visible antes de otorgar. */
     modalidad: ModalidadAprovechamiento;
     modalidad_etiqueta: string;

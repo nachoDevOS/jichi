@@ -49,8 +49,11 @@ export interface EscalaFila {
     descripcion_kg: string;
     kilos_min: number;
     kilos_max: number;
-    /** Lo que se cobra por ese cupo. */
-    valor_bs: number;
+    /** Código del servicio en SIREB: de ahí sale el precio. */
+    servicio_sireb: string;
+    /** Nombre y precio según SIREB; null si no respondió o el código no existe. */
+    sireb_nombre: string | null;
+    sireb_monto: number | null;
     /** false = tramo derogado: desaparece del formulario de cupo. */
     estado: boolean;
     /** Cupos otorgados bajo este tramo. Por eso no se borra. */

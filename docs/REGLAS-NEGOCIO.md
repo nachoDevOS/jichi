@@ -26,8 +26,10 @@
 - Este módulo aplica **exclusivamente para pescadores**.
 - Está regulado por escalas predefinidas en **`categorias_aprovechamiento`**, que
   establecen un número de escala, un rango de kilos mínimos y un **techo máximo
-  de extracción** (`kilos_max`), además del costo oficial en bolivianos
-  (`valor_bs`).
+  de extracción** (`kilos_max`), y el **código del servicio en Recaudaciones**
+  (`servicio_sireb`). *(29/09/2026)* El precio no lo guarda Jichi: lo da SIREB
+  al otorgar y queda congelado en la autorización. Sin respuesta de SIREB no se
+  otorga.
 - Cuando un pescador solicita un cupo se genera un registro en
   **`aprovechamientos_pesq`** que **hereda** la modalidad y el volumen total de
   kilos de la escala elegida.

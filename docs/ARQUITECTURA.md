@@ -266,9 +266,10 @@ copia en vez de leerse por relación:
 | `recibos.monto_total`, `recibos.concepto` | Lo que dice el papel entregado |
 | `guias_movimiento.asociacion_id` | El aval impreso en la guía |
 | `aprovechamientos_pesq.volumen_total_kg`, `modalidad` | Lo que se otorgó, aunque la escala cambie |
+| `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar (ver [modulos/SIREB.md](modulos/SIREB.md)) |
 
-> **Lo que NO está congelado:** el arancel de la autorización y del carnet se
-> lee del catálogo en vivo (`valor_bs` de la escala, `precio_bs` del tipo). Por
+> **Lo que NO está congelado:** el arancel del carnet se lee del catálogo en
+> vivo (`precio_bs` del tipo). Por
 > eso no se puede cambiar el tipo de un carnet con cobros cargados. Y el titular
 > del recibo se lee del padrón al imprimir: corregir un apellido cambia la
 > reimpresión. Ver [MER.md](MER.md), tabla `recibos`.
@@ -376,8 +377,8 @@ permiso.
 | Configuración | ❌ No existe (la tabla sí) | — | [PENDIENTES.md](PENDIENTES.md) |
 
 El menú lateral agrupa: **Ventanilla** (Beneficiarios, Aprov. Pesquero, Carnets,
-Faenas, Guías), **Caja** (Cobros, Recibos), **Catálogos** (Asociaciones, Escala,
-Tipos de carnet, Productos) y **Administración** (Reportes, Configuración). Vive en
+Faenas, Guías), **Caja** (Cobros, Recibos), **Catálogos** (Asociaciones, Tipos
+de carnet, Productos) y **Administración** (Reportes) y **Configuración** (Escala). Vive en
 `components/panel/layout/navegacion.ts`.
 
 ### El patrón a copiar

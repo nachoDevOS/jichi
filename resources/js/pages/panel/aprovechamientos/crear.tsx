@@ -101,7 +101,7 @@ export default function CrearCupo({
                             etiqueta="Tramo de la escala"
                             htmlFor="categoria_aprov_id"
                             error={form.errors.categoria_aprov_id}
-                            ayuda="Solo aparecen los tramos vigentes. De él salen los kilos y el monto."
+                            ayuda="Solo aparecen los tramos vigentes. De él salen los kilos; el monto lo da Recaudaciones (SIREB)."
                             obligatorio
                         >
                             <Select
@@ -114,7 +114,7 @@ export default function CrearCupo({
                                 {escala.map((t) => (
                                     <option key={t.id} value={t.id}>
                                         {t.nro_escala} · {t.descripcion_kg} —{' '}
-                                        {bs(t.valor_bs, institucion.moneda)}
+                                        {t.monto !== null ? bs(t.monto, institucion.moneda) : 'sin precio en SIREB'}
                                     </option>
                                 ))}
                             </Select>
@@ -236,8 +236,14 @@ export default function CrearCupo({
                                         A cobrar
                                     </p>
                                     <p className="text-2xl font-semibold tabular-nums">
-                                        {bs(tramo.valor_bs, institucion.moneda)}
+                                        {tramo.monto !== null ? bs(tramo.monto, institucion.moneda) : '—'}
                                     </p>
+                                    {tramo.monto === null && (
+                                        <p className="text-xs text-rose-700 dark:text-rose-300">
+                                            Recaudaciones (SIREB) no dio el precio de este tramo: no se va a
+                                            poder otorgar hasta que responda.
+                                        </p>
+                                    )}
                                     {/*
                                         Se dice a dónde lleva el botón. Decía que
                                         abría la CAJA, y hace rato que termina en

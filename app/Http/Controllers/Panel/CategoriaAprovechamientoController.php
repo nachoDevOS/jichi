@@ -6,6 +6,7 @@ use App\Enums\ModalidadAprovechamiento;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\GuardarCategoriaAprovechamientoRequest;
 use App\Models\CategoriaAprovechamiento;
+use App\Sireb\SirebService;
 use App\Support\Paginacion;
 use App\Support\Sql;
 use Illuminate\Http\RedirectResponse;
@@ -22,7 +23,7 @@ class CategoriaAprovechamientoController extends Controller
     /**
      * Listado y formulario — GET /panel/catalogos/categorias-aprovechamiento
      */
-    public function index(Request $request): Response
+    public function index(Request $request, SirebService $sireb): Response
     {
         $buscar = $request->string('buscar')->trim()->value() ?: null;
         $modalidad = $request->string('modalidad')->trim()->value() ?: null;
@@ -35,6 +36,9 @@ class CategoriaAprovechamientoController extends Controller
          * huecos aparecerían y desaparecerían al cambiar de página.
          */
         $todos = CategoriaAprovechamiento::query()->enOrdenDeEscala()->get();
+
+        // Solo para mostrar el precio: sin SIREB la pantalla abre igual.
+        $catalogo = $sireb->catalogoSiResponde();
 
         $escala = CategoriaAprovechamiento::query()
             ->when($buscar, function ($q) use ($buscar) {
@@ -59,7 +63,9 @@ class CategoriaAprovechamientoController extends Controller
                 'descripcion_kg' => $c->descripcion_kg,
                 'kilos_min' => (float) $c->kilos_min,
                 'kilos_max' => (float) $c->kilos_max,
-                'valor_bs' => (float) $c->valor_bs,
+                'servicio_sireb' => $c->servicio_sireb,
+                'sireb_nombre' => $catalogo[$c->servicio_sireb]['nombre'] ?? null,
+                'sireb_monto' => $catalogo[$c->servicio_sireb]['monto'] ?? null,
                 'estado' => (bool) $c->estado,
                 'aprovechamientos_count' => $c->aprovechamientos_count,
             ]);
@@ -70,6 +76,7 @@ class CategoriaAprovechamientoController extends Controller
             'opcionesPorPagina' => Paginacion::OPCIONES,
 
             'huecos' => $this->huecos($todos),
+            'sirebDisponible' => $catalogo !== null,
             'siguienteNumero' => ((int) $todos->max('nro_escala')) + 1,
 
             // Las opciones salen del enum y no escritas en React: si estuvieran

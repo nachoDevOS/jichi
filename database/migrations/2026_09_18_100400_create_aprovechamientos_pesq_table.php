@@ -28,6 +28,11 @@ return new class extends Migration
                 ->comment('Copiada del tramo al otorgar');
             $table->decimal('volumen_total_kg', 12, 2)->comment('Kilos, copiados de la escala');
 
+            // Congelado de SIREB al otorgar o corregir: un cambio de arancel no
+            // mueve lo que ya se está cobrando.
+            $table->decimal('monto', 10, 2)->comment('Precio de SIREB al otorgar');
+            $table->string('sireb_tarifa_id', 36)->nullable()->comment('Tarifa de SIREB de ese precio');
+
             // Renglón del talonario. Texto libre: no hay padrón de embarcaciones.
             $table->string('tipo_embarcacion', 120)->comment('Canoa, peque-peque, bote…');
 

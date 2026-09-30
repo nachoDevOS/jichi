@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'descripcion_kg',
     'kilos_min',
     'kilos_max',
-    'valor_bs',
+    'servicio_sireb',
     'estado',
 ])]
 class CategoriaAprovechamiento extends Model
@@ -46,7 +46,6 @@ class CategoriaAprovechamiento extends Model
         return [
             'kilos_min' => 'decimal:2',
             'kilos_max' => 'decimal:2',
-            'valor_bs' => 'decimal:2',
             'estado' => 'boolean',
             'modalidad' => ModalidadAprovechamiento::class,
         ];
@@ -62,15 +61,15 @@ class CategoriaAprovechamiento extends Model
     //  Lectura
 
     /**
-     * Cómo se lee en un desplegable: «3 · 201 kg Hasta 500 Kg — 110,00 Bs».
+     * Cómo se lee en un desplegable: «3 · 201 kg Hasta 400 Kg (SEDAG-003)».
      */
     protected function etiqueta(): Attribute
     {
         return Attribute::get(fn (): string => sprintf(
-            '%d · %s — %s Bs',
+            '%d · %s (%s)',
             $this->nro_escala,
             $this->descripcion_kg,
-            number_format((float) $this->valor_bs, 2, ',', '.'),
+            $this->servicio_sireb,
         ));
     }
 

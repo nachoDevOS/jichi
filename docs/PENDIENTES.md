@@ -6,6 +6,25 @@
 
 ---
 
+## 🔴 Precios de SIREB: volver a migrar y cargar los servicios — 29/09/2026
+
+La escala ya no tiene `valor_bs`: guarda `servicio_sireb`, y la autorización
+congela `monto` y `sireb_tarifa_id` (migraciones editadas, regla 12). **Hasta
+volver a migrar, la base de trabajo no tiene esas columnas.** Y hasta que
+Recaudaciones cargue un servicio por tramo, **no se puede otorgar ninguna
+autorización**:
+
+- [ ] Volver a migrar (`migrate:fresh --seed`). Verificado sobre SQLite descartable.
+- [ ] Recaudaciones carga los 7 tramos como 7 servicios en SIREB, cada uno con
+      UNA tarifa vigente. Hoy SIREB tiene un solo `SEDAG-001` con 7 tarifas, y
+      solo en su seeder de desarrollo.
+- [ ] Poner en cada tramo el código real (Catálogos → Escala). Los del seeder
+      (`SEDAG-001` a `SEDAG-007`) son plantilla.
+- [ ] `SIREB_URL`, `SIREB_CLIENT_ID` y `SIREB_CLIENT_SECRET` en el `.env`, y el
+      sistema `sedag` dado de alta y `activo` en el panel de SIREB.
+- [ ] Siguiente: carnet, faena y guía, con el mismo esquema. Ver
+      [modulos/SIREB.md](modulos/SIREB.md).
+
 ## 🔴 Hay que volver a migrar para el portal — 28/09/2026
 
 El portal del beneficiario agregó columnas a `users` DENTRO de las migraciones

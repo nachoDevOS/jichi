@@ -7,6 +7,8 @@ use App\Exceptions\CupoInvalidoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\CategoriaAprovechamiento;
+use App\Sireb\SirebException;
+use App\Sireb\SirebService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -15,6 +17,8 @@ use Illuminate\Support\Facades\DB;
  */
 class OtorgarCupoService
 {
+    public function __construct(private readonly SirebService $sireb) {}
+
     /**
      * Otorga la bolsa madre a una persona.
      */
@@ -49,9 +53,13 @@ class OtorgarCupoService
                 throw CupoInvalidoException::escalaDerogada($tramo->nro_escala);
             }
 
+            $precio = $this->precioDe($tramo);
+
             $cupo = AprovechamientoPesq::create([
                 'beneficiario_id' => $beneficiario->id,
                 'categoria_aprov_id' => $tramo->id,
+                'monto' => $precio['monto'],
+                'sireb_tarifa_id' => $precio['tarifa_id'],
 
                 /*
                  * El volumen sale del techo del tramo.
@@ -111,8 +119,13 @@ class OtorgarCupoService
                 throw CupoInvalidoException::escalaDerogada($tramo->nro_escala);
             }
 
+            // Corregir el borrador vuelve a pedir el precio, como la guía.
+            $precio = $this->precioDe($tramo);
+
             $bloqueado->update([
                 'categoria_aprov_id' => $tramo->id,
+                'monto' => $precio['monto'],
+                'sireb_tarifa_id' => $precio['tarifa_id'],
                 'modalidad' => $tramo->modalidad,
                 'volumen_total_kg' => $tramo->kilos_max,
                 'tipo_embarcacion' => $tipoEmbarcacion,
@@ -185,5 +198,20 @@ class OtorgarCupoService
     private function vencimientoDe(Carbon $fecha): string
     {
         return $fecha->copy()->endOfYear()->toDateString();
+    }
+
+    /**
+     * El precio del tramo según Recaudaciones. Va dentro de la transacción a
+     * propósito: el catálogo está en caché, y sin precio no se otorga nada.
+     *
+     * @return array{codigo: string, nombre: string, monto: float, tarifa_id: string}
+     */
+    private function precioDe(CategoriaAprovechamiento $tramo): array
+    {
+        try {
+            return $this->sireb->precioDe($tramo->servicio_sireb);
+        } catch (SirebException $e) {
+            throw CupoInvalidoException::sinPrecio($tramo->nro_escala, $e->getMessage());
+        }
     }
 }

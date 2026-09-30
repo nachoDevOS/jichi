@@ -22,6 +22,7 @@ export default function CatalogoEscala({
     escala,
     filtros,
     huecos,
+    sirebDisponible,
     siguienteNumero,
     modalidades,
     opcionesPorPagina,
@@ -29,6 +30,8 @@ export default function CatalogoEscala({
     escala: Paginado<EscalaFila>;
     filtros: { buscar: string | null; modalidad: string | null; por_pagina: number };
     huecos: HuecoEscala[];
+    /** false = SIREB no respondió: los precios no se pueden mostrar. */
+    sirebDisponible: boolean;
     /** El número que sigue, calculado sobre TODOS los tramos y no sobre la página. */
     siguienteNumero: number;
     /** Las opciones salen del enum de PHP: escritas acá se desincronizan. */
@@ -51,7 +54,7 @@ export default function CatalogoEscala({
     return (
         <LayoutPanel
             titulo="Escala de aprovechamiento"
-            descripcion="Los tramos oficiales: a tantos kilos autorizados, tantos bolivianos."
+            descripcion="Los tramos oficiales en kilos. El precio de cada uno lo pone Recaudaciones (SIREB)."
             acciones={
                 puede('catalogos.gestionar') && (
                     <Button onClick={() => setEditando('nueva')}>
@@ -64,6 +67,8 @@ export default function CatalogoEscala({
             <Head title="Escala de aprovechamiento" />
 
             <div className="space-y-6">
+                {!sirebDisponible && <AvisoSireb />}
+
                 {huecos.length > 0 && <AvisoHuecos huecos={huecos} />}
 
                 {editando !== null && puede('catalogos.gestionar') && (
@@ -163,7 +168,8 @@ export default function CatalogoEscala({
                                                     <th className="px-5 py-2.5 font-medium">N°</th>
                                                     <th className="px-5 py-2.5 font-medium">Rango</th>
                                                     <th className="px-5 py-2.5 font-medium">Régimen</th>
-                                                    <th className="px-5 py-2.5 text-right font-medium">Valor</th>
+                                                    <th className="px-5 py-2.5 font-medium">Servicio SIREB</th>
+                                                    <th className="px-5 py-2.5 text-right font-medium">Precio</th>
                                                     <th className="px-5 py-2.5 text-right font-medium">Otorgados</th>
                                                     <th className="px-5 py-2.5" />
                                                 </tr>
@@ -207,8 +213,26 @@ export default function CatalogoEscala({
 
                                                         </td>
 
+                                                        <td className="px-5 py-2.5">
+                                                            <p className="font-mono text-xs">{t.servicio_sireb}</p>
+                                                            {t.sireb_nombre && (
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {t.sireb_nombre}
+                                                                </p>
+                                                            )}
+                                                        </td>
+
+                                                        {/* El precio es de SIREB: si no llega, se dice por qué. */}
                                                         <td className="px-5 py-2.5 text-right tabular-nums">
-                                                            {bs(t.valor_bs, institucion.moneda)}
+                                                            {t.sireb_monto !== null ? (
+                                                                bs(t.sireb_monto, institucion.moneda)
+                                                            ) : sirebDisponible ? (
+                                                                <Badge color="rose">
+                                                                    {t.sireb_nombre ? 'Sin precio único' : 'No existe en SIREB'}
+                                                                </Badge>
+                                                            ) : (
+                                                                <span className="text-muted-foreground">—</span>
+                                                            )}
                                                         </td>
 
                                                         <td className="px-5 py-2.5 text-right tabular-nums text-muted-foreground">
@@ -241,6 +265,28 @@ export default function CatalogoEscala({
 
             </div>
         </LayoutPanel>
+    );
+}
+
+/** SIREB no respondió: los precios no se ven y otorgar va a fallar. */
+function AvisoSireb() {
+    return (
+        <Card className="border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
+            <CardContent className="flex items-start gap-3 pt-5">
+                <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" />
+
+                <div className="min-w-0 text-sm">
+                    <p className="font-medium text-amber-900 dark:text-amber-200">
+                        Recaudaciones (SIREB) no responde
+                    </p>
+
+                    <p className="text-amber-800/80 dark:text-amber-200/80">
+                        No se pueden mostrar los precios, y mientras siga así no se puede otorgar ni
+                        corregir un aprovechamiento. Avise a la Unidad de Sistemas.
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -305,7 +351,7 @@ function FormularioTramo({
         descripcion_kg: tramo?.descripcion_kg ?? '',
         kilos_min: tramo?.kilos_min ?? '',
         kilos_max: tramo?.kilos_max ?? '',
-        valor_bs: tramo?.valor_bs ?? '',
+        servicio_sireb: tramo?.servicio_sireb ?? '',
         estado: tramo?.estado ?? true,
     });
 
@@ -335,16 +381,19 @@ function FormularioTramo({
                 <form onSubmit={enviar} className="space-y-4">
                     {/* A lo ancho los seis campos entran en dos filas. */}
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Campo etiqueta="N° de escala" htmlFor="nro_escala" error={form.errors.nro_escala} obligatorio>
-                        <Input
-                            id="nro_escala"
-                            type="number"
-                            min={1}
-                            value={form.data.nro_escala}
-                            onChange={(e) => form.setData('nro_escala', e.target.value)}
-                            aria-invalid={Boolean(form.errors.nro_escala)}
-                        />
-                    </Campo>
+                    {/* Solo en el alta: al editar el número ya está en el título y viaja igual. */}
+                    {esAlta && (
+                        <Campo etiqueta="N° de escala" htmlFor="nro_escala" error={form.errors.nro_escala} obligatorio>
+                            <Input
+                                id="nro_escala"
+                                type="number"
+                                min={1}
+                                value={form.data.nro_escala}
+                                onChange={(e) => form.setData('nro_escala', e.target.value)}
+                                aria-invalid={Boolean(form.errors.nro_escala)}
+                            />
+                        </Campo>
+                    )}
 
                     <Campo
                         etiqueta="Texto de la resolución"
@@ -410,20 +459,20 @@ function FormularioTramo({
                     </Campo>
 
                     <Campo
-                        etiqueta="Valor (Bs)"
-                        htmlFor="valor_bs"
-                        error={form.errors.valor_bs}
-                        ayuda="Lo que se cobra por este cupo. Se copia al otorgarlo, así que cambiarlo no toca los ya otorgados."
+                        etiqueta="Servicio SIREB"
+                        htmlFor="servicio_sireb"
+                        error={form.errors.servicio_sireb}
+                        ayuda="El código del servicio en Recaudaciones. De ahí sale el precio, que se congela al otorgar el cupo."
                         obligatorio
                     >
                         <Input
-                            id="valor_bs"
-                            type="number"
-                            step="0.01"
-                            min={0}
-                            value={form.data.valor_bs}
-                            onChange={(e) => form.setData('valor_bs', e.target.value)}
-                            aria-invalid={Boolean(form.errors.valor_bs)}
+                            id="servicio_sireb"
+                            className="font-mono uppercase"
+                            maxLength={30}
+                            value={form.data.servicio_sireb}
+                            onChange={(e) => form.setData('servicio_sireb', e.target.value.toUpperCase())}
+                            aria-invalid={Boolean(form.errors.servicio_sireb)}
+                            placeholder="SEDAG-001"
                         />
                     </Campo>
 

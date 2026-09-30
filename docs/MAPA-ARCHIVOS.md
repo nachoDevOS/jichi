@@ -139,6 +139,16 @@ restricción del login por correo en `LoginRequest` y el botón de `pages/auth/l
 
 Ver [modulos/IBARE.md](modulos/IBARE.md).
 
+## `app/Sireb/` — precios de Recaudaciones (SIREB)
+
+| Archivo | Qué hace |
+| --- | --- |
+| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`), baja el catálogo del SEDAG y lo guarda en caché. `precioDe()` falla si el código no existe o no tiene UNA tarifa general; `catalogoSiResponde()` devuelve null en vez de fallar, para las pantallas que solo muestran |
+| `SirebException.php` | Los mensajes que ve el funcionario |
+
+Hoy lo usa solo la autorización (`OtorgarCupoService`, la escala y los formularios
+de otorgar y corregir). Ver [modulos/SIREB.md](modulos/SIREB.md).
+
 ## `app/Support/` y `app/Traits/`
 
 | Archivo | Ln | No obvio |

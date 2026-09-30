@@ -25,6 +25,8 @@ export default function EditarCupo({
         documento: string | null;
         foto_url: string | null;
         categoria_aprov_id: number;
+        /** Lo que se congeló de SIREB al otorgar o en la última corrección. */
+        monto: number;
         tipo_embarcacion: string | null;
         fecha_solicitud: string | null;
     };
@@ -97,7 +99,7 @@ export default function EditarCupo({
                             etiqueta="Tramo de la escala"
                             htmlFor="categoria_aprov_id"
                             error={form.errors.categoria_aprov_id}
-                            ayuda="Cambiarlo vuelve a copiar los kilos y el monto del tramo nuevo."
+                            ayuda="Guardar vuelve a copiar los kilos del tramo y a pedir el monto a Recaudaciones (SIREB)."
                             obligatorio
                         >
                             <Select
@@ -109,7 +111,7 @@ export default function EditarCupo({
                                 {escala.map((t) => (
                                     <option key={t.id} value={t.id}>
                                         {t.nro_escala} · {t.descripcion_kg} —{' '}
-                                        {bs(t.valor_bs, institucion.moneda)}
+                                        {t.monto !== null ? bs(t.monto, institucion.moneda) : 'sin precio en SIREB'}
                                     </option>
                                 ))}
                             </Select>
@@ -189,8 +191,8 @@ export default function EditarCupo({
                                             Cambia de la escala {original.nro_escala} a la{' '}
                                             {tramo.nro_escala}: de {original.kilos_max} a{' '}
                                             {tramo.kilos_max} kg, y de{' '}
-                                            {bs(original.valor_bs, institucion.moneda)} a{' '}
-                                            {bs(tramo.valor_bs, institucion.moneda)}.
+                                            {bs(cupo.monto, institucion.moneda)} a{' '}
+                                            {tramo.monto !== null ? bs(tramo.monto, institucion.moneda) : 'sin precio en SIREB'}.
                                         </span>
                                     </p>
                                 )}
@@ -224,8 +226,13 @@ export default function EditarCupo({
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                         A cobrar
                                     </p>
+                                    {/* Sin cambio de tramo vale lo congelado; con cambio, el precio de hoy. */}
                                     <p className="text-2xl font-semibold tabular-nums">
-                                        {bs(tramo.valor_bs, institucion.moneda)}
+                                        {!cambioDeTramo
+                                            ? bs(cupo.monto, institucion.moneda)
+                                            : tramo.monto !== null
+                                              ? bs(tramo.monto, institucion.moneda)
+                                              : '—'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
                                         Todavía no entró ningún pago: por eso este cupo se puede

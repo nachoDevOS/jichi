@@ -127,8 +127,15 @@ la misma sintaxis.
 | `modalidad` | string(30) | `ModalidadAprovechamiento` |
 | `descripcion_kg` | string(160) | El texto literal de la resolución |
 | `kilos_min` / `kilos_max` | decimal(12,2) | |
-| `valor_bs` | decimal(10,2) | |
+| `servicio_sireb` | string(30) | Código del servicio en Recaudaciones (SIREB). Único entre las filas vivas (lo exige el Request) |
 | `estado` | boolean | Vigente o derogada |
+
+**Por qué no tiene precio** *(29/09/2026)*. El precio lo fija Recaudaciones
+(SIREB), que es la fuente de verdad del arancel del GAD: cada tramo es un
+servicio propio allá, con una sola tarifa vigente. La escala guarda el código;
+el monto se pide al otorgar y se congela en `aprovechamientos_pesq.monto`. Los
+kilos se quedan acá porque son del CUPO, no del precio. Ver
+[modulos/SIREB.md](modulos/SIREB.md).
 
 **Por qué es una tabla y no un `match()` en código.** La escala la fija una
 resolución y cambia sin avisar a nadie que programe. Escrita en PHP, actualizarla
@@ -281,6 +288,8 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `categoria_aprov_id` | FK RESTRICT | Bajo qué tramo se otorgó |
 | `modalidad` | string(30) | **Copiada** del tramo |
 | `volumen_total_kg` | decimal(12,2) | **Copiado** del techo del tramo |
+| `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar; corregir el borrador lo vuelve a pedir |
+| `sireb_tarifa_id` | string(36) **null** | La tarifa de SIREB de ese monto, como constancia |
 | `tipo_embarcacion` | string(120) | El renglón del talonario. **Obligatorio** |
 | `estado` | string(20) | `EstadoAprovechamiento` |
 | `fecha_solicitud` | date | El día que la persona lo pidió |

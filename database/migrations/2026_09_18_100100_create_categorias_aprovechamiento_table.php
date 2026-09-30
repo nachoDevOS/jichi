@@ -29,7 +29,8 @@ return new class extends Migration
             // Decimal: con enteros un cupo de 100,5 kg cae fuera de su tramo.
             $table->decimal('kilos_min', 12, 2);
             $table->decimal('kilos_max', 12, 2);
-            $table->decimal('valor_bs', 10, 2)->comment('Lo que se cobra por ese cupo');
+            // El precio NO vive acá: lo pone Recaudaciones. Ver docs/modulos/SIREB.md.
+            $table->string('servicio_sireb', 30)->comment('Código del servicio en SIREB, ej. SEDAG-001');
 
             $table->boolean('estado')->default(true);
 

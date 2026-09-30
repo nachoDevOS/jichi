@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'categoria_aprov_id',
     'modalidad',
     'volumen_total_kg',
+    'monto',
+    'sireb_tarifa_id',
     'tipo_embarcacion',
     'estado',
     'fecha_solicitud',
@@ -56,6 +58,7 @@ class AprovechamientoPesq extends Model
     {
         return [
             'volumen_total_kg' => 'decimal:2',
+            'monto' => 'decimal:2',
             'estado' => EstadoAprovechamiento::class,
             'modalidad' => ModalidadAprovechamiento::class,
             'fecha_solicitud' => 'date',
@@ -110,11 +113,11 @@ class AprovechamientoPesq extends Model
     //  Reglas de negocio
 
     /**
-     * Lo que sale este cupo: el valor de la escala con la que se otorgó.
+     * Lo que sale este cupo: el precio de SIREB, congelado al otorgar o corregir.
      */
     public function montoACobrar(): float
     {
-        return (float) ($this->categoria?->valor_bs ?? 0.0);
+        return (float) $this->monto;
     }
 
     /**

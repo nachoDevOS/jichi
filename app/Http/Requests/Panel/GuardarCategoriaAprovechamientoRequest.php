@@ -4,6 +4,7 @@ namespace App\Http\Requests\Panel;
 
 use App\Enums\ModalidadAprovechamiento;
 use App\Models\CategoriaAprovechamiento;
+use App\Sireb\SirebService;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -51,7 +52,13 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
             'kilos_min' => ['required', 'numeric', 'min:0', 'max:9999999999', 'decimal:0,2'],
             'kilos_max' => ['required', 'numeric', 'gt:kilos_min', 'max:9999999999', 'decimal:0,2'],
 
-            'valor_bs' => ['required', 'numeric', 'min:0', 'max:99999999', 'decimal:0,2'],
+            // Un código por tramo: dos tramos con el mismo servicio cobrarían lo mismo.
+            'servicio_sireb' => [
+                'required', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._-]*$/',
+                Rule::unique('categorias_aprovechamiento', 'servicio_sireb')
+                    ->whereNull('deleted_at')
+                    ->ignore($this->idActual()),
+            ],
 
             'estado' => ['required', 'boolean'],
         ];
@@ -88,12 +95,14 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
                 if ($choque) {
                     $validator->errors()->add('kilos_min', sprintf(
                         'Este rango se pisa con la escala %d (%s a %s kg). Los tramos no pueden solaparse: '.
-                        'un cupo que cayera en los dos se cobraría con el más barato.',
+                        'un cupo que cayera en los dos no sabría con qué servicio cobrarse.',
                         $choque->nro_escala,
                         number_format((float) $choque->kilos_min, 2, ',', '.'),
                         number_format((float) $choque->kilos_max, 2, ',', '.'),
                     ));
                 }
+
+                $this->comprobarEnSireb($validator);
             },
         ];
     }
@@ -111,8 +120,9 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
             'kilos_min.required' => 'Indique el piso del rango, en kilos.',
             'kilos_max.required' => 'Indique el techo del rango, en kilos.',
             'kilos_max.gt' => 'El techo del rango tiene que ser mayor que el piso.',
-            'valor_bs.required' => 'Indique cuánto se cobra por este tramo.',
-            'valor_bs.decimal' => 'El valor lleva como máximo dos decimales.',
+            'servicio_sireb.required' => 'Indique el código del servicio en Recaudaciones (SIREB).',
+            'servicio_sireb.regex' => 'El código va en mayúsculas, sin espacios: SEDAG-001.',
+            'servicio_sireb.unique' => 'Ese código ya lo usa otro tramo de la escala.',
         ];
     }
 
@@ -120,11 +130,36 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
     {
         $this->merge([
             'descripcion_kg' => trim((string) $this->input('descripcion_kg')),
+            'servicio_sireb' => mb_strtoupper(trim((string) $this->input('servicio_sireb'))),
             'estado' => $this->boolean('estado', true),
             // Casi todos los tramos son escala general: es el valor que evita
             // preguntar lo obvio en el caso frecuente.
             'modalidad' => $this->input('modalidad') ?: ModalidadAprovechamiento::EscalaGeneral->value,
         ]);
+    }
+
+    /**
+     * El código tiene que existir en SIREB con un solo precio. Si SIREB no
+     * responde se deja guardar: el control de verdad lo hace el otorgamiento.
+     */
+    private function comprobarEnSireb(Validator $validator): void
+    {
+        $catalogo = app(SirebService::class)->catalogoSiResponde();
+        $codigo = (string) $this->input('servicio_sireb');
+
+        if ($catalogo === null) {
+            return;
+        }
+
+        if (! isset($catalogo[$codigo])) {
+            $validator->errors()->add('servicio_sireb', "El servicio {$codigo} no está en el catálogo del SEDAG en Recaudaciones.");
+        } elseif ($catalogo[$codigo]['monto'] === null) {
+            $validator->errors()->add('servicio_sireb', sprintf(
+                'El servicio %s tiene %d tarifas vigentes en Recaudaciones; hace falta exactamente una.',
+                $codigo,
+                $catalogo[$codigo]['tarifas'],
+            ));
+        }
     }
 
     /** El id del tramo que se está editando, o null si es un alta. */

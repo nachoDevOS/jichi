@@ -35,6 +35,12 @@ class CupoInvalidoException extends RuntimeException
         );
     }
 
+    /** Recaudaciones no dio el precio del tramo: sin precio no se otorga. */
+    public static function sinPrecio(int $nroEscala, string $motivo): self
+    {
+        return new self("No se pudo obtener el precio de la escala {$nroEscala}. {$motivo}");
+    }
+
     /** Se quiso presentar un cupo que ya no está en el borrador. */
     public static function noSePuedeEnviar(string $estado): self
     {

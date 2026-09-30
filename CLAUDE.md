@@ -628,11 +628,14 @@ Los tres tienen que pasar.
   rechazar. **Antes de usar `estaVigente()` como permiso, preguntarse qué se está
   preguntando de verdad**: hay `estaEnFecha()`, `puedeEditarse()`,
   `puedeEliminarse()` y `puedeEmitirFaena()`, y cada una mira cosas distintas.
-- **`monto` NO es una columna de `aprovechamientos_pesq`.** Lo que se cobra lo
-  calcula `montoACobrar()` leyendo el `valor_bs` de la escala con la que se
-  otorgó. Pedirlo como propiedad devuelve vacío en silencio —la misma trampa que
-  `pluck()` sobre una columna inexistente— y un ensayo que lo compare contra la
-  tarifa da en rojo por el lado equivocado.
+- **EL PRECIO DE LA AUTORIZACIÓN NO LO PONE JICHI: LO PONE SIREB** (29/09/2026).
+  La escala guarda `servicio_sireb`, no un precio; al otorgar o corregir,
+  `OtorgarCupoService` pide el monto a Recaudaciones y lo congela en
+  `aprovechamientos_pesq.monto`. **Sin SIREB no se otorga**: es a propósito,
+  ninguna tarifa se escribe a mano. Las pantallas que solo MUESTRAN precio usan
+  `SirebService::catalogoSiResponde()` y abren igual con SIREB caído. **El
+  catálogo va en caché 10 minutos**: un precio recién cambiado en SIREB tarda
+  eso en llegar. Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
 - **Llamar a un servicio DENTRO de un `foreach` parte en pedazos lo que ese
   servicio construye como una unidad, y no falla nada.** `AprovechamientoController::pagar()`
   cobraba llamando a `CobrarService` una vez por depósito, así que dos boletas
