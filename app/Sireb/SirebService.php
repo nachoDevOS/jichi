@@ -20,10 +20,6 @@ class SirebService
     /**
      * Una página del catálogo TAL COMO LA MANDA SIREB, sin resumir ni cachear.
      * SIREB filtra por la dependencia del token: solo llegan servicios del SEDAG.
-     *
-     * @return array<string, mixed>
-     *
-     * @throws SirebException
      */
     public function catalogoCrudo(int $pagina = 1): array
     {
@@ -33,8 +29,6 @@ class SirebService
     /**
      * Token de máquina (client_credentials) emitido por Ibare. Sin refresh_token:
      * vencido, se pide otro con las mismas credenciales.
-     *
-     * @throws SirebException
      */
     public function token(bool $refrescar = false): string
     {
@@ -69,12 +63,7 @@ class SirebService
         return $token;
     }
 
-    /**
-     * @param  array<string, mixed>  $consulta
-     * @return array<string, mixed>
-     *
-     * @throws SirebException
-     */
+
     private function get(string $ruta, array $consulta): array
     {
         $respuesta = $this->pedir($ruta, $consulta, $this->token());
@@ -99,7 +88,7 @@ class SirebService
         return $respuesta->json();
     }
 
-    /** @param  array<string, mixed>  $consulta */
+    
     private function pedir(string $ruta, array $consulta, string $token): Response
     {
         try {
