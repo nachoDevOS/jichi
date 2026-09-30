@@ -600,6 +600,7 @@ class AprovechamientoController extends Controller
                 'kilos_min' => (float) $c->kilos_min,
                 'kilos_max' => (float) $c->kilos_max,
                 'servicio_sireb' => $c->servicio_sireb,
+                'tarifa_sireb' => $c->tarifa_sireb,
                 // Sin precio hasta volver a conectar SIREB: ver docs/modulos/SIREB.md.
                 'monto' => null,
                 // El régimen del tramo: la escala progresiva o la cuota de una

@@ -123,11 +123,13 @@ la misma sintaxis.
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
-| `nro_escala` | smallint, único | 1 a 7, el orden oficial |
+| `nro_escala` | smallint, único | El orden oficial. **Lo asigna el sistema** al dar de alta —el más alto más uno, contando los dados de baja— y no se edita (30/09/2026) |
 | `modalidad` | string(30) | `ModalidadAprovechamiento` |
 | `descripcion_kg` | string(160) | El texto literal de la resolución |
 | `kilos_min` / `kilos_max` | decimal(12,2) | |
-| `servicio_sireb` | string(30) | Código del servicio en Recaudaciones (SIREB). Único entre las filas vivas (lo exige el Request) |
+| `servicio_sireb` | uuid | Id del servicio en Recaudaciones (SIREB). Lo comparten todos los tramos |
+| `tarifa_sireb` | uuid | Id de la tarifa del tramo dentro de ese servicio: de ahí sale el precio. Única entre las filas vivas (lo exige el Request) |
+| `sireb_historial` | json, nullable | Los pares servicio/tarifa **anteriores**, cada uno con `desde`, `hasta` y `cambiado_por`. El actual vive en las dos columnas de arriba. Lo escribe el evento `updating` del modelo al cambiar cualquiera de las dos; no pasa por `#[Fillable]` ni por la auditoría (30/09/2026) |
 | `estado` | boolean | Vigente o derogada |
 
 **Por qué no tiene precio** *(29/09/2026)*. El precio lo fija Recaudaciones

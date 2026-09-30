@@ -9,13 +9,16 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Cliente del gateway de Recaudaciones. Hoy solo baja el catálogo del SEDAG tal
- * cual llega; conectarlo con la escala y los demás catálogos es la etapa
- * siguiente. Ver docs/modulos/SIREB.md.
+ * Cliente del gateway de Recaudaciones: servicios del SEDAG y sus tarifas, con
+ * el token de Ibare. Ver docs/modulos/SIREB.md.
  */
 class SirebService
 {
     private const CACHE_TOKEN = 'sireb.token';
+
+    private const CACHE_SERVICIOS = 'sireb.servicios';
+
+    private const RUTA_SERVICIOS = '/api/v1/catalogo/servicios';
 
     /**
      * Una página del catálogo TAL COMO LA MANDA SIREB, sin resumir ni cachear.
@@ -23,7 +26,7 @@ class SirebService
      */
     public function catalogoCrudo(int $pagina = 1): array
     {
-        return $this->get('/api/v1/catalogo/servicios', ['pagina' => $pagina, 'por_pagina' => 100]);
+        return $this->get(self::RUTA_SERVICIOS, ['pagina' => $pagina, 'por_pagina' => 100]) ?? [];
     }
 
     /**
@@ -63,8 +66,8 @@ class SirebService
         return $token;
     }
 
-
-    private function get(string $ruta, array $consulta): array
+    /** La respuesta de SIREB, o null si el recurso no existe (404). */
+    private function get(string $ruta, array $consulta = []): ?array
     {
         $respuesta = $this->pedir($ruta, $consulta, $this->token());
 
@@ -79,6 +82,10 @@ class SirebService
             throw SirebException::rechazado($respuesta->status());
         }
 
+        if ($respuesta->status() === 404) {
+            return null;
+        }
+
         if (! $respuesta->successful() || ! is_array($respuesta->json())) {
             Log::warning('SIREB respondió con error', ['ruta' => $ruta, 'status' => $respuesta->status(), 'cuerpo' => $respuesta->body()]);
 
@@ -88,7 +95,6 @@ class SirebService
         return $respuesta->json();
     }
 
-    
     private function pedir(string $ruta, array $consulta, string $token): Response
     {
         try {
@@ -99,5 +105,55 @@ class SirebService
         } catch (ConnectionException) {
             throw SirebException::noResponde();
         }
+    }
+
+    // Desde aka se tiene que implementar las nuevas funciones de SIREB, que son las que usan el token de Ibare. Por ahora solo se implementa el catálogo de servicios.
+
+    /**
+     * Todos los servicios del SEDAG con sus tarifas, juntando las páginas.
+     * En caché 10 minutos: un precio recién cambiado en SIREB tarda eso en llegar.
+     */
+    public function servicios(bool $refrescar = false): array
+    {
+        if ($refrescar) {
+            Cache::forget(self::CACHE_SERVICIOS);
+        }
+
+        return Cache::remember(self::CACHE_SERVICIOS, now()->addMinutes(10), function (): array {
+            $servicios = [];
+            $pagina = 1;
+
+            do {
+                $cuerpo = $this->catalogoCrudo($pagina);
+                array_push($servicios, ...($cuerpo['data'] ?? []));
+                $pagina++;
+            } while ($pagina <= (int) ($cuerpo['meta']['total_paginas'] ?? 1));
+
+            return $servicios;
+        });
+    }
+
+    /**
+     * Igual que servicios(), pero null si SIREB no responde: para las pantallas
+     * que solo MUESTRAN precios y tienen que abrir igual.
+     */
+    public function serviciosSiResponde(): ?array
+    {
+        try {
+            return $this->servicios();
+        } catch (SirebException) {
+            return null;
+        }
+    }
+
+    /**
+     * Un servicio con sus tarifas, pedido directo a SIREB y sin caché: el precio
+     * que devuelve es el de ahora. Null si SIREB no tiene ese id.
+     */
+    public function servicio(string $servicioId): ?array
+    {
+        $cuerpo = $this->get(self::RUTA_SERVICIOS.'/'.rawurlencode(mb_strtolower(trim($servicioId))));
+
+        return $cuerpo['data'] ?? null;
     }
 }

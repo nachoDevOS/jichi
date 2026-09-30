@@ -220,6 +220,7 @@ export interface TramoElegible {
      */
     kilos_max: number;
     servicio_sireb: string;
+    tarifa_sireb: string;
     /** Precio de referencia de SIREB; null si no respondió. El que vale se congela al guardar. */
     monto: number | null;
     /** El régimen del tramo, visible antes de otorgar. */

@@ -59,11 +59,9 @@ export const NAVEGACION: ItemNavegacion[] = [
     { titulo: 'Asociaciones', ruta: 'asociaciones.index', icono: Building2, permiso: 'catalogos.ver', grupo: 'Catálogos' },
     { titulo: 'Tipos de carnet', ruta: 'tipos-carnet.index', icono: Tags, permiso: 'catalogos.ver', grupo: 'Catálogos' },
     { titulo: 'Productos', tituloCompleto: 'Productos hidrobiológicos', ruta: 'productos.index', icono: Fish, permiso: 'catalogos.ver', grupo: 'Catálogos' },
+    { titulo: 'Escala', tituloCompleto: 'Escala de aprovechamiento', ruta: 'categorias-aprovechamiento.index', icono: Ruler, permiso: 'catalogos.ver', grupo: 'Catálogos' },
 
     { titulo: 'Reportes', ruta: 'reportes.index', icono: BarChart3, permiso: 'reportes.ver', grupo: 'Administración' },
-
-    // --- Lo que alimenta a otros sistemas: la escala apunta a los servicios de SIREB.
-    { titulo: 'Escala', tituloCompleto: 'Escala de aprovechamiento', ruta: 'categorias-aprovechamiento.index', icono: Ruler, permiso: 'catalogos.ver', grupo: 'Configuración' },
 ];
 
 /**

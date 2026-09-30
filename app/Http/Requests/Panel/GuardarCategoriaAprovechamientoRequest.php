@@ -25,13 +25,7 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            /*
-             * NO lleva `max:7` aunque hoy la escala tenga siete tramos.
-             */
-            'nro_escala' => [
-                'required', 'integer', 'min:1', 'max:99',
-                Rule::unique('categorias_aprovechamiento', 'nro_escala')->ignore($this->idActual()),
-            ],
+            // Sin `nro_escala`: lo asigna el sistema al dar de alta y no se edita.
 
             /*
              * El TEXTO OFICIAL, y no se deduce de los kilos.
@@ -51,10 +45,12 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
             'kilos_min' => ['required', 'numeric', 'min:0', 'max:9999999999', 'decimal:0,2'],
             'kilos_max' => ['required', 'numeric', 'gt:kilos_min', 'max:9999999999', 'decimal:0,2'],
 
-            // Un código por tramo: dos tramos con el mismo servicio cobrarían lo mismo.
-            'servicio_sireb' => [
-                'required', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._-]*$/',
-                Rule::unique('categorias_aprovechamiento', 'servicio_sireb')
+            // Los tramos comparten servicio; lo que no se repite es la tarifa,
+            // o dos tramos cobrarían lo mismo.
+            'servicio_sireb' => ['required', 'uuid'],
+            'tarifa_sireb' => [
+                'required', 'uuid',
+                Rule::unique('categorias_aprovechamiento', 'tarifa_sireb')
                     ->whereNull('deleted_at')
                     ->ignore($this->idActual()),
             ],
@@ -111,16 +107,16 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nro_escala.required' => 'Indique el número de escala.',
-            'nro_escala.unique' => 'Ya existe un tramo con ese número de escala.',
             'modalidad.required' => 'Indique bajo qué régimen se autoriza este tramo.',
             'descripcion_kg.required' => 'Escriba el texto tal como figura en la resolución.',
             'kilos_min.required' => 'Indique el piso del rango, en kilos.',
             'kilos_max.required' => 'Indique el techo del rango, en kilos.',
             'kilos_max.gt' => 'El techo del rango tiene que ser mayor que el piso.',
-            'servicio_sireb.required' => 'Indique el código del servicio en Recaudaciones (SIREB).',
-            'servicio_sireb.regex' => 'El código va en mayúsculas, sin espacios: SEDAG-001.',
-            'servicio_sireb.unique' => 'Ese código ya lo usa otro tramo de la escala.',
+            'servicio_sireb.required' => 'Indique el id del servicio en Recaudaciones (SIREB).',
+            'servicio_sireb.uuid' => 'El id del servicio no tiene el formato de SIREB: cópielo completo.',
+            'tarifa_sireb.required' => 'Indique el id de la tarifa del tramo en SIREB.',
+            'tarifa_sireb.uuid' => 'El id de la tarifa no tiene el formato de SIREB: cópielo completo.',
+            'tarifa_sireb.unique' => 'Esa tarifa ya la usa otro tramo de la escala.',
         ];
     }
 
@@ -128,7 +124,9 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
     {
         $this->merge([
             'descripcion_kg' => trim((string) $this->input('descripcion_kg')),
-            'servicio_sireb' => mb_strtoupper(trim((string) $this->input('servicio_sireb'))),
+            // SIREB manda los ids en minúscula: así se comparan tal cual.
+            'servicio_sireb' => mb_strtolower(trim((string) $this->input('servicio_sireb'))),
+            'tarifa_sireb' => mb_strtolower(trim((string) $this->input('tarifa_sireb'))),
             'estado' => $this->boolean('estado', true),
             // Casi todos los tramos son escala general: es el valor que evita
             // preguntar lo obvio en el caso frecuente.

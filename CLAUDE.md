@@ -629,13 +629,18 @@ Los tres tienen que pasar.
   preguntando de verdad**: hay `estaEnFecha()`, `puedeEditarse()`,
   `puedeEliminarse()` y `puedeEmitirFaena()`, y cada una mira cosas distintas.
 - **EL PRECIO DE LA AUTORIZACIÓN NO LO PONE JICHI: LO PONE SIREB** (29/09/2026).
-  La escala guarda `servicio_sireb`, no un precio; al otorgar o corregir,
-  `OtorgarCupoService` pide el monto a Recaudaciones y lo congela en
-  `aprovechamientos_pesq.monto`. **Sin SIREB no se otorga**: es a propósito,
-  ninguna tarifa se escribe a mano. Las pantallas que solo MUESTRAN precio usan
-  `SirebService::catalogoSiResponde()` y abren igual con SIREB caído. **El
-  catálogo va en caché 10 minutos**: un precio recién cambiado en SIREB tarda
-  eso en llegar. Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
+  La escala guarda `servicio_sireb` y `tarifa_sireb` (uuid completos), no un
+  precio; al otorgar o corregir, `OtorgarCupoService` pide el monto a
+  Recaudaciones y lo congela en `aprovechamientos_pesq.monto`. **Sin SIREB no se
+  otorga**: es a propósito, ninguna tarifa se escribe a mano. Las pantallas que
+  solo MUESTRAN precio usan `SirebService::serviciosSiResponde()` y abren igual
+  con SIREB caído. **`servicios()` va en caché 10 minutos**: un precio recién
+  cambiado en SIREB tarda eso en llegar; `servicio($id)` no, da el de ahora.
+  Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
+- **Un id de SIREB cortado no falla: deja de coincidir.** `servicio_sireb` era
+  `string(30)` y los ids de SIREB miden 36; se guardaban recortados y en
+  mayúscula, y ninguna búsqueda los encontraba, sin ningún error. Hoy son `uuid`
+  (30/09/2026). Un id de otro sistema va con su largo real, y se prueba buscándolo.
 - **Llamar a un servicio DENTRO de un `foreach` parte en pedazos lo que ese
   servicio construye como una unidad, y no falla nada.** `AprovechamientoController::pagar()`
   cobraba llamando a `CobrarService` una vez por depósito, así que dos boletas

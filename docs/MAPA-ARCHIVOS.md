@@ -143,7 +143,7 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 
 | Archivo | Qué hace |
 | --- | --- |
-| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`), baja el catálogo del SEDAG y lo guarda en caché. `precioDe()` falla si el código no existe o no tiene UNA tarifa general; `catalogoSiResponde()` devuelve null en vez de fallar, para las pantallas que solo muestran |
+| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`) y lee el catálogo del SEDAG: `catalogoCrudo()` una página, `servicios()` todas juntas en caché 10 min, `serviciosSiResponde()` null si SIREB cae, `servicio($id)` uno con sus tarifas, sin caché. Un 404 de SIREB vuelve como null, no como error |
 | `SirebException.php` | Los mensajes que ve el funcionario |
 
 Hoy lo usa solo la autorización (`OtorgarCupoService`, la escala y los formularios

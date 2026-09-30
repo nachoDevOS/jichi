@@ -394,6 +394,19 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:catalogos.ver')
             ->name('categorias-aprovechamiento.index');
 
+        // ANTES de /{categoria}: si no, «crear» se toma como id.
+        Route::get('/categorias-aprovechamiento/crear', [CategoriaAprovechamientoController::class, 'create'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('categorias-aprovechamiento.create');
+
+        Route::get('/categorias-aprovechamiento/{categoria}/editar', [CategoriaAprovechamientoController::class, 'edit'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('categorias-aprovechamiento.edit');
+
+        Route::get('/categorias-aprovechamiento/{categoria}', [CategoriaAprovechamientoController::class, 'show'])
+            ->middleware('permiso:catalogos.ver')
+            ->name('categorias-aprovechamiento.show');
+
         Route::middleware('permiso:catalogos.gestionar')->group(function () {
             Route::post('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'store'])
                 ->name('categorias-aprovechamiento.store');

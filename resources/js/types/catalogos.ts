@@ -41,23 +41,53 @@ export interface EscalaFila {
      * El RÉGIMEN del tramo, y de él depende si el cupo se va a poder ampliar.
      */
     modalidad: ModalidadAprovechamiento;
-    modalidad_etiqueta: string;
-    modalidad_color: string;
     /**
      * El texto literal de la resolución.
      */
     descripcion_kg: string;
     kilos_min: number;
     kilos_max: number;
-    /** Código del servicio en SIREB: de ahí sale el precio. */
+    /** Id del servicio en SIREB, compartido por los tramos. */
     servicio_sireb: string;
-    /** Nombre y precio según SIREB; null si no respondió o el código no existe. */
-    sireb_nombre: string | null;
-    sireb_monto: number | null;
+    /** Id de la tarifa del tramo en SIREB: de ahí sale el precio. */
+    tarifa_sireb: string;
     /** false = tramo derogado: desaparece del formulario de cupo. */
     estado: boolean;
     /** Cupos otorgados bajo este tramo. Por eso no se borra. */
     aprovechamientos_count: number;
+}
+
+/** Un par servicio/tarifa de SIREB que tuvo un tramo, en la vista de historial. */
+export interface TarifaHistorial {
+    servicio_sireb: string | null;
+    tarifa_sireb: string | null;
+    /** Instantes ISO: se muestran con fechaHora(). */
+    desde: string | null;
+    /** Etiqueta y precio de HOY en SIREB; null si ya no está o SIREB no responde. */
+    tarifa_etiqueta: string | null;
+    tarifa_monto: number | null;
+}
+
+export interface TarifaAnterior extends TarifaHistorial {
+    hasta: string | null;
+    /** Nombre de quien la cambió; null si ya no existe el usuario. */
+    cambiado_por: string | null;
+}
+
+/** Lo que la pantalla de edición necesita de un tramo. */
+export type TramoFormulario = Pick<
+    EscalaFila,
+    'id' | 'modalidad' | 'descripcion_kg' | 'kilos_min' | 'kilos_max' | 'servicio_sireb' | 'tarifa_sireb' | 'estado'
+>;
+
+/** Un servicio de SIREB, recortado a lo que usa el select de tarifa. */
+export interface ServicioSireb {
+    id: string;
+    codigo: string | null;
+    nombre: string;
+    /** false = dado de baja en SIREB: no se puede elegir. */
+    activo: boolean;
+    tarifas: { id: string; etiqueta: string; monto: number }[];
 }
 
 /**

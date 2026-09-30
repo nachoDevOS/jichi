@@ -1,9 +1,8 @@
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Pencil, Plus, Ruler, Search, TriangleAlert, X } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { History, Pencil, Plus, Ruler, Search, TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Campo } from '@/components/ui/campo';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
@@ -11,8 +10,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs } from '@/lib/utils';
-import type { ModalidadAprovechamiento, OpcionEnum, PageProps, Paginado } from '@/types';
+import { cn } from '@/lib/utils';
+import type { OpcionEnum, Paginado } from '@/types';
 import type { EscalaFila, HuecoEscala } from '@/types/catalogos';
 
 /**
@@ -22,26 +21,19 @@ export default function CatalogoEscala({
     escala,
     filtros,
     huecos,
-    sirebDisponible,
-    siguienteNumero,
     modalidades,
     opcionesPorPagina,
 }: {
     escala: Paginado<EscalaFila>;
     filtros: { buscar: string | null; modalidad: string | null; por_pagina: number };
     huecos: HuecoEscala[];
-    /** false = SIREB no respondió: los precios no se pueden mostrar. */
-    sirebDisponible: boolean;
-    /** El número que sigue, calculado sobre TODOS los tramos y no sobre la página. */
-    siguienteNumero: number;
     /** Las opciones salen del enum de PHP: escritas acá se desincronizan. */
     modalidades: OpcionEnum[];
     opcionesPorPagina: number[];
 }) {
     const { puede } = usePermisos();
-    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
-    const [editando, setEditando] = useState<EscalaFila | 'nueva' | null>(null);
+    const modalidad = (valor: string) => modalidades.find((o) => o.value === valor);
 
     function filtrar(valores: Record<string, string | number | null> = {}) {
         router.get(
@@ -57,32 +49,17 @@ export default function CatalogoEscala({
             descripcion="Los tramos oficiales en kilos. El precio de cada uno lo pone Recaudaciones (SIREB)."
             acciones={
                 puede('catalogos.gestionar') && (
-                    <Button onClick={() => setEditando('nueva')}>
+                    <Link href={route('categorias-aprovechamiento.create')} className={cn(buttonVariants())}>
                         <Plus className="size-4" />
                         Nuevo tramo
-                    </Button>
+                    </Link>
                 )
             }
         >
             <Head title="Escala de aprovechamiento" />
 
             <div className="space-y-6">
-                {!sirebDisponible && <AvisoSireb />}
-
                 {huecos.length > 0 && <AvisoHuecos huecos={huecos} />}
-
-                {editando !== null && puede('catalogos.gestionar') && (
-                    <FormularioTramo
-                        // Ver el comentario de la `key` en asociaciones.tsx:
-                        // sin ella el useForm conservaría los valores del
-                        // tramo anterior al cambiar de fila.
-                        key={editando === 'nueva' ? 'nueva' : editando.id}
-                        tramo={editando === 'nueva' ? null : editando}
-                        modalidades={modalidades}
-                        siguienteNumero={siguienteNumero}
-                        onCerrar={() => setEditando(null)}
-                    />
-                )}
 
                 <Card className="min-w-0">
                         <CardHeader>
@@ -168,8 +145,7 @@ export default function CatalogoEscala({
                                                     <th className="px-5 py-2.5 font-medium">N°</th>
                                                     <th className="px-5 py-2.5 font-medium">Rango</th>
                                                     <th className="px-5 py-2.5 font-medium">Régimen</th>
-                                                    <th className="px-5 py-2.5 font-medium">Servicio SIREB</th>
-                                                    <th className="px-5 py-2.5 text-right font-medium">Precio</th>
+                                                    <th className="px-5 py-2.5 font-medium">SIREB</th>
                                                     <th className="px-5 py-2.5 text-right font-medium">Otorgados</th>
                                                     <th className="px-5 py-2.5" />
                                                 </tr>
@@ -207,32 +183,21 @@ export default function CatalogoEscala({
                                                             no sale de la progresión por kilos.
                                                         */}
                                                         <td className="px-5 py-2.5">
-                                                            <Badge color={t.modalidad_color}>
-                                                                {t.modalidad_etiqueta}
+                                                            {/* Etiqueta y color salen de `modalidades`, que manda el enum. */}
+                                                            <Badge color={modalidad(t.modalidad)?.color}>
+                                                                {modalidad(t.modalidad)?.label ?? t.modalidad}
                                                             </Badge>
 
                                                         </td>
 
                                                         <td className="px-5 py-2.5">
-                                                            <p className="font-mono text-xs">{t.servicio_sireb}</p>
-                                                            {t.sireb_nombre && (
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {t.sireb_nombre}
-                                                                </p>
-                                                            )}
-                                                        </td>
-
-                                                        {/* El precio es de SIREB: si no llega, se dice por qué. */}
-                                                        <td className="px-5 py-2.5 text-right tabular-nums">
-                                                            {t.sireb_monto !== null ? (
-                                                                bs(t.sireb_monto, institucion.moneda)
-                                                            ) : sirebDisponible ? (
-                                                                <Badge color="rose">
-                                                                    {t.sireb_nombre ? 'Sin precio único' : 'No existe en SIREB'}
-                                                                </Badge>
-                                                            ) : (
-                                                                <span className="text-muted-foreground">—</span>
-                                                            )}
+                                                            <p className="font-mono text-xs">
+                                                                <span className="text-muted-foreground">Tarifa </span>
+                                                                {t.tarifa_sireb}
+                                                            </p>
+                                                            <p className="font-mono text-xs text-muted-foreground">
+                                                                Servicio {t.servicio_sireb}
+                                                            </p>
                                                         </td>
 
                                                         <td className="px-5 py-2.5 text-right tabular-nums text-muted-foreground">
@@ -240,16 +205,25 @@ export default function CatalogoEscala({
                                                         </td>
 
                                                         <td className="px-5 py-2.5 text-right">
-                                                            {puede('catalogos.gestionar') && (
-                                                                <Button
-                                                                    variant="editar"
-                                                                    size="sm"
-                                                                    title="Editar"
-                                                                    onClick={() => setEditando(t)}
+                                                            <div className="flex justify-end gap-2">
+                                                                <Link
+                                                                    href={route('categorias-aprovechamiento.show', t.id)}
+                                                                    className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
+                                                                    title="Historial de SIREB"
                                                                 >
-                                                                    <Pencil className="size-4" />
-                                                                </Button>
-                                                            )}
+                                                                    <History className="size-4" />
+                                                                </Link>
+
+                                                                {puede('catalogos.gestionar') && (
+                                                                    <Link
+                                                                        href={route('categorias-aprovechamiento.edit', t.id)}
+                                                                        className={cn(buttonVariants({ variant: 'editar', size: 'sm' }))}
+                                                                        title="Editar"
+                                                                    >
+                                                                        <Pencil className="size-4" />
+                                                                    </Link>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -265,28 +239,6 @@ export default function CatalogoEscala({
 
             </div>
         </LayoutPanel>
-    );
-}
-
-/** SIREB no respondió: los precios no se ven y otorgar va a fallar. */
-function AvisoSireb() {
-    return (
-        <Card className="border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
-            <CardContent className="flex items-start gap-3 pt-5">
-                <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" />
-
-                <div className="min-w-0 text-sm">
-                    <p className="font-medium text-amber-900 dark:text-amber-200">
-                        Recaudaciones (SIREB) no responde
-                    </p>
-
-                    <p className="text-amber-800/80 dark:text-amber-200/80">
-                        No se pueden mostrar los precios, y mientras siga así no se puede otorgar ni
-                        corregir un aprovechamiento. Avise a la Unidad de Sistemas.
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
     );
 }
 
@@ -320,186 +272,6 @@ function AvisoHuecos({ huecos }: { huecos: HuecoEscala[] }) {
                         ))}
                     </ul>
                 </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-/** Alta y edición de un tramo. El mismo formulario para los dos casos. */
-function FormularioTramo({
-    tramo,
-    modalidades,
-    siguienteNumero,
-    onCerrar,
-}: {
-    tramo: EscalaFila | null;
-    modalidades: OpcionEnum[];
-    /** Para proponer el número en un alta, sin que el operador tenga que contarlos. */
-    siguienteNumero: number;
-    onCerrar: () => void;
-}) {
-    const esAlta = tramo === null;
-
-    const form = useForm({
-        // Va como TEXTO y no como número: es lo que devuelve un <input>, y
-        // useForm fija el tipo con el valor inicial. Arrancando en number, el
-        // primer tecleo no compila.
-        nro_escala: String(tramo?.nro_escala ?? siguienteNumero),
-        // Escala general por defecto: son seis de siete tramos, y el régimen
-        // especial es la excepción que se marca a propósito.
-        modalidad: tramo?.modalidad ?? ('escala_general' as ModalidadAprovechamiento),
-        descripcion_kg: tramo?.descripcion_kg ?? '',
-        kilos_min: tramo?.kilos_min ?? '',
-        kilos_max: tramo?.kilos_max ?? '',
-        servicio_sireb: tramo?.servicio_sireb ?? '',
-        estado: tramo?.estado ?? true,
-    });
-
-    function enviar(e: FormEvent) {
-        e.preventDefault();
-
-        const opciones = { preserveScroll: true, onSuccess: () => onCerrar() };
-
-        if (esAlta) {
-            form.post(route('categorias-aprovechamiento.store'), opciones);
-        } else {
-            form.put(route('categorias-aprovechamiento.update', tramo.id), opciones);
-        }
-    }
-
-    return (
-        <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                <CardTitle>{esAlta ? 'Nuevo tramo' : `Editar escala ${tramo.nro_escala}`}</CardTitle>
-
-                <Button variant="ghost" size="sm" onClick={onCerrar} aria-label="Cerrar">
-                    <X className="size-4" />
-                </Button>
-            </CardHeader>
-
-            <CardContent>
-                <form onSubmit={enviar} className="space-y-4">
-                    {/* A lo ancho los seis campos entran en dos filas. */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {/* Solo en el alta: al editar el número ya está en el título y viaja igual. */}
-                    {esAlta && (
-                        <Campo etiqueta="N° de escala" htmlFor="nro_escala" error={form.errors.nro_escala} obligatorio>
-                            <Input
-                                id="nro_escala"
-                                type="number"
-                                min={1}
-                                value={form.data.nro_escala}
-                                onChange={(e) => form.setData('nro_escala', e.target.value)}
-                                aria-invalid={Boolean(form.errors.nro_escala)}
-                            />
-                        </Campo>
-                    )}
-
-                    <Campo
-                        etiqueta="Texto de la resolución"
-                        htmlFor="descripcion_kg"
-                        error={form.errors.descripcion_kg}
-                        ayuda="Tal como figura en el documento. Es lo que se imprime, y no siempre es la lectura de los números."
-                        obligatorio
-                    >
-                        <Input
-                            id="descripcion_kg"
-                            value={form.data.descripcion_kg}
-                            onChange={(e) => form.setData('descripcion_kg', e.target.value)}
-                            aria-invalid={Boolean(form.errors.descripcion_kg)}
-                            placeholder="201 Kg Hasta 500 Kg"
-                        />
-                    </Campo>
-
-                    <Campo
-                        etiqueta="Régimen"
-                        htmlFor="modalidad"
-                        error={form.errors.modalidad}
-                        ayuda="La escala general es la progresión por kilos; la especie especial lleva tasación fija por resolución."
-                        obligatorio
-                    >
-                        <Select
-                            id="modalidad"
-                            value={form.data.modalidad}
-                            onChange={(e) =>
-                                form.setData('modalidad', e.target.value as ModalidadAprovechamiento)
-                            }
-                            aria-invalid={Boolean(form.errors.modalidad)}
-                        >
-                            {modalidades.map((o) => (
-                                <option key={o.value} value={o.value}>
-                                    {o.label}
-                                </option>
-                            ))}
-                        </Select>
-                    </Campo>
-
-                    <Campo etiqueta="Desde (kg)" htmlFor="kilos_min" error={form.errors.kilos_min} obligatorio>
-                            <Input
-                                id="kilos_min"
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                value={form.data.kilos_min}
-                                onChange={(e) => form.setData('kilos_min', e.target.value)}
-                                aria-invalid={Boolean(form.errors.kilos_min)}
-                            />
-                        </Campo>
-
-                    <Campo etiqueta="Hasta (kg)" htmlFor="kilos_max" error={form.errors.kilos_max} obligatorio>
-                        <Input
-                            id="kilos_max"
-                            type="number"
-                            step="0.01"
-                            min={0}
-                            value={form.data.kilos_max}
-                            onChange={(e) => form.setData('kilos_max', e.target.value)}
-                            aria-invalid={Boolean(form.errors.kilos_max)}
-                        />
-                    </Campo>
-
-                    <Campo
-                        etiqueta="Servicio SIREB"
-                        htmlFor="servicio_sireb"
-                        error={form.errors.servicio_sireb}
-                        ayuda="El código del servicio en Recaudaciones. De ahí sale el precio, que se congela al otorgar el cupo."
-                        obligatorio
-                    >
-                        <Input
-                            id="servicio_sireb"
-                            className="font-mono uppercase"
-                            maxLength={30}
-                            value={form.data.servicio_sireb}
-                            onChange={(e) => form.setData('servicio_sireb', e.target.value.toUpperCase())}
-                            aria-invalid={Boolean(form.errors.servicio_sireb)}
-                            placeholder="SEDAG-001"
-                        />
-                    </Campo>
-
-                    <Campo etiqueta="Vigente" htmlFor="estado" error={form.errors.estado}>
-                        <label className="flex items-center gap-2 text-sm">
-                            <input
-                                id="estado"
-                                type="checkbox"
-                                checked={form.data.estado}
-                                onChange={(e) => form.setData('estado', e.target.checked)}
-                                className="size-4 rounded border-input"
-                            />
-                            Se puede elegir al otorgar un cupo
-                        </label>
-                    </Campo>
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                        <Button type="submit" disabled={form.processing}>
-                            {esAlta ? 'Registrar' : 'Guardar cambios'}
-                        </Button>
-
-                        <Button type="button" variant="outline" onClick={onCerrar}>
-                            Cancelar
-                        </Button>
-                    </div>
-                </form>
             </CardContent>
         </Card>
     );

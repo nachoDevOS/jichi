@@ -30,7 +30,9 @@ return new class extends Migration
             $table->decimal('kilos_min', 12, 2);
             $table->decimal('kilos_max', 12, 2);
             // El precio NO vive acá: lo pone Recaudaciones. Ver docs/modulos/SIREB.md.
-            $table->string('servicio_sireb', 30)->comment('Código del servicio en SIREB, ej. SEDAG-001');
+            $table->uuid('servicio_sireb')->comment('Id del servicio en SIREB: la autorización de pesca');
+            $table->uuid('tarifa_sireb')->comment('Id de la tarifa del tramo dentro del servicio');
+            $table->json('sireb_historial')->nullable()->comment('Servicio y tarifa que tuvo antes, con desde/hasta');
 
             $table->boolean('estado')->default(true);
 
