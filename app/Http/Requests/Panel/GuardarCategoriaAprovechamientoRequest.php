@@ -4,7 +4,6 @@ namespace App\Http\Requests\Panel;
 
 use App\Enums\ModalidadAprovechamiento;
 use App\Models\CategoriaAprovechamiento;
-use App\Sireb\SirebService;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -102,7 +101,6 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
                     ));
                 }
 
-                $this->comprobarEnSireb($validator);
             },
         ];
     }
@@ -136,30 +134,6 @@ class GuardarCategoriaAprovechamientoRequest extends FormRequest
             // preguntar lo obvio en el caso frecuente.
             'modalidad' => $this->input('modalidad') ?: ModalidadAprovechamiento::EscalaGeneral->value,
         ]);
-    }
-
-    /**
-     * El código tiene que existir en SIREB con un solo precio. Si SIREB no
-     * responde se deja guardar: el control de verdad lo hace el otorgamiento.
-     */
-    private function comprobarEnSireb(Validator $validator): void
-    {
-        $catalogo = app(SirebService::class)->catalogoSiResponde();
-        $codigo = (string) $this->input('servicio_sireb');
-
-        if ($catalogo === null) {
-            return;
-        }
-
-        if (! isset($catalogo[$codigo])) {
-            $validator->errors()->add('servicio_sireb', "El servicio {$codigo} no está en el catálogo del SEDAG en Recaudaciones.");
-        } elseif ($catalogo[$codigo]['monto'] === null) {
-            $validator->errors()->add('servicio_sireb', sprintf(
-                'El servicio %s tiene %d tarifas vigentes en Recaudaciones; hace falta exactamente una.',
-                $codigo,
-                $catalogo[$codigo]['tarifas'],
-            ));
-        }
     }
 
     /** El id del tramo que se está editando, o null si es un alta. */

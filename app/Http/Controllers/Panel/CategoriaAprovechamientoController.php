@@ -6,7 +6,6 @@ use App\Enums\ModalidadAprovechamiento;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\GuardarCategoriaAprovechamientoRequest;
 use App\Models\CategoriaAprovechamiento;
-use App\Sireb\SirebService;
 use App\Support\Paginacion;
 use App\Support\Sql;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +22,7 @@ class CategoriaAprovechamientoController extends Controller
     /**
      * Listado y formulario — GET /panel/catalogos/categorias-aprovechamiento
      */
-    public function index(Request $request, SirebService $sireb): Response
+    public function index(Request $request): Response
     {
         $buscar = $request->string('buscar')->trim()->value() ?: null;
         $modalidad = $request->string('modalidad')->trim()->value() ?: null;
@@ -36,9 +35,6 @@ class CategoriaAprovechamientoController extends Controller
          * huecos aparecerían y desaparecerían al cambiar de página.
          */
         $todos = CategoriaAprovechamiento::query()->enOrdenDeEscala()->get();
-
-        // Solo para mostrar el precio: sin SIREB la pantalla abre igual.
-        $catalogo = $sireb->catalogoSiResponde();
 
         $escala = CategoriaAprovechamiento::query()
             ->when($buscar, function ($q) use ($buscar) {
@@ -64,8 +60,9 @@ class CategoriaAprovechamientoController extends Controller
                 'kilos_min' => (float) $c->kilos_min,
                 'kilos_max' => (float) $c->kilos_max,
                 'servicio_sireb' => $c->servicio_sireb,
-                'sireb_nombre' => $catalogo[$c->servicio_sireb]['nombre'] ?? null,
-                'sireb_monto' => $catalogo[$c->servicio_sireb]['monto'] ?? null,
+                // Sin nombre ni precio hasta volver a conectar SIREB.
+                'sireb_nombre' => null,
+                'sireb_monto' => null,
                 'estado' => (bool) $c->estado,
                 'aprovechamientos_count' => $c->aprovechamientos_count,
             ]);

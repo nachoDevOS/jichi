@@ -8,6 +8,11 @@
 
 ## 🔴 Precios de SIREB: volver a migrar y cargar los servicios — 29/09/2026
 
+> **30/09/2026: la conexión del precio está DESCONECTADA** (ver
+> [modulos/SIREB.md](modulos/SIREB.md)). Hoy no se puede otorgar ni corregir
+> ninguna autorización. Queda solo `php artisan jichi:sireb` para probar el token
+> y ver el catálogo crudo.
+
 La escala ya no tiene `valor_bs`: guarda `servicio_sireb`, y la autorización
 congela `monto` y `sireb_tarifa_id` (migraciones editadas, regla 12). **Hasta
 volver a migrar, la base de trabajo no tiene esas columnas.** Y hasta que

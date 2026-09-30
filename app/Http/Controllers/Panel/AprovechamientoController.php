@@ -23,7 +23,6 @@ use App\Models\Recibo;
 use App\Services\CobrarService;
 use App\Services\OtorgarCupoService;
 use App\Services\RevisarCupoService;
-use App\Sireb\SirebService;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -590,9 +589,6 @@ class AprovechamientoController extends Controller
      */
     private function tramosElegibles(): array
     {
-        // El precio de referencia; el que vale se congela al guardar.
-        $catalogo = app(SirebService::class)->catalogoSiResponde();
-
         return CategoriaAprovechamiento::query()
             ->vigentes()
             ->enOrdenDeEscala()
@@ -604,7 +600,8 @@ class AprovechamientoController extends Controller
                 'kilos_min' => (float) $c->kilos_min,
                 'kilos_max' => (float) $c->kilos_max,
                 'servicio_sireb' => $c->servicio_sireb,
-                'monto' => $catalogo[$c->servicio_sireb]['monto'] ?? null,
+                // Sin precio hasta volver a conectar SIREB: ver docs/modulos/SIREB.md.
+                'monto' => null,
                 // El régimen del tramo: la escala progresiva o la cuota de una
                 // especie con tasación fija. Se muestra ANTES de otorgarlo.
                 'modalidad' => $c->modalidad->value,

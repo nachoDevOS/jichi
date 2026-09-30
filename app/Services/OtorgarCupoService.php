@@ -7,8 +7,6 @@ use App\Exceptions\CupoInvalidoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\CategoriaAprovechamiento;
-use App\Sireb\SirebException;
-use App\Sireb\SirebService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -17,8 +15,6 @@ use Illuminate\Support\Facades\DB;
  */
 class OtorgarCupoService
 {
-    public function __construct(private readonly SirebService $sireb) {}
-
     /**
      * Otorga la bolsa madre a una persona.
      */
@@ -201,17 +197,16 @@ class OtorgarCupoService
     }
 
     /**
-     * El precio del tramo según Recaudaciones. Va dentro de la transacción a
-     * propósito: el catálogo está en caché, y sin precio no se otorga nada.
+     * El precio del tramo. DESCONECTADO a propósito: la conexión con SIREB se
+     * rehace por etapas, y mientras tanto no se otorga a un precio escrito a mano.
      *
-     * @return array{codigo: string, nombre: string, monto: float, tarifa_id: string}
+     * @return array{monto: float, tarifa_id: string}
      */
     private function precioDe(CategoriaAprovechamiento $tramo): array
     {
-        try {
-            return $this->sireb->precioDe($tramo->servicio_sireb);
-        } catch (SirebException $e) {
-            throw CupoInvalidoException::sinPrecio($tramo->nro_escala, $e->getMessage());
-        }
+        throw CupoInvalidoException::sinPrecio(
+            $tramo->nro_escala,
+            'La conexión con Recaudaciones (SIREB) está en ajuste: por ahora no se puede otorgar ni corregir.',
+        );
     }
 }

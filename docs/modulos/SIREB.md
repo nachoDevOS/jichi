@@ -1,5 +1,12 @@
 # SIREB — los precios vienen de Recaudaciones
 
+> ⚠️ **30/09/2026 — DESCONECTADO.** `SirebService` quedó solo con `token()` y
+> `catalogoCrudo()` (la respuesta de SIREB tal cual), para probar la conexión con
+> `php artisan jichi:sireb`. El precio NO se pide: otorgar o corregir una
+> autorización falla con «La conexión con Recaudaciones (SIREB) está en ajuste»,
+> y la escala y el formulario muestran los tramos sin precio. Lo de abajo describe
+> cómo funcionaba el 29/09 y sirve de guía para volver a conectarlo.
+>
 > 29/09/2026. Hoy lo usa **solo la autorización**. Carnet, faena y guía siguen
 > con su precio propio en Jichi, y pasan a este esquema en las etapas siguientes.
 
@@ -19,8 +26,8 @@ Jichi ──GET /api/v1/catalogo/servicios + token──▶ SIREB
 ```
 
 - Credencial de máquina **aparte** de la del login: `SIREB_CLIENT_ID` (`sedag`)
-  y `SIREB_CLIENT_SECRET`. El token lo emite `SIREB_IBARE_URL` (vacío = el
-  `IBARE_URL` del login). **Tiene que ser el Ibare en el que confía ese SIREB**:
+  y `SIREB_CLIENT_SECRET`. El token lo emite `SIREB_IBARE_URL`, propio: ya no
+  cae en el `IBARE_URL` del login si falta. **Tiene que ser el Ibare en el que confía ese SIREB**:
   contra `test.sireb` va `test.ibare`, o SIREB responde `TOKEN_INVALIDO`.
 - El token dura 10 minutos y lo renueva `SirebService` solo. El `Idempotency-Key`
   es otra cosa: va solo al registrar liquidaciones, que Jichi todavía no hace.
@@ -29,6 +36,20 @@ Jichi ──GET /api/v1/catalogo/servicios + token──▶ SIREB
 - El catálogo va en **caché 10 minutos** (`SIREB_CACHE_MINUTOS`), y el token
   hasta un minuto antes de vencer. Si un código no aparece, se descarga de nuevo
   una vez antes de fallar: puede ser un alta reciente.
+
+### Probar la conexión
+
+```sh
+php artisan jichi:sireb
+```
+
+Pide un token nuevo a Ibare y baja el catálogo sin caché (es el `curl` de
+`/oauth/token` más `GET /api/v1/catalogo/servicios`). Muestra el token, su
+vencimiento y el JSON del catálogo **tal como lo manda SIREB**. Con `--resumen`,
+en vez del JSON, una tabla con lo que Jichi entiende de cada servicio y si sirve
+para la escala: solo sirve con **una** tarifa general.
+Si falla, muestra el mismo mensaje que vería ventanilla al otorgar. Vive en
+`app/Console/Commands/ProbarSirebCommand.php`.
 
 ## La escala
 

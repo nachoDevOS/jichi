@@ -113,9 +113,10 @@ return [
     // servicio y pide el monto al otorgar. Credencial de máquina aparte de la del
     // login; el token lo emite Ibare. Ver docs/modulos/SIREB.md.
     'sireb' => [
-        'url' => rtrim((string) env('SIREB_URL', 'http://localhost:8000'), '/'),
-        // El Ibare que emite el token tiene que ser el mismo en el que confía ese SIREB.
-        'ibare_url' => rtrim((string) (env('SIREB_IBARE_URL') ?: env('IBARE_URL', 'http://localhost:8001')), '/'),
+        'url' => rtrim((string) env('SIREB_URL'), '/'),
+        // El Ibare que emite el token tiene que ser el mismo en el que confía ese
+        // SIREB. Propio y sin caer en IBARE_URL: el del login puede ser otro.
+        'ibare_url' => rtrim((string) env('SIREB_IBARE_URL'), '/'),
         'client_id' => env('SIREB_CLIENT_ID', 'sedag'),
         'client_secret' => env('SIREB_CLIENT_SECRET'),
         'timeout' => (int) env('SIREB_TIMEOUT', 10),
