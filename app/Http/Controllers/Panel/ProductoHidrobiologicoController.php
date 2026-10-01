@@ -24,8 +24,9 @@ class ProductoHidrobiologicoController extends Controller
     /**
      * Listado — GET /panel/catalogos/productos
      */
-    public function index(Request $request): Response
+    public function index(Request $request, VistaSireb $vista): Response
     {
+        $tarifas = $vista->tarifasPorId();
         $buscar = $request->string('buscar')->trim()->value() ?: null;
         $porPagina = Paginacion::filas($request);
 
@@ -45,6 +46,7 @@ class ProductoHidrobiologicoController extends Controller
                 'nombre' => $p->nombre,
                 'servicio_sireb' => $p->servicio_sireb,
                 'tarifa_sireb' => $p->tarifa_sireb,
+                ...VistaSireb::describir($tarifas, $p->tarifa_sireb),
                 'estado' => (bool) $p->estado,
                 'detalles_count' => $p->detalles_count,
             ]);
@@ -53,6 +55,7 @@ class ProductoHidrobiologicoController extends Controller
             'productos' => $productos,
             'filtros' => ['buscar' => $buscar, 'por_pagina' => $porPagina],
             'opcionesPorPagina' => Paginacion::OPCIONES,
+            'sirebDisponible' => $tarifas !== null,
         ]);
     }
 
@@ -120,13 +123,10 @@ class ProductoHidrobiologicoController extends Controller
             ],
             // Para el select de tarifa: null si SIREB no responde, y la pantalla abre igual.
             'serviciosSireb' => $vista->serviciosParaSelect(),
-            // Se pueden compartir: el select solo avisa qué productos la usan.
+            // Qué producto ya usa cada tarifa: el select las deshabilita en vez de dejar que el Request las rechace.
             'tarifasUsadas' => ProductoHidrobiologico::query()
                 ->whereNotNull('tarifa_sireb')
-                ->orderBy('nombre')
-                ->get(['nombre', 'tarifa_sireb'])
-                ->groupBy('tarifa_sireb')
-                ->map(fn ($grupo) => $grupo->pluck('nombre')->join(', ')),
+                ->pluck('nombre', 'tarifa_sireb'),
         ]);
     }
 }

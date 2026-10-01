@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { History, Pencil, Plus, Ruler, Search, TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { CeldaSireb } from '@/components/panel/catalogos/celda-sireb';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +11,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { cn } from '@/lib/utils';
-import type { OpcionEnum, Paginado } from '@/types';
+import { bs, cn } from '@/lib/utils';
+import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { EscalaFila, HuecoEscala } from '@/types/catalogos';
 
 /**
@@ -23,6 +24,7 @@ export default function CatalogoEscala({
     huecos,
     modalidades,
     opcionesPorPagina,
+    sirebDisponible,
 }: {
     escala: Paginado<EscalaFila>;
     filtros: { buscar: string | null; modalidad: string | null; por_pagina: number };
@@ -30,8 +32,11 @@ export default function CatalogoEscala({
     /** Las opciones salen del enum de PHP: escritas acá se desincronizan. */
     modalidades: OpcionEnum[];
     opcionesPorPagina: number[];
+    /** false = SIREB no respondió: los precios no se pueden mostrar. */
+    sirebDisponible: boolean;
 }) {
     const { puede } = usePermisos();
+    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
     const modalidad = (valor: string) => modalidades.find((o) => o.value === valor);
 
@@ -59,6 +64,17 @@ export default function CatalogoEscala({
             <Head title="Escala de aprovechamiento" />
 
             <div className="space-y-6">
+                {!sirebDisponible && (
+                    <Card className="border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
+                        <CardContent className="flex items-start gap-3 pt-5 text-sm">
+                            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" />
+                            <p className="text-amber-900 dark:text-amber-200">
+                                Recaudaciones (SIREB) no responde: no se pueden mostrar los precios.
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {huecos.length > 0 && <AvisoHuecos huecos={huecos} />}
 
                 <Card className="min-w-0">
@@ -146,6 +162,7 @@ export default function CatalogoEscala({
                                                     <th className="px-5 py-2.5 font-medium">Rango</th>
                                                     <th className="px-5 py-2.5 font-medium">Régimen</th>
                                                     <th className="px-5 py-2.5 font-medium">SIREB</th>
+                                                    <th className="px-5 py-2.5 text-right font-medium">Precio</th>
                                                     <th className="px-5 py-2.5 text-right font-medium">Otorgados</th>
                                                     <th className="px-5 py-2.5" />
                                                 </tr>
@@ -191,13 +208,16 @@ export default function CatalogoEscala({
                                                         </td>
 
                                                         <td className="px-5 py-2.5">
-                                                            <p className="font-mono text-xs">
-                                                                <span className="text-muted-foreground">Tarifa </span>
-                                                                {t.tarifa_sireb}
-                                                            </p>
-                                                            <p className="font-mono text-xs text-muted-foreground">
-                                                                Servicio {t.servicio_sireb}
-                                                            </p>
+                                                            <CeldaSireb
+                                                                servicioId={t.servicio_sireb}
+                                                                tarifaId={t.tarifa_sireb}
+                                                                servicio={t.sireb_servicio}
+                                                                etiqueta={t.sireb_etiqueta}
+                                                            />
+                                                        </td>
+
+                                                        <td className="px-5 py-2.5 text-right tabular-nums">
+                                                            {t.precio !== null ? bs(t.precio, institucion.moneda) : '—'}
                                                         </td>
 
                                                         <td className="px-5 py-2.5 text-right tabular-nums text-muted-foreground">

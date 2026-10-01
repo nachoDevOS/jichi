@@ -7,8 +7,8 @@ import type { ServicioSireb } from '@/types/catalogos';
 
 /**
  * El select de tarifa de SIREB, agrupado por servicio. Elegir una tarifa
- * devuelve también su servicio: así no se pueden cruzar. Lo usan la escala y
- * los tipos de carnet.
+ * devuelve también su servicio: así no se pueden cruzar. Lo usan la escala,
+ * los tipos de carnet, los productos y los aranceles.
  */
 export function SelectorTarifaSireb({
     tarifa,
@@ -16,7 +16,6 @@ export function SelectorTarifaSireb({
     servicioGuardado,
     serviciosSireb,
     tarifasUsadas,
-    compartible = false,
     error,
     onElegir,
 }: {
@@ -28,8 +27,6 @@ export function SelectorTarifaSireb({
     serviciosSireb: ServicioSireb[] | null;
     /** Id de tarifa → qué registro la usa ya. */
     tarifasUsadas: Record<string, string>;
-    /** true = varios registros pueden usar la misma tarifa: se avisa, no se bloquea. */
-    compartible?: boolean;
     error?: string;
     onElegir: (tarifaId: string, servicioId: string) => void;
 }) {
@@ -84,9 +81,9 @@ export function SelectorTarifaSireb({
                             const ocupada = usadaPor !== undefined && t.id !== tarifaGuardada;
 
                             return (
-                                <option key={t.id} value={t.id} disabled={!s.activo || (ocupada && !compartible)}>
+                                <option key={t.id} value={t.id} disabled={!s.activo || ocupada}>
                                     {t.etiqueta || 'Sin etiqueta'} — {bs(t.monto, institucion.moneda)}
-                                    {ocupada ? ` (${compartible ? 'también' : 'ya la usa'}: ${usadaPor})` : ''}
+                                    {ocupada ? ` (ya la usa: ${usadaPor})` : ''}
                                 </option>
                             );
                         })}

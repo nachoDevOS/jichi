@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { Fish, History, Pencil, Plus, Search } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Fish, History, Pencil, Plus, Search, TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { CeldaSireb } from '@/components/panel/catalogos/celda-sireb';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +11,8 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { cn } from '@/lib/utils';
-import type { Paginado } from '@/types';
+import { bs, cn } from '@/lib/utils';
+import type { PageProps, Paginado } from '@/types';
 import type { ProductoFila } from '@/types/catalogos';
 
 /**
@@ -21,12 +22,16 @@ export default function CatalogoProductos({
     productos,
     filtros,
     opcionesPorPagina,
+    sirebDisponible,
 }: {
     productos: Paginado<ProductoFila>;
     filtros: { buscar: string | null; por_pagina: number };
     opcionesPorPagina: number[];
+    /** false = SIREB no respondió: los precios no se pueden mostrar. */
+    sirebDisponible: boolean;
 }) {
     const { puede } = usePermisos();
+    const { institucion } = usePage<PageProps>().props;
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
 
     function filtrar(valores: Record<string, string | number | null> = {}) {
@@ -53,6 +58,17 @@ export default function CatalogoProductos({
             <Head title="Productos hidrobiológicos" />
 
             <div className="space-y-6">
+                {!sirebDisponible && (
+                    <Card className="border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
+                        <CardContent className="flex items-start gap-3 pt-5 text-sm">
+                            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" />
+                            <p className="text-amber-900 dark:text-amber-200">
+                                Recaudaciones (SIREB) no responde: no se pueden mostrar los precios.
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <Card className="min-w-0">
                     <CardHeader>
                         <CardTitle>Registrados</CardTitle>
@@ -117,6 +133,7 @@ export default function CatalogoProductos({
                                                 <th className="px-5 py-2.5 font-medium">Estado</th>
                                                 <th className="px-5 py-2.5 text-right font-medium">En guías</th>
                                                 <th className="px-5 py-2.5 font-medium">SIREB</th>
+                                                <th className="px-5 py-2.5 text-right font-medium">Precio / kg</th>
                                                 <th className="px-5 py-2.5" />
                                             </tr>
                                         </thead>
@@ -139,19 +156,16 @@ export default function CatalogoProductos({
                                                     </td>
 
                                                     <td className="px-5 py-2.5">
-                                                        {p.tarifa_sireb ? (
-                                                            <>
-                                                                <p className="font-mono text-xs">
-                                                                    <span className="text-muted-foreground">Tarifa </span>
-                                                                    {p.tarifa_sireb}
-                                                                </p>
-                                                                <p className="font-mono text-xs text-muted-foreground">
-                                                                    Servicio {p.servicio_sireb}
-                                                                </p>
-                                                            </>
-                                                        ) : (
-                                                            <Badge color="amber">Sin tarifa</Badge>
-                                                        )}
+                                                        <CeldaSireb
+                                                            servicioId={p.servicio_sireb}
+                                                            tarifaId={p.tarifa_sireb}
+                                                            servicio={p.sireb_servicio}
+                                                            etiqueta={p.sireb_etiqueta}
+                                                        />
+                                                    </td>
+
+                                                    <td className="px-5 py-2.5 text-right tabular-nums">
+                                                        {p.precio !== null ? bs(p.precio, institucion.moneda) : '—'}
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-right">

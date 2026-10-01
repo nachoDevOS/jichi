@@ -93,8 +93,6 @@ export default function ProductosFormulario({
                                     servicioGuardado={producto?.servicio_sireb ?? null}
                                     serviciosSireb={serviciosSireb}
                                     tarifasUsadas={tarifasUsadas}
-                                    // Dos especies pueden cobrar igual el kilo.
-                                    compartible
                                     error={form.errors.tarifa_sireb ?? form.errors.servicio_sireb}
                                     onElegir={(tarifa, servicio) =>
                                         form.setData((d) => ({ ...d, tarifa_sireb: tarifa, servicio_sireb: servicio }))

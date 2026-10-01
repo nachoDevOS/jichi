@@ -113,7 +113,7 @@ export default function CrearCupo({
                                 <option value="">Elija un tramo…</option>
                                 {escala.map((t) => (
                                     <option key={t.id} value={t.id}>
-                                        {t.nro_escala} · {t.descripcion_kg} —{' '}
+                                        {t.descripcion_kg} —{' '}
                                         {t.monto !== null ? bs(t.monto, institucion.moneda) : 'sin precio en SIREB'}
                                     </option>
                                 ))}

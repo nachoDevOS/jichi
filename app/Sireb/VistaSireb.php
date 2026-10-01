@@ -19,8 +19,6 @@ class VistaSireb
 
     /**
      * Los servicios recortados a lo que usa el select; null si SIREB no responde.
-     *
-     * @return list<array<string, mixed>>|null
      */
     public function serviciosParaSelect(): ?array
     {
@@ -47,10 +45,24 @@ class VistaSireb
     /**
      * Precio de cada tarifa de servicios ACTIVOS, por id; null si SIREB no
      * responde. Para mostrar de referencia: el que vale lo congela la emisión.
-     *
-     * @return array<string, float>|null
      */
     public function preciosPorTarifa(): ?array
+    {
+        $tarifas = $this->tarifasPorId();
+
+        return $tarifas === null ? null : array_filter(
+            array_map(fn (array $t) => $t['monto'], $tarifas),
+            fn (?float $monto) => $monto !== null,
+        );
+    }
+
+    /**
+     * Cada tarifa por id con el nombre de su servicio y su etiqueta; null si
+     * SIREB no responde. El monto va en null si el servicio no está activo.
+     *
+     * @return array<string, array{servicio: string, etiqueta: string, monto: ?float}>|null
+     */
+    public function tarifasPorId(): ?array
     {
         $servicios = $this->sireb->serviciosSiResponde();
 
@@ -59,17 +71,39 @@ class VistaSireb
         }
 
         return collect($servicios)
-            ->filter(fn (array $s) => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO)
-            ->flatMap(fn (array $s) => $s['tarifas'] ?? [])
-            ->mapWithKeys(fn (array $t) => [$t['id'] => (float) $t['monto']])
+            ->flatMap(fn (array $s) => array_map(fn (array $t) => [
+                'id' => $t['id'],
+                'servicio' => $s['nombre'] ?? '',
+                'etiqueta' => $t['etiqueta'] ?? '',
+                'monto' => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO ? (float) $t['monto'] : null,
+            ], $s['tarifas'] ?? []))
+            ->keyBy('id')
+            ->map(fn (array $t) => array_diff_key($t, ['id' => true]))
             ->all();
+    }
+
+    /**
+     * Lo que muestra un listado de catálogo sobre la tarifa de una fila.
+     * Nombres en null si la tarifa ya no está en SIREB o no responde.
+     *
+     * @param  array<string, array{servicio: string, etiqueta: string, monto: ?float}>|null  $tarifas  de tarifasPorId()
+     * @return array{sireb_servicio: ?string, sireb_etiqueta: ?string, precio: ?float}
+     */
+    public static function describir(?array $tarifas, ?string $tarifaId): array
+    {
+        $tarifa = $tarifaId === null ? null : ($tarifas[$tarifaId] ?? null);
+
+        return [
+            'sireb_servicio' => $tarifa['servicio'] ?? null,
+            'sireb_etiqueta' => $tarifa['etiqueta'] ?? null,
+            // De referencia: el que vale lo congela cada documento al emitirse.
+            'precio' => $tarifa['monto'] ?? null,
+        ];
     }
 
     /**
      * La tarifa actual y las anteriores de un registro con `sireb_historial`,
      * cada una con qué es HOY en SIREB y quién la cambió.
-     *
-     * @return array{actual: array<string, mixed>, anteriores: list<array<string, mixed>>, sirebDisponible: bool}
      */
     public function historial(Model $modelo): array
     {

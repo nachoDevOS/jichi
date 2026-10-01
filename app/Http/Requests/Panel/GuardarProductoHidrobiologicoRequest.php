@@ -32,9 +32,13 @@ class GuardarProductoHidrobiologicoRequest extends FormRequest
                 Rule::unique('productos_hidrobiologicos', 'nombre')->ignore($idActual)->whereNull('deleted_at'),
             ],
 
-            // Varios productos pueden compartir tarifa: SIREB puede cobrar igual el kilo de dos especies.
+            // Una tarifa por producto, como en la escala: compartida, el precio de una
+            // especie no se podría cambiar sin arrastrar a la otra.
             'servicio_sireb' => ['required', 'uuid'],
-            'tarifa_sireb' => ['required', 'uuid'],
+            'tarifa_sireb' => [
+                'required', 'uuid',
+                Rule::unique('productos_hidrobiologicos', 'tarifa_sireb')->ignore($idActual)->whereNull('deleted_at'),
+            ],
 
             'estado' => ['required', 'boolean'],
         ];
@@ -52,6 +56,7 @@ class GuardarProductoHidrobiologicoRequest extends FormRequest
             'servicio_sireb.uuid' => 'El id del servicio no tiene el formato de SIREB.',
             'tarifa_sireb.required' => 'Elija la tarifa de SIREB del producto.',
             'tarifa_sireb.uuid' => 'El id de la tarifa no tiene el formato de SIREB.',
+            'tarifa_sireb.unique' => 'Esa tarifa ya la usa otro producto.',
         ];
     }
 

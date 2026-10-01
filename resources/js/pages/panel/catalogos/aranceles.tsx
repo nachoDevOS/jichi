@@ -1,6 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Coins, History, Pencil, TriangleAlert } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { CeldaSireb } from '@/components/panel/catalogos/celda-sireb';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
@@ -76,19 +76,12 @@ export default function CatalogoAranceles({
                                                 </td>
 
                                                 <td className="px-5 py-2.5">
-                                                    {a.tarifa_sireb ? (
-                                                        <>
-                                                            <p className="font-mono text-xs">
-                                                                <span className="text-muted-foreground">Tarifa </span>
-                                                                {a.tarifa_sireb}
-                                                            </p>
-                                                            <p className="font-mono text-xs text-muted-foreground">
-                                                                Servicio {a.servicio_sireb}
-                                                            </p>
-                                                        </>
-                                                    ) : (
-                                                        <Badge color="amber">Sin tarifa</Badge>
-                                                    )}
+                                                    <CeldaSireb
+                                                        servicioId={a.servicio_sireb}
+                                                        tarifaId={a.tarifa_sireb}
+                                                        servicio={a.sireb_servicio}
+                                                        etiqueta={a.sireb_etiqueta}
+                                                    />
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-right tabular-nums">

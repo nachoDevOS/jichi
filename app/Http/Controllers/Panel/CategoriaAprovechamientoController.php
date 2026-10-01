@@ -23,8 +23,9 @@ class CategoriaAprovechamientoController extends Controller
     /**
      * Listado y formulario — GET /panel/catalogos/categorias-aprovechamiento
      */
-    public function index(Request $request): Response
+    public function index(Request $request, VistaSireb $vista): Response
     {
+        $tarifas = $vista->tarifasPorId();
         $buscar = $request->string('buscar')->trim()->value() ?: null;
         $modalidad = $request->string('modalidad')->trim()->value() ?: null;
         $porPagina = Paginacion::filas($request);
@@ -60,6 +61,7 @@ class CategoriaAprovechamientoController extends Controller
                 'kilos_max' => (float) $c->kilos_max,
                 'servicio_sireb' => $c->servicio_sireb,
                 'tarifa_sireb' => $c->tarifa_sireb,
+                ...VistaSireb::describir($tarifas, $c->tarifa_sireb),
                 'estado' => (bool) $c->estado,
                 'aprovechamientos_count' => $c->aprovechamientos_count,
             ]);
@@ -75,6 +77,7 @@ class CategoriaAprovechamientoController extends Controller
             // en los dos lados, agregar una modalidad en la pantalla y olvidarse
             // del servidor dejaría al operador eligiendo un valor que se rechaza.
             'modalidades' => ModalidadAprovechamiento::opciones(),
+            'sirebDisponible' => $tarifas !== null,
         ]);
     }
 

@@ -110,7 +110,7 @@ export default function EditarCupo({
                             >
                                 {escala.map((t) => (
                                     <option key={t.id} value={t.id}>
-                                        {t.nro_escala} · {t.descripcion_kg} —{' '}
+                                        {t.descripcion_kg} —{' '}
                                         {t.monto !== null ? bs(t.monto, institucion.moneda) : 'sin precio en SIREB'}
                                     </option>
                                 ))}
@@ -188,8 +188,8 @@ export default function EditarCupo({
                                     <p className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
                                         <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                                         <span>
-                                            Cambia de la escala {original.nro_escala} a la{' '}
-                                            {tramo.nro_escala}: de {original.kilos_max} a{' '}
+                                            Cambia de «{original.descripcion_kg}» a «{tramo.descripcion_kg}»: de{' '}
+                                            {original.kilos_max} a{' '}
                                             {tramo.kilos_max} kg, y de{' '}
                                             {bs(cupo.monto, institucion.moneda)} a{' '}
                                             {tramo.monto !== null ? bs(tramo.monto, institucion.moneda) : 'sin precio en SIREB'}.

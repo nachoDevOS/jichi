@@ -22,8 +22,9 @@ class TipoCarnetController extends Controller
     /**
      * Listado — GET /panel/catalogos/tipos-carnet
      */
-    public function index(Request $request): Response
+    public function index(Request $request, VistaSireb $vista): Response
     {
+        $tarifas = $vista->tarifasPorId();
         $buscar = $request->string('buscar')->trim()->value() ?: null;
         $actor = $request->string('actor')->trim()->value() ?: null;
         $porPagina = Paginacion::filas($request);
@@ -50,6 +51,7 @@ class TipoCarnetController extends Controller
                 'tipo_actor_color' => $t->tipo_actor->color(),
                 'servicio_sireb' => $t->servicio_sireb,
                 'tarifa_sireb' => $t->tarifa_sireb,
+                ...VistaSireb::describir($tarifas, $t->tarifa_sireb),
                 'estado' => (bool) $t->estado,
                 'carnets_count' => $t->carnets_count,
             ]);
@@ -59,6 +61,7 @@ class TipoCarnetController extends Controller
             'filtros' => ['buscar' => $buscar, 'actor' => $actor, 'por_pagina' => $porPagina],
             'opcionesPorPagina' => Paginacion::OPCIONES,
             'actores' => TipoActor::opciones(),
+            'sirebDisponible' => $tarifas !== null,
         ]);
     }
 

@@ -22,7 +22,7 @@ class ArancelSirebController extends Controller
      */
     public function index(VistaSireb $vista): Response
     {
-        $precios = $vista->preciosPorTarifa();
+        $tarifas = $vista->tarifasPorId();
 
         return Inertia::render('panel/catalogos/aranceles', [
             'aranceles' => ArancelSireb::query()
@@ -35,11 +35,10 @@ class ArancelSirebController extends Controller
                     'descripcion' => $a->concepto->descripcion(),
                     'servicio_sireb' => $a->servicio_sireb,
                     'tarifa_sireb' => $a->tarifa_sireb,
-                    // De referencia: el que vale lo congela cada documento al emitirse.
-                    'precio' => $precios[$a->tarifa_sireb] ?? null,
+                    ...VistaSireb::describir($tarifas, $a->tarifa_sireb),
                 ])
                 ->all(),
-            'sirebDisponible' => $precios !== null,
+            'sirebDisponible' => $tarifas !== null,
         ]);
     }
 

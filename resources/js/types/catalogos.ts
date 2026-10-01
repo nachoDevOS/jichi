@@ -33,7 +33,7 @@ export interface AsociacionFila {
 export type FichaAsociacion = Record<string, string | null>;
 
 /** Un tramo de la escala oficial de aprovechamiento. */
-export interface EscalaFila {
+export interface EscalaFila extends ReferenciaSireb {
     id: number;
     /** El orden oficial: 1, 2, 3… No tiene tope fijo en código a propósito. */
     nro_escala: number;
@@ -99,7 +99,7 @@ export interface HuecoEscala {
 }
 
 /** Una fila del catálogo de credenciales. */
-export interface TipoCarnetFila {
+export interface TipoCarnetFila extends ReferenciaSireb {
     id: number;
     nombre: string;
     /** Para qué actividad sirve: es lo que tiene que coincidir con el carnet. */
@@ -120,7 +120,7 @@ export type TipoCarnetFormulario = Pick<
 >;
 
 /** Una fila del catálogo de productos hidrobiológicos. */
-export interface ProductoFila {
+export interface ProductoFila extends ReferenciaSireb {
     id: number;
     nombre: string;
     /** Ids de SIREB, de donde sale el precio por kilo; null hasta que alguien elige la tarifa. */
@@ -131,16 +131,22 @@ export interface ProductoFila {
     detalles_count: number;
 }
 
+/** Cómo se llama HOY en SIREB la tarifa de una fila; todo null si no está o SIREB no responde. */
+export interface ReferenciaSireb {
+    sireb_servicio: string | null;
+    sireb_etiqueta: string | null;
+    /** Precio de referencia: el que vale lo congela cada documento al emitirse. */
+    precio: number | null;
+}
+
 /** Una fila de Aranceles de SIREB: un cobro que no cuelga de un catálogo. */
-export interface ArancelFila {
+export interface ArancelFila extends ReferenciaSireb {
     id: number;
     concepto: string;
     etiqueta: string;
     descripcion: string;
     servicio_sireb: string | null;
     tarifa_sireb: string | null;
-    /** Precio de referencia en SIREB; null sin tarifa o sin SIREB. */
-    precio: number | null;
 }
 
 /** Lo que la pantalla de alta/edición necesita de un producto. */

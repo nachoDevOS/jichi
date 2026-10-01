@@ -23,6 +23,7 @@ use App\Models\Recibo;
 use App\Services\CobrarService;
 use App\Services\OtorgarCupoService;
 use App\Services\RevisarCupoService;
+use App\Sireb\VistaSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -589,6 +590,8 @@ class AprovechamientoController extends Controller
      */
     private function tramosElegibles(): array
     {
+        $tarifas = app(VistaSireb::class)->tarifasPorId();
+
         return CategoriaAprovechamiento::query()
             ->vigentes()
             ->enOrdenDeEscala()
@@ -601,8 +604,8 @@ class AprovechamientoController extends Controller
                 'kilos_max' => (float) $c->kilos_max,
                 'servicio_sireb' => $c->servicio_sireb,
                 'tarifa_sireb' => $c->tarifa_sireb,
-                // Sin precio hasta volver a conectar SIREB: ver docs/modulos/SIREB.md.
-                'monto' => null,
+                // De referencia, el de la caché: el que vale lo pide el servicio al guardar.
+                'monto' => VistaSireb::describir($tarifas, $c->tarifa_sireb)['precio'],
                 // El régimen del tramo: la escala progresiva o la cuota de una
                 // especie con tasación fija. Se muestra ANTES de otorgarlo.
                 'modalidad' => $c->modalidad->value,

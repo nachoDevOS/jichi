@@ -1,14 +1,7 @@
 # SIREB — los precios vienen de Recaudaciones
 
-> ⚠️ **30/09/2026 — EN RECONEXIÓN.** `SirebService` ya lee servicios y tarifas
-> (ver «Qué ofrece `SirebService`»), pero todavía **no está enchufado** a la
-> escala ni al otorgamiento: otorgar o corregir una autorización falla con «La
-> conexión con Recaudaciones (SIREB) está en ajuste», y la escala muestra los
-> tramos sin precio. «Al otorgar», más abajo, describe cómo funcionaba el 29/09 y
-> sirve de guía para volver a conectarlo.
->
-> 29/09/2026. Hoy lo usa **solo la autorización**. Carnet, faena y guía siguen
-> con su precio propio en Jichi, y pasan a este esquema en las etapas siguientes.
+> 30/09/2026: los cuatro documentos —autorización, carnet, faena y guía— toman
+> el precio de SIREB al emitirse y lo congelan. Ninguna tarifa se escribe a mano.
 
 ## La regla
 
@@ -92,6 +85,12 @@ manda SIREB: la columna vieja de 30 caracteres los cortaba y ya no coincidían.
 Los `rango_desde` / `rango_hasta` de SIREB llegan en null, así que los kilos y
 la modalidad siguen siendo de Jichi.
 
+El listado muestra la tarifa de cada tramo por su NOMBRE —servicio y etiqueta
+de SIREB, con los ids en el `title`— y su precio de referencia, con
+`VistaSireb::tarifasPorId()` + `describir()`. Si SIREB no responde o ya no tiene
+la tarifa, vuelven los ids y el precio sale «—»; el monto también es «—» con el
+servicio de baja. El que vale es el que congela cada cupo al otorgarse.
+
 ### El formulario del tramo
 
 *(30/09/2026)* Alta y edición van en su **propia pantalla**
@@ -138,7 +137,7 @@ formulario de alta/edición ya ocupa ese lugar y los dos se pisaban.
 
 *(30/09/2026)* Tienen lo mismo que la escala, salvo el alta, que no existe a
 propósito (la lista sale de la resolución): `servicio_sireb` y `tarifa_sireb`
-(nullable: los sembrados nacen sin tarifa y la tabla lo marca «Sin tarifa»),
+(nullable: un tipo sin tarifa lo marca «Sin tarifa»; `CatalogoSeeder` ya siembra los dos con la suya),
 historial, edición en `tipos-carnet-formulario.tsx` y vista de historial en
 `tipos-carnet-historial.tsx`.
 
@@ -160,13 +159,16 @@ Las pantallas de crear/editar carnet muestran el precio de referencia con
 `VistaSireb::preciosPorTarifa()` («—» si no hay); el que vale es el que congela
 la emisión.
 
+Los listados de Tipos de carnet, Productos —precio por kilo— y Aranceles muestran la tarifa igual que la escala: nombre, etiqueta y precio de referencia.
+
 ### Productos hidrobiológicos
 
 *(30/09/2026)* Igual que la escala —con alta, edición e historial en pantallas
 aparte (`productos-formulario.tsx`, `productos-historial.tsx`)— y sin
-`precio_kg`: la tarifa **por kilo** sale de SIREB. Dos diferencias: la tarifa
-**se puede compartir** entre productos (el select avisa «también: …» pero no la
-bloquea), y el precio lo congela la **guía**: `EmitirGuiaService` lo pide por
+`precio_kg`: la tarifa **por kilo** sale de SIREB. Como en la escala, **una
+tarifa por producto**: el select deshabilita las ocupadas y el Request las
+rechaza (30/09/2026; antes se podían compartir). La diferencia es que el precio
+lo congela la **guía**: `EmitirGuiaService` lo pide por
 producto con `PrecioSireb` y lo guarda en `guia_detalles.precio_kg` +
 `sireb_tarifa_id`. Sin precio de algún producto, la guía no se emite. El
 formulario de la guía muestra el precio de referencia con
@@ -176,7 +178,7 @@ formulario de la guía muestra el precio de referencia con
 
 *(30/09/2026)* Los cobros que no cuelgan de un catálogo tienen su fila en
 `aranceles_sireb`, una por `ConceptoArancel` —hoy solo `faena`—, y se editan en
-**Catálogos › Aranceles** (sin alta ni baja: las filas las pone el seeder). Cada
+**Catálogos › Aranceles** (sin alta ni baja: las filas las pone el seeder, `faena` ya con su tarifa). Cada
 una lleva el select de tarifa y el historial de siempre.
 
 - **Faena:** `EmitirFaenaService` pide el precio con `PrecioSireb` sobre la fila
@@ -192,38 +194,35 @@ servicio `activo` y la tarifa dentro de él, y si algo falla lanza
 `SinPrecioException` con el motivo, que cada servicio envuelve en su excepción.
 
 **Lo compartido entre los catálogos:** el trait `App\Traits\HistorialSireb`
-(anota el cambio), `App\Sireb\VistaSireb` (arma el select y el historial) y los
-componentes `components/panel/catalogos/selector-tarifa-sireb.tsx` e
-`historial-sireb.tsx`. Un catálogo nuevo con tarifa de SIREB usa estas cuatro
+(anota el cambio), `App\Sireb\VistaSireb` (arma el select, el historial y la
+celda del listado) y los componentes `components/panel/catalogos/selector-tarifa-sireb.tsx`,
+`historial-sireb.tsx` y `celda-sireb.tsx`. Un catálogo nuevo con tarifa de SIREB usa estas cinco
 piezas y no copia nada. Un período «sin tarifa» también queda en el historial,
 con sus fechas.
 
 ## Al otorgar
 
-`OtorgarCupoService::otorgar()` y `editar()` piden el precio con
-`SirebService::precioDe()` y lo **congelan** en `aprovechamientos_pesq.monto`,
-junto con `sireb_tarifa_id`. `montoACobrar()` lee esa columna, así que los
-listados, la Caja y el tablero no llaman a SIREB.
+`OtorgarCupoService::otorgar()` y `editar()` piden el precio del tramo con
+`PrecioSireb::de($servicio_sireb, $tarifa_sireb)` —directo a SIREB, sin caché— y
+lo **congelan** en `aprovechamientos_pesq.monto`, junto con `sireb_tarifa_id`.
+`montoACobrar()` lee esa columna, así que los listados, la Caja y el tablero no
+llaman a SIREB.
 
 | Situación | Qué pasa |
 | --- | --- |
 | SIREB da un precio | Se otorga con ese monto |
-| El código no existe en SIREB | No se otorga: «no está en el catálogo del SEDAG» |
-| El servicio tiene varias tarifas | No se otorga: «necesita exactamente una» |
+| El servicio no existe o está de baja | No se otorga |
+| La tarifa ya no está en ese servicio | No se otorga: «su tarifa ya no está en SIREB» |
 | SIREB o Ibare no responden | No se otorga: «Recaudaciones no responde» |
 | Se corrige el borrador | Se vuelve a pedir el precio |
 
-**Sin SIREB no se otorga, a propósito**: ninguna tarifa se escribe a mano. Las
-pantallas que solo muestran el precio (la escala y los formularios) usan
-`serviciosSiResponde()`, que devuelve null en vez de fallar, y abren igual.
-`SirebService::precioDe()` ya no existe; el `precioDe()` privado de
-`OtorgarCupoService` falla a propósito («en ajuste»). Al reconectar, el precio
-sale de la tarifa `tarifa_sireb` dentro de `servicio($servicio_sireb)`.
+El error nombra el tramo por su texto («601 Kg Hasta 800 Kg»), nunca por su
+número. Los selects de crear/editar muestran «texto del tramo — precio» con el
+precio de referencia de `tarifasPorId()` (caché 10 min); el que vale es el que
+pide el servicio al guardar.
 
 ## Lo que falta
 
-- La autorización de pesca: `OtorgarCupoService::precioDe()` sigue «en ajuste»;
-  se conecta con `PrecioSireb` sobre `servicio_sireb`/`tarifa_sireb` del tramo.
 - El cobro sigue en Jichi (pagos, boletas, recibo). Registrar la liquidación en
   SIREB y usar su `codigo_publico` es otra etapa: ver el análisis de las
   diferencias (una boleta por liquidación, vencimiento, quién valida).

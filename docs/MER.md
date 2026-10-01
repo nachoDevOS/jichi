@@ -184,7 +184,7 @@ mintiendo—.
 | --- | --- | --- |
 | `nombre` | string(120), único | |
 | `tipo_actor` | string(20) | Para qué actividad sirve |
-| `servicio_sireb` / `tarifa_sireb` | uuid, nullable | Servicio y tarifa de SIREB del tipo: de ahí sale el precio. **Ya no hay `precio_bs`** (30/09/2026). Nullable porque los tipos sembrados nacen sin ellos —y sin tarifa ese tipo no emite—; el Request los exige al editar, y la tarifa es única entre las filas vivas |
+| `servicio_sireb` / `tarifa_sireb` | uuid, nullable | Servicio y tarifa de SIREB del tipo: de ahí sale el precio. **Ya no hay `precio_bs`** (30/09/2026). Nullable porque un tipo puede quedar sin ellos —y sin tarifa no emite—; `CatalogoSeeder` siembra los dos con su tarifa; el Request los exige al editar, y la tarifa es única entre las filas vivas |
 | `sireb_historial` | json, nullable | Los pares anteriores, igual que en la escala: trait `HistorialSireb` |
 | `estado` | boolean | |
 
@@ -726,7 +726,7 @@ cambiaría lo que se cobró.
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `nombre` | string(120) | «Surubí». Único entre los vivos (lo exige el Request) |
-| `servicio_sireb` / `tarifa_sireb` | uuid, nullable | Servicio y tarifa **por kilo** de SIREB. **Ya no hay `precio_kg`** (30/09/2026). Nullable porque los sembrados nacen sin ellos —y sin tarifa el producto no entra en una guía—. A diferencia de la escala y los tipos de carnet, **la tarifa se puede compartir**: dos especies pueden cobrar igual el kilo |
+| `servicio_sireb` / `tarifa_sireb` | uuid, nullable | Servicio y tarifa **por kilo** de SIREB. **Ya no hay `precio_kg`** (30/09/2026). Nullable porque un producto puede no tener tarifa todavía en SIREB —y sin ella no entra en una guía—; `CatalogoSeeder` siembra solo los que ya tienen tarifa. Como en la escala, **la tarifa no se comparte** (lo controla el Request, sin índice): compartida, cambiar el precio de una especie arrastraría a la otra |
 | `sireb_historial` | json, nullable | Los pares anteriores: trait `HistorialSireb` |
 | `estado` | boolean | Inactivo: no se elige en una guía nueva |
 

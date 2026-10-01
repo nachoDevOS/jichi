@@ -6,29 +6,12 @@
 
 ---
 
-## 🔴 Precios de SIREB: volver a migrar y cargar los servicios — 29/09/2026
+## ✅ Precios de SIREB conectados — 30/09/2026
 
-> **30/09/2026: la conexión del precio está DESCONECTADA** (ver
-> [modulos/SIREB.md](modulos/SIREB.md)). Hoy no se puede otorgar ni corregir
-> ninguna autorización. Queda solo `php artisan jichi:sireb` para probar el token
-> y ver el catálogo crudo.
-
-La escala ya no tiene `valor_bs`: guarda `servicio_sireb`, y la autorización
-congela `monto` y `sireb_tarifa_id` (migraciones editadas, regla 12). **Hasta
-volver a migrar, la base de trabajo no tiene esas columnas.** Y hasta que
-Recaudaciones cargue un servicio por tramo, **no se puede otorgar ninguna
-autorización**:
-
-- [ ] Volver a migrar (`migrate:fresh --seed`). Verificado sobre SQLite descartable.
-- [ ] Recaudaciones carga los 7 tramos como 7 servicios en SIREB, cada uno con
-      UNA tarifa vigente. Hoy SIREB tiene un solo `SEDAG-001` con 7 tarifas, y
-      solo en su seeder de desarrollo.
-- [ ] Poner en cada tramo el código real (Catálogos → Escala). Los del seeder
-      (`SEDAG-001` a `SEDAG-007`) son plantilla.
-- [ ] `SIREB_URL`, `SIREB_CLIENT_ID` y `SIREB_CLIENT_SECRET` en el `.env`, y el
-      sistema `sedag` dado de alta y `activo` en el panel de SIREB.
-- [ ] Siguiente: carnet, faena y guía, con el mismo esquema. Ver
-      [modulos/SIREB.md](modulos/SIREB.md).
+La autorización, el carnet, la faena y la guía piden el precio a SIREB al
+emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
+por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
+que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
 ## 🔴 Hay que volver a migrar para el portal — 28/09/2026
 
