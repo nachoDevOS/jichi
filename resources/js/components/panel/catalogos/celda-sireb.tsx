@@ -9,11 +9,14 @@ export function CeldaSireb({
     tarifaId,
     servicio,
     etiqueta,
+    estado,
 }: {
     servicioId: string | null;
     tarifaId: string | null;
     servicio: string | null;
     etiqueta: string | null;
+    /** Estado de la tarifa en SIREB; sin él no se muestra la etiqueta. */
+    estado?: string | null;
 }) {
     if (!tarifaId) {
         return <Badge color="amber">Sin tarifa</Badge>;
@@ -35,6 +38,11 @@ export function CeldaSireb({
         <div title={`Tarifa ${tarifaId}\nServicio ${servicioId}`}>
             <p>{servicio}</p>
             <p className="text-xs text-muted-foreground">{etiqueta}</p>
+            {estado && (
+                <Badge color={estado === 'activo' ? 'emerald' : 'slate'} className="mt-1">
+                    {estado === 'activo' ? 'Activa' : 'Inactiva'}
+                </Badge>
+            )}
         </div>
     );
 }

@@ -223,6 +223,10 @@ pide el servicio al guardar.
 
 ## Lo que falta
 
+- **El endpoint para el precio al emitir es provisorio** (01/10/2026).
+  `servicio($id)` —el que usa `PrecioSireb` al registrar— se reemplaza por el
+  que va a pasar el responsable. Ver [PENDIENTES.md](../PENDIENTES.md).
+
 - El cobro sigue en Jichi (pagos, boletas, recibo). Registrar la liquidación en
   SIREB y usar su `codigo_publico` es otra etapa: ver el análisis de las
   diferencias (una boleta por liquidación, vencimiento, quién valida).

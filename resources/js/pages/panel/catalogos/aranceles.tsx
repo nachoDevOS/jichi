@@ -81,6 +81,7 @@ export default function CatalogoAranceles({
                                                         tarifaId={a.tarifa_sireb}
                                                         servicio={a.sireb_servicio}
                                                         etiqueta={a.sireb_etiqueta}
+                                                        estado={a.sireb_estado}
                                                     />
                                                 </td>
 

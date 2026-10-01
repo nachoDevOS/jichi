@@ -13,6 +13,14 @@ emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
 por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
 que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
+## 🟠 El precio al emitir: falta el endpoint definitivo de SIREB — 01/10/2026
+
+Al registrar, `PrecioSireb::de()` pide el precio con `SirebService::servicio($id)`
+(`GET /api/v1/catalogo/servicios/{id}`, sin caché). El responsable decidió no
+usar ese camino por ahora: va a pasar el endpoint correcto. Cuando llegue, se
+cambia `servicio()` —o lo que llama `PrecioSireb`— y se prueba emitiendo los
+cuatro documentos. Lo que solo muestra precios (`servicios()`) no cambia.
+
 ## 🔴 Hay que volver a migrar para el portal — 28/09/2026
 
 El portal del beneficiario agregó columnas a `users` DENTRO de las migraciones

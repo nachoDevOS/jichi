@@ -87,6 +87,7 @@ export interface ServicioSireb {
     nombre: string;
     /** false = dado de baja en SIREB: no se puede elegir. */
     activo: boolean;
+    /** Solo las liquidables: el servidor descarta el resto. */
     tarifas: { id: string; etiqueta: string; monto: number }[];
 }
 
@@ -135,6 +136,8 @@ export interface ProductoFila extends ReferenciaSireb {
 export interface ReferenciaSireb {
     sireb_servicio: string | null;
     sireb_etiqueta: string | null;
+    /** Estado de la tarifa tal como lo manda SIREB: `activo` / `inactivo`. */
+    sireb_estado: string | null;
     /** Precio de referencia: el que vale lo congela cada documento al emitirse. */
     precio: number | null;
 }

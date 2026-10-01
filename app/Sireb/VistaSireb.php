@@ -28,18 +28,27 @@ class VistaSireb
             return null;
         }
 
-        return array_map(fn (array $s): array => [
-            'id' => $s['id'],
-            'codigo' => $s['codigo'] ?? null,
-            'nombre' => $s['nombre'] ?? '',
-            // SIREB manda también lo dado de baja: solo `activo` se puede elegir.
-            'activo' => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO,
-            'tarifas' => array_map(fn (array $t): array => [
-                'id' => $t['id'],
-                'etiqueta' => $t['etiqueta'] ?? '',
-                'monto' => (float) ($t['monto'] ?? 0),
-            ], $s['tarifas'] ?? []),
-        ], $servicios);
+        // Llegan todas las tarifas (`tarifas=todas`): el select ofrece solo las
+        // liquidables, y un servicio sin ninguna no aparece.
+        return collect($servicios)
+            ->map(fn (array $s): array => [
+                'id' => $s['id'],
+                'codigo' => $s['codigo'] ?? null,
+                'nombre' => $s['nombre'] ?? '',
+                'activo' => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO,
+                'tarifas' => collect($s['tarifas'] ?? [])
+                    ->filter(fn (array $t) => ($t['liquidable'] ?? false) === true)
+                    ->map(fn (array $t): array => [
+                        'id' => $t['id'],
+                        'etiqueta' => $t['etiqueta'] ?? '',
+                        'monto' => (float) ($t['monto'] ?? 0),
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->filter(fn (array $s) => $s['activo'] && $s['tarifas'] !== [])
+            ->values()
+            ->all();
     }
 
     /**
@@ -58,9 +67,9 @@ class VistaSireb
 
     /**
      * Cada tarifa por id con el nombre de su servicio y su etiqueta; null si
-     * SIREB no responde. El monto va en null si el servicio no está activo.
+     * SIREB no responde. El monto va en null si la tarifa no es liquidable.
      *
-     * @return array<string, array{servicio: string, etiqueta: string, monto: ?float}>|null
+     * @return array<string, array{servicio: string, etiqueta: string, estado: ?string, monto: ?float}>|null
      */
     public function tarifasPorId(): ?array
     {
@@ -75,7 +84,11 @@ class VistaSireb
                 'id' => $t['id'],
                 'servicio' => $s['nombre'] ?? '',
                 'etiqueta' => $t['etiqueta'] ?? '',
-                'monto' => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO ? (float) $t['monto'] : null,
+                // `activo` / `inactivo`, tal como lo manda SIREB.
+                'estado' => $t['estado'] ?? null,
+                // Sin precio si no se puede cobrar: servicio de baja o tarifa no liquidable.
+                'monto' => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO && ($t['liquidable'] ?? false) === true
+                    ? (float) $t['monto'] : null,
             ], $s['tarifas'] ?? []))
             ->keyBy('id')
             ->map(fn (array $t) => array_diff_key($t, ['id' => true]))
@@ -86,8 +99,8 @@ class VistaSireb
      * Lo que muestra un listado de catálogo sobre la tarifa de una fila.
      * Nombres en null si la tarifa ya no está en SIREB o no responde.
      *
-     * @param  array<string, array{servicio: string, etiqueta: string, monto: ?float}>|null  $tarifas  de tarifasPorId()
-     * @return array{sireb_servicio: ?string, sireb_etiqueta: ?string, precio: ?float}
+     * @param  array<string, array{servicio: string, etiqueta: string, estado: ?string, monto: ?float}>|null  $tarifas  de tarifasPorId()
+     * @return array{sireb_servicio: ?string, sireb_etiqueta: ?string, sireb_estado: ?string, precio: ?float}
      */
     public static function describir(?array $tarifas, ?string $tarifaId): array
     {
@@ -96,6 +109,7 @@ class VistaSireb
         return [
             'sireb_servicio' => $tarifa['servicio'] ?? null,
             'sireb_etiqueta' => $tarifa['etiqueta'] ?? null,
+            'sireb_estado' => $tarifa['estado'] ?? null,
             // De referencia: el que vale lo congela cada documento al emitirse.
             'precio' => $tarifa['monto'] ?? null,
         ];

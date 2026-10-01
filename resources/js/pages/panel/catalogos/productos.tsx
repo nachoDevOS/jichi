@@ -161,6 +161,7 @@ export default function CatalogoProductos({
                                                             tarifaId={p.tarifa_sireb}
                                                             servicio={p.sireb_servicio}
                                                             etiqueta={p.sireb_etiqueta}
+                                                            estado={p.sireb_estado}
                                                         />
                                                     </td>
 

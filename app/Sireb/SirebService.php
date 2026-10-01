@@ -23,10 +23,11 @@ class SirebService
     /**
      * Una página del catálogo TAL COMO LA MANDA SIREB, sin resumir ni cachear.
      * SIREB filtra por la dependencia del token: solo llegan servicios del SEDAG.
+     * Con `tarifas=todas`: cada tarifa trae `estado`, `tarifario_estado` y `liquidable`.
      */
     public function catalogoCrudo(int $pagina = 1): array
     {
-        return $this->get(self::RUTA_SERVICIOS, ['pagina' => $pagina, 'por_pagina' => 100]) ?? [];
+        return $this->get(self::RUTA_SERVICIOS, ['pagina' => $pagina, 'por_pagina' => 100, 'tarifas' => 'todas']) ?? [];
     }
 
     /**

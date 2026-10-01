@@ -213,6 +213,7 @@ export default function CatalogoEscala({
                                                                 tarifaId={t.tarifa_sireb}
                                                                 servicio={t.sireb_servicio}
                                                                 etiqueta={t.sireb_etiqueta}
+                                                                estado={t.sireb_estado}
                                                             />
                                                         </td>
 
