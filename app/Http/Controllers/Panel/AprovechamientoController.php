@@ -36,9 +36,6 @@ use Inertia\Response;
  */
 class AprovechamientoController extends Controller
 {
-    /** TEMPORAL (02/10/2026): «Registrar» solo verifica la tarifa en SIREB y no guarda. En false vuelve a otorgar. */
-    private const SOLO_VERIFICAR_TARIFA = true;
-
     public function __construct(private readonly OtorgarCupoService $servicio) {}
 
     /**
@@ -126,10 +123,6 @@ class AprovechamientoController extends Controller
     {
         $datos = $request->validated();
 
-        if (self::SOLO_VERIFICAR_TARIFA) {
-            return $this->verificarTarifa(CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']));
-        }
-
         try {
             $cupo = $this->servicio->otorgar(
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
@@ -138,6 +131,10 @@ class AprovechamientoController extends Controller
                 now()->parse($datos['fecha_solicitud']),
             );
         } catch (CupoInvalidoException $e) {
+            if ($e->delTramo) {
+                return $this->tarifaRechazada($e);
+            }
+
             // Error DEL CAMPO y no un cartel arriba: la regla que falló es sobre
             // la persona elegida, y el texto tiene que salir al lado de ese campo.
             return back()
@@ -159,23 +156,10 @@ class AprovechamientoController extends Controller
             ));
     }
 
-    /** El resultado de la verificación en SIREB, sin escribir nada; el formulario queda como estaba. */
-    private function verificarTarifa(CategoriaAprovechamiento $tramo): RedirectResponse
+    /** Tarifa inactiva, vencida o SIREB caído: no se registra y el motivo va en el aviso, no bajo el select. */
+    private function tarifaRechazada(CupoInvalidoException $e): RedirectResponse
     {
-        try {
-            ['precio' => $precio] = $this->servicio->verificarPrecio($tramo);
-        } catch (CupoInvalidoException $e) {
-            // Al lado del tramo: es la tarifa de ese tramo la que falló.
-            return back()->withInput()
-                ->withErrors(['categoria_aprov_id' => $e->getMessage()])
-                ->with('error', 'No se registró el aprovechamiento: la tarifa no pasó la verificación en SIREB.');
-        }
-
-        return back()->withInput()->with('info', sprintf(
-            'Tarifa verificada en SIREB: tarifa y servicio activos, cobrable. Monto: %s Bs. '.
-            'Modo verificación: NO se guardó nada.',
-            number_format($precio['monto'], 2, ',', '.'),
-        ));
+        return back()->withInput()->with('error', 'No se registró la autorización. '.$e->getMessage());
     }
 
     /**
@@ -396,12 +380,15 @@ class AprovechamientoController extends Controller
                 now()->parse($datos['fecha_solicitud']),
             );
         } catch (CupoInvalidoException $e) {
-            // Cuelga del tramo y no de la persona: al corregir, el titular no se
-            // toca, así que el único campo con el que el operador puede
-            // reaccionar es la escala.
+            if ($e->delTramo) {
+                return $this->tarifaRechazada($e);
+            }
+
+            // Al corregir el titular no se toca: el único campo con el que el
+            // operador puede reaccionar es la escala.
             return back()->withInput()
                 ->withErrors(['categoria_aprov_id' => $e->getMessage()])
-                ->with('error', 'No se registró el aprovechamiento: la tarifa no pasó la verificación en SIREB.');
+                ->with('error', 'No se registró el aprovechamiento. Revise el motivo en el formulario.');
         }
 
         return redirect()

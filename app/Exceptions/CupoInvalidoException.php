@@ -9,6 +9,9 @@ use RuntimeException;
  */
 class CupoInvalidoException extends RuntimeException
 {
+    /** Falló el tramo elegido (tarifa o escala), no la persona: se avisa arriba, no bajo un campo. */
+    public bool $delTramo = false;
+
     /**
      *  Una persona, una bolsa madre vigente a la vez
      */
@@ -29,16 +32,26 @@ class CupoInvalidoException extends RuntimeException
      */
     public static function escalaDerogada(int $nroEscala): self
     {
-        return new self(
+        $e = new self(
             "La escala {$nroEscala} fue derogada y ya no se puede otorgar. ".
             'Vuelva a abrir el formulario para ver los tramos vigentes.',
         );
+        $e->delTramo = true;
+
+        return $e;
     }
 
-    /** Recaudaciones no dio el precio del tramo: sin precio no se otorga. */
-    public static function sinPrecio(string $tramo, string $motivo): self
+    /** Recaudaciones no dio el precio del tramo. Texto para ventanilla: el motivo técnico va al log. */
+    public static function sinPrecio(string $tramo, bool $sinRespuesta): self
     {
-        return new self("No se pudo obtener el precio del tramo «{$tramo}»: {$motivo} Revíselo en Catálogos › Escala.");
+        $e = new self($sinRespuesta
+            ? 'No se pudo consultar el precio en Recaudaciones porque el sistema no responde en este momento. '.
+              'Espere unos minutos y vuelva a intentarlo.'
+            : "La escala de la autorización «{$tramo}» no está habilitada para cobrar en este momento. ".
+              'Elija otra escala o consulte con el encargado del sistema.');
+        $e->delTramo = true;
+
+        return $e;
     }
 
     /** Se quiso presentar un cupo que ya no está en el borrador. */

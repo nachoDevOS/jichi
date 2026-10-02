@@ -12,7 +12,7 @@ export function useFlash() {
 
     useEffect(() => {
         if (flash?.exito) toast.success(flash.exito);
-        if (flash?.error) toast.error(flash.error);
+        if (flash?.error) toast.error(flash.error, { duration: 10000 }); // el motivo es largo: 4 s no alcanzan
         if (flash?.info) toast.info(flash.info);
     }, [flash]);
 }

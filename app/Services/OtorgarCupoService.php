@@ -11,6 +11,7 @@ use App\Sireb\PrecioSireb;
 use App\Sireb\SinPrecioException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  *  PASO 2 DEL FLUJO DEL PESCADOR — otorgar la BOLSA MADRE
@@ -224,7 +225,12 @@ class OtorgarCupoService
         try {
             return $this->precios->de($tramo->servicio_sireb, $tramo->tarifa_sireb, exigirLiquidable: true);
         } catch (SinPrecioException $e) {
-            throw CupoInvalidoException::sinPrecio($tramo->descripcion_kg, $e->getMessage());
+            // El motivo exacto (tarifa de baja, servicio de baja…) es para quien administra SIREB.
+            Log::warning('SIREB rechazó el precio del tramo', [
+                'tramo' => $tramo->id, 'tarifa' => $tramo->tarifa_sireb, 'motivo' => $e->getMessage(),
+            ]);
+
+            throw CupoInvalidoException::sinPrecio($tramo->descripcion_kg, $e->sinRespuesta);
         }
     }
 }

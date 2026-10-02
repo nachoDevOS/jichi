@@ -241,6 +241,14 @@ llaman a SIREB.
 | SIREB o Ibare no responden | No se otorga: «Recaudaciones no responde» |
 | Se corrige el borrador | Se vuelve a pedir el precio |
 
+*(02/10/2026)* **Ventanilla no ve esos motivos**: ve uno de dos avisos rojos,
+arriba de la pantalla. Si SIREB no contestó: «no responde en este momento,
+espere unos minutos». Si contestó que no se cobra (cualquiera de las otras
+filas): «La escala de la autorización «1 Kg Hasta 100 Kg» no está habilitada para cobrar en este
+momento. Elija otra escala o consulte con el encargado del sistema». El motivo
+exacto va a `storage/logs` («SIREB rechazó el precio del tramo»). Lo distingue
+`SinPrecioException::$sinRespuesta`.
+
 El error nombra el tramo por su texto («601 Kg Hasta 800 Kg»), nunca por su
 número. Los selects de crear/editar muestran «texto del tramo — precio» con el
 precio de referencia de `tarifasPorId()` (caché 10 min); el que vale es el que

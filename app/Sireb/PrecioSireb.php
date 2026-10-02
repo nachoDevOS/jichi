@@ -31,7 +31,10 @@ class PrecioSireb
         try {
             $tarifa = $this->tarifas[$servicioId.'|'.$tarifaId] ??= $this->sireb->tarifa($servicioId, $tarifaId);
         } catch (SirebException) {
-            throw new SinPrecioException('Recaudaciones (SIREB) no responde. Intente de nuevo en unos minutos.');
+            $e = new SinPrecioException('Recaudaciones (SIREB) no responde. Intente de nuevo en unos minutos.');
+            $e->sinRespuesta = true;
+
+            throw $e;
         }
 
         // El 404 no distingue si falta el servicio o la tarifa dentro de él.

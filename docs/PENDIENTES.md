@@ -13,13 +13,11 @@ emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
 por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
 que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
-## 🔴 «Registrar» la autorización NO GUARDA: modo verificación — 02/10/2026
+## ✅ «Registrar» la autorización vuelve a guardar — 02/10/2026
 
-`AprovechamientoController::SOLO_VERIFICAR_TARIFA = true`, a propósito y por
-ahora: el botón solo consulta la tarifa en SIREB
-(`OtorgarCupoService::verificarPrecio()`) y muestra el resultado —el monto si
-pasa, el motivo bajo «Tramo de la escala» si no—, sin escribir en la base. Para
-volver a otorgar, ponerlo en `false`.
+Se quitó el modo de solo verificación. `otorgar()` verifica la tarifa en SIREB
+(`verificarPrecio()`) y, si está activa, guarda; si no, no guarda y el motivo
+sale en el aviso rojo de arriba.
 
 ## ✅ El precio al emitir: endpoint definitivo de SIREB — 02/10/2026
 
