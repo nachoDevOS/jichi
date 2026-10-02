@@ -266,8 +266,8 @@ copia en vez de leerse por relación:
 | `recibos.monto_total`, `recibos.concepto` | Lo que dice el papel entregado |
 | `guias_movimiento.asociacion_id` | El aval impreso en la guía |
 | `aprovechamientos_pesq.volumen_total_kg`, `modalidad` | Lo que se otorgó, aunque la escala cambie |
-| `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar (ver [modulos/SIREB.md](modulos/SIREB.md)) |
-| `carnets.monto`, `permisos_faena.monto`, `guia_detalles.precio_kg` (+ `sireb_tarifa_id`) | El precio de SIREB al emitir (30/09/2026) |
+| `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar, solo si la tarifa y el servicio están activos y la tarifa es liquidable (ver [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir)) |
+| `carnets.monto`, `permisos_faena.monto`, `guia_detalles.precio_kg` (+ `sireb_tarifa_id`) | El precio de SIREB al emitir (30/09/2026), solo si la tarifa y el servicio están activos (02/10/2026) |
 
 > **Lo que NO está congelado:** el titular del recibo se lee del padrón al
 > imprimir: corregir un apellido cambia la reimpresión. Ver [MER.md](MER.md),

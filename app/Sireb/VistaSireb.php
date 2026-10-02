@@ -15,6 +15,9 @@ class VistaSireb
     /** El único estado de servicio que SIREB manda como elegible. */
     public const SERVICIO_ACTIVO = 'activo';
 
+    /** Lo mismo para la tarifa: `activo` / `inactivo`. */
+    public const TARIFA_ACTIVA = 'activo';
+
     public function __construct(private SirebService $sireb) {}
 
     /**

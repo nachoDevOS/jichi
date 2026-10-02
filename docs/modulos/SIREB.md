@@ -54,13 +54,15 @@ llegan servicios del SEDAG**, nunca los de otras dependencias.
 | `catalogoCrudo($pagina)` | `GET /api/v1/catalogo/servicios?pagina=N&por_pagina=100&tarifas=todas` | **Una página**, tal cual: `data` + `meta` | No | `SirebException` |
 | `servicios($refrescar)` | El mismo, **una llamada por página** | **Todos** los servicios con sus tarifas, en una lista | 10 min | `SirebException` |
 | `serviciosSiResponde()` | Igual que `servicios()` | La lista, o `null` | 10 min | `null` |
-| `servicio($id)` | `GET /api/v1/catalogo/servicios/{id}` | **Un** servicio con sus `tarifas`, o `null` si SIREB responde 404 | No: precio de ahora | `SirebException` |
+| `servicio($id)` | `GET /api/v1/catalogo/servicios/{id}` | **Un** servicio con sus `tarifas`, o `null` si SIREB responde 404. Hoy no lo usa la emisión | No | `SirebException` |
+| `tarifa($servicio, $tarifa)` | `GET /api/v1/catalogo/servicios/{servicio}/tarifas/{tarifa}` | **Una** tarifa con su `estado`, `monto` y el `servicio` adentro, o `null` si SIREB responde 404 | No: estado y precio de ahora | `SirebException` |
 - **Mostrar** precios (escala, formularios) → `serviciosSiResponde()`: la
   pantalla abre igual con SIREB caído.
-- **Cobrar u otorgar** → `servicio($servicio_sireb)` y buscar `tarifa_sireb`
-  en sus `tarifas`: si SIREB no responde tiene que fallar, o se otorgaría un cupo
-  sin precio. Buscarla **dentro** de ese servicio evita cobrar con la tarifa de
-  otro.
+- **Cobrar u otorgar** → `PrecioSireb::de()`, que pide `tarifa($servicio_sireb,
+  $tarifa_sireb)` y exige **tarifa Y servicio en `activo`** (02/10/2026; antes
+  solo miraba el servicio y cobraba una tarifa dada de baja). Si SIREB no
+  responde tiene que fallar, o se otorgaría un cupo sin precio. Pedirla **bajo**
+  ese servicio evita cobrar con la tarifa de otro.
 - **SIREB NO filtra por estado** (coordinado con Recaudaciones, 30/09/2026):
   manda los servicios activos y los dados de baja, cada uno con su `estado`.
   Decidir si se cobra es de Jichi: **solo `estado === 'activo'` es cobrable**, y
@@ -222,16 +224,20 @@ con sus fechas.
 ## Al otorgar
 
 `OtorgarCupoService::otorgar()` y `editar()` piden el precio del tramo con
-`PrecioSireb::de($servicio_sireb, $tarifa_sireb)` —directo a SIREB, sin caché— y
-lo **congelan** en `aprovechamientos_pesq.monto`, junto con `sireb_tarifa_id`.
+`PrecioSireb::de($servicio_sireb, $tarifa_sireb, exigirLiquidable: true)`
+—directo a SIREB, sin caché— y lo **congelan** en `aprovechamientos_pesq.monto`,
+junto con `sireb_tarifa_id`. La verificación completa está en
+[Validación de la tarifa al emitir](#validación-de-la-tarifa-al-emitir).
 `montoACobrar()` lee esa columna, así que los listados, la Caja y el tablero no
 llaman a SIREB.
 
 | Situación | Qué pasa |
 | --- | --- |
-| SIREB da un precio | Se otorga con ese monto |
-| El servicio no existe o está de baja | No se otorga |
-| La tarifa ya no está en ese servicio | No se otorga: «su tarifa ya no está en SIREB» |
+| Tarifa y servicio activos, tarifa liquidable | Se otorga con ese monto |
+| La tarifa o el servicio no existen (404) | No se otorga: «su tarifa ya no está en SIREB» |
+| El servicio está de baja | No se otorga: «su servicio está dado de baja en SIREB» |
+| La tarifa está de baja | No se otorga: «su tarifa está dada de baja en SIREB» |
+| La tarifa está activa pero no es liquidable | No se otorga: «su tarifa no se puede cobrar hoy en SIREB (tarifario no vigente)» |
 | SIREB o Ibare no responden | No se otorga: «Recaudaciones no responde» |
 | Se corrige el borrador | Se vuelve a pedir el precio |
 
@@ -247,11 +253,95 @@ es para ventanilla, no nombra a SIREB. Lo decide el campo `liquidable` de
 ahí no se deshabilita nada). Al editar una autorización cuyo tramo quedó así, se
 ve seleccionado; guardar falla al pedir el precio.
 
-## Lo que falta
+## Validación de la tarifa al emitir
 
-- **El endpoint para el precio al emitir es provisorio** (01/10/2026).
-  `servicio($id)` —el que usa `PrecioSireb` al registrar— se reemplaza por el
-  que va a pasar el responsable. Ver [PENDIENTES.md](../PENDIENTES.md).
+*(02/10/2026)* Antes de guardar cualquiera de los cuatro documentos, Jichi
+pregunta a SIREB por **esa** tarifa y decide si se puede cobrar. Todo pasa en
+`PrecioSireb::de()`; los servicios de emisión solo lo llaman y traducen el error
+a su excepción.
+
+### El endpoint
+
+```
+GET /api/v1/catalogo/servicios/{servicio_sireb}/tarifas/{tarifa_sireb}
+Authorization: Bearer <token de Ibare>     (lo pone SirebService::get())
+```
+
+Primero el id del servicio, después el de la tarifa: si la tarifa no pertenece a
+ese servicio, SIREB responde 404, así que no se puede cobrar con la tarifa de
+otro servicio. Respuesta (recortada):
+
+```json
+{"data": {
+  "id": "01a0f096-…", "monto": "55.00", "etiqueta": "1 kg Hasta 100 kg",
+  "estado": "activo", "tarifario_estado": "vigente", "liquidable": true,
+  "servicio": {"id": "01a0f088-…", "codigo": "p", "estado": "activo",
+               "estado_tarifario": "liquidable", …}
+}}
+```
+
+Una sola llamada trae el estado de la tarifa **y** el de su servicio. Va sin
+caché: lo que se congela en el documento es el precio y el estado de ese momento.
+
+### El flujo
+
+```
+Funcionario aprieta «Registrar»
+  └─ Controller ─▶ OtorgarCupoService::otorgar() / editar()
+                     (o EmitirCarnetService, EmitirFaenaService, EmitirGuiaService)
+       └─ DB::transaction
+            ├─ bloquea al beneficiario, revisa reglas propias (una bolsa por persona…)
+            └─ PrecioSireb::de(servicio, tarifa, exigirLiquidable?)
+                 ├─ ids en null ............................ ✗ «no tiene tarifa de SIREB elegida»
+                 ├─ SirebService::tarifa() ── GET … ──▶ SIREB
+                 │    ├─ 401 → pide token nuevo y reintenta una vez
+                 │    ├─ 401/403 otra vez, 5xx, sin red ... ✗ «Recaudaciones (SIREB) no responde»
+                 │    └─ 404 → null ....................... ✗ «su tarifa ya no está en SIREB»
+                 ├─ servicio.estado ≠ 'activo' ............ ✗ «su servicio está dado de baja en SIREB»
+                 ├─ tarifa.estado ≠ 'activo' .............. ✗ «su tarifa está dada de baja en SIREB»
+                 ├─ exigirLiquidable y liquidable ≠ true .. ✗ «su tarifa no se puede cobrar hoy…»
+                 └─ ✓ {monto, tarifa_id}
+            └─ create(): monto y sireb_tarifa_id CONGELADOS → estado PENDIENTE
+```
+
+Cada ✗ es una `SinPrecioException`. El servicio de emisión la envuelve en su
+propia excepción (en la autorización: `CupoInvalidoException::sinPrecio()`, que
+nombra el tramo y manda a Catálogos › Escala), la transacción se deshace y
+**no queda nada escrito**. Ni en Jichi ni en SIREB: hoy Jichi solo **lee** de
+SIREB.
+
+### Qué exige cada documento
+
+| Documento | Tarifa `activo` | Servicio `activo` | `liquidable` |
+| --- | --- | --- | --- |
+| Autorización de Pesca para Aprovechamiento Pesquero | Sí | Sí | **Sí** |
+| Carnet | Sí | Sí | No (por ahora) |
+| Permiso de faena | Sí | Sí | No (por ahora) |
+| Guía (cada producto) | Sí | Sí | No (por ahora) |
+
+`liquidable` es lo que SIREB calcula sobre el tarifario: una tarifa puede estar
+`activo` y no ser cobrable si su tarifario no está `vigente`. Exigirlo a los
+otros tres es cambiar el `false` por defecto en su llamada a `de()`.
+
+### Detalles que importan
+
+- **Solo `'activo'` vale**, por igualdad estricta (`VistaSireb::SERVICIO_ACTIVO`,
+  `TARIFA_ACTIVA`): un estado nuevo que SIREB agregue mañana cuenta como no
+  cobrable, que es el lado seguro.
+- **Sin SIREB no se emite**, a propósito: la alternativa sería cobrar un precio
+  viejo o inventado.
+- **Caché por petición**: `PrecioSireb` recuerda cada par servicio|tarifa
+  durante la petición, así que una guía que repite un producto pide una vez. Pero
+  **cada tarifa distinta es una llamada** (~3 s contra `test.sireb`). Ver
+  [PENDIENTES.md](../PENDIENTES.md).
+- La llamada corre **dentro** de la transacción, con la fila del beneficiario
+  bloqueada: si SIREB tarda, el bloqueo dura lo mismo. No molesta con una
+  ventanilla, pero es lo primero que hay que mirar si aparecen esperas.
+- El select del formulario ya deshabilita las tarifas no liquidables (caché de
+  10 min); esta verificación es la que manda, porque en esos 10 minutos la tarifa
+  pudo cambiar.
+
+## Lo que falta
 
 - El cobro sigue en Jichi (pagos, boletas, recibo). Registrar la liquidación en
   SIREB y usar su `codigo_publico` es otra etapa: ver el análisis de las

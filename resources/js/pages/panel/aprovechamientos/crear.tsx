@@ -54,7 +54,8 @@ export default function CrearCupo({
 
     function enviar(e: FormEvent) {
         e.preventDefault();
-        form.post(route('aprovechamientos.store'));
+        // preserveState: si el servidor devuelve a esta misma pantalla, no se pierde lo cargado.
+        form.post(route('aprovechamientos.store'), { preserveState: true });
     }
 
     // Sin escala cargada no hay nada que otorgar, y el formulario en blanco no

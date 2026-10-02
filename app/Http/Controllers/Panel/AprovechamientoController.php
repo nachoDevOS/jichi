@@ -36,6 +36,9 @@ use Inertia\Response;
  */
 class AprovechamientoController extends Controller
 {
+    /** TEMPORAL (02/10/2026): «Registrar» solo verifica la tarifa en SIREB y no guarda. En false vuelve a otorgar. */
+    private const SOLO_VERIFICAR_TARIFA = true;
+
     public function __construct(private readonly OtorgarCupoService $servicio) {}
 
     /**
@@ -123,6 +126,10 @@ class AprovechamientoController extends Controller
     {
         $datos = $request->validated();
 
+        if (self::SOLO_VERIFICAR_TARIFA) {
+            return $this->verificarTarifa(CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']));
+        }
+
         try {
             $cupo = $this->servicio->otorgar(
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
@@ -135,7 +142,8 @@ class AprovechamientoController extends Controller
             // la persona elegida, y el texto tiene que salir al lado de ese campo.
             return back()
                 ->withInput()
-                ->withErrors(['beneficiario_id' => $e->getMessage()]);
+                ->withErrors(['beneficiario_id' => $e->getMessage()])
+                ->with('error', 'No se registró el aprovechamiento. Revise el motivo en el formulario.');
         }
 
         /*
@@ -149,6 +157,25 @@ class AprovechamientoController extends Controller
                 number_format((float) $cupo->volumen_total_kg, 2, ',', '.'),
                 number_format($cupo->montoACobrar(), 2, ',', '.'),
             ));
+    }
+
+    /** El resultado de la verificación en SIREB, sin escribir nada; el formulario queda como estaba. */
+    private function verificarTarifa(CategoriaAprovechamiento $tramo): RedirectResponse
+    {
+        try {
+            ['precio' => $precio] = $this->servicio->verificarPrecio($tramo);
+        } catch (CupoInvalidoException $e) {
+            // Al lado del tramo: es la tarifa de ese tramo la que falló.
+            return back()->withInput()
+                ->withErrors(['categoria_aprov_id' => $e->getMessage()])
+                ->with('error', 'No se registró el aprovechamiento: la tarifa no pasó la verificación en SIREB.');
+        }
+
+        return back()->withInput()->with('info', sprintf(
+            'Tarifa verificada en SIREB: tarifa y servicio activos, cobrable. Monto: %s Bs. '.
+            'Modo verificación: NO se guardó nada.',
+            number_format($precio['monto'], 2, ',', '.'),
+        ));
     }
 
     /**
@@ -372,7 +399,9 @@ class AprovechamientoController extends Controller
             // Cuelga del tramo y no de la persona: al corregir, el titular no se
             // toca, así que el único campo con el que el operador puede
             // reaccionar es la escala.
-            return back()->withInput()->withErrors(['categoria_aprov_id' => $e->getMessage()]);
+            return back()->withInput()
+                ->withErrors(['categoria_aprov_id' => $e->getMessage()])
+                ->with('error', 'No se registró el aprovechamiento: la tarifa no pasó la verificación en SIREB.');
         }
 
         return redirect()

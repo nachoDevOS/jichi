@@ -635,7 +635,9 @@ Los tres tienen que pasar.
   otorga**: es a propósito, ninguna tarifa se escribe a mano. Las pantallas que
   solo MUESTRAN precio usan `SirebService::serviciosSiResponde()` y abren igual
   con SIREB caído. **`servicios()` va en caché 10 minutos**: un precio recién
-  cambiado en SIREB tarda eso en llegar; `servicio($id)` no, da el de ahora.
+  cambiado en SIREB tarda eso en llegar; `tarifa($servicio, $tarifa)` no, da el
+  de ahora. Al emitir, la tarifa y su servicio tienen que estar `activo` (la
+  autorización exige además `liquidable`), o no se emite.
   Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
 - **Un id de SIREB cortado no falla: deja de coincidir.** `servicio_sireb` era
   `string(30)` y los ids de SIREB miden 36; se guardaban recortados y en

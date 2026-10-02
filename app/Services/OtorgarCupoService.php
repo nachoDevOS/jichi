@@ -45,15 +45,7 @@ class OtorgarCupoService
                 );
             }
 
-            // El tramo se relee DESDE LA BASE: entre abrir el formulario y guardar
-            // pueden pasar minutos, y alguien pudo derogar la escala.
-            $tramo = CategoriaAprovechamiento::query()->whereKey($categoria->id)->firstOrFail();
-
-            if (! $tramo->estado) {
-                throw CupoInvalidoException::escalaDerogada($tramo->nro_escala);
-            }
-
-            $precio = $this->precioDe($tramo);
+            ['tramo' => $tramo, 'precio' => $precio] = $this->verificarPrecio($categoria);
 
             $cupo = AprovechamientoPesq::create([
                 'beneficiario_id' => $beneficiario->id,
@@ -201,15 +193,36 @@ class OtorgarCupoService
     }
 
     /**
-     * El precio del tramo según SIREB, el de ahora. Sin él no se otorga:
-     * ninguna tarifa se escribe a mano.
+     * Lo que otorgar() revisa del tramo antes de escribir: vigente en Jichi y con
+     * tarifa cobrable en SIREB. No escribe nada, así que sirve también para probar.
+     *
+     * @return array{tramo: CategoriaAprovechamiento, precio: array{monto: float, tarifa_id: string}}
+     *
+     * @throws CupoInvalidoException
+     */
+    public function verificarPrecio(CategoriaAprovechamiento $categoria): array
+    {
+        // Se relee DESDE LA BASE: entre abrir el formulario y guardar pueden pasar
+        // minutos, y alguien pudo derogar la escala.
+        $tramo = CategoriaAprovechamiento::query()->whereKey($categoria->id)->firstOrFail();
+
+        if (! $tramo->estado) {
+            throw CupoInvalidoException::escalaDerogada($tramo->nro_escala);
+        }
+
+        return ['tramo' => $tramo, 'precio' => $this->precioDe($tramo)];
+    }
+
+    /**
+     * El precio del tramo según SIREB, el de ahora: tarifa y servicio activos y
+     * la tarifa liquidable. Sin eso no se otorga; ninguna tarifa se escribe a mano.
      *
      * @return array{monto: float, tarifa_id: string}
      */
     private function precioDe(CategoriaAprovechamiento $tramo): array
     {
         try {
-            return $this->precios->de($tramo->servicio_sireb, $tramo->tarifa_sireb);
+            return $this->precios->de($tramo->servicio_sireb, $tramo->tarifa_sireb, exigirLiquidable: true);
         } catch (SinPrecioException $e) {
             throw CupoInvalidoException::sinPrecio($tramo->descripcion_kg, $e->getMessage());
         }

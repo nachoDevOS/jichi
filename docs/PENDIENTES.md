@@ -13,13 +13,29 @@ emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
 por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
 que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
-## 🟠 El precio al emitir: falta el endpoint definitivo de SIREB — 01/10/2026
+## 🔴 «Registrar» la autorización NO GUARDA: modo verificación — 02/10/2026
 
-Al registrar, `PrecioSireb::de()` pide el precio con `SirebService::servicio($id)`
-(`GET /api/v1/catalogo/servicios/{id}`, sin caché). El responsable decidió no
-usar ese camino por ahora: va a pasar el endpoint correcto. Cuando llegue, se
-cambia `servicio()` —o lo que llama `PrecioSireb`— y se prueba emitiendo los
-cuatro documentos. Lo que solo muestra precios (`servicios()`) no cambia.
+`AprovechamientoController::SOLO_VERIFICAR_TARIFA = true`, a propósito y por
+ahora: el botón solo consulta la tarifa en SIREB
+(`OtorgarCupoService::verificarPrecio()`) y muestra el resultado —el monto si
+pasa, el motivo bajo «Tramo de la escala» si no—, sin escribir en la base. Para
+volver a otorgar, ponerlo en `false`.
+
+## ✅ El precio al emitir: endpoint definitivo de SIREB — 02/10/2026
+
+`PrecioSireb::de()` pide la tarifa con `SirebService::tarifa($servicio, $tarifa)`
+(`GET /api/v1/catalogo/servicios/{s}/tarifas/{t}`, sin caché) y exige tarifa y
+servicio `activo`; la autorización exige además `liquidable`. Flujo completo en
+[modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir).
+Probado contra `test.sireb` y el tramo real; **falta probar desde las pantallas
+los cuatro documentos**, incluido el caso de una tarifa dada de baja.
+
+## 🟡 La guía hace una llamada a SIREB por tarifa distinta — 02/10/2026
+
+Antes era una por servicio. Con SIREB de prueba cada llamada tardó ~3 s, así que
+una guía con cinco productos de tarifas distintas puede tardar ~15 s en
+registrarse. Medirlo en la pantalla; si molesta, la guía puede volver a pedir el
+servicio entero (`servicio($id)`, que trae todas sus tarifas con su `estado`).
 
 ## 🔴 Hay que volver a migrar para el portal — 28/09/2026
 

@@ -157,4 +157,16 @@ class SirebService
 
         return $cuerpo['data'] ?? null;
     }
+
+    /**
+     * Una tarifa con su servicio adentro (`servicio`), sin caché: el estado y el
+     * precio son los de ahora. Null si SIREB no la tiene bajo ese servicio.
+     */
+    public function tarifa(string $servicioId, string $tarifaId): ?array
+    {
+        $id = fn (string $v): string => rawurlencode(mb_strtolower(trim($v)));
+        $cuerpo = $this->get(self::RUTA_SERVICIOS.'/'.$id($servicioId).'/tarifas/'.$id($tarifaId));
+
+        return $cuerpo['data'] ?? null;
+    }
 }
