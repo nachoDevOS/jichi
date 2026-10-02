@@ -59,17 +59,17 @@ class VistaSireb
     {
         $tarifas = $this->tarifasPorId();
 
-        return $tarifas === null ? null : array_filter(
-            array_map(fn (array $t) => $t['monto'], $tarifas),
-            fn (?float $monto) => $monto !== null,
+        return $tarifas === null ? null : array_map(
+            fn (array $t) => $t['monto'],
+            array_filter($tarifas, fn (array $t) => $t['liquidable']),
         );
     }
 
     /**
      * Cada tarifa por id con el nombre de su servicio y su etiqueta; null si
-     * SIREB no responde. El monto va en null si la tarifa no es liquidable.
+     * SIREB no responde. `liquidable` dice si hoy se puede cobrar.
      *
-     * @return array<string, array{servicio: string, etiqueta: string, estado: ?string, monto: ?float}>|null
+     * @return array<string, array{servicio: string, etiqueta: string, estado: ?string, monto: float, liquidable: bool}>|null
      */
     public function tarifasPorId(): ?array
     {
@@ -86,9 +86,9 @@ class VistaSireb
                 'etiqueta' => $t['etiqueta'] ?? '',
                 // `activo` / `inactivo`, tal como lo manda SIREB.
                 'estado' => $t['estado'] ?? null,
-                // Sin precio si no se puede cobrar: servicio de baja o tarifa no liquidable.
-                'monto' => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO && ($t['liquidable'] ?? false) === true
-                    ? (float) $t['monto'] : null,
+                'monto' => (float) $t['monto'],
+                // Se cobra solo si el servicio está activo y SIREB la da por liquidable.
+                'liquidable' => ($s['estado'] ?? null) === self::SERVICIO_ACTIVO && ($t['liquidable'] ?? false) === true,
             ], $s['tarifas'] ?? []))
             ->keyBy('id')
             ->map(fn (array $t) => array_diff_key($t, ['id' => true]))
@@ -99,8 +99,8 @@ class VistaSireb
      * Lo que muestra un listado de catálogo sobre la tarifa de una fila.
      * Nombres en null si la tarifa ya no está en SIREB o no responde.
      *
-     * @param  array<string, array{servicio: string, etiqueta: string, estado: ?string, monto: ?float}>|null  $tarifas  de tarifasPorId()
-     * @return array{sireb_servicio: ?string, sireb_etiqueta: ?string, sireb_estado: ?string, precio: ?float}
+     * @param  array<string, array{servicio: string, etiqueta: string, estado: ?string, monto: float, liquidable: bool}>|null  $tarifas  de tarifasPorId()
+     * @return array{sireb_servicio: ?string, sireb_etiqueta: ?string, sireb_estado: ?string, sireb_liquidable: ?bool, precio: ?float}
      */
     public static function describir(?array $tarifas, ?string $tarifaId): array
     {
@@ -110,6 +110,7 @@ class VistaSireb
             'sireb_servicio' => $tarifa['servicio'] ?? null,
             'sireb_etiqueta' => $tarifa['etiqueta'] ?? null,
             'sireb_estado' => $tarifa['estado'] ?? null,
+            'sireb_liquidable' => $tarifa['liquidable'] ?? null,
             // De referencia: el que vale lo congela cada documento al emitirse.
             'precio' => $tarifa['monto'] ?? null,
         ];

@@ -138,6 +138,8 @@ export interface ReferenciaSireb {
     sireb_etiqueta: string | null;
     /** Estado de la tarifa tal como lo manda SIREB: `activo` / `inactivo`. */
     sireb_estado: string | null;
+    /** Si hoy se puede cobrar; null si la tarifa no está o SIREB no responde. */
+    sireb_liquidable: boolean | null;
     /** Precio de referencia: el que vale lo congela cada documento al emitirse. */
     precio: number | null;
 }

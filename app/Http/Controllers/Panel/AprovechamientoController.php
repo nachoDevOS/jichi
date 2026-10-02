@@ -596,22 +596,28 @@ class AprovechamientoController extends Controller
             ->vigentes()
             ->enOrdenDeEscala()
             ->get()
-            ->map(fn (CategoriaAprovechamiento $c): array => [
-                'id' => $c->id,
-                'nro_escala' => $c->nro_escala,
-                'descripcion_kg' => $c->descripcion_kg,
-                'kilos_min' => (float) $c->kilos_min,
-                'kilos_max' => (float) $c->kilos_max,
-                'servicio_sireb' => $c->servicio_sireb,
-                'tarifa_sireb' => $c->tarifa_sireb,
-                // De referencia, el de la caché: el que vale lo pide el servicio al guardar.
-                'monto' => VistaSireb::describir($tarifas, $c->tarifa_sireb)['precio'],
-                // El régimen del tramo: la escala progresiva o la cuota de una
-                // especie con tasación fija. Se muestra ANTES de otorgarlo.
-                'modalidad' => $c->modalidad->value,
-                'modalidad_etiqueta' => $c->modalidad->etiqueta(),
-                'modalidad_descripcion' => $c->modalidad->descripcion(),
-            ])
+            ->map(function (CategoriaAprovechamiento $c) use ($tarifas): array {
+                $sireb = VistaSireb::describir($tarifas, $c->tarifa_sireb);
+
+                return [
+                    'id' => $c->id,
+                    'nro_escala' => $c->nro_escala,
+                    'descripcion_kg' => $c->descripcion_kg,
+                    'kilos_min' => (float) $c->kilos_min,
+                    'kilos_max' => (float) $c->kilos_max,
+                    'servicio_sireb' => $c->servicio_sireb,
+                    'tarifa_sireb' => $c->tarifa_sireb,
+                    // De referencia, el de la caché: el que vale lo pide el servicio al guardar.
+                    'monto' => $sireb['precio'],
+                    // false = SIREB la tiene inactiva: se ve con su precio pero no se elige.
+                    'liquidable' => $tarifas === null ? null : ($sireb['sireb_liquidable'] ?? false),
+                    // El régimen del tramo: la escala progresiva o la cuota de una
+                    // especie con tasación fija. Se muestra ANTES de otorgarlo.
+                    'modalidad' => $c->modalidad->value,
+                    'modalidad_etiqueta' => $c->modalidad->etiqueta(),
+                    'modalidad_descripcion' => $c->modalidad->descripcion(),
+                ];
+            })
             ->all();
     }
 

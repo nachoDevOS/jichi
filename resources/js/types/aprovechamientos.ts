@@ -223,6 +223,8 @@ export interface TramoElegible {
     tarifa_sireb: string;
     /** Precio de referencia de SIREB; null si no respondió. El que vale se congela al guardar. */
     monto: number | null;
+    /** false = tarifa inactiva en SIREB: se muestra deshabilitada. null = SIREB no respondió. */
+    liquidable: boolean | null;
     /** El régimen del tramo, visible antes de otorgar. */
     modalidad: ModalidadAprovechamiento;
     modalidad_etiqueta: string;

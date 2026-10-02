@@ -112,9 +112,10 @@ export default function CrearCupo({
                             >
                                 <option value="">Elija un tramo…</option>
                                 {escala.map((t) => (
-                                    <option key={t.id} value={t.id}>
+                                    <option key={t.id} value={t.id} disabled={t.liquidable === false}>
                                         {t.descripcion_kg} —{' '}
                                         {t.monto !== null ? bs(t.monto, institucion.moneda) : 'sin precio en SIREB'}
+                                        {t.liquidable === false ? ' (tarifa no disponible)' : ''}
                                     </option>
                                 ))}
                             </Select>

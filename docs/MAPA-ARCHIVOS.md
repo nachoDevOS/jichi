@@ -143,10 +143,10 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 
 | Archivo | Qué hace |
 | --- | --- |
-| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`) y lee el catálogo del SEDAG: `catalogoCrudo()` una página, `servicios()` todas juntas en caché 10 min, `serviciosSiResponde()` null si SIREB cae, `servicio($id)` uno con sus tarifas, sin caché. Un 404 de SIREB vuelve como null, no como error |
+| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`) y lee el catálogo del SEDAG: `catalogoCrudo()` una página con `tarifas=todas` (llegan también las inactivas), `servicios()` todas juntas en caché 10 min, `serviciosSiResponde()` null si SIREB cae, `servicio($id)` uno con sus tarifas, sin caché. Un 404 de SIREB vuelve como null, no como error |
 | `SirebException.php` | Los mensajes que ve el funcionario |
-| `PrecioSireb.php` | El precio de una tarifa al EMITIR, para congelarlo: exige servicio `activo` y la tarifa dentro de él; si no, `SinPrecioException` con el motivo. Lo usan `EmitirCarnetService` y `EmitirGuiaService` |
-| `VistaSireb.php` | Lo que las pantallas de catálogo necesitan de SIREB, ya armado: `serviciosParaSelect()` (null si SIREB cae) e `historial($modelo)` (actual + anteriores, con qué es hoy cada tarifa y quién la cambió). Lo usan la escala y los tipos de carnet |
+| `PrecioSireb.php` | El precio de una tarifa al EMITIR, para congelarlo: exige servicio `activo` y la tarifa dentro de él; si no, `SinPrecioException` con el motivo. Lo usan `OtorgarCupoService`, `EmitirCarnetService`, `EmitirFaenaService` y `EmitirGuiaService` |
+| `VistaSireb.php` | Lo que las pantallas de catálogo necesitan de SIREB, ya armado: `serviciosParaSelect()` (solo tarifas liquidables de servicios activos; null si SIREB cae), `tarifasPorId()` (precio + `estado` + `liquidable` de cada tarifa), `preciosPorTarifa()` (solo liquidables), `describir()` e `historial($modelo)` (actual + anteriores, con qué es hoy cada tarifa y quién la cambió). Lo usan los cuatro catálogos y los formularios de autorización, carnet, faena y guía |
 
 Hoy lo usa solo la autorización (`OtorgarCupoService`, la escala y los formularios
 de otorgar y corregir). Ver [modulos/SIREB.md](modulos/SIREB.md).

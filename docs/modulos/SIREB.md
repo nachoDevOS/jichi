@@ -51,7 +51,7 @@ llegan servicios del SEDAG**, nunca los de otras dependencias.
 
 | Método | Endpoint | Devuelve | Caché | Si SIREB no responde |
 | --- | --- | --- | --- | --- |
-| `catalogoCrudo($pagina)` | `GET /api/v1/catalogo/servicios?pagina=N&por_pagina=100` | **Una página**, tal cual: `data` + `meta` | No | `SirebException` |
+| `catalogoCrudo($pagina)` | `GET /api/v1/catalogo/servicios?pagina=N&por_pagina=100&tarifas=todas` | **Una página**, tal cual: `data` + `meta` | No | `SirebException` |
 | `servicios($refrescar)` | El mismo, **una llamada por página** | **Todos** los servicios con sus tarifas, en una lista | 10 min | `SirebException` |
 | `serviciosSiResponde()` | Igual que `servicios()` | La lista, o `null` | 10 min | `null` |
 | `servicio($id)` | `GET /api/v1/catalogo/servicios/{id}` | **Un** servicio con sus `tarifas`, o `null` si SIREB responde 404 | No: precio de ahora | `SirebException` |
@@ -64,8 +64,13 @@ llegan servicios del SEDAG**, nunca los de otras dependencias.
 - **SIREB NO filtra por estado** (coordinado con Recaudaciones, 30/09/2026):
   manda los servicios activos y los dados de baja, cada uno con su `estado`.
   Decidir si se cobra es de Jichi: **solo `estado === 'activo'` es cobrable**, y
-  cualquier otro valor —también uno que SIREB agregue después— no. Hoy la
-  **tarifa no trae estado**: queda por confirmar con Recaudaciones que lo mande.
+  cualquier otro valor —también uno que SIREB agregue después— no.
+- **El catálogo trae TODAS las tarifas** (`tarifas=todas`, 01/10/2026). Sin el
+  parámetro SIREB manda solo las liquidables; con él llegan también las
+  inactivas, cada una con `estado` (`activo` / `inactivo`), `tarifario_estado` y
+  `liquidable`. Jichi decide con **`liquidable === true`** y el servicio
+  `activo`: así un tramo con tarifa dada de baja se sigue viendo con su precio,
+  en vez de desaparecer.
 - El id se pasa a minúscula antes de pedirlo: SIREB los manda así.
 - `get()` devuelve `null` en un **404** (`SERVICIO_NO_ENCONTRADO`) en vez de
   tratarlo como «no responde»: son dos cosas distintas para quien llama.
@@ -88,8 +93,20 @@ la modalidad siguen siendo de Jichi.
 El listado muestra la tarifa de cada tramo por su NOMBRE —servicio y etiqueta
 de SIREB, con los ids en el `title`— y su precio de referencia, con
 `VistaSireb::tarifasPorId()` + `describir()`. Si SIREB no responde o ya no tiene
-la tarifa, vuelven los ids y el precio sale «—»; el monto también es «—» con el
-servicio de baja. El que vale es el que congela cada cupo al otorgarse.
+la tarifa, vuelven los ids y el precio sale «—». El que vale es el que congela
+cada cupo al otorgarse.
+
+*(01/10/2026)* Debajo de la etiqueta va una insignia con el **estado de la
+tarifa tal como lo manda SIREB**: **Activa** (verde) o **Inactiva** (gris)
+—`sireb_estado` de `describir()`, prop `estado` de `CeldaSireb`—. El precio se
+muestra aunque esté inactiva. Lo mismo en Tipos de carnet, Productos y
+Aranceles.
+
+`tarifasPorId()` da por cada tarifa `servicio`, `etiqueta`, `estado`, `monto`
+(siempre el de SIREB) y `liquidable`. **El precio y si se puede cobrar van
+separados**: `preciosPorTarifa()` —el de los formularios de carnet, faena y
+guía— filtra por `liquidable`, y `describir()` manda las dos cosas
+(`precio`, `sireb_liquidable`).
 
 ### El formulario del tramo
 
@@ -102,13 +119,15 @@ una llena `tarifa_sireb` **y** `servicio_sireb` (el de su grupo). Así no se pue
 combinar una tarifa con un servicio ajeno. Lo arma
 `CategoriaAprovechamientoController::formulario()` con `serviciosSiResponde()`,
 recortado a `id`, `codigo`, `nombre`, `activo` y `tarifas` (`id`, `etiqueta`,
-`monto`).
+`monto`). *(01/10/2026)* **Solo llegan tarifas liquidables y servicios activos
+que tengan alguna**: el filtro va en `serviciosParaSelect()`, no en React, y
+vale igual para la escala, tipos de carnet, productos y aranceles.
 
 | Caso | Qué hace el select |
 | --- | --- |
 | Tarifa que ya usa otra escala | Deshabilitada, con «(escala N)» (prop `tarifasUsadas`) |
-| Servicio dado de baja | Su grupo dice «— de baja» y sus tarifas no se pueden elegir |
-| Tarifa guardada que ya no llega | Opción «Tarifa actual (no está en SIREB)»: editar otro campo no la borra |
+| Servicio dado de baja o tarifa no liquidable | No aparece (lo descarta `serviciosParaSelect()`) |
+| Tarifa guardada que ya no llega o dejó de ser liquidable | Opción «Tarifa actual (no está en SIREB)»: editar otro campo no la borra |
 | SIREB no responde | Select deshabilitado con aviso; al editar se conservan los ids actuales |
 
 Se muestran todos los servicios del SEDAG, sin filtrar por `modo_tarifa`.
@@ -189,7 +208,7 @@ una lleva el select de tarifa y el historial de siempre.
   producto (ver «Productos hidrobiológicos»).
 
 **`App\Sireb\PrecioSireb`** es la consulta de precio al emitir, compartida por
-carnet y guía: pide `servicio()` una vez por servicio en la petición, exige el
+autorización, carnet, faena y guía: pide `servicio()` una vez por servicio en la petición, exige el
 servicio `activo` y la tarifa dentro de él, y si algo falla lanza
 `SinPrecioException` con el motivo, que cada servicio envuelve en su excepción.
 
@@ -220,6 +239,13 @@ El error nombra el tramo por su texto («601 Kg Hasta 800 Kg»), nunca por su
 número. Los selects de crear/editar muestran «texto del tramo — precio» con el
 precio de referencia de `tarifasPorId()` (caché 10 min); el que vale es el que
 pide el servicio al guardar.
+
+*(01/10/2026)* Un tramo cuya tarifa **no es liquidable** en SIREB se lista igual,
+con su precio, pero **deshabilitado** y con «(tarifa no disponible)»: el texto
+es para ventanilla, no nombra a SIREB. Lo decide el campo `liquidable` de
+`AprovechamientoController::tramosElegibles()` (`null` si SIREB no respondió:
+ahí no se deshabilita nada). Al editar una autorización cuyo tramo quedó así, se
+ve seleccionado; guardar falla al pedir el precio.
 
 ## Lo que falta
 
