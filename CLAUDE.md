@@ -55,7 +55,8 @@ para no equivocarse:
         PERMISO DE FAENA (una por salida, 30 días;
         reserva kilos al registrarse, los descuenta al aprobarse)
 
- recibo ──< pago ──(polimórfico)──▶ Autorización | Carnet | Faena | Guía
+ Los cuatro se PAGAN EN SIREB (Recaudaciones): cada uno registra su liquidación
+ y, cuando SIREB la da por pagada, Jichi lo aprueba y emite su RECIBO.
 ```
 
 - **El carnet es la llave anual; con él solo no se sale a trabajar.** Lo que
@@ -69,23 +70,23 @@ para no equivocarse:
   (`EstadoAprovechamiento`, `EstadoCarnet`, `EstadoFaena`, `EstadoGuia`):
 
   ```
-  PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ vencido / revocado / agotado
-  (borrador)  ▲                │   └── al enviar sale el RECIBO
-     │        └──[rechazar]────┘
-     └──[eliminar, con motivo]
+  PENDIENTE ──(SIREB: «pagada»)──▶ APROBADO ──▶ vencido / revocado / agotado
+  (borrador: se corrige y se elimina)     └── al aprobar sale el RECIBO
   ```
 
-  Enviar exige el monto cubierto; aprobar exige todas las boletas validadas.
-  Rechazar devuelve a pendiente, no es un estado final.
+  Al crearse registra su liquidación en SIREB; el pago se carga y se valida
+  ALLÁ. Jichi pregunta (`ConfirmarPagoService`, botón «Verificar pago» y
+  `jichi:verificar-pagos` cada 10 min) y aprueba solo. **No hay `en_revision`,
+  ni firma, ni tabla `pagos`** (02/10/2026). Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
 - **Revocar la autorización NO reescribe sus carnets ni sus faenas: los deja
   «sin efecto»**, porque su vigencia se calcula mirando al padre. Ver la trampa
   de la vigencia, más abajo.
-- **Lo que se entregó, se congela**: el recibo copia monto y concepto, la guía
-  copia el precio de cada producto. **No hay columnas de saldo**: lo pagado es la
-  suma de `pagos` y el saldo de kilos se calcula sobre las faenas.
+- **Lo que se entregó, se congela**: el recibo copia monto, concepto y la boleta
+  de SIREB; la guía copia el precio de cada producto. **No hay columnas de
+  saldo**: el saldo de kilos se calcula sobre las faenas.
 
 Todo eso vive en `app/Services/` (`OtorgarCupoService`, `Emitir*Service`,
-`Revisar*Service`, `CobrarService`, `ControlarPagoService`), en transacciones con
+`Revisar*Service`, `LiquidarSirebService`, `ConfirmarPagoService`), en transacciones con
 la fila que contiene el recurso escaso bloqueada. **No se replica en el
 controlador ni en React.**
 
@@ -318,9 +319,8 @@ Los tres tienen que pasar.
 - **Una transacción de base de datos NO deshace escrituras en disco.** Si se
   sube un archivo dentro de la transacción y algo falla, el rollback borra las
   filas pero el archivo queda huérfano para siempre. Por eso TODOS los adjuntos
-  —la cédula y el aval del carnet, la boleta de cada pago— se suben ANTES de
-  abrir la transacción, y el `catch` los borra. Ver `CarnetController::store()` y
-  `PagoController`.
+  —la cédula y el aval del carnet— se suben ANTES de abrir la transacción, y el
+  `catch` los borra. Ver `CarnetController::store()`.
 - **`env()` en `StorageController` devolvía null con `config:cache`.** El error
   era silencioso: el sistema creía que el disco no era s3 y escribía los adjuntos
   en el servidor local sin avisar. Ahora todo sale de `config(...)`, y la
@@ -329,10 +329,9 @@ Los tres tienen que pasar.
   de `/beneficiarios/{beneficiario}`, o esas palabras se toman como id.
 - **`cascadeOnDelete` NO se dispara con una baja lógica.** Es una restricción
   del MOTOR y solo corre en un DELETE de verdad; `$modelo->delete()` sobre una
-  tabla con `SoftDeletes` es un UPDATE. `pagos.recibo_id` es CASCADE, así que
-  dar de baja un recibo dejaría sus pagos vivos y visibles en caja, colgando de
-  un comprobante que ya no está. Hoy nada da de baja recibos; el día que algo lo
-  haga, la baja tiene que arrastrar el detalle a mano.
+  tabla con `SoftDeletes` es un UPDATE. `guia_detalles.guia_movimiento_id` es CASCADE, así
+  que dar de baja una guía dejaría sus renglones vivos: `EmitirGuiaService`
+  los baja a mano.
 - **Índices únicos con borrado lógico:** nunca incluir `deleted_at` en un
   `unique()`. En SQL `NULL != NULL`, así que el índice no bloquea nada. Usar
   índice parcial `WHERE deleted_at IS NULL` (ver la migración de
@@ -394,13 +393,13 @@ Los tres tienen que pasar.
   y el código lo lee, va **también** en `protected $attributes` del modelo, con
   el `->value` del enum, porque `$attributes` se llena antes de que corran los
   casts. Pasó TRES veces en un día —el estado y el monto de la faena y
-  `pagos.estado_validacion`— y las tres las descubrió una prueba que preguntaba
+  el estado de la validación de un pago— y las tres las descubrió una prueba que preguntaba
   por el estado justo después de `create()`. Ver `PermisoFaena` y `Pago`.
 - **Una relación polimórfica NO se puede precargar con `with('pagable.carnet')`.**
   Eloquent no sabe qué es `pagable` hasta que lee la fila, así que no puede
   resolver lo que cuelga de él: lo que se escribe así se ignora y el N+1 sigue
   ahí, sin ningún error. Va con `morphWith`, declarando qué traer para cada
-  tipo. Ver `CajaController::index()` y `ReciboController`.
+  tipo. Ver `ReciboController` (`recibible`).
 - **Una variable CSS declarada en `:root` NO crea una utilidad de Tailwind.**
   `--institucional-azul` estaba escrita desde el principio, pero
   `bg-institucional-azul` no existía: Tailwind 4 solo genera la utilidad si el
@@ -434,7 +433,7 @@ Los tres tienen que pasar.
   `config/app.php` traía `'timezone' => 'UTC'`, y en UTC-4 eso significa que
   de 20:00 a medianoche `now()` ya es el día siguiente: un carnet aprobado a
   las 21:00 salía emitido «mañana», la faena salía con fecha de mañana y el
-  arqueo de «hoy» en Caja y en el tablero no veía lo cobrado esa noche. Nadie lo
+  arqueo de «hoy» en el tablero no veía lo cobrado esa noche. Nadie lo
   notó porque se prueba de día. Hoy es `America/La_Paz` (`APP_TIMEZONE`).
   **Ojo con los datos cargados antes del cambio**: sus `created_at` se
   guardaron en hora UTC sin zona, así que ahora se leen 4 horas corridos. En
@@ -524,13 +523,12 @@ Los tres tienen que pasar.
 - **`withSum()` devuelve NULL cuando no hay filas, no cero.** Es lo que
   contesta `sum()` en SQL sobre un conjunto vacío, y rompe el patrón de
   «reusar el agregado si vino en la consulta»: escrito como
-  `if ($this->pagos_sum_monto === null) { consultar }`, justamente la fila SIN
-  pagos —la que más aparece en un listado— se cae a la consulta agregada suelta,
+  `if ($this->x_sum_kilos === null) { consultar }`, justamente la fila SIN
+  faenas —la que más aparece en un listado— se cae a la consulta agregada suelta,
   con el `withSum` puesto, viéndose correcto y sin ningún error. El N+1 sigue
   ahí para la mitad de las filas. Se pregunta si la CLAVE EXISTE:
-  `array_key_exists('pagos_sum_monto_parcial', $this->getAttributes())`. Ver
-  `App\Traits\Pagable::montoPagado()` y
-  `AprovechamientoPesq::kilosConsumidos()`.
+  `array_key_exists('faenas_que_consumen_sum_kilos_extraidos', $this->getAttributes())`.
+  Ver `AprovechamientoPesq::kilosConsumidos()`.
 - **El trait `Auditable` YA registra el borrado: escribir la auditoría a mano
   deja DOS filas.** Engancha `created`, `updated` y `deleted`, así que un
   servicio que además llame a `registrarAuditoria('eliminado', …)` duplica el
@@ -644,8 +642,8 @@ Los tres tienen que pasar.
   mayúscula, y ninguna búsqueda los encontraba, sin ningún error. Hoy son `uuid`
   (30/09/2026). Un id de otro sistema va con su largo real, y se prueba buscándolo.
 - **Llamar a un servicio DENTRO de un `foreach` parte en pedazos lo que ese
-  servicio construye como una unidad, y no falla nada.** `AprovechamientoController::pagar()`
-  cobraba llamando a `CobrarService` una vez por depósito, así que dos boletas
+  servicio construye como una unidad, y no falla nada.** El viejo cobro de
+  depósitos (retirado el 02/10/2026) llamaba al servicio una vez por boleta, así que dos boletas
   del mismo cupo salían como **000001 y 000002**: dos papeles donde
   va uno, dos números gastados de una serie que Contabilidad audita y dos cobros
   en el arqueo del día donde hubo uno. Lo caro fue lo otro: el control de «no
@@ -654,45 +652,35 @@ Los tres tienen que pasar.
   uno pasaban los tres. **Antes de escribir un servicio adentro de un bucle,
   preguntarse qué crea de una sola pieza** —un recibo, un correlativo, un
   expediente— y si sus controles miran el conjunto o solo la llamada.
-- **EL RECIBO DEL APROVECHAMIENTO ES UNO POR TRÁMITE, y se emite AL ENVIAR A
-  REVISIÓN.** No es uno por depósito: la persona entrega sus boletas —una o
-  cinco— y se lleva un papel con el total, igual que el recibo oficial del modelo
-  anterior. Por eso `pagos.recibo_id` es **nullable**: el depósito se carga
-  mientras el trámite está PENDIENTE y todavía no hay papel que ponerle.
-  `CobrarService::registrarDepositos()` lo deja en NULL y
-  `CobrarService::emitirRecibo()` lo llena desde `RevisarCupoService::enviar()`,
-  **dentro de su misma transacción** —un recibo emitido sobre un cupo que se
-  quedó en pendiente sería un papel por un expediente que nadie presentó—. Un
-  reenvío no emite un segundo papel: `emitirRecibo()` solo toma los pagos
-  sueltos. En **Caja** sigue saliendo en el acto, que es lo correcto ahí: se
-  cobra y se entrega en el mismo movimiento.
-- **`method_exists($enum, 'admitePagos')` deja pasar todo cuando el enum llama a
-  ese método de otra forma.** `EstadoGuia` declara `admitePagos()` y
-  `EstadoAprovechamiento` declara `permitePagos()`: la comprobación de
-  `CobrarService::resolver()` contesta «no existe» para el cupo y **no valida
-  ningún estado**, en silencio. Un `method_exists` sobre un nombre que solo
-  algunas clases usan no es una comprobación: es un `if` apagado. Va contra el
-  MODELO, que sí expone `admitePagos()` en los tres. **La forma correcta cuando
-  solo algunas clases contestan que sí**: declarar el método en el trait
-  compartido con un `false` por defecto y sobreescribirlo donde aplique — ver
-  `Pagable::admiteControlDePagos()`.
-- **`pagos.estado_validacion` NO es el estado del pago: es el de su CONTROL.**
-  El dinero entró o no entró, y eso lo dice que la fila exista; esto dice si
-  alguien MIRÓ la boleta contra el extracto del banco. Tres consecuencias que se
-  olvidan: un **OBSERVADO sigue sumando** en `montoPagado()` —sacarlo dejaría al
-  trámite sin cubrir por una observación que puede estar equivocada—; **un
-  observado no se valida, se corrige** —`admiteControl()` solo deja pasar lo que
-  nadie miró, así que el botón «Validar» no existe sobre él—; y al corregir se
-  borra el control ENTERO, `validado_por` y `validado_en` incluidos, porque quien
-  validó lo hizo sobre otros números. El control es parte de la REVISIÓN: solo
-  corre EN REVISIÓN, y `RevisarCupoService::aprobar()` exige que no quede ninguna
-  sin validar — sin eso, validar sería decorativo.
+- **El pago de los cuatro documentos se hace y se valida en SIREB; Jichi solo
+  pregunta** (02/10/2026). No hay tabla `pagos`, ni Caja, ni «enviar a
+  revisión», ni firma de supervisión. `ConfirmarPagoService::verificar()` consulta
+  `GET /liquidaciones/{id}` y, con `estado = pagada` y el pago `confirmado`,
+  aprueba (los `Revisar*Service::aprobar()` conservan las reglas propias: cupo
+  revocado, kilos libres, fechas, número de registro) y emite el recibo con la
+  boleta de SIREB, en una transacción. SIREB no avisa: lo disparan el botón de la
+  ficha y `jichi:verificar-pagos` cada 10 minutos, que **en producción necesita
+  el cron de Laravel** (`schedule:run`); sin él, nada se aprueba solo.
 - **Un `LIKE` sobre una columna JSON no encuentra nada con tildes.** Laravel
   guarda el JSON con `json_encode` por defecto, que escapa los acentos a
   `\uXXXX` y las barras a `\/`: buscar «Pérez» no encuentra `P\u00e9rez`, y
   falla EN SILENCIO —devuelve cero filas, como si no existiera—. Justo con los
   apellidos de acá. El término se escapa igual antes de comparar:
   `trim(json_encode($termino), '"')`. Ver `AsociacionController::comoEnElJson()`.
+- **La venta en SIREB va FUERA de la transacción, con la clave guardada ANTES.**
+  Adentro, un timeout deshace todo —la `Idempotency-Key` incluida— aunque SIREB
+  sí haya creado la liquidación, y el reintento sale con clave nueva: dos deudas
+  en SIREB por un trámite. Va en dos tiempos: `LiquidarSirebService::preparar()`
+  dentro, `enviar()` después del commit, sobre las columnas `sireb_*` del documento. Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
+- **`tsc` NO revisa los nombres de ruta.** `route('caja.index')` compila igual
+  aunque la ruta ya no exista, y revienta recién en el navegador al hacer clic.
+  Al quitar o renombrar rutas, cruzar las usadas en React contra
+  `php artisan route:list --json`: pasó al retirar la Caja (02/10/2026), con dos
+  enlaces vivos a rutas borradas y `tsc` en verde.
+- **`php artisan tinker archivo.php` NO termina: corre el archivo y se queda en
+  el REPL**, esperando entrada, con lo que el archivo dejó abierto —una
+  transacción, sus bloqueos—. Para un script va
+  `php artisan tinker --execute="require 'archivo.php';" < /dev/null`.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **NADA AVISA SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Una tabla, un

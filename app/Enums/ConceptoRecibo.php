@@ -35,15 +35,15 @@ enum ConceptoRecibo: string
     }
 
     /**
-     *  Qué casilla va marcada, según lo que se cobró
+     *  Qué casilla va marcada, según el documento pagado
      */
-    public static function desdePagable(?object $pagable): self
+    public static function desdeDocumento(?object $documento): self
     {
         return match (true) {
-            $pagable instanceof AprovechamientoPesq => self::AprovechamientoPesquero,
-            $pagable instanceof GuiaMovimiento => self::GuiaTransporte,
-            $pagable instanceof PermisoFaena => self::PermisoFaena,
-            $pagable instanceof Carnet => self::Cedulas,
+            $documento instanceof AprovechamientoPesq => self::AprovechamientoPesquero,
+            $documento instanceof GuiaMovimiento => self::GuiaTransporte,
+            $documento instanceof PermisoFaena => self::PermisoFaena,
+            $documento instanceof Carnet => self::Cedulas,
             default => self::Otros,
         };
     }

@@ -7,7 +7,7 @@ use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
-use App\Traits\Pagable;
+use App\Traits\LiquidableSireb;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,7 +39,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class Carnet extends Model
 {
-    use Auditable, Codificable, Pagable, SoftDeletes;
+    use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
     /**
      * Ver el comentario de Asociacion::$attributes: un default de la base NO
@@ -136,37 +136,31 @@ class Carnet extends Model
         return (float) $this->monto;
     }
 
-    /**
-     *  El circuito de revisión, resuelto en el modelo
-     *
-     * Los cinco de abajo son los que el controlador manda a la pantalla en los
-     * campos `puede_*`. Ninguno se vuelve a evaluar en React.
-     */
+    public function titularSireb(): Beneficiario
+    {
+        return $this->beneficiario;
+    }
 
-    /**
-     * ¿Se pueden corregir sus datos HOY?
-     *
-     * El estado Y que no haya entrado un peso: con un depósito cargado ya hay
-     * un cobro contra ESTE carnet, y cambiarle el tipo le cambiaría el arancel
-     * por debajo a algo que alguien ya pagó.
-     */
+    public function itemsSireb(): array
+    {
+        return [['tarifa_id' => $this->sireb_tarifa_id, 'cantidad' => 1]];
+    }
+
+    /** ¿Se pueden corregir sus datos HOY? Corregir anula la liquidación en SIREB y registra otra. */
     public function puedeEditarse(): bool
     {
-        return $this->estado->permiteEdicion() && $this->montoPagado() <= 0.0;
+        return $this->estado->permiteEdicion();
     }
 
     /**
      * ¿Se puede borrar la fila entera?
      *
-     * Las tres cosas. Los motivos son distintos: lo cobrado se resuelve por
-     * caja, pero un permiso ya emitido no se resuelve de ninguna manera —el
-     * papel está afuera, en manos de la persona—.
+     * Un permiso ya emitido no se resuelve de ninguna manera: el papel está
+     * afuera, en manos de la persona.
      */
     public function puedeEliminarse(): bool
     {
-        return $this->estado->permiteEliminacion()
-            && $this->montoPagado() <= 0.0
-            && $this->sinPermisosEmitidos();
+        return $this->estado->permiteEliminacion() && $this->sinPermisosEmitidos();
     }
 
     /**
@@ -187,29 +181,11 @@ class Carnet extends Model
         return $this->faenas()->doesntExist() && $this->guias()->doesntExist();
     }
 
-    /** ¿Se le pueden cargar depósitos hoy? Exigido por el trait Pagable. */
-    public function admitePagos(): bool
-    {
-        return $this->estado->permitePagos();
-    }
-
-    /** ¿Se puede presentar a revisión? Pendiente Y con el arancel cubierto. */
-    public function puedeEnviarseARevision(): bool
-    {
-        return $this->estado->permiteEnvio() && $this->saldoPendiente() <= 0.0;
-    }
-
-    /** ¿Está presentado y esperando una firma? */
-    public function puedeRevisarse(): bool
-    {
-        return $this->estado->permiteRevision();
-    }
-
     /**
      * ¿Pasó alguna vez por la firma?
      *
-     * A revocado y vencido se llega desde ACTIVO, así que los tres tuvieron su
-     * firma; pendiente y en revisión no. Es lo que habilita la impresión: el
+     * A revocado y vencido se llega desde APROBADO, así que los tres se
+     * pagaron; pendiente no. Es lo que habilita la impresión: el
      * plástico no sale de un carnet que nadie aprobó.
      */
     public function yaFueAprobado(): bool
@@ -219,21 +195,6 @@ class Carnet extends Model
             EstadoCarnet::Revocado,
             EstadoCarnet::Vencido,
         ], true);
-    }
-
-    /**
-     * El control de las boletas es parte de la REVISIÓN: en pendiente el
-     * expediente todavía se arma, y aprobado ya no admite reparos.
-     */
-    public function admiteControlDePagos(): bool
-    {
-        return $this->estado->permiteRevision();
-    }
-
-    /** Corregir un depósito vale con el expediente ABIERTO. */
-    public function admiteCorreccionDePagos(): bool
-    {
-        return $this->estado->estaAbierto();
     }
 
     /**
@@ -338,10 +299,8 @@ class Carnet extends Model
         // El orden importa: el primero que aparece es el que hay que resolver
         // antes que los demás.
         $porElCarnet = match (true) {
-            $this->estado === EstadoCarnet::Pendiente => 'El carnet está PENDIENTE: falta cubrir el '
-                .'arancel y enviarlo a revisión.',
-            $this->estado === EstadoCarnet::EnRevision => 'El carnet está presentado y esperando '
-                .'la firma de quien lo aprueba.',
+            $this->estado === EstadoCarnet::Pendiente => 'El carnet está PENDIENTE: falta que se pague '
+                .'en Recaudaciones.',
             $this->estado === EstadoCarnet::Revocado => 'El carnet está revocado.',
             $this->autorizacionRevocada() => 'Sin efecto: su Autorización de Pesca para Aprovechamiento '
                 .'Pesquero fue revocada. Hace falta una autorización nueva y un carnet nuevo.',

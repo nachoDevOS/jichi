@@ -1,4 +1,5 @@
 import type { EstadoFaena } from '@/types';
+import type { VentaSireb } from '@/types/aprovechamientos';
 
 /**
  * Tipos del módulo Faenas — el permiso de UNA salida de pesca.
@@ -63,15 +64,14 @@ export interface FaenaFila {
     ya_fue_aprobada: boolean;
     /** Firmada y no revocada: recién ahí se imprime el permiso. */
     puede_imprimirse: boolean;
-    /** Si se le pueden cargar depósitos hoy. Solo mientras está pendiente. */
-    admite_pagos: boolean;
 
-    /** El arancel de la salida y cómo va cobrado. */
+    /** El arancel de la salida. */
     monto: number;
-    saldo_pendiente: number;
-    pagado: boolean;
+    /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
+    sireb: VentaSireb | null;
+    puede_verificar_pago: boolean;
 
-    /** El recibo del trámite. Existe desde el ENVÍO; null mientras es borrador. */
+    /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
 
@@ -89,15 +89,6 @@ export interface FaenaFila {
 export interface FaenaFicha extends FaenaFila {
     asociacion: string | null;
 
-    /**
-     * Las del circuito de revisión, resueltas en el servidor. React no vuelve
-     * a evaluar el estado: pregunta por estas.
-     */
-    puede_enviarse: boolean;
-    puede_revisarse: boolean;
-    puede_aprobarse: boolean;
-    /** Cuántas boletas quedan sin controlar. Bloquean la aprobación. */
-    pagos_sin_validar: number;
 
     /**
      * El cupo del que salieron los kilos.

@@ -7,7 +7,7 @@ use App\Enums\EstadoFaena;
 use App\Enums\ModalidadAprovechamiento;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
-use App\Traits\Pagable;
+use App\Traits\LiquidableSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -37,7 +37,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class AprovechamientoPesq extends Model
 {
-    use Auditable, Codificable, Pagable, SoftDeletes;
+    use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
     /** «AprovechamientoPesq» no pluraliza a «aprovechamientos_pesq» por sí solo. */
     protected $table = 'aprovechamientos_pesq';
@@ -48,8 +48,7 @@ class AprovechamientoPesq extends Model
      * preguntarle el estado en la línea siguiente contestaría null.
      */
     protected $attributes = [
-        // Nace pendiente: se activa cuando se termina de cobrar. Ver
-        // EstadoAprovechamiento y CobrarService::activarSiQuedoPagado().
+        // Nace pendiente: se aprueba cuando SIREB confirma el pago. Ver ConfirmarPagoService.
         'estado' => EstadoAprovechamiento::Pendiente->value,
         'modalidad' => ModalidadAprovechamiento::EscalaGeneral->value,
     ];
@@ -159,11 +158,10 @@ class AprovechamientoPesq extends Model
     {
         return $this->faenas()->whereIn('permisos_faena.estado', [
             EstadoFaena::Pendiente,
-            EstadoFaena::EnRevision,
         ]);
     }
 
-    /** Kilos apartados por faenas pendientes o en revisión. Mismo patrón que `kilosConsumidos()`. */
+    /** Kilos apartados por faenas pendientes. Mismo patrón que `kilosConsumidos()`. */
     public function kilosReservados(): float
     {
         if (array_key_exists('faenas_que_reservan_sum_kilos_extraidos', $this->getAttributes())) {
@@ -251,7 +249,7 @@ class AprovechamientoPesq extends Model
      */
     public function puedeEditarse(): bool
     {
-        return $this->estado->permiteEdicion() && $this->montoPagado() <= 0.0;
+        return $this->estado->permiteEdicion();
     }
 
     /**
@@ -259,38 +257,14 @@ class AprovechamientoPesq extends Model
      */
     public function puedeEliminarse(): bool
     {
-        return $this->estado->permiteEliminacion()
-            && $this->montoPagado() <= 0.0
-            && $this->faenas()->doesntExist();
-    }
-
-    /**
-     * ¿Se le pueden cargar depósitos hoy?
-     */
-    public function admitePagos(): bool
-    {
-        return $this->estado->permitePagos();
-    }
-
-    /**
-     *  ¿Se puede mandar a que alguien lo firme?
-     */
-    public function puedeEnviarseARevision(): bool
-    {
-        return $this->estado->permiteEnvio() && $this->saldoPendiente() <= 0.0;
-    }
-
-    /** ¿Está presentado y esperando una firma? */
-    public function puedeRevisarse(): bool
-    {
-        return $this->estado->permiteRevision();
+        return $this->estado->permiteEliminacion() && $this->faenas()->doesntExist();
     }
 
     /**
      * ¿Pasó alguna vez por la firma? Es lo que habilita la autorización en papel.
      *
      * A vencido y agotado se llega desde ACTIVO, así que los tres tuvieron su
-     * firma; pendiente, en revisión y rechazado no. Un cupo vencido se reimprime
+     * aprobación; pendiente no. Un cupo vencido se reimprime
      * igual: puede hacer falta reponer el papel de una gestión cerrada.
      */
     public function yaFueAprobado(): bool
@@ -304,7 +278,18 @@ class AprovechamientoPesq extends Model
         ], true);
     }
 
-    /** ¿Se imprime la autorización? Firmada y no revocada, como el carnet. */
+    /** ¿Se imprime la autorización? Aprobada y no revocada, como el carnet. */
+    public function titularSireb(): Beneficiario
+    {
+        return $this->beneficiario;
+    }
+
+    public function itemsSireb(): array
+    {
+        return [['tarifa_id' => $this->sireb_tarifa_id, 'cantidad' => 1]];
+    }
+
+    /** ¿Se imprime la autorización? Aprobada y no revocada, como el carnet. */
     public function puedeImprimirse(): bool
     {
         return $this->yaFueAprobado() && $this->estado !== EstadoAprovechamiento::Revocado;
@@ -314,24 +299,6 @@ class AprovechamientoPesq extends Model
     public function puedeRevocarse(): bool
     {
         return $this->estado->permiteRevocacion();
-    }
-
-    /**
-     * El control es parte de la revisión: en pendiente el expediente todavía
-     * cambia entero, y aprobado ya no admite reparos.
-     */
-    public function admiteControlDePagos(): bool
-    {
-        return $this->estado->permiteRevision();
-    }
-
-    /**
-     * Corregir vale con el expediente ABIERTO. En revisión hace falta: es la
-     * única salida de una observación, y observar solo pasa ahí.
-     */
-    public function admiteCorreccionDePagos(): bool
-    {
-        return $this->estado->estaAbierto();
     }
 
     /** ¿El tope de la bolsa madre se hace cumplir? Ver `config/jichi.php`. */
@@ -425,8 +392,7 @@ class AprovechamientoPesq extends Model
         // tiene que resolver antes que los demás.
         return match (true) {
             $this->estado === EstadoAprovechamiento::Revocado => 'No autoriza faenas: la autorización fue revocada.',
-            $this->estado === EstadoAprovechamiento::Pendiente => 'Todavía no autorizala cedula y faenas: falta cubrir el monto y enviarlo a revisión.',
-            $this->estado === EstadoAprovechamiento::EnRevision => 'Todavía no autoriza faenas: está presentado y esperando la firma.',
+            $this->estado === EstadoAprovechamiento::Pendiente => 'Todavía no autoriza carnet ni faenas: falta que se pague en Recaudaciones.',
             ! $this->estaEnFecha() => 'No autoriza faenas: el cupo venció.',
             $this->estaAgotado() => 'No autoriza faenas: el cupo se quedó sin kilos.',
             $this->libreKg() <= 0.0 => $this->motivoReservado(),
@@ -438,7 +404,7 @@ class AprovechamientoPesq extends Model
     public function motivoReservado(): string
     {
         return sprintf(
-            'Sin kilos libres: %s kg están reservados por faenas pendientes o en revisión. '
+            'Sin kilos libres: %s kg están reservados por faenas pendientes. '
             .'Hay que eliminar la que no vaya a salir para registrar otra.',
             number_format($this->kilosReservados(), 2, ',', '.'),
         );
@@ -473,7 +439,6 @@ class AprovechamientoPesq extends Model
         return $query
             ->whereIn($this->qualifyColumn('estado'), [
                 EstadoAprovechamiento::Pendiente,
-                EstadoAprovechamiento::EnRevision,
                 EstadoAprovechamiento::Aprobado,
             ])
             ->whereDate($this->qualifyColumn('fecha_vencimiento'), '>=', now()->toDateString());

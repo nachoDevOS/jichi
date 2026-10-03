@@ -23,7 +23,7 @@ Jichi ──GET /api/v1/catalogo/servicios + token──▶ SIREB
   cae en el `IBARE_URL` del login si falta. **Tiene que ser el Ibare en el que confía ese SIREB**:
   contra `test.sireb` va `test.ibare`, o SIREB responde `TOKEN_INVALIDO`.
 - El token dura 10 minutos y lo renueva `SirebService` solo. El `Idempotency-Key`
-  es otra cosa: va solo al registrar liquidaciones, que Jichi todavía no hace.
+  es otra cosa: va solo al registrar liquidaciones (ver «La liquidación y el pago»).
 - En SIREB, `sedag` tiene que estar dado de alta como sistema consumidor y
   `activo`, o responde `403 SISTEMA_NO_HABILITADO`.
 - El catálogo va en **caché 10 minutos** (`SIREB_CACHE_MINUTOS`), y el token
@@ -349,8 +349,96 @@ otros tres es cambiar el `false` por defecto en su llamada a `de()`.
   10 min); esta verificación es la que manda, porque en esos 10 minutos la tarifa
   pudo cambiar.
 
+## La liquidación y el pago — los cuatro documentos
+
+*(02/10/2026)* **El pago se hace en SIREB.** Autorización, carnet, faena y guía
+registran su liquidación al crearse y se aprueban solos cuando SIREB la da por
+pagada. Jichi no carga ni controla boletas; no hay tabla `pagos`, Caja ni
+`en_revision`.
+
+### Registrar la liquidación
+
+Sigue la regla de la guía de integración de SIREB: **una clave por liquidación,
+guardada ANTES de llamar, la misma en todos los reintentos**. Por eso va en dos
+tiempos, y la llamada queda **fuera** de la transacción:
+
+```
+① verificar la tarifa (GET …/tarifas/{t})   ── no activa o SIREB caído → no se guarda nada
+② TRANSACCIÓN: el documento + código + sireb_idempotency_key = Str::uuid()
+               y sireb_estado = por_enviar → COMMIT
+③ POST /liquidaciones con esa clave        ── red/timeout/5xx → 2 reintentos, 1 s, MISMA clave
+④ 201/200 → sireb_liquidacion_id y sireb_codigo_publico, estado registrada
+   sigue fallando → queda por_enviar: aviso amarillo; «Verificar pago» la reintenta
+```
+
+```
+POST /api/v1/liquidaciones
+Idempotency-Key: 9f3c2a1e-7b4d-4e8a-b1c2-5d6e7f8a9b0c
+{"cliente": {"ci_nit": "6326340", "nombre_completo": "Óscar Lucas Aguilera Laureano"},
+ "referencia_externa": "EFGT-96R4-CJ42-AHYJ",
+ "items": [{"tarifa_id": "<sireb_tarifa_id congelada>", "cantidad": 1}]}
+```
+
+| Documento | `items` |
+| --- | --- |
+| Autorización, carnet, faena | Un ítem: su tarifa, cantidad 1 |
+| Guía | Un ítem por renglón del cuadro D: la tarifa por kilo del producto, cantidad = kilos. El 50% de piscicultura no viaja (ver PENDIENTES) |
+
+- **`cliente` va en línea**: SIREB lo busca por C.I. y lo crea si no existe.
+  `ci_nit` es C.I. + complemento, sin expedido.
+- **La referencia es el código de verificación** del documento, único global.
+- **La clave NO es el código**: el código es uno por documento y la clave una por
+  liquidación (corregir anula y registra otra, con clave nueva).
+- **Por qué fuera de la transacción**: adentro, un timeout deshacía todo —clave
+  incluida— aunque SIREB sí hubiera creado la liquidación, y el reintento salía
+  con clave nueva: **una segunda deuda en SIREB**.
+- **Vive en columnas `sireb_*` de cada documento** (trait `LiquidableSireb`).
+  `sireb_envio` es un JSON de constancia: la clave, lo enviado, cuándo, la
+  respuesta o el error, el pago confirmado y, al anular, el motivo. Corregir pisa
+  esas columnas; la versión anterior queda en `auditorias`.
+- **Corregir el borrador** con otra tarifa, otros kilos (guía) u otro monto:
+  primero anula en SIREB (`PATCH …/anular`, con motivo) y después corrige y
+  registra otra. **Eliminar**: primero anula. Si SIREB no anula —ya tiene un
+  pago—, no se toca nada (aviso rojo, `SirebException::paraVentanilla()`).
+- **Anular una liquidación `por_enviar`** la manda antes con su clave: pudo haber
+  llegado aunque no volvió respuesta. Si SIREB contesta 422, con esa clave nunca
+  la creó: se marca anulada sin llamar a anular.
+
+### Confirmar el pago
+
+`ConfirmarPagoService::verificar()` pide `GET /liquidaciones/{id}`:
+
+| SIREB dice | Jichi |
+| --- | --- |
+| `pendiente`, sin pago | Sigue pendiente: «todavía no se registró ningún pago» (con el código) |
+| `pendiente`, pago `pendiente` | Sigue pendiente: «falta que lo validen en Recaudaciones» |
+| `anulada` / `vencida` | Sigue pendiente: «corrija el trámite para generar uno nuevo, o elimínelo» |
+| `pagada`, pago `confirmado` | **Aprueba** (`Revisar*Service::aprobar()`, con sus reglas) **y emite el recibo** con la boleta, en una transacción |
+
+Si una regla de Jichi lo frena al aprobar (autorización revocada, kilos), queda
+pendiente con ese motivo. Lo disparan el botón **«Verificar pago»** de la ficha
+(`POST /panel/{documento}/{id}/verificar-pago`, permiso `{documento}.crear`) y
+`jichi:verificar-pagos` cada 10 minutos (`routes/console.php`; necesita el cron
+de Laravel).
+
+| Pieza | Qué hace |
+| --- | --- |
+| `SirebService::registrarLiquidacion()` / `liquidacion()` / `anularLiquidacion()` | El HTTP. Las escrituras reintentan ante red, timeout o 5xx con `Http::retry()` (`REINTENTOS = 2`, 1 s; un 4xx no). Todo pasa por `enviar()` (token + reintento ante 401) |
+| `LiquidarSirebService` | `preparar()` (dentro de la transacción), `enviar()`, `enviarSinFrenar()`, `anularSiCambia()` y `anular()` (fuera) |
+| Trait `LiquidableSireb` | Columnas y casts, `titularSireb()`, `itemsSireb()`, `registradoEnSireb()`, `porPagar()`, `resumenSireb()` y la relación `recibo` |
+| `ConfirmarPagoService` | Consulta, aprueba y emite el recibo |
+| `EstadoLiquidacionSireb` | `por_enviar` / `registrada` / `anulada` |
+| `TarjetaRecaudaciones` (React) | La tarjeta de las cuatro fichas: estado, código de pago, recibo y «Verificar pago» |
+| Flash `aviso` | El toast amarillo: se hizo, pero falta algo |
+
+Probado el 02/10/2026 con SIREB simulado (`Http::fake`) dentro de transacciones
+deshechas: los cuatro documentos registran su liquidación, se aprueban al darlos
+por pagados, emiten su recibo con la boleta y no duplican al reintentar; corregir
+y eliminar anulan. La consulta real (`GET /liquidaciones/{id}`) se probó contra
+test.sireb. **Falta pagar una de punta a punta en test.sireb.**
+
 ## Lo que falta
 
-- El cobro sigue en Jichi (pagos, boletas, recibo). Registrar la liquidación en
-  SIREB y usar su `codigo_publico` es otra etapa: ver el análisis de las
-  diferencias (una boleta por liquidación, vencimiento, quién valida).
+- Probar de punta a punta contra test.sireb (pagar, validar, ver la aprobación).
+- El cron de Laravel en el servidor, o nada se aprueba solo.
+- La guía de piscicultura: su 50% no viaja a SIREB.

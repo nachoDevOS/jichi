@@ -33,6 +33,13 @@ return new class extends Migration
             $table->decimal('monto', 10, 2)->comment('Precio de SIREB al otorgar');
             $table->string('sireb_tarifa_id', 36)->nullable()->comment('Tarifa de SIREB de ese precio');
 
+            // La liquidación en SIREB (ahí se paga). La clave se guarda ANTES de llamar. Ver MER.md.
+            $table->uuid('sireb_idempotency_key')->nullable()->unique()->comment('Header Idempotency-Key');
+            $table->uuid('sireb_liquidacion_id')->nullable()->comment('Id de la liquidación en SIREB');
+            $table->string('sireb_codigo_publico', 40)->nullable()->comment('Con el que se paga en SIREB');
+            $table->string('sireb_estado', 20)->nullable()->comment('EstadoLiquidacionSireb; null si nunca se vendió');
+            $table->json('sireb_envio')->nullable()->comment('Lo enviado a SIREB y su respuesta o error');
+
             // Renglón del talonario. Texto libre: no hay padrón de embarcaciones.
             $table->string('tipo_embarcacion', 120)->comment('Canoa, peque-peque, bote…');
 

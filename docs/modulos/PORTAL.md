@@ -77,38 +77,19 @@ ventanilla ──[Resetear]──▶ clave temporal nueva (también reactiva)
 | Pantalla | Controlador | Qué |
 | --- | --- | --- |
 | Inicio | `InicioController` | Lo vigente hoy, qué puede tramitar (`App\Support\TramitesDisponibles`), si debe algo y cuántos trámites tiene en curso |
-| En curso | `EnCursoController` | Lista de trámites abiertos con filtros (Todos / Pendientes / En revisión) y, en cada fila (`fila-tramite.tsx`), la línea de avance Solicitado → Pago → Revisión → Aprobado. El paso lo da `etapa` y el texto `siguiente_paso`, los dos de `ResumenPortal` a partir del enum: React no decide |
+| En curso | `EnCursoController` | Lista de trámites abiertos —todos esperan el pago en SIREB— y, en cada fila (`fila-tramite.tsx`), la línea de avance Solicitado → Pago en Recaudaciones → Aprobado y el **código de pago** de SIREB. El paso lo da `etapa` y el texto `siguiente_paso`, los dos de `ResumenPortal` a partir del enum: React no decide |
 | Mis papeles | `PapelesController` | Todo lo que se aprobó alguna vez, con filtros **Vigentes** (abre acá) / **Vencidos** (incluye la autorización agotada) / **Revocados** (incluye anulado y «sin efecto») / Todos. `situacion`, `dias_restantes` y `motivo_baja` los calcula `ResumenPortal` desde el enum y `estaVigente()`; «vence pronto» a 30 días. Lo abierto va en «En curso» |
-| Mis pagos | `PagosController` | Por **gestión** (`?gestion=`, informe de aportes del **Art. 13**). Pestaña **Pagos**: **una fila por trámite** con el total, sus recibos y el peor estado de sus boletas (observado > en control > validado); al tocarla, cada boleta con número, fecha, monto, estado, motivo si está observada y **«Ver comprobante»**. Un trámite puede pagarse con una o varias boletas. Pestaña **Recibos**. Cada recibo se **descarga** (botón con ícono, `/mi-cuenta/recibos/{codigo}/descargar`, `DescargarReciboController`, el mismo PDF del panel como `attachment`): prueba el pago y no habilita nada, así que se baja siempre; lo ajeno da 404. El reglamento no lo menciona; lo respalda el Art. 13. No muestra quién validó |
+| Mis pagos | `PagosController` | Por **gestión** (`?gestion=`, informe de aportes del **Art. 13**): sus **recibos**, cada uno con la boleta tal como la validó SIREB (número, banco, fecha). Cada recibo se **descarga** (`/mi-cuenta/recibos/{codigo}/descargar`, `DescargarReciboController`, el mismo PDF del panel como `attachment`); lo ajeno da 404. El pago se hace en SIREB (02/10/2026) |
 | Mis datos | `PerfilController` | Sus datos, **solo para leer**: se corrigen en ventanilla |
 
 Cada documento lleva su código y un enlace a `/verificar` (en pestaña aparte),
 la misma página que abre el QR.
 
-### «Pagar con QR» es una DEMOSTRACIÓN, apagada fuera de local (28/09/2026)
+### El pago se hace en SIREB (02/10/2026)
 
-Una tarjeta con saldo pendiente muestra «Pagar … con QR», que abre el **modal
-global** del portal (`components/portal/modal-pago.tsx`): `ProveedorPago` va
-montado en `LayoutPortal` y cualquier tarjeta lo abre con `useModalPago()`. El
-concepto, el monto y el código salen de la tarjeta; el QR es una **imagen**
-(`/mi-cuenta/pagar/{codigo}/qr`, `PagoSimuladoController`), porque el sistema no
-usa `fetch`.
-
-**No está conectado a ningún banco y no registra nada**, pero a pedido del
-responsable la pantalla ya no lo dice: muestra el texto del pago automático
-(«no necesita llevar ningún comprobante a ventanilla»). Por eso vive detrás de
-**`jichi.portal.pago_qr`** (`PORTAL_PAGO_QR`), que por defecto está encendido
-**solo con `APP_ENV=local`**: en producción el botón no aparece y la ruta da
-404. **No se enciende en producción hasta conectar un cobro real**: un
-beneficiario creería haber pagado y su trámite seguiría pendiente. El
-*contenido* del QR sigue diciendo `SIMULACION - SIN VALOR DE PAGO`, así que una
-app de banco no lo toma como cobro.
-
-La ruta usa el **código público**, no un id, y el controlador responde **404**
-si el documento no es de quien tiene la sesión, si no se cobra o si no falta
-plata: 404 y no 403, para no confirmar que el código existe. Conectarlo a un
-cobro real (QR interbancario) sería otro módulo: pagos que entran solos, sin
-boleta, y un control que hoy es manual.
+El «Pagar con QR» simulado se retiró. Un trámite pendiente muestra el **código de
+pago** de su liquidación en SIREB (`codigo_pago`, de `ResumenPortal`) y el texto
+de qué falta; cuando Recaudaciones valida el pago, el documento se aprueba solo.
 
 **Las consultas son las del panel:** `App\Support\ExpedienteBeneficiario` tiene
 los `with()` que usa también `BeneficiarioController::show()`. Lo que se muestra
@@ -138,11 +119,11 @@ nada, en lugar de copiar un armado lleno de medidas a mano.
   28/09/2026): perdido, se revoca y se emite otro en ventanilla con código nuevo
   —la reposición—. Bajarlo de nuevo desde casa saltearía ese trámite. Se descargan la
   autorización, la faena y la guía.
-- El control de dueño es el mismo de «Pagar»: `App\Support\DocumentoDelPortal`.
+- El control de dueño: `App\Support\DocumentoDelPortal`.
 
 ### Vista previa «NO VÁLIDO» de lo abierto (28/09/2026)
 
-Un trámite **pendiente o en revisión** trae «Vista previa» →
+Un trámite **pendiente** trae «Vista previa» →
 `/mi-cuenta/vista-previa/{codigo}` (`Portal/VistaPreviaController`): el mismo PDF
 del panel con **«NO VÁLIDO»** cruzado en cada hoja. Lo aprobado no la tiene: se
 descarga limpio.

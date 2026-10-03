@@ -30,7 +30,7 @@ const PREGUNTAS = [
     },
     {
         p: '¿Cómo se paga?',
-        r: 'Por depósito bancario. La boleta se entrega en ventanilla y a cambio recibe un recibo oficial numerado. La Unidad controla el depósito contra el banco antes de aprobar el documento.',
+        r: 'En Recaudaciones del Gobierno Autónomo Departamental del Beni, con el código de pago que le dan en ventanilla. Cuando el pago se valida allá, el documento queda aprobado y se emite su recibo oficial numerado.',
     },
     {
         p: '¿Cómo sé si un documento es auténtico?',

@@ -1,18 +1,9 @@
-import {
-    Banknote,
-    ClipboardCheck,
-    FileSignature,
-    FileText,
-    Fish,
-    IdCard,
-    Printer,
-    Truck,
-} from 'lucide-react';
+import { Banknote, ClipboardCheck, FileText, Fish, IdCard, Printer, Truck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Aparecer } from '@/components/publico/institucional/aparecer';
 import { Seccion } from '@/components/publico/institucional/seccion';
 
-/** El mismo circuito para todos los documentos: se presenta, se paga, se firma y se retira. */
+/** El mismo circuito para todos los documentos: se presenta, se paga en Recaudaciones y se retira. */
 const PASOS: { icono: LucideIcon; titulo: string; texto: string }[] = [
     {
         icono: FileText,
@@ -21,13 +12,8 @@ const PASOS: { icono: LucideIcon; titulo: string; texto: string }[] = [
     },
     {
         icono: Banknote,
-        titulo: 'Deposite y entregue la boleta',
-        texto: 'El pago es por depósito bancario. Al entregar la boleta recibe un recibo oficial numerado.',
-    },
-    {
-        icono: FileSignature,
-        titulo: 'La Unidad revisa y firma',
-        texto: 'Se controla el depósito contra el banco y se aprueba el documento.',
+        titulo: 'Pague en Recaudaciones',
+        texto: 'Con el código de pago que le dan en ventanilla. Cuando Recaudaciones valida el pago, el documento queda aprobado y se emite su recibo oficial numerado.',
     },
     {
         icono: Printer,
@@ -71,7 +57,7 @@ export function Pasos() {
             bajada="Todos los documentos siguen los mismos cuatro pasos."
             oscuro
         >
-            <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <ol className="grid gap-4 sm:grid-cols-3">
                 {PASOS.map((p, i) => (
                     <li key={p.titulo}>
                         <Aparecer retraso={i * 100} className="h-full">

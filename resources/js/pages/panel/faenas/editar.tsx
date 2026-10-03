@@ -58,7 +58,7 @@ export default function EditarFaena({
     return (
         <LayoutPanel
             titulo={`Corregir la faena N° ${faena.numero_legible}`}
-            descripcion="Solo mientras está PENDIENTE y sin ningún depósito cargado. El titular y el carnet no se cambian."
+            descripcion="Solo mientras está PENDIENTE de pago. El titular y el carnet no se cambian."
         >
             <Head title={`Corregir faena ${faena.numero_legible}`} />
 

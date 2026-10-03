@@ -166,12 +166,10 @@ class AutorizacionPescaController extends Controller
         return $partes === [] ? 'Sin domicilio en la ficha' : implode(' · ', $partes);
     }
 
-    /** La fecha del último depósito: cuándo quedó cubierto el monto. */
+    /** La fecha del pago en SIREB, copiada al recibo: cuándo quedó cancelada. */
     private function cancelacionDe(AprovechamientoPesq $cupo): string
     {
-        $ultimo = $cupo->pagos()->reorder()->orderByDesc('fecha_deposito')->first();
-
-        return $ultimo?->fecha_deposito?->format('d/m/Y') ?? 'Al contado';
+        return $cupo->recibo?->fecha_pago?->format('d/m/Y') ?? 'Al contado';
     }
 
     private function lugar(): string

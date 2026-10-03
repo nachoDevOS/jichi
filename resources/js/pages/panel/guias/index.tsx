@@ -218,13 +218,13 @@ export default function IndiceGuias({
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-right tabular-nums">
-                                                    {g.pagado ? (
-                                                        <span className="text-emerald-700 dark:text-emerald-400">
-                                                            Pagado
+                                                    {g.puede_verificar_pago ? (
+                                                        <span className="text-amber-700 dark:text-amber-400">
+                                                            debe {bs(g.monto, institucion.moneda)}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-amber-700 dark:text-amber-400">
-                                                            debe {bs(g.saldo_pendiente, institucion.moneda)}
+                                                        <span className="text-emerald-700 dark:text-emerald-400">
+                                                            Pagado
                                                         </span>
                                                     )}
                                                 </td>

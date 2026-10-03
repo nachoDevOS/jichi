@@ -1,0 +1,131 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\EstadoLiquidacionSireb;
+use App\Sireb\SirebException;
+use App\Sireb\SirebService;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+
+/**
+ * La liquidación de un documento en SIREB (trait LiquidableSireb), en dos tiempos:
+ * preparar() guarda la clave DENTRO de la transacción del documento y enviar()
+ * llama DESPUÉS del commit, así un reintento manda la misma clave y SIREB no
+ * duplica. Ver docs/modulos/SIREB.md.
+ */
+class LiquidarSirebService
+{
+    public function __construct(private readonly SirebService $sireb) {}
+
+    /** Liquidación nueva, clave nueva, sin llamar a SIREB. */
+    public function preparar(Model $documento): void
+    {
+        $documento->update([
+            'sireb_idempotency_key' => (string) Str::uuid(),
+            'sireb_liquidacion_id' => null,
+            'sireb_codigo_publico' => null,
+            'sireb_estado' => EstadoLiquidacionSireb::PorEnviar,
+            'sireb_envio' => null,
+        ]);
+    }
+
+    /**
+     * Manda la liquidación con su clave guardada. Lo enviado y la respuesta (o el
+     * error) quedan en `sireb_envio`.
+     *
+     * @throws SirebException
+     */
+    public function enviar(Model $documento): void
+    {
+        if ($documento->sireb_estado !== EstadoLiquidacionSireb::PorEnviar) {
+            return;
+        }
+
+        $titular = $documento->titularSireb();
+        $cuerpo = [
+            'cliente' => [
+                'ci_nit' => $titular->ci.($titular->complemento ? '-'.$titular->complemento : ''),
+                'nombre_completo' => $titular->nombreCompleto,
+            ],
+            'referencia_externa' => $documento->codigo_legible,
+            'items' => $documento->itemsSireb(),
+        ];
+        $envio = ['idempotency_key' => $documento->sireb_idempotency_key, 'enviado' => $cuerpo, 'enviado_en' => now()->toIso8601String()];
+
+        try {
+            $liquidacion = $this->sireb->registrarLiquidacion($cuerpo, $documento->sireb_idempotency_key);
+        } catch (SirebException $e) {
+            Log::warning('SIREB no registró la liquidación', ['documento' => $documento::class.':'.$documento->getKey(), 'motivo' => $e->getMessage()]);
+            $documento->update(['sireb_envio' => [...$envio, 'error' => $e->getMessage()]]);
+
+            throw $e;
+        }
+
+        $documento->update([
+            'sireb_liquidacion_id' => $liquidacion['id'],
+            'sireb_codigo_publico' => $liquidacion['codigo_publico'] ?? null,
+            'sireb_estado' => EstadoLiquidacionSireb::Registrada,
+            'sireb_envio' => [...$envio, 'respuesta' => $liquidacion],
+        ]);
+    }
+
+    /** Como enviar(), pero si SIREB falla no frena: queda «por enviar» y la ficha ofrece reintentar. */
+    public function enviarSinFrenar(Model $documento): void
+    {
+        try {
+            $this->enviar($documento);
+        } catch (SirebException) {
+            // Ya quedó en el log y en `sireb_envio`.
+        }
+    }
+
+    /**
+     * Al CORREGIR, antes de tocar nada: si cambia lo que se cobra, anula la vieja.
+     * Devuelve si hace falta preparar otra (también si la anterior ya estaba anulada).
+     *
+     * @throws SirebException
+     */
+    public function anularSiCambia(Model $documento, array $itemsNuevos, float $montoNuevo): bool
+    {
+        $cambia = $documento->itemsSireb() != $itemsNuevos || (float) $documento->monto !== $montoNuevo;
+
+        if ($cambia) {
+            $this->anular($documento, 'Corrección del borrador en Jichi: cambió lo que se cobra.');
+        }
+
+        return $cambia || in_array($documento->sireb_estado, [null, EstadoLiquidacionSireb::Anulada], true);
+    }
+
+    /**
+     * Anula la liquidación en curso. Una por enviar se manda antes con su clave:
+     * pudo haber llegado aunque no volvió respuesta. Si SIREB no anula, no se sigue.
+     *
+     * @throws SirebException
+     */
+    public function anular(Model $documento, string $motivo): void
+    {
+        if (in_array($documento->sireb_estado, [null, EstadoLiquidacionSireb::Anulada], true)) {
+            return;
+        }
+
+        try {
+            $this->enviar($documento);
+
+            if ($documento->registradoEnSireb()) {
+                $this->sireb->anularLiquidacion($documento->sireb_liquidacion_id, $motivo);
+            }
+        } catch (SirebException $e) {
+            // Un «no» de SIREB al ENVIAR (422) dice que con esta clave nunca la creó: no hay nada que anular.
+            if ($e->codigo === null || $documento->registradoEnSireb()) {
+                throw $e;
+            }
+        }
+
+        $documento->update([
+            'sireb_estado' => EstadoLiquidacionSireb::Anulada,
+            'sireb_envio' => [...($documento->sireb_envio ?? []), 'anulada' => ['motivo' => $motivo, 'en' => now()->toIso8601String()]],
+        ]);
+    }
+}

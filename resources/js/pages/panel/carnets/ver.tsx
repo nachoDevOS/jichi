@@ -1,34 +1,17 @@
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import {
-    Ban,
-    Check,
-    ExternalLink,
-    Paperclip,
-    Pencil,
-    Printer,
-    Receipt,
-    Send,
-    Ship,
-    Trash2,
-    Truck,
-    Undo2,
-    User,
-    Waves,
-} from 'lucide-react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Ban, ExternalLink, Paperclip, Pencil, Printer, Receipt, Ship, Trash2, Truck, User, Waves } from 'lucide-react';
 import { useState } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TarjetaPagos } from '@/components/panel/pagos/tarjeta-pagos';
-import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
+import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn, fecha, fechaHora } from '@/lib/utils';
-import type { PageProps } from '@/types';
-import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
+import { cn, fecha, fechaHora } from '@/lib/utils';
+import type { ReciboDelCupo } from '@/types/aprovechamientos';
 import type { CarnetFicha, FaenaDelCarnet, GuiaDelCarnet } from '@/types/carnets';
 
 /**
@@ -36,28 +19,21 @@ import type { CarnetFicha, FaenaDelCarnet, GuiaDelCarnet } from '@/types/carnets
  */
 export default function VerCarnet({
     carnet,
-    pagos,
     recibo,
     faenas,
     guias,
 }: {
     carnet: CarnetFicha;
-    pagos: PagoDelCupo[];
     recibo: ReciboDelCupo | null;
     faenas: FaenaDelCarnet[];
     guias: GuiaDelCarnet[];
 }) {
     const { puede } = usePermisos();
-    const { institucion } = usePage<PageProps>().props;
-    const [rechazando, setRechazando] = useState(false);
-    const [aprobando, setAprobando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
     const [revocando, setRevocando] = useState(false);
 
     const borrado = useForm({ motivo: '' });
     const revocacion = useForm({ motivo: '' });
-    const rechazo = useForm({ motivo: '' });
-    const envio = useForm({});
 
     return (
         <LayoutPanel
@@ -113,50 +89,7 @@ export default function VerCarnet({
                         </Button>
                     )}
 
-                    {/*
-                        EL CIRCUITO, igual que en el aprovechamiento: presentar
-                        es de ventanilla y firmar es de supervisión. Las tres
-                        banderas llegan resueltas del servidor.
-                    */}
-                    {puede('carnets.enviar') && carnet.puede_enviarse && (
-                        <Button
-                            onClick={() =>
-                                envio.post(route('carnets.enviar', carnet.id), {
-                                    preserveScroll: true,
-                                })
-                            }
-                            disabled={envio.processing}
-                        >
-                            <Send className="size-4" />
-                            Enviar a revisión
-                        </Button>
-                    )}
 
-                    {puede('carnets.aprobar') && carnet.puede_revisarse && (
-                        <>
-                            {/* Apagado mientras falte validar alguna boleta, y
-                                el title dice cuántas: el servidor lo exige
-                                igual, y un botón que promete y falla es peor. */}
-                            <Button
-                                onClick={() => setAprobando(true)}
-                                disabled={envio.processing || !carnet.puede_aprobarse}
-                                title={
-                                    carnet.puede_aprobarse
-                                        ? undefined
-                                        : `Faltan ${carnet.pagos_sin_validar} depósito(s) por validar`
-                                }
-                                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                            >
-                                <Check className="size-4" />
-                                Aprobar
-                            </Button>
-
-                            <Button variant="eliminar" onClick={() => setRechazando(true)}>
-                                <Undo2 className="size-4" />
-                                Rechazar
-                            </Button>
-                        </>
-                    )}
 
                     {/* El plástico sale recién con el carnet firmado. */}
                     {puede('carnets.imprimir') && carnet.puede_imprimirse && (
@@ -435,19 +368,6 @@ export default function VerCarnet({
                         )}
                         <Dato etiqueta="Vence el" valor={fecha(carnet.fecha_vencimiento)} />
 
-                        <div className="flex items-center justify-between gap-2">
-                            <span className="text-muted-foreground">Cobro</span>
-                            {carnet.pagado ? (
-                                <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                                    Pagado
-                                </span>
-                            ) : (
-                                <span className="font-medium text-amber-700 dark:text-amber-400">
-                                    debe {bs(carnet.saldo_pendiente, institucion.moneda)}
-                                </span>
-                            )}
-                        </div>
-
                         {/*
                             El aviso de vencimiento cercano. `dias_para_vencer`
                             llega calculado del servidor: la pantalla no resta
@@ -467,17 +387,15 @@ export default function VerCarnet({
                 </Card>
             </div>
 
-            {/* El cobro del arancel, con el mismo formulario que el cupo. */}
+            {/* El cobro: se paga en SIREB, igual que los otros tres documentos. */}
             <div className="mt-6">
-                <TarjetaPagos
-                    pagos={pagos}
+                <TarjetaRecaudaciones
+                    monto={carnet.monto}
+                    sireb={carnet.sireb}
                     recibo={recibo}
-                    saldoPendiente={carnet.saldo_pendiente}
-                    titular={carnet.beneficiario ?? 'el titular'}
-                    admitePagos={carnet.admite_pagos}
-                    rutaPagar={route('carnets.pagar', carnet.id)}
-                    permisoEnviar="carnets.enviar"
-                    textoAlEnviar="El carnet pasa a EN REVISIÓN y se emite el recibo con el total; el carnet se imprime recién cuando esté aprobado."
+                    puedeVerificar={carnet.puede_verificar_pago}
+                    rutaVerificar={route('carnets.verificar-pago', carnet.id)}
+                    permiso="carnets.crear"
                 />
             </div>
 
@@ -625,81 +543,7 @@ export default function VerCarnet({
                 </Card>
             )}
 
-            {/*
-                APROBAR PIDE CASILLA: es la FIRMA. Desde acá el carnet habilita
-                a trabajar y se puede imprimir, y no hay «des-aprobar».
-            */}
-            <ConfirmarAccion
-                abierto={aprobando}
-                tono="afirmativo"
-                titulo="Aprobar el carnet"
-                descripcion={
-                    <div className="space-y-2">
-                        <p>
-                            El carnet <strong>{carnet.codigo}</strong> de{' '}
-                            <strong>{carnet.beneficiario ?? 'el titular'}</strong> queda ACTIVO hasta
-                            el <strong>{fecha(carnet.fecha_vencimiento)}</strong>, y desde ese momento
-                            se puede imprimir.
-                        </p>
-                        <p>
-                            <strong>No se puede deshacer.</strong>
-                        </p>
-                    </div>
-                }
-                confirmacion="Verifiqué las boletas contra el extracto del banco y el expediente está completo."
-                textoConfirmar="Aprobar"
-                procesando={envio.processing}
-                onCancelar={() => setAprobando(false)}
-                onConfirmar={() =>
-                    envio.patch(route('carnets.aprobar', carnet.id), {
-                        preserveScroll: true,
-                        onSuccess: () => setAprobando(false),
-                    })
-                }
-            />
 
-            {/*
-                RECHAZAR PIDE MOTIVO Y CASILLA, igual que en el cupo: es la otra
-                mitad de la firma y se confirma igual.
-            */}
-            <ConfirmarConMotivo
-                abierto={rechazando}
-                titulo="Rechazar y devolver a ventanilla"
-                descripcion={
-                    <div className="space-y-2">
-                        <p>
-                            El carnet vuelve a <strong>PENDIENTE</strong>.
-                        </p>
-                        <p>
-                            Los depósitos ya cargados <strong>no se tocan</strong>, y el recibo
-                            entregado sigue valiendo: ventanilla corrige lo observado y lo vuelve a
-                            presentar sin recargar nada.
-                        </p>
-                    </div>
-                }
-                etiquetaMotivo="Motivo del rechazo"
-                ayuda="Es lo que va a leer quien tenga que corregirlo. Queda en la auditoría con su nombre."
-                placeholder="La boleta 0012345 no figura en el extracto del banco."
-                confirmacion="El expediente vuelve a ventanilla con este motivo escrito, y queda registrado a mi nombre."
-                textoConfirmar="Rechazar"
-                valor={rechazo.data.motivo}
-                onCambiar={(v) => rechazo.setData('motivo', v)}
-                error={rechazo.errors.motivo}
-                procesando={rechazo.processing}
-                onCancelar={() => {
-                    setRechazando(false);
-                    rechazo.reset();
-                }}
-                onConfirmar={() =>
-                    rechazo.patch(route('carnets.rechazar', carnet.id), {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setRechazando(false);
-                            rechazo.reset();
-                        },
-                    })
-                }
-            />
 
             {/*
                 ELIMINAR PIDE MOTIVO **Y** CASILLA. La fila desaparece de los
@@ -714,7 +558,7 @@ export default function VerCarnet({
                     <div className="space-y-2">
                         <p>
                             El carnet <strong>{carnet.codigo}</strong> desaparece de los listados. Se
-                            elimina solo porque está PENDIENTE y sin cobrar.
+                            elimina solo porque está PENDIENTE de pago; el cobro se anula en Recaudaciones.
                         </p>
                         <p>
                             <strong>El código no se libera:</strong> el índice es global y ese

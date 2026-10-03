@@ -10,72 +10,20 @@ use App\Models\PermisoFaena;
 use Illuminate\Support\Facades\DB;
 
 /**
- *  El circuito de revisión de una faena
- *
- * Espejo de `RevisarCarnetService` y de `RevisarCupoService`: la salida de
- * pesca se cobra y se firma igual que los otros dos trámites, así que el
- * operador aprende un solo circuito.
+ * Aprobar la faena cuando SIREB confirma el pago (lo llama ConfirmarPagoService).
  */
 class RevisarFaenaService
 {
-    public function __construct(private readonly CobrarService $caja) {}
-
     /**
-     * PENDIENTE ──▶ EN REVISIÓN, y acá sale el RECIBO.
-     */
-    public function enviar(PermisoFaena $faena): PermisoFaena
-    {
-        return DB::transaction(function () use ($faena): PermisoFaena {
-            $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
-
-            if (! $bloqueada->estado->permiteEnvio()) {
-                throw PermisoOperativoException::faenaNoSePuedeEnviar($bloqueada->estado->etiqueta());
-            }
-
-            if ($bloqueada->saldoPendiente() > 0.0) {
-                throw PermisoOperativoException::faltaCubrirElArancelDeLaFaena(
-                    $bloqueada->saldoPendiente(),
-                );
-            }
-
-            $bloqueada->motivoAuditoria = 'Depósitos cargados y arancel cubierto: se presenta para revisión.';
-            $bloqueada->update(['estado' => EstadoFaena::EnRevision]);
-
-            // Devuelve null en un REENVÍO: sin depósitos sueltos no se toca el
-            // correlativo y el número que la persona tiene sigue valiendo.
-            $this->caja->emitirRecibo($bloqueada);
-
-            // La instancia ORIGINAL refrescada, no la copia bloqueada. Ver CLAUDE.md.
-            return $faena->refresh();
-        });
-    }
-
-    /**
-     * En revisión ──▶ APROBADO. Recién acá el permiso autoriza a salir.
+     * PENDIENTE ──▶ APROBADO, con el pago ya confirmado en SIREB. Recién acá autoriza a salir.
      */
     public function aprobar(PermisoFaena $faena): PermisoFaena
     {
         return DB::transaction(function () use ($faena): PermisoFaena {
             $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
 
-            if (! $bloqueada->estado->permiteRevision()) {
+            if (! $bloqueada->estado->estaAbierto()) {
                 throw PermisoOperativoException::faenaNoSePuedeRevisar($bloqueada->estado->etiqueta());
-            }
-
-            // Se vuelve a mirar el arancel: entre el envío y la firma se pudo
-            // dar de baja un depósito.
-            if ($bloqueada->saldoPendiente() > 0.0) {
-                throw PermisoOperativoException::faltaCubrirElArancelDeLaFaena(
-                    $bloqueada->saldoPendiente(),
-                );
-            }
-
-            // Y que ninguna boleta quede sin controlar: `sinValidar()` cuenta
-            // también las observadas.
-            $sinControlar = $bloqueada->pagos()->sinValidar()->count();
-
-            if ($sinControlar > 0) {
-                throw PermisoOperativoException::faltaControlarBoletasDeLaFaena($sinControlar);
             }
 
             // ACÁ se consume el cupo, y por eso acá está el control de saldo: la
@@ -94,7 +42,7 @@ class RevisarFaenaService
                 throw PermisoOperativoException::sinCupoVigente();
             }
 
-            // Si la revocaron mientras la faena esperaba la firma, ya no se aprueba.
+            // Si la revocaron mientras la faena esperaba el pago, ya no se aprueba.
             if ($cupo !== null && $cupo->estado === EstadoAprovechamiento::Revocado) {
                 throw PermisoOperativoException::cupoRevocado();
             }
@@ -110,38 +58,16 @@ class RevisarFaenaService
                 }
             }
 
-            // La firma fija las dos fechas del papel: sale hoy y desembarca al techo.
-            $bloqueada->motivoAuditoria = 'Depósitos verificados: el permiso queda habilitado.';
+            // La aprobación fija las dos fechas del papel: sale hoy y desembarca al techo.
+            $bloqueada->motivoAuditoria = 'Pago confirmado en SIREB: el permiso queda habilitado.';
             $bloqueada->update([
                 'estado' => EstadoFaena::Aprobado,
                 'fecha_salida' => now()->toDateString(),
                 'fecha_desembarque' => PermisoFaena::desembarqueDesde(now())->toDateString(),
             ]);
 
-            // Si esta firma dejó la bolsa en cero, el cupo pasa a `agotado`.
+            // Si esta aprobación dejó la bolsa en cero, el cupo pasa a `agotado`.
             $cupo?->fresh()->sincronizarEstadoPorSaldo();
-
-            return $faena->refresh();
-        });
-    }
-
-    /**
-     * En revisión ──▶ PENDIENTE, con el motivo escrito.
-     *
-     * Los pagos NO se tocan y el recibo tampoco se anula: ese papel ya está en
-     * manos de la persona, y un reenvío no emite un segundo.
-     */
-    public function rechazar(PermisoFaena $faena, string $motivo): PermisoFaena
-    {
-        return DB::transaction(function () use ($faena, $motivo): PermisoFaena {
-            $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
-
-            if (! $bloqueada->estado->permiteRevision()) {
-                throw PermisoOperativoException::faenaNoSePuedeRevisar($bloqueada->estado->etiqueta());
-            }
-
-            $bloqueada->motivoAuditoria = $motivo;
-            $bloqueada->update(['estado' => EstadoFaena::Pendiente]);
 
             return $faena->refresh();
         });

@@ -33,11 +33,9 @@ decisiones que acá solo se nombran.
 | `EstadoRubro.php` | 48 | `activo \| inactivo` | Un rubro nunca se borra |
 | `TipoTramite.php` | 92 | `emision_inicial \| actualizacion` | **Lo decide el sistema, no el operador**. «Adición de rubro» ya no existe: pedir otro rubro emite otro carnet |
 | `RolSistema.php` | 124 | Roles y **todos** sus permisos | Un solo rol hoy (`administrador`). Los permisos ya están en cuatro bloques para poder agregar el segundo en una línea |
-| `EstadoValidacionPago.php` | 113 | `pendiente \| validado \| observado` | NO es el estado del pago sino el de su CONTROL. Nace PENDIENTE: si arrancara validado, todo estaría aprobado por omisión. Tres estados y no dos — «sin mirar» y «no cuadra» son cosas distintas |
 | `EstadoPermiso.php` | 106 | `emitido \| anulado` | **Lo comparten faenas y guías**, porque su ciclo de vida es idéntico. Solo dos valores: no hay circuito — el permiso se llena, se cobra y se entrega en el acto. Se **anula**, nunca se borra: el número ya se gastó del talonario |
 | `TipoTransporte.php` | 79 | `fluvial \| aerea \| terrestre` | Dice **quién controla y dónde**: la naval en el río, un retén en la carretera. Por eso la columna es obligatoria mientras el resto del transporte es opcional. `rotuloIdentificacion()` cambia «Placa» por «Matrícula» |
 | `CondicionProducto.php` | 70 | `fresco \| congelado \| seco \| salado` | Lista **cerrada**, al revés de la especie vecina: son cuatro, las usa el formulario de papel y no aparecen nuevas |
-| `FormaPago.php` | 52 | `deposito \| efectivo` | Son las dos casillas del recibo de papel |
 | `ConceptoRecibo.php` | 110 | Las seis casillas de DESCRIPCIÓN del recibo | Puente rubro→casilla **por nombre**, con caída a `Otros`: el catálogo y el talonario evolucionan por separado |
 
 ## `app/Services/` — acá viven las reglas
@@ -81,7 +79,6 @@ decisiones que acá solo se nombran.
 | `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
 | `Tramite.php` | 310 | Cuelga del **carnet**. `montoPagado()` reusa `pagos_sum_monto` si el listado hizo `withSum`. Las 5 fechas van en `#[Fillable]` aunque ningún formulario las mande — `update()` las descartaría |
 | `CarnetRubro.php` | 71 | Pivote **con modelo propio**, porque `attach()` no dispara eventos y `Auditable` no registraría nada |
-| `Pago.php` | 243 | **`pagable()` es un `morphTo`**: el depósito cubre un trámite, una faena o una guía. Sin morphMap — en la columna va el nombre completo de la clase. La columna del archivo es **`urlFile`**, el accesor es `comprobante_url`. No se anulan ni se borran |
 | `Faena.php` | 288 | Cuelga del **carnet**, no del beneficiario. `$attributes` declara `estado` por defecto **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `diasAutorizados()` suma uno — salir y desembarcar el mismo día es un día, no cero. `estaVigente()` mira TRES cosas, y la que se olvida es el carnet |
 | `GuiaMovimiento.php` | 350 | Cuelga del **carnet**, no del beneficiario; la carga está en `GuiaDetalle`. **`montoACobrar()` lee la COLUMNA**, no `config()`: el arancel se congela al emitir. `factorArancel()` es el único lugar donde vive el 50% de piscicultura. `$attributes` declara `estado`, `monto` y `peso_total_kg` **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `beneficiarioId` es un accesor —no una columna— para que `CobrarService` le hable igual que al carnet |
 | `GuiaDetalle.php` | 70 | Un renglón del cuadro D. `condicion` es UN enum de diez casos y no dos columnas: partirlo en estado × presentación dejaría combinaciones que el talonario no tiene. Desde el 27/09/2026 apunta a `producto_id` y guarda **copias** de nombre y precio: el papel no cambia si el catálogo cambia. `precio_kg` es lo pagado en origen, no el arancel |
@@ -100,7 +97,6 @@ decisiones que acá solo se nombran.
 | `Panel/TramiteController.php` | 645 | **No decide nada.** `resumir()` arma lo que comparten tabla y ficha |
 | `Panel/CarnetController.php` | 243 | **Sin `create()` ni `store()`**: un carnet nace en el servicio. La dirección del QR ya no se arma acá: la da `Carnet::urlVerificacion()` |
 | `Panel/CarnetImpresionController.php` | 263 | El PDF del plástico. **No marca impreso** —eso sigue siendo `PATCH /tramites/{tramite}/generar`— ni guarda nada en disco. CR80: 243×153 pt |
-| `Panel/PagoController.php` | 123 | Libro de caja + alta. **Sin anulación** |
 | `Panel/RubroController.php` | 97 | **Sin `destroy()`** |
 | `Panel/ReciboController.php` | 199 | Solo dibuja el PDF. Media carta apaisada. Imágenes embebidas |
 | `Panel/PermisoFaenaImpresionController.php` | 130 | El «Permiso por Faena» en PDF. Carta vertical. Sale recién con la faena **aprobada**. El monto es la copia congelada de la fila, no la tarifa de hoy; la fecha del pie sale de `fecha_emision` para que una reimpresión diga lo mismo |
@@ -143,9 +139,11 @@ Ver [modulos/IBARE.md](modulos/IBARE.md).
 
 | Archivo | Qué hace |
 | --- | --- |
-| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`) y lee el catálogo del SEDAG: `catalogoCrudo()` una página con `tarifas=todas` (llegan también las inactivas), `servicios()` todas juntas en caché 10 min, `serviciosSiResponde()` null si SIREB cae, `servicio($id)` uno con sus tarifas, sin caché; `tarifa($servicio, $tarifa)` una tarifa con su servicio adentro, sin caché (la que usa la emisión). Un 404 de SIREB vuelve como null, no como error |
+| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`) y lee el catálogo del SEDAG: `catalogoCrudo()` una página con `tarifas=todas` (llegan también las inactivas), `servicios()` todas juntas en caché 10 min, `serviciosSiResponde()` null si SIREB cae, `servicio($id)` uno con sus tarifas, sin caché; `tarifa($servicio, $tarifa)` una tarifa con su servicio adentro, sin caché (la que usa la emisión); `registrarLiquidacion()` el POST de la deuda con `Idempotency-Key`. GET y POST pasan por `enviar()` (token + reintento ante 401). Un 404 de SIREB vuelve como null, no como error |
 | `SirebException.php` | Los mensajes que ve el funcionario |
 | `PrecioSireb.php` | El precio de una tarifa al EMITIR, para congelarlo: pide `tarifa()` y exige tarifa y servicio `activo` (y `liquidable` si se pasa `exigirLiquidable`, hoy solo la autorización); si no, `SinPrecioException` con el motivo. Flujo en [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir). Lo usan `OtorgarCupoService`, `EmitirCarnetService`, `EmitirFaenaService` y `EmitirGuiaService` |
+| `../Services/LiquidarSirebService.php` | La liquidación de cada documento en SIREB, sobre sus columnas `sireb_*` (trait `LiquidableSireb`): `preparar()` guarda la `Idempotency-Key` dentro de la transacción; `enviar()` y `anular()` llaman a SIREB después del commit. `sireb_envio` guarda lo enviado y la respuesta |
+| `../Services/ConfirmarPagoService.php` | Pregunta a SIREB (`GET /liquidaciones/{id}`); con `pagada` aprueba el documento (vía `Revisar*Service::aprobar()`) y emite su recibo con la boleta, en una transacción. Lo usan el botón «Verificar pago» y `jichi:verificar-pagos` (cada 10 min, `routes/console.php`) |
 | `VistaSireb.php` | Lo que las pantallas de catálogo necesitan de SIREB, ya armado: `serviciosParaSelect()` (solo tarifas liquidables de servicios activos; null si SIREB cae), `tarifasPorId()` (precio + `estado` + `liquidable` de cada tarifa), `preciosPorTarifa()` (solo liquidables), `describir()` e `historial($modelo)` (actual + anteriores, con qué es hoy cada tarifa y quién la cambió). Lo usan los cuatro catálogos y los formularios de autorización, carnet, faena y guía |
 
 Hoy lo usa solo la autorización (`OtorgarCupoService`, la escala y los formularios

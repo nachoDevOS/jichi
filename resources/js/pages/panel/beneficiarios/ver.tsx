@@ -150,7 +150,7 @@ export default function VerBeneficiario({
                     <PestanaComercializador carnets={carnets} guias={guias} moneda={institucion.moneda} />
                 )}
                 {pestana === 'pagos' && (
-                    <PestanaPagos beneficiarioId={beneficiario.id} recibos={recibos} deuda={deuda} moneda={institucion.moneda} />
+                    <PestanaPagos recibos={recibos} deuda={deuda} moneda={institucion.moneda} />
                 )}
                 {pestana === 'datos' && (
                     <>

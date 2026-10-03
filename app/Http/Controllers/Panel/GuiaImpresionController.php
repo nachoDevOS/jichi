@@ -97,7 +97,7 @@ class GuiaImpresionController extends Controller
 
         return [
             'numero' => $guia->numero_legible,
-            'recibo' => $guia->recibos()->first()?->numero_recibo ?: '',
+            'recibo' => $guia->recibo?->numero_recibo ?: '',
 
             'fecha' => [
                 'dia' => $fecha?->format('d') ?? '',

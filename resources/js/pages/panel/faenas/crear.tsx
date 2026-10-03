@@ -93,7 +93,7 @@ export default function CrearFaena({
     return (
         <LayoutPanel
             titulo="Registrar faena"
-            descripcion={`Autoriza UNA salida de ${diasVigencia} días. Nace PENDIENTE: autoriza recién cuando se cobre el arancel y la aprueben.`}
+            descripcion={`Autoriza UNA salida de ${diasVigencia} días. Nace PENDIENTE: autoriza recién cuando se pague en Recaudaciones.`}
         >
             <Head title="Registrar faena" />
 

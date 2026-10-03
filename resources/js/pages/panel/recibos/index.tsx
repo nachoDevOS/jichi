@@ -1,7 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Printer, ReceiptText, Search, TriangleAlert } from 'lucide-react';
+import { Printer, ReceiptText, Search } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
@@ -11,7 +10,7 @@ import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fechaHora } from '@/lib/utils';
 import type { PageProps, Paginado } from '@/types';
-import type { ReciboFila } from '@/types/caja';
+import type { ReciboFila } from '@/types/recibos';
 
 /**
  *  RECIBOS — los comprobantes entregados
@@ -37,38 +36,14 @@ export default function IndiceRecibos({
         );
     }
 
-    const descuadrados = recibos.data.filter((r) => !r.cuadra).length;
-
     return (
         <LayoutPanel
             titulo="Recibos"
-            descripcion="Los comprobantes numerados. Cada uno puede cubrir varios trámites."
+            descripcion="Un comprobante por documento, emitido cuando Recaudaciones confirma el pago."
         >
             <Head title="Recibos" />
 
             <div className="space-y-6">
-                {/*
-                    El aviso solo aparece si hay alguno descuadrado. Un cartel
-                    permanente enseñaría a ignorarlo, que es lo contrario de lo
-                    que un aviso viene a hacer.
-                */}
-                {descuadrados > 0 && (
-                    <Card className="border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
-                        <CardContent className="flex items-start gap-3 pt-5 text-sm">
-                            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" />
-                            <div>
-                                <p className="font-medium text-amber-900 dark:text-amber-200">
-                                    {descuadrados} recibo(s) no cuadran
-                                </p>
-                                <p className="text-amber-800/80 dark:text-amber-200/80">
-                                    Lo impreso en el papel entregado ya no coincide con la suma de sus
-                                    abonos. Alguien corrigió un cobro después de emitirlo.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
                 {/* `min-w-0`: sin él la tarjeta se estira al ancho de la tabla. */}
                 <Card className="min-w-0">
                     <CardContent className="space-y-4 p-0">
@@ -145,7 +120,7 @@ export default function IndiceRecibos({
                                 descripcion={
                                     filtros.buscar || filtros.desde || filtros.hasta
                                         ? 'Ninguno coincide con los filtros.'
-                                        : 'Los recibos nacen del cobro: se emiten desde Caja, junto con sus abonos.'
+                                        : 'Se emiten solos, uno por documento, cuando Recaudaciones confirma el pago.'
                                 }
                             />
                         ) : (
@@ -173,9 +148,11 @@ export default function IndiceRecibos({
                                                         >
                                                             {r.numero_recibo}
                                                         </Link>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {r.pagos_count} abono(s)
-                                                        </p>
+                                                        {r.numero_boleta && (
+                                                            <p className="text-xs text-muted-foreground">
+                                                                boleta {r.numero_boleta}
+                                                            </p>
+                                                        )}
                                                     </td>
 
                                                     <td className="px-5 py-2.5">
@@ -194,17 +171,6 @@ export default function IndiceRecibos({
                                                             {bs(r.monto_total, institucion.moneda)}
                                                         </span>
 
-                                                        {!r.cuadra && (
-                                                            <>
-                                                                <Badge color="amber" className="ml-2">
-                                                                    no cuadra
-                                                                </Badge>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    hoy suma{' '}
-                                                                    {bs(r.monto_actual, institucion.moneda)}
-                                                                </p>
-                                                            </>
-                                                        )}
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-muted-foreground">

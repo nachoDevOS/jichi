@@ -33,7 +33,6 @@ class ExpedienteBeneficiario
                     ->withSum('faenasQueConsumen', 'kilos_extraidos')
                     ->withSum('faenasQueReservan', 'kilos_extraidos'),
             ])
-            ->withSum('pagos', 'monto_parcial')
             // Por id y no por emisión: la emisión es NULL hasta la firma, y
             // cada motor ordena los NULL en otra punta.
             ->orderByDesc('id')
@@ -45,7 +44,6 @@ class ExpedienteBeneficiario
     {
         return $beneficiario->faenas()
             ->with('carnet.aprovechamiento:id,estado')
-            ->withSum('pagos', 'monto_parcial')
             ->orderByDesc('permisos_faena.numero_faena')
             ->get();
     }
@@ -54,7 +52,6 @@ class ExpedienteBeneficiario
     public static function guias(Beneficiario $beneficiario): Collection
     {
         return $beneficiario->guias()
-            ->withSum('pagos', 'monto_parcial')
             ->orderByDesc('guias_movimiento.numero_guia')
             ->get();
     }
@@ -64,7 +61,6 @@ class ExpedienteBeneficiario
     {
         return Recibo::query()
             ->where('beneficiario_id', $beneficiario->id)
-            ->withCount('pagos')
             ->orderByDesc('id')
             ->get();
     }
@@ -76,7 +72,6 @@ class ExpedienteBeneficiario
             ->with('categoria')
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
             ->withSum('faenasQueReservan', 'kilos_extraidos')
-            ->withSum('pagos', 'monto_parcial')
             // Por la SOLICITUD: la emisión está en NULL hasta la firma.
             ->orderByDesc('fecha_solicitud')
             ->get();

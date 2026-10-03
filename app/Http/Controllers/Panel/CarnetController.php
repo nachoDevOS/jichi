@@ -5,14 +5,11 @@ namespace App\Http\Controllers\Panel;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Exceptions\CarnetInvalidoException;
-use App\Exceptions\CobroInvalidoException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\EditarCarnetRequest;
 use App\Http\Requests\Panel\EliminarCarnetRequest;
 use App\Http\Requests\Panel\EmitirCarnetRequest;
-use App\Http\Requests\Panel\RechazarCarnetRequest;
-use App\Http\Requests\Panel\RegistrarDepositosRequest;
 use App\Http\Requests\Panel\ReponerCarnetRequest;
 use App\Http\Requests\Panel\RevocarCarnetRequest;
 use App\Models\AprovechamientoPesq;
@@ -20,13 +17,11 @@ use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
-use App\Models\Pago;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use App\Models\TipoCarnet;
-use App\Services\CobrarService;
+use App\Services\ConfirmarPagoService;
 use App\Services\EmitirCarnetService;
-use App\Services\RevisarCarnetService;
 use App\Sireb\VistaSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
@@ -66,14 +61,10 @@ class CarnetController extends Controller
                 'tipoCarnet',
                 'aprovechamiento',
             ])
-            // Evita una consulta agregada POR FILA al calcular el saldo.
-            ->withSum('pagos', 'monto_parcial')
             // Los dos conteos de `puedeEliminarse()`: sin ellos son dos consultas
             // más POR FILA solo para decidir si se dibuja un botón.
             ->withCount(['faenas', 'guias'])
-            // `Pagable::recibos()` es una CONSULTA y no una relación: por fila
-            // serían treinta. Se resuelve desde los pagos precargados.
-            ->with(['pagos:id,pagable_type,pagable_id,recibo_id', 'pagos.recibo:id,numero_recibo'])
+            ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
             ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
                 fn ($s) => $s
                     ->whereHas('beneficiario', fn ($b) => $b->buscar($termino))
@@ -251,8 +242,7 @@ class CarnetController extends Controller
         ]);
 
         // El recibo del trámite —uno solo— y cuántas boletas faltan controlar.
-        $recibo = $carnet->recibos()->first();
-        $sinValidar = $carnet->pagos()->sinValidar()->count();
+        $recibo = $carnet->recibo;
 
         return Inertia::render('panel/carnets/ver', [
             'carnet' => [
@@ -288,39 +278,7 @@ class CarnetController extends Controller
                     'fecha_vencimiento' => $carnet->aprovechamiento->fecha_vencimiento?->toDateString(),
                 ] : null,
 
-                // Aprobar no es «estar en revisión»: es eso Y que no quede
-                // ninguna boleta sin validar. El número dice cuántas.
-                'pagos_sin_validar' => $sinValidar,
-                'puede_aprobarse' => $carnet->puedeRevisarse() && $sinValidar === 0,
             ],
-
-            // El detalle de lo cobrado: una fila por boleta, con su control.
-            'pagos' => $carnet->pagos()
-                // Precargados: si no, cinco depósitos son diez consultas.
-                ->with(['registradoPor:id,name', 'validadoPor:id,name'])
-                ->latest('created_at')
-                ->get()
-                // El trámite se le pone a mano: `admiteControl()` le pregunta al
-                // `pagable`, y sin esto cada fila lo va a buscar a la base.
-                ->each(fn (Pago $p) => $p->setRelation('pagable', $carnet))
-                ->map(fn (Pago $p): array => [
-                    'id' => $p->id,
-                    'monto_parcial' => (float) $p->monto_parcial,
-                    'nro_transaccion' => $p->nro_transaccion,
-                    'fecha_deposito' => $p->fecha_deposito?->toDateString(),
-                    'comprobante_url' => $p->comprobante_url,
-                    'cobrado_en' => $p->created_at?->toIso8601String(),
-                    'estado_validacion' => $p->estado_validacion->value,
-                    'estado_validacion_etiqueta' => $p->estado_validacion->etiqueta(),
-                    'estado_validacion_color' => $p->estado_validacion->color(),
-                    'observacion' => $p->observacion,
-                    'registrado_por' => $p->registradoPor?->name,
-                    'validado_por' => $p->validadoPor?->name,
-                    'validado_en' => $p->validado_en?->toIso8601String(),
-                    'puede_validarse' => $p->admiteControl(),
-                    'puede_corregirse' => $p->admiteCorreccion(),
-                ])
-                ->all(),
 
             // Las salidas emitidas con ESTE carnet. Al revocarlo siguen valiendo.
             'faenas' => $carnet->faenas()
@@ -368,7 +326,9 @@ class CarnetController extends Controller
                 'numero_recibo' => $recibo->numero_recibo,
                 'monto_total' => (float) $recibo->monto_total,
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
-                'pagos_count' => $recibo->pagos()->count(),
+                'numero_boleta' => $recibo->numero_boleta,
+                'entidad_bancaria' => $recibo->entidad_bancaria,
+                'fecha_pago' => $recibo->fecha_pago?->toDateString(),
             ] : null,
         ]);
     }
@@ -527,182 +487,18 @@ class CarnetController extends Controller
     }
 
     /**
-     *  Cargar los depósitos — POST /panel/carnets/{carnet}/pagos
+     * Verificar pago — POST /panel/carnets/{carnet}/verificar-pago
      *
-     * Espejo de `AprovechamientoController::pagar()`: el carnet se cobra igual
-     * que el cupo, con una sección por boleta y cubriendo el arancel entero.
+     * Pregunta a SIREB; si está pagado, lo aprueba y emite el recibo.
      */
-    public function pagar(
-        RegistrarDepositosRequest $request,
-        Carnet $carnet,
-        CobrarService $caja,
-        RevisarCarnetService $revision,
-    ): RedirectResponse {
-        $datos = $request->validated();
-
-        // ANTES de subir nada: descubrirlo adentro obligaría a borrar los
-        // archivos ya escritos, que una transacción no deshace.
-        if (! $carnet->admitePagos()) {
-            return back()->withErrors([
-                'pagos' => CobroInvalidoException::noAdmiteDepositos(
-                    'El carnet '.$carnet->codigo_legible,
-                    $carnet->estado->etiqueta(),
-                )->getMessage(),
-            ]);
-        }
-
-        $suma = round(array_sum(array_map(
-            static fn (array $p): float => round((float) $p['monto'], 2),
-            $datos['pagos'],
-        )), 2);
-
-        $saldo = $carnet->saldoPendiente();
-
-        if ($suma < $saldo) {
-            return back()->withInput()->withErrors([
-                'pagos' => CobroInvalidoException::noCubreElMonto(
-                    'este carnet',
-                    $suma,
-                    $saldo,
-                )->getMessage(),
-            ]);
-        }
-
-        $subidos = [];
-
-        try {
-            foreach ($datos['pagos'] as $i => $pago) {
-                $subidos[$i] = app(StorageController::class)
-                    ->file($request->file("pagos.{$i}.comprobante"), 'comprobantes');
-            }
-
-            $depositos = [];
-
-            foreach ($datos['pagos'] as $i => $pago) {
-                $depositos[] = [
-                    'monto' => (float) $pago['monto'],
-                    'nro_transaccion' => $pago['nro_transaccion'],
-                    'fecha_deposito' => $pago['fecha_deposito'],
-                    'comprobante' => $subidos[$i],
-                ];
-            }
-
-            $caja->registrarDepositos($carnet, $depositos);
-        } catch (CobroInvalidoException $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            return back()->withInput()->withErrors(['pagos' => $e->getMessage()]);
-        } catch (\Throwable $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            throw $e;
-        }
-
-        $carnet->refresh();
-        $cuantos = count($datos['pagos']);
-
-        //  Registrar y enviar son un solo acto cuando el arancel queda cubierto
-        $enviado = false;
-
-        if (($datos['enviar'] ?? false) && $carnet->puedeEnviarseARevision()) {
-            $revision->enviar($carnet);
-            $carnet->refresh();
-            $enviado = true;
-        }
-
-        return redirect()
-            ->route('carnets.show', $carnet)
-            ->with('exito', match (true) {
-                $enviado => sprintf(
-                    '%d depósito(s) registrado(s) y enviado a revisión. Se emitió el recibo con el '.
-                    'total; queda esperando la firma de quien lo aprueba.',
-                    $cuantos,
-                ),
-                $carnet->saldoPendiente() <= 0.0 => sprintf(
-                    '%d depósito(s) registrado(s). El arancel quedó cubierto: ya se puede enviar a revisión.',
-                    $cuantos,
-                ),
-                default => sprintf(
-                    '%d depósito(s) registrado(s). Quedan %s Bs por cobrar.',
-                    $cuantos,
-                    number_format($carnet->saldoPendiente(), 2, ',', '.'),
-                ),
-            });
-    }
-
-    /**
-     * Enviar a revisión — POST /panel/carnets/{carnet}/enviar
-     */
-    public function enviar(Carnet $carnet, RevisarCarnetService $revision): RedirectResponse
+    public function verificarPago(Carnet $carnet, ConfirmarPagoService $pagos): RedirectResponse
     {
-        try {
-            $revision->enviar($carnet);
-        } catch (CarnetInvalidoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
+        $resultado = $pagos->verificar($carnet);
 
-        return redirect()
-            ->route('carnets.show', $carnet)
-            ->with('exito', 'Enviado a revisión. Se emitió el recibo con el total de los depósitos; '.
-                'queda esperando la firma de quien lo aprueba.');
-    }
-
-    /**
-     * Aprobar — PATCH /panel/carnets/{carnet}/aprobar
-     *
-     * Recién acá la credencial habilita a trabajar y se puede imprimir.
-     */
-    public function aprobar(Carnet $carnet, RevisarCarnetService $revision): RedirectResponse
-    {
-        try {
-            $revision->aprobar($carnet);
-        } catch (CarnetInvalidoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('carnets.show', $carnet)
-            ->with('exito', "Carnet {$carnet->codigo_legible} aprobado. Ya se puede imprimir.");
-    }
-
-    /**
-     * Rechazar — PATCH /panel/carnets/{carnet}/rechazar
-     */
-    public function rechazar(RechazarCarnetRequest $request, Carnet $carnet, RevisarCarnetService $revision): RedirectResponse
-    {
-        try {
-            $revision->rechazar($carnet, $request->validated()['motivo']);
-        } catch (CarnetInvalidoException $e) {
-            return back()->withErrors(['motivo' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('carnets.show', $carnet)
-            ->with('exito', 'Carnet devuelto a ventanilla. Los depósitos quedan intactos: se corrige '.
-                'lo observado y se vuelve a presentar.');
+        return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     //  Auxiliares
-
-    /**
-     * El recibo del trámite, sin disparar una consulta por fila.
-     *
-     * Igual que en aprovechamientos: `Pagable::recibos()` es una consulta y no
-     * una relación, así que en un listado hay que resolverlo desde los pagos
-     * ya precargados.
-     */
-    private function reciboDe(Carnet $carnet): ?Recibo
-    {
-        if ($carnet->relationLoaded('pagos')) {
-            return $carnet->pagos->firstWhere('recibo_id', '!=', null)?->recibo;
-        }
-
-        return $carnet->recibos()->first();
-    }
 
     /**
      * Los datos de un carnet que pintan el listado y la ficha.
@@ -711,7 +507,7 @@ class CarnetController extends Controller
      */
     private function resumir(Carnet $carnet): array
     {
-        $recibo = $this->reciboDe($carnet);
+        $recibo = $carnet->recibo;
 
         return [
             'id' => $carnet->id,
@@ -768,23 +564,16 @@ class CarnetController extends Controller
             // Y si no puede, POR QUÉ: un carnet pendiente no es uno vencido.
             'motivo_sin_permisos' => $carnet->motivoSinPermisos(),
 
-            // Corregir y eliminar llegan RESUELTAS, y no se deducen del estado
-            // en React: las dos miran además si entró plata.
+            // Corregir y eliminar llegan RESUELTAS, y no se deducen del estado en React.
             'puede_editarse' => $carnet->puedeEditarse(),
             'puede_eliminarse' => $carnet->puedeEliminarse(),
             'puede_revocarse' => $carnet->estado->permiteRevocacion(),
 
             'monto' => $carnet->montoACobrar(),
-            'saldo_pendiente' => $carnet->saldoPendiente(),
-            'pagado' => $carnet->estaPagado(),
 
-            /*
-             * Las del circuito de revisión, resueltas en el servidor. React no
-             * vuelve a evaluar el estado: pregunta por estas.
-             */
-            'admite_pagos' => $carnet->admitePagos(),
-            'puede_enviarse' => $carnet->puedeEnviarseARevision(),
-            'puede_revisarse' => $carnet->puedeRevisarse(),
+            // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
+            'sireb' => $carnet->resumenSireb(),
+            'puede_verificar_pago' => $carnet->estado->estaAbierto(),
             'ya_fue_aprobado' => $carnet->yaFueAprobado(),
 
             // Los dos respaldos de la emisión, listos para abrir.

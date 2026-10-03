@@ -7,17 +7,23 @@ use App\Traits\Codificable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * La CABECERA del comprobante oficial de caja.
+ * El comprobante oficial de un documento, emitido cuando SIREB confirmó el pago.
+ * Copia la boleta tal como la validó SIREB. Ver ConfirmarPagoService.
  */
 #[Fillable([
     'beneficiario_id',
+    'recibible_type',
+    'recibible_id',
     'numero_recibo',
     'monto_total',
     'concepto',
+    'numero_boleta',
+    'entidad_bancaria',
+    'fecha_pago',
 ])]
 class Recibo extends Model
 {
@@ -32,6 +38,7 @@ class Recibo extends Model
     {
         return [
             'monto_total' => 'decimal:2',
+            'fecha_pago' => 'date',
         ];
     }
 
@@ -50,43 +57,9 @@ class Recibo extends Model
         return $this->belongsTo(Beneficiario::class);
     }
 
-    /**
-     * El detalle: los abonos que este papel ampara.
-     */
-    public function pagos(): HasMany
+    /** El documento pagado: autorización, carnet, faena o guía. */
+    public function recibible(): MorphTo
     {
-        return $this->hasMany(Pago::class);
+        return $this->morphTo()->withTrashed();
     }
-
-    //  Reglas de negocio
-
-    /**
-     * La suma de lo que HOY cuelga de este recibo.
-     */
-    public function montoCalculado(): float
-    {
-        if ($this->relationLoaded('pagos')) {
-            return (float) $this->pagos->sum('monto_parcial');
-        }
-
-        return (float) $this->pagos()->sum('monto_parcial');
-    }
-
-    /** ¿Lo impreso coincide con lo que hay? Con un céntimo de tolerancia por el redondeo. */
-    public function cuadra(): bool
-    {
-        return abs($this->montoCalculado() - (float) $this->monto_total) < 0.01;
-    }
-
-    /**
-     * Recalcula y guarda el total a partir del detalle.
-     */
-    public function recalcularTotal(): static
-    {
-        $this->forceFill(['monto_total' => $this->montoCalculado()])->save();
-
-        return $this;
-    }
-
-    //  Scopes
 }

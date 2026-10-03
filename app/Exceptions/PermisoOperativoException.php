@@ -30,8 +30,7 @@ class PermisoOperativoException extends RuntimeException
     public static function carnetNoVigente(EstadoCarnet $estado): self
     {
         $detalle = match ($estado) {
-            EstadoCarnet::Pendiente => 'Está PENDIENTE: falta cobrar su arancel y enviarlo a revisión.',
-            EstadoCarnet::EnRevision => 'Está EN REVISIÓN: falta que lo aprueben.',
+            EstadoCarnet::Pendiente => 'Está PENDIENTE: falta que se pague en Recaudaciones.',
             EstadoCarnet::Revocado => 'Está REVOCADO, y eso no se revierte: hay que emitir uno nuevo.',
             EstadoCarnet::Vencido => 'Está VENCIDO. Hay que emitir el carnet de la gestión en curso '.
                 'antes de poder emitir este papel.',
@@ -48,29 +47,18 @@ class PermisoOperativoException extends RuntimeException
     {
         return new self(
             'El pescador no tiene un aprovechamiento vigente del que descontar kilos. '.
-            'Hay que otorgarle la bolsa madre —y cobrarla— antes de emitir faenas.',
+            'Hay que otorgarle la bolsa madre —y que se pague— antes de emitir faenas.',
         );
     }
 
     /**
-     * El cupo existe y está en fecha, pero todavía no se cobró.
+     * El cupo existe y está en fecha, pero todavía no se pagó.
      */
     public static function cupoPendienteDePago(): self
     {
         return new self(
             'El aprovechamiento está PENDIENTE DE PAGO y todavía no autoriza a pescar. '.
-            'Cóbrelo en caja y después emita la faena.',
-        );
-    }
-
-    /**
-     * El cupo está presentado y esperando una firma.
-     */
-    public static function cupoEnRevision(): self
-    {
-        return new self(
-            'El aprovechamiento está EN REVISIÓN y todavía no autoriza a pescar. '.
-            'Los depósitos ya están cargados: falta que lo aprueben.',
+            'Cuando se pague en Recaudaciones, verifique el pago en su ficha y emita la faena.',
         );
     }
 
@@ -95,7 +83,7 @@ class PermisoOperativoException extends RuntimeException
     {
         return new self(sprintf(
             'La faena declara %s kg y quedan libres %s kg: %s kg están reservados por faenas '.
-            'pendientes o en revisión. Baje los kilos o elimine la faena que no vaya a salir.',
+            'pendientes. Baje los kilos o elimine la faena que no vaya a salir.',
             number_format($pedido, 2, ',', '.'),
             number_format($libre, 2, ',', '.'),
             number_format($reservado, 2, ',', '.'),
@@ -113,22 +101,14 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     *  El circuito de la faena: cobrar, presentar y firmar
+     *  El circuito de la faena: pagar en SIREB y aprobar
      */
 
-    /** Se quiso presentar una faena que no está PENDIENTE. */
-    public static function faenaNoSePuedeEnviar(string $estado): self
-    {
-        return new self(
-            "La faena está {$estado} y solo se presenta a revisión la que está PENDIENTE.",
-        );
-    }
-
-    /** Se quiso firmar o rechazar algo que no está presentado. */
+    /** Se quiso aprobar algo que ya no está pendiente. */
     public static function faenaNoSePuedeRevisar(string $estado): self
     {
         return new self(
-            "La faena está {$estado}: se aprueba o se rechaza la que está EN REVISIÓN.",
+            "La faena está {$estado}: solo se aprueba la que está PENDIENTE de pago.",
         );
     }
 
@@ -149,54 +129,14 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     * Tiene depósitos encima: se resuelven por caja, no borrando la fila.
-     */
-    public static function faenaTienePagos(int $cuantos): self
-    {
-        return new self(sprintf(
-            'La faena tiene %d depósito(s) cargados. Dé de baja los depósitos antes de '.
-            'corregirla o eliminarla: lo que se cobró es por ESTA salida.',
-            $cuantos,
-        ));
-    }
-
-    /** Falta plata para presentarla. */
-    public static function faltaCubrirElArancelDeLaFaena(float $saldo): self
-    {
-        return new self(sprintf(
-            'Faltan %s Bs por cubrir del arancel de la faena. Cargue los depósitos antes de '.
-            'presentarla a revisión.',
-            number_format($saldo, 2, ',', '.'),
-        ));
-    }
-
-    /** Quedan boletas sin controlar: firmar así dejaría la validación decorativa. */
-    public static function faltaControlarBoletasDeLaFaena(int $cuantas): self
-    {
-        return new self(sprintf(
-            'Quedan %d boleta(s) sin controlar. Validelas —o corrija lo observado— antes de '.
-            'aprobar la faena.',
-            $cuantas,
-        ));
-    }
-
-    /**
      *  El circuito de la guía: el mismo de la faena, sobre otro papel
      */
 
-    /** Se quiso presentar una guía que no está PENDIENTE. */
-    public static function guiaNoSePuedeEnviar(string $estado): self
-    {
-        return new self(
-            "La guía está {$estado} y solo se presenta a revisión la que está PENDIENTE.",
-        );
-    }
-
-    /** Se quiso firmar o rechazar algo que no está presentado. */
+    /** Se quiso aprobar algo que ya no está pendiente. */
     public static function guiaNoSePuedeRevisar(string $estado): self
     {
         return new self(
-            "La guía está {$estado}: se aprueba o se rechaza la que está EN REVISIÓN.",
+            "La guía está {$estado}: solo se aprueba la que está PENDIENTE de pago.",
         );
     }
 
@@ -216,42 +156,12 @@ class PermisoOperativoException extends RuntimeException
         );
     }
 
-    /** Tiene depósitos encima: se resuelven por caja, no borrando la fila. */
-    public static function guiaTienePagos(int $cuantos): self
-    {
-        return new self(sprintf(
-            'La guía tiene %d depósito(s) cargados. Dé de baja los depósitos antes de '.
-            'corregirla o eliminarla: lo que se cobró es por ESTE traslado.',
-            $cuantos,
-        ));
-    }
-
-    /** Falta plata para presentarla. */
-    public static function faltaCubrirElArancelDeLaGuia(float $saldo): self
-    {
-        return new self(sprintf(
-            'Faltan %s Bs por cubrir del arancel de la guía. Cargue los depósitos antes de '.
-            'presentarla a revisión.',
-            number_format($saldo, 2, ',', '.'),
-        ));
-    }
-
-    /** Quedan boletas sin controlar: firmar así dejaría la validación decorativa. */
-    public static function faltaControlarBoletasDeLaGuia(int $cuantas): self
-    {
-        return new self(sprintf(
-            'Quedan %d boleta(s) sin controlar. Validelas —o corrija lo observado— antes de '.
-            'aprobar la guía.',
-            $cuantas,
-        ));
-    }
-
-    /** Anular es para la guía firmada; el borrador se elimina y la presentada se rechaza. */
+    /** Anular es para la guía aprobada; el borrador se elimina. */
     public static function guiaNoSeAnula(string $estado): self
     {
         return new self(
             "Una guía {$estado} no se anula: anular es para la guía ya aprobada. ".
-            'Un borrador se elimina y una guía en revisión se rechaza.',
+            'Un borrador se elimina.',
         );
     }
 

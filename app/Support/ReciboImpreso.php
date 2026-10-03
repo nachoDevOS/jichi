@@ -25,21 +25,12 @@ readonly class ReciboImpreso
      */
     public static function desde(Recibo $recibo, string $lugar): self
     {
-        $pagos = $recibo->pagos;
-
         return new self(
             recibo: $recibo,
             lugar: $lugar,
-            // La casilla del PRIMER pago: el papel tiene una sola, y el detalle
-            // completo va igual renglón por renglón. Ver ConceptoRecibo.
-            descripcion: ConceptoRecibo::desdePagable($pagos->first()?->pagable),
-            detalle: $pagos
-                ->map(fn ($p): array => [
-                    'descripcion' => $p->concepto_detalle,
-                    'monto' => (float) $p->monto_parcial,
-                ])
-                ->values()
-                ->all(),
+            descripcion: ConceptoRecibo::desdeDocumento($recibo->recibible),
+            // Un renglón: un recibo es de un documento.
+            detalle: [['descripcion' => $recibo->concepto, 'monto' => (float) $recibo->monto_total]],
         );
     }
 
@@ -54,33 +45,11 @@ readonly class ReciboImpreso
             'beneficiario_ci' => $this->recibo->beneficiario?->documento_identidad ?: 'S/N',
             'concepto' => $this->recibo->concepto,
 
-            /*
-             * Las boletas del banco —todas—, no el número del recibo.
-             *
-             * Va en el renglón «N°» del papel. Ver `boletas()`.
-             */
-            'nro_deposito' => $this->boletas(),
+            // La boleta del banco, no el número del recibo: va en el renglón «N°» del papel.
+            'nro_deposito' => trim(($this->recibo->numero_boleta ?? '').' '.($this->recibo->entidad_bancaria ? '('.$this->recibo->entidad_bancaria.')' : '')),
 
             default => null,
         };
-    }
-
-    /**
-     * Todas las boletas del recibo. El papel es UNO por trámite, así que tiene
-     * que nombrarlas todas: es con lo que Contabilidad lo cruza contra el banco.
-     */
-    public function boletas(int $tope = 6): string
-    {
-        $numeros = $this->recibo->pagos
-            ->pluck('nro_transaccion')
-            ->filter()
-            ->values();
-
-        if ($numeros->count() <= $tope) {
-            return $numeros->implode(' · ');
-        }
-
-        return $numeros->take($tope)->implode(' · ').' y '.($numeros->count() - $tope).' más';
     }
 
     /** El monto total, congelado al emitir. */

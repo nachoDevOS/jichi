@@ -253,9 +253,9 @@ export default function CrearCupo({
                                         mismo, sin salir del expediente.
                                     */}
                                     <p className="text-xs text-muted-foreground">
-                                        Al registrarlo queda PENDIENTE y se abre su ficha, donde se
-                                        cargan los depósitos. Con el monto cubierto se envía a
-                                        revisión, y recién con la firma autoriza a pescar.
+                                        Al registrarlo queda PENDIENTE y se registra el cobro en
+                                        Recaudaciones. Cuando se paga allá, queda aprobada sola y
+                                        recién ahí autoriza a pescar.
                                     </p>
                                 </div>
                             </>

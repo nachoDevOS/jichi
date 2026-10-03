@@ -412,7 +412,7 @@ export default function IndiceCarnets({
                         <p>
                             El carnet <strong>{eliminando?.codigo}</strong> de{' '}
                             <strong>{eliminando?.beneficiario ?? 'el titular'}</strong> desaparece de
-                            los listados. Se elimina solo porque está PENDIENTE y sin cobrar.
+                            los listados. Se elimina solo porque está PENDIENTE de pago; el cobro se anula en Recaudaciones.
                         </p>
                         <p>
                             <strong>El código no se libera:</strong> ese número pudo alcanzar a

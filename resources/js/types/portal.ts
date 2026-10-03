@@ -9,8 +9,8 @@ interface PapelBase {
     codigo: string | null;
     /** Ruta de /verificar para ese código: la misma página que abre el QR. */
     verificar: string | null;
-    /** El PNG del QR del «Pagar» simulado; null si no falta plata. */
-    qr_pago: string | null;
+    /** Con este código se paga en SIREB. Null si todavía no se registró allá. */
+    codigo_pago: string | null;
     /** El PDF, solo si vale hoy; null si no se imprime. */
     descargar: string | null;
     /** El PDF con «NO VÁLIDO», solo de lo abierto: se ve, no se descarga. */
@@ -18,14 +18,12 @@ interface PapelBase {
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
-    /** Pendiente o en revisión: todavía no vale. */
+    /** Pendiente de pago: todavía no vale. */
     en_tramite: boolean;
-    /** Presentado: la Unidad está controlando el depósito. */
-    en_revision: boolean;
     /** Qué le falta a un trámite abierto, ya redactado por el servidor. Null si no está abierto. */
     siguiente_paso: string | null;
     /** Dónde está en el circuito, para la línea de avance. Null si no está abierto. */
-    etapa: 'pago' | 'envio' | 'revision' | null;
+    etapa: 'pago' | null;
     /** Dónde va en «Mis papeles». Null si está abierto: eso va en «En curso». */
     situacion: 'vigente' | 'vencido' | 'revocado' | null;
     /** Hasta cuándo vale (o valió). La guía trae hora: vale por horas. */
@@ -34,7 +32,7 @@ interface PapelBase {
     dias_restantes: number | null;
     /** Por qué ya no vale: revocado, anulado, sin efecto o agotado. */
     motivo_baja: string | null;
-    /** Lo que falta depositar, si todavía admite depósitos. */
+    /** Lo que falta pagar en SIREB. */
     debe: number;
 }
 
@@ -92,38 +90,13 @@ export interface ReciboPortal {
     numero: string;
     concepto: string;
     monto_total: number;
-    depositos: number;
+    numero_boleta: string | null;
+    entidad_bancaria: string | null;
+    /** Un DÍA, el de la boleta. */
+    fecha_pago: string | null;
     emitido_en: string | null;
     /** El PDF del recibo, para bajarlo. */
     descargar: string | null;
-}
-
-/** Una boleta de depósito y el estado de su control, tal como la ve el titular. */
-export interface DepositoPortal {
-    nro_transaccion: string;
-    /** Un DÍA, el de la boleta. */
-    fecha_deposito: string | null;
-    monto: number;
-    control_etiqueta: string;
-    control_color: string;
-    /** Por qué se observó; solo en los observados. */
-    observacion: string | null;
-    /** La boleta que subió (imagen o PDF). */
-    comprobante: string | null;
-}
-
-/** Un trámite pagado, con todas sus boletas: se puede pagar con una o con varias. */
-export interface TramitePagado {
-    /** Para qué trámite fue: «Permiso de Faena». */
-    concepto: string;
-    total: number;
-    /** Los recibos que cubren sus boletas. */
-    recibos: { numero: string; descargar: string | null }[];
-    /** El peor estado de sus boletas. */
-    control: 'pendiente' | 'validado' | 'observado';
-    control_etiqueta: string;
-    control_color: string;
-    depositos: DepositoPortal[];
 }
 
 export interface DatosPortal {

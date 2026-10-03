@@ -20,15 +20,15 @@ enum RolSistema: string
     {
         return match ($this) {
             self::Administrador => 'Control total del sistema: beneficiarios, aprovechamientos, '.
-                'carnets, faenas, guías, caja y configuración.',
+                'carnets, faenas, guías, recibos y configuración.',
         };
     }
 
     /**
      * Permisos asignados al rol durante el seeding.
      *
-     * El reparto, en una línea: VENTANILLA arma y presenta, SUPERVISIÓN firma y
-     * deshace. Son dos personas distintas a propósito. Ver docs/ARQUITECTURA.md.
+     * El reparto, en una línea: VENTANILLA arma, SUPERVISIÓN deshace. Aprobar ya no
+     * es de nadie: lo hace el pago confirmado en SIREB. Ver docs/ARQUITECTURA.md.
      *
      * @return array<int, string>
      */
@@ -41,13 +41,13 @@ enum RolSistema: string
             'carnets.ver',
             'faenas.ver',
             'guias.ver',
-            'caja.ver',
+            'recibos.ver',
             'catalogos.ver',
             'reportes.ver',
         ];
 
-        // VENTANILLA: cargar, corregir el borrador, cobrar, presentar a
-        // revisión, cerrar lo que volvió y entregar los papeles.
+        // VENTANILLA: cargar, corregir el borrador, verificar el pago en SIREB
+        // (el permiso `crear` de cada documento) y entregar los papeles.
         $operacion = [
             'beneficiarios.crear',
             'beneficiarios.editar',
@@ -56,19 +56,15 @@ enum RolSistema: string
 
             'aprovechamientos.crear',
             'aprovechamientos.editar',
-            'aprovechamientos.enviar',
 
             'carnets.crear',
             'carnets.editar',
-            'carnets.enviar',
 
             'faenas.crear',
             'faenas.editar',
-            'faenas.enviar',
 
             'guias.crear',
             'guias.editar',
-            'guias.enviar',
 
             // Entregar un papel es un acto distinto de consultar la ficha, así
             // que cada documento lleva su propio permiso.
@@ -77,25 +73,12 @@ enum RolSistema: string
             'faenas.imprimir',
             'guias.imprimir',
             'recibos.imprimir',
-
-            'caja.cobrar',
-            // Corregir un depósito es lo único que levanta una observación.
-            'pagos.corregir',
         ];
 
-        // SUPERVISIÓN: firmar, y deshacer lo que ya no se puede corregir.
+        // SUPERVISIÓN: deshacer lo que ya no se puede corregir.
         $supervision = [
-            'aprovechamientos.aprobar',
-            'carnets.aprobar',
-            'faenas.aprobar',
-            'guias.aprobar',
-
-            // Controlar las boletas es del mismo lado que aprobar: sin eso, la
-            // validación sería decorativa.
-            'pagos.controlar',
-
             // Eliminar deja la fila fuera de los listados y solo queda la
-            // auditoría con el motivo. Solo sobre borradores sin plata encima.
+            // auditoría con el motivo. Solo sobre borradores; anula el cobro en SIREB.
             'aprovechamientos.eliminar',
             'carnets.eliminar',
             'faenas.eliminar',
@@ -106,7 +89,6 @@ enum RolSistema: string
             'carnets.revocar',
             'aprovechamientos.revocar',
             'guias.anular',
-            'caja.anular',
 
             'reportes.exportar',
             'auditoria.ver',

@@ -8,7 +8,7 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\Configuracion;
 use App\Models\GuiaMovimiento;
-use App\Models\Pago;
+use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use App\Support\Paginacion;
 use App\Support\QrVerificacion;
@@ -21,7 +21,7 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as RespuestaHttp;
 
 /**
- *  RECIBOS — los comprobantes entregados
+ *  RECIBOS — el comprobante de cada documento pagado en SIREB
  */
 class ReciboController extends Controller
 {
@@ -48,10 +48,6 @@ class ReciboController extends Controller
              * las leen todas, y una que falte vuelve null sin ningún error.
              */
             ->with('beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado')
-            ->withCount('pagos')
-            // El total de lo que HAY, para contrastarlo con lo impreso sin una
-            // consulta agregada por fila.
-            ->withSum('pagos', 'monto_parcial')
             ->when($filtros['buscar'], function ($q, $termino) {
                 $operador = Sql::like($q->getConnection());
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $termino).'%';
@@ -76,15 +72,7 @@ class ReciboController extends Controller
                 'documento' => $r->beneficiario?->documento_identidad,
                 'concepto' => $r->concepto,
                 'monto_total' => (float) $r->monto_total,
-                'pagos_count' => $r->pagos_count,
-                /*
-                 * `cuadra` compara lo IMPRESO con lo que hay hoy. Llega
-                 * resuelto del servidor porque es una comparación con
-                 * tolerancia —un céntimo, por el redondeo— y escrita en React
-                 * sería una segunda copia de esa tolerancia.
-                 */
-                'cuadra' => abs((float) ($r->pagos_sum_monto_parcial ?? 0) - (float) $r->monto_total) < 0.01,
-                'monto_actual' => (float) ($r->pagos_sum_monto_parcial ?? 0),
+                'numero_boleta' => $r->numero_boleta,
                 'emitido_en' => $r->created_at?->toIso8601String(),
             ]);
 
@@ -100,18 +88,7 @@ class ReciboController extends Controller
      */
     public function show(Recibo $recibo): Response
     {
-        /*
-         * Igual que en el listado de caja: `pagable` es polimórfica y NO se
-         * precarga con `with('pagos.pagable.beneficiario')` — eso se ignora en
-         * silencio y el N+1 sigue ahí. Va con morphWith.
-         */
-        $recibo->load(['beneficiario', 'pagos' => fn ($q) => $q->with([
-            'pagable' => fn ($m) => $m->morphWith([
-                Carnet::class => ['codigo', 'beneficiario', 'tipoCarnet'],
-                AprovechamientoPesq::class => ['beneficiario', 'categoria'],
-                GuiaMovimiento::class => ['carnet.beneficiario'],
-            ]),
-        ])]);
+        $recibo->load(['beneficiario', 'recibible']);
 
         return Inertia::render('panel/recibos/ver', [
             'recibo' => [
@@ -122,40 +99,27 @@ class ReciboController extends Controller
                 'documento' => $recibo->beneficiario?->documento_identidad,
                 'concepto' => $recibo->concepto,
                 'monto_total' => (float) $recibo->monto_total,
-                'monto_actual' => $recibo->montoCalculado(),
-                'cuadra' => $recibo->cuadra(),
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
 
-                'pagos' => $recibo->pagos
-                    ->map(fn (Pago $p): array => [
-                        'id' => $p->id,
-                        'concepto' => $p->concepto_detalle,
-                        'detalle' => $this->detalleDe($p),
-                        'monto_parcial' => (float) $p->monto_parcial,
-                        // La boleta del banco, para poder abrirla desde el
-                        // recibo sin ir a buscarla al archivo físico.
-                        'nro_transaccion' => $p->nro_transaccion,
-                        'comprobante_url' => $p->comprobante_url,
-                        'fecha_deposito' => $p->fecha_deposito?->toDateString(),
-                    ])
-                    ->values()
-                    ->all(),
+                // La boleta tal como la validó SIREB.
+                'numero_boleta' => $recibo->numero_boleta,
+                'entidad_bancaria' => $recibo->entidad_bancaria,
+                'fecha_pago' => $recibo->fecha_pago?->toDateString(),
+
+                // El documento pagado, con el enlace a su ficha.
+                'documento_pagado' => $this->documentoDe($recibo->recibible),
             ],
         ]);
     }
 
-    /**
-     * Qué trámite concreto pagó este abono.
-     */
-    private function detalleDe(Pago $pago): ?string
+    /** Qué documento pagó este recibo y dónde se abre. @return array{nombre: string, url: string}|null */
+    private function documentoDe(mixed $x): ?array
     {
-        $x = $pago->pagable;
-
         return match (true) {
-            $x instanceof Carnet => $x->codigo_legible.' · '.($x->beneficiario?->nombreCompleto ?? '—'),
-            // La capacidad y no el N° de escala, que es del catálogo interno.
-            $x instanceof AprovechamientoPesq => ($x->categoria?->descripcion_kg ?? (float) $x->volumen_total_kg.' kg').' · '.($x->beneficiario?->nombreCompleto ?? '—'),
-            $x instanceof GuiaMovimiento => $x->numero_legible.' · '.$x->ruta,
+            $x instanceof AprovechamientoPesq => ['nombre' => 'Autorización '.$x->numeroLegible(), 'url' => route('aprovechamientos.show', $x)],
+            $x instanceof Carnet => ['nombre' => 'Carnet '.$x->codigo_legible, 'url' => route('carnets.show', $x)],
+            $x instanceof PermisoFaena => ['nombre' => $x->etiqueta, 'url' => route('faenas.show', $x)],
+            $x instanceof GuiaMovimiento => ['nombre' => $x->etiqueta, 'url' => route('guias.show', $x)],
             default => null,
         };
     }
@@ -165,18 +129,7 @@ class ReciboController extends Controller
      */
     public function imprimir(Recibo $recibo): RespuestaHttp
     {
-        /*
-         * Los pagos van con `morphWith` y NO con `with('pagable.beneficiario')`:
-         * Eloquent no sabe qué es `pagable` hasta que lee la fila, así que lo
-         * segundo se IGNORA en silencio y cada renglón dispararía su consulta.
-         */
-        $recibo->load(['codigo', 'beneficiario', 'pagos' => fn ($q) => $q->with([
-            'pagable' => fn ($m) => $m->morphWith([
-                Carnet::class => ['codigo', 'tipoCarnet'],
-                AprovechamientoPesq::class => ['categoria'],
-                GuiaMovimiento::class => [],
-            ]),
-        ])]);
+        $recibo->load(['codigo', 'beneficiario', 'recibible']);
 
         $impreso = ReciboImpreso::desde(
             $recibo,

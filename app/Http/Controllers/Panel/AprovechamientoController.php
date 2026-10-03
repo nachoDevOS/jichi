@@ -4,27 +4,21 @@ namespace App\Http\Controllers\Panel;
 
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
-use App\Exceptions\CobroInvalidoException;
 use App\Exceptions\CupoInvalidoException;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\EliminarCupoRequest;
 use App\Http\Requests\Panel\OtorgarCupoRequest;
-use App\Http\Requests\Panel\RechazarCupoRequest;
-use App\Http\Requests\Panel\RegistrarDepositosRequest;
 use App\Http\Requests\Panel\RevocarCupoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\CategoriaAprovechamiento;
-use App\Models\Pago;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
-use App\Services\CobrarService;
+use App\Services\ConfirmarPagoService;
 use App\Services\OtorgarCupoService;
 use App\Services\RevisarCupoService;
 use App\Sireb\VistaSireb;
-use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,6 +30,9 @@ use Inertia\Response;
  */
 class AprovechamientoController extends Controller
 {
+    private const AVISO_SIN_SIREB = 'Se guardó la autorización, pero Recaudaciones no respondió y falta registrar el cobro allá. '.
+        'Use «Verificar pago» en esta ficha más tarde.';
+
     public function __construct(private readonly OtorgarCupoService $servicio) {}
 
     /**
@@ -61,10 +58,7 @@ class AprovechamientoController extends Controller
             // pantalla son 61 consultas sin ellos, y el listado se ve igual.
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
             ->withSum('faenasQueReservan', 'kilos_extraidos')
-            ->withSum('pagos', 'monto_parcial')
-            // `recibos()` del trait NO es una relación sino una consulta, así
-            // que llamarla por fila serían treinta. Se precargan los pagos.
-            ->with(['pagos:id,pagable_type,pagable_id,recibo_id', 'pagos.recibo:id,numero_recibo'])
+            ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
             ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
                 'beneficiario',
                 fn ($b) => $b->buscar($termino),
@@ -131,8 +125,8 @@ class AprovechamientoController extends Controller
                 now()->parse($datos['fecha_solicitud']),
             );
         } catch (CupoInvalidoException $e) {
-            if ($e->delTramo) {
-                return $this->tarifaRechazada($e);
+            if ($e->avisoGeneral) {
+                return $this->avisoDeError($e, 'No se registró la autorización. ');
             }
 
             // Error DEL CAMPO y no un cartel arriba: la regla que falló es sobre
@@ -141,6 +135,10 @@ class AprovechamientoController extends Controller
                 ->withInput()
                 ->withErrors(['beneficiario_id' => $e->getMessage()])
                 ->with('error', 'No se registró el aprovechamiento. Revise el motivo en el formulario.');
+        }
+
+        if (! $cupo->registradoEnSireb()) {
+            return redirect()->route('aprovechamientos.show', $cupo)->with('aviso', self::AVISO_SIN_SIREB);
         }
 
         /*
@@ -156,10 +154,22 @@ class AprovechamientoController extends Controller
             ));
     }
 
-    /** Tarifa inactiva, vencida o SIREB caído: no se registra y el motivo va en el aviso, no bajo el select. */
-    private function tarifaRechazada(CupoInvalidoException $e): RedirectResponse
+    /** Escala o SIREB: el motivo va en el aviso rojo de arriba, no bajo un campo. */
+    private function avisoDeError(CupoInvalidoException $e, string $prefijo): RedirectResponse
     {
-        return back()->withInput()->with('error', 'No se registró la autorización. '.$e->getMessage());
+        return back()->withInput()->with('error', $prefijo.$e->getMessage());
+    }
+
+    /**
+     * Verificar pago — POST /panel/aprovechamientos/{id}/verificar-pago
+     *
+     * Pregunta a SIREB; si está pagada, la aprueba y emite el recibo.
+     */
+    public function verificarPago(AprovechamientoPesq $aprovechamiento, ConfirmarPagoService $pagos): RedirectResponse
+    {
+        $resultado = $pagos->verificar($aprovechamiento);
+
+        return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     /**
@@ -173,13 +183,8 @@ class AprovechamientoController extends Controller
             'codigo',
         ]);
 
-        // El recibo del trámite: uno solo, emitido al enviar a revisión. NULL
-        // mientras está pendiente.
-        $recibo = $aprovechamiento->recibos()->first();
-
-        // Boletas sin dar por buenas, observadas incluidas. Acá y no en
-        // `resumir()`, que el listado corre treinta veces.
-        $sinValidar = $aprovechamiento->pagos()->sinValidar()->count();
+        // El recibo: uno, emitido cuando SIREB confirmó el pago. NULL mientras está pendiente.
+        $recibo = $aprovechamiento->recibo;
 
         return Inertia::render('panel/aprovechamientos/ver', [
             'cupo' => [
@@ -195,64 +200,25 @@ class AprovechamientoController extends Controller
                     ? [(float) $aprovechamiento->categoria->kilos_min, (float) $aprovechamiento->categoria->kilos_max]
                     : null,
 
-                // Aprobar no es «estar en revisión»: es eso Y que no falte
-                // ninguna boleta por validar. El número va para decir cuántas.
-                'pagos_sin_validar' => $sinValidar,
-                'puede_aprobarse' => $aprovechamiento->puedeRevisarse() && $sinValidar === 0,
-
                 // Firmado, en fecha y sin cédula viva: una vigente o en trámite ya lo cubre.
                 // Revocada o vencida no cuenta, así se puede emitir la que la reemplaza.
                 'puede_emitir_carnet' => $aprovechamiento->estado->habilita()
                     && $aprovechamiento->estaEnFecha()
                     && ! $aprovechamiento->carnets()
                         ->where(fn ($q) => $q->vigentes()
-                            ->orWhereIn('estado', [EstadoCarnet::Pendiente, EstadoCarnet::EnRevision]))
+                            ->orWhere('estado', EstadoCarnet::Pendiente))
                         ->exists(),
             ],
 
             'modoEstricto' => AprovechamientoPesq::modoEstricto(),
 
-            /*
-             *  Los depósitos que pagaron este cupo, con su boleta
-             */
-            'pagos' => $aprovechamiento->pagos()
-                // Precargados: si no, cinco depósitos son diez consultas.
-                ->with(['registradoPor:id,name', 'validadoPor:id,name'])
-                ->latest('created_at')
-                ->get()
-                // A mano: `admiteControl()` le pregunta al `pagable`, y sin esto
-                // cada fila lo va a buscar a la base.
-                ->each(fn (Pago $p) => $p->setRelation('pagable', $aprovechamiento))
-                ->map(fn (Pago $p): array => [
-                    'id' => $p->id,
-                    'monto_parcial' => (float) $p->monto_parcial,
-                    'nro_transaccion' => $p->nro_transaccion,
-                    'fecha_deposito' => $p->fecha_deposito?->toDateString(),
-                    'comprobante_url' => $p->comprobante_url,
-                    // Un MOMENTO: cuándo entró la plata. Va con toIso8601String().
-                    'cobrado_en' => $p->created_at?->toIso8601String(),
-
-                    // El control de la boleta. `puede_*` llegan resueltas: la
-                    // regla mira el estado del TRÁMITE, no solo el del pago.
-                    'estado_validacion' => $p->estado_validacion->value,
-                    'estado_validacion_etiqueta' => $p->estado_validacion->etiqueta(),
-                    'estado_validacion_color' => $p->estado_validacion->color(),
-                    'observacion' => $p->observacion,
-                    'registrado_por' => $p->registradoPor?->name,
-                    'validado_por' => $p->validadoPor?->name,
-                    // Otro MOMENTO: cuándo se miró la boleta.
-                    'validado_en' => $p->validado_en?->toIso8601String(),
-                    'puede_validarse' => $p->admiteControl(),
-                    'puede_corregirse' => $p->admiteCorreccion(),
-                ])
-                ->all(),
-
-            // Para la cabecera de la tarjeta de Pagos. El número no va repetido
-            // en cada fila: repetirlo hacía leer «un recibo por depósito».
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,
                 'monto_total' => (float) $recibo->monto_total,
+                'numero_boleta' => $recibo->numero_boleta,
+                'entidad_bancaria' => $recibo->entidad_bancaria,
+                'fecha_pago' => $recibo->fecha_pago?->toDateString(),
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
             ] : null,
 
@@ -373,15 +339,15 @@ class AprovechamientoController extends Controller
         $datos = $request->validated();
 
         try {
-            $this->servicio->editar(
+            $corregido = $this->servicio->editar(
                 $aprovechamiento,
                 CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
                 $datos['tipo_embarcacion'],
                 now()->parse($datos['fecha_solicitud']),
             );
         } catch (CupoInvalidoException $e) {
-            if ($e->delTramo) {
-                return $this->tarifaRechazada($e);
+            if ($e->avisoGeneral) {
+                return $this->avisoDeError($e, 'No se corrigió la autorización. ');
             }
 
             // Al corregir el titular no se toca: el único campo con el que el
@@ -389,6 +355,10 @@ class AprovechamientoController extends Controller
             return back()->withInput()
                 ->withErrors(['categoria_aprov_id' => $e->getMessage()])
                 ->with('error', 'No se registró el aprovechamiento. Revise el motivo en el formulario.');
+        }
+
+        if (! $corregido->registradoEnSireb()) {
+            return redirect()->route('aprovechamientos.show', $aprovechamiento)->with('aviso', self::AVISO_SIN_SIREB);
         }
 
         return redirect()
@@ -412,173 +382,6 @@ class AprovechamientoController extends Controller
         return redirect()
             ->route('aprovechamientos.index')
             ->with('exito', "Aprovechamiento de {$persona} eliminado. El motivo quedó en la auditoría.");
-    }
-
-    /**
-     *  Cargar los depósitos — POST /panel/aprovechamientos/{id}/pagos
-     */
-    public function pagar(
-        RegistrarDepositosRequest $request,
-        AprovechamientoPesq $aprovechamiento,
-        CobrarService $caja,
-        RevisarCupoService $revision,
-    ): RedirectResponse {
-        $datos = $request->validated();
-        $aprovechamiento->loadMissing('beneficiario');
-
-        // El estado se mira antes de subir nada: descubrirlo después de escribir
-        // cinco archivos obligaría a borrarlos.
-        if (! $aprovechamiento->admitePagos()) {
-            return back()->withErrors([
-                'pagos' => CupoInvalidoException::noAdmitePagos(
-                    $aprovechamiento->estado->etiqueta(),
-                )->getMessage(),
-            ]);
-        }
-
-        // Y el monto igual. El control de verdad lo hace el servicio con la fila
-        // bloqueada; esto solo evita subir archivos que habría que borrar.
-        $suma = round(array_sum(array_map(
-            static fn (array $p): float => round((float) $p['monto'], 2),
-            $datos['pagos'],
-        )), 2);
-
-        $saldo = $aprovechamiento->saldoPendiente();
-
-        if ($suma < $saldo) {
-            return back()->withInput()->withErrors([
-                'pagos' => CobroInvalidoException::noCubreElMonto(
-                    'este aprovechamiento',
-                    $suma,
-                    $saldo,
-                )->getMessage(),
-            ]);
-        }
-
-        $subidos = [];
-
-        try {
-            foreach ($datos['pagos'] as $i => $pago) {
-                $subidos[$i] = app(StorageController::class)
-                    ->file($request->file("pagos.{$i}.comprobante"), 'comprobantes');
-            }
-
-            $depositos = [];
-
-            foreach ($datos['pagos'] as $i => $pago) {
-                $depositos[] = [
-                    'monto' => (float) $pago['monto'],
-                    'nro_transaccion' => $pago['nro_transaccion'],
-                    'fecha_deposito' => $pago['fecha_deposito'],
-                    'comprobante' => $subidos[$i],
-                ];
-            }
-
-            $caja->registrarDepositos($aprovechamiento, $depositos);
-        } catch (CobroInvalidoException $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            // Cuelga de `pagos` porque lo que falla es cuánto se está cobrando,
-            // y el operador corrige los montos de las secciones.
-            return back()->withInput()->withErrors(['pagos' => $e->getMessage()]);
-        } catch (\Throwable $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            throw $e;
-        }
-
-        $cupo = $aprovechamiento->refresh();
-        $cuantos = count($datos['pagos']);
-
-        /*
-         *  Registrar y enviar son un solo acto cuando el monto queda cubierto
-         */
-        $enviado = false;
-
-        if (($datos['enviar'] ?? false) && $cupo->puedeEnviarseARevision()) {
-            // El recibo lo emite el ENVÍO, y sale a nombre del titular del cupo.
-            $revision->enviar($cupo);
-
-            $cupo->refresh();
-            $enviado = true;
-        }
-
-        return redirect()
-            ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', match (true) {
-                $enviado => sprintf(
-                    '%d depósito(s) registrado(s) y enviado a revisión. Se emitió el recibo del trámite '.
-                    'con el total; queda esperando la firma de quien lo aprueba.',
-                    $cuantos,
-                ),
-                $cupo->saldoPendiente() <= 0.0 => sprintf(
-                    '%d depósito(s) registrado(s). El monto quedó cubierto: ya se puede enviar a revisión.',
-                    $cuantos,
-                ),
-                default => sprintf(
-                    '%d depósito(s) registrado(s). Quedan %s Bs por cobrar.',
-                    $cuantos,
-                    number_format($cupo->saldoPendiente(), 2, ',', '.'),
-                ),
-            });
-    }
-
-    /**
-     * Enviar a revisión — POST /panel/aprovechamientos/{id}/enviar
-     */
-    public function enviar(AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
-    {
-        try {
-            $revision->enviar($aprovechamiento);
-        } catch (CupoInvalidoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', 'Enviado a revisión. Se emitió el recibo del trámite con el total de los '.
-                'depósitos; queda esperando la firma de quien lo aprueba.');
-    }
-
-    /**
-     * Aprobar — PATCH /panel/aprovechamientos/{id}/aprobar
-     *
-     * Recién acá el cupo autoriza faenas.
-     */
-    public function aprobar(AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
-    {
-        try {
-            $revision->aprobar($aprovechamiento);
-        } catch (CupoInvalidoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', 'Aprobado. El aprovechamiento quedó activo y ya autoriza faenas.');
-    }
-
-    /**
-     * Rechazar — PATCH /panel/aprovechamientos/{id}/rechazar
-     *
-     * Vuelve a PENDIENTE con el motivo escrito. Los pagos ya cargados siguen
-     * ahí: ventanilla corrige y lo vuelve a presentar sin recargar nada.
-     */
-    public function rechazar(RechazarCupoRequest $request, AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
-    {
-        try {
-            $revision->rechazar($aprovechamiento, $request->validated()['motivo']);
-        } catch (CupoInvalidoException $e) {
-            return back()->withErrors(['motivo' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('aprovechamientos.show', $aprovechamiento)
-            ->with('exito', 'Rechazado y devuelto a ventanilla. El motivo quedó en la auditoría.');
     }
 
     /**
@@ -638,28 +441,13 @@ class AprovechamientoController extends Controller
     }
 
     /**
-     * El recibo del trámite, sin disparar una consulta por fila.
-     *
-     * `Pagable::recibos()` es una CONSULTA y no una relación, así que en un
-     * listado hay que resolverlo desde los pagos ya precargados.
-     */
-    private function reciboDe(AprovechamientoPesq $cupo): ?Recibo
-    {
-        if ($cupo->relationLoaded('pagos')) {
-            return $cupo->pagos->firstWhere('recibo_id', '!=', null)?->recibo;
-        }
-
-        return $cupo->recibos()->first();
-    }
-
-    /**
      * Los datos de un cupo que pintan el listado y la ficha.
      *
      * @return array<string, mixed>
      */
     private function resumir(AprovechamientoPesq $cupo): array
     {
-        $recibo = $this->reciboDe($cupo);
+        $recibo = $cupo->recibo;
 
         return [
             'id' => $cupo->id,
@@ -682,7 +470,7 @@ class AprovechamientoController extends Controller
             'tipo_embarcacion' => $cupo->tipo_embarcacion,
             'kilos_consumidos' => $cupo->kilosConsumidos(),
             'saldo_kg' => $cupo->saldoKg(),
-            // Apartado por faenas pendientes o en revisión: no descuenta, pero no está libre.
+            // Apartado por faenas pendientes: no descuenta, pero no está libre.
             'kilos_reservados' => $cupo->kilosReservados(),
             'libre_kg' => $cupo->libreKg(),
             'porcentaje_usado' => $cupo->porcentajeUsado(),
@@ -715,28 +503,20 @@ class AprovechamientoController extends Controller
             'puede_editarse' => $cupo->puedeEditarse(),
             'puede_eliminarse' => $cupo->puedeEliminarse(),
 
-            /*
-             * Las tres del circuito de revisión, resueltas en el servidor.
-             */
-            'admite_pagos' => $cupo->admitePagos(),
-            'puede_enviarse' => $cupo->puedeEnviarseARevision(),
-            'puede_revisarse' => $cupo->puedeRevisarse(),
-            // La autorización en papel sale recién con el cupo firmado.
+            // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
+            'sireb' => $cupo->resumenSireb(),
+            'puede_verificar_pago' => $cupo->estado->estaAbierto(),
+            // La autorización en papel sale recién con el cupo aprobado.
             'ya_fue_aprobado' => $cupo->yaFueAprobado(),
             // Revocada: firmada, pero sin papel y sin poder revocarse de nuevo.
             'puede_imprimirse' => $cupo->puedeImprimirse(),
             'puede_revocarse' => $cupo->puedeRevocarse(),
 
-            /*
-             * EL RECIBO, para poder imprimirlo sin entrar a la ficha. Existe
-             * desde el ENVÍO, así que aparece en revisión y sigue después.
-             */
+            // EL RECIBO, para poder imprimirlo sin entrar a la ficha. Existe desde la aprobación.
             'recibo_id' => $recibo?->id,
             'recibo_numero' => $recibo?->numero_recibo,
 
             'monto' => $cupo->montoACobrar(),
-            'saldo_pendiente' => $cupo->saldoPendiente(),
-            'pagado' => $cupo->estaPagado(),
 
             // Son DÍAS, no instantes: van con toDateString(). Mandados como
             // instante, en UTC-4 la pantalla mostraría el día anterior.

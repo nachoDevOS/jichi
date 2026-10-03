@@ -244,9 +244,8 @@ export default function CrearGuia({
 
                                 <p className="text-xs text-muted-foreground">
                                     La guía queda <strong>PENDIENTE</strong>: todavía no ampara
-                                    nada. Desde su ficha se cargan los depósitos y se envía a
-                                    revisión; recién con la firma vale {diasVigencia} días y se
-                                    puede imprimir.
+                                    nada. Se paga en Recaudaciones; cuando el pago se valida allá
+                                    queda aprobada, vale {diasVigencia} días y se puede imprimir.
                                 </p>
                             </>
                         )}

@@ -51,6 +51,7 @@ export interface LimitesArchivo {
  */
 export interface Flash {
     exito: string | null;
+    aviso: string | null;
     error: string | null;
     info: string | null;
     /** La clave temporal del portal, recién creada o reseteada. Llega UNA vez. */
@@ -107,7 +108,6 @@ export interface Paginado<T> {
  */
 export type EstadoCarnet =
     | 'pendiente'
-    | 'en_revision'
     | 'aprobado'
     | 'revocado'
     | 'vencido';
@@ -122,7 +122,6 @@ export type TipoActor = 'pescador' | 'comercializador';
  */
 export type EstadoAprovechamiento =
     | 'pendiente'
-    | 'en_revision'
     | 'aprobado'
     | 'vencido'
     | 'agotado'
@@ -134,10 +133,10 @@ export type EstadoAprovechamiento =
 export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 
 /** Espejo de App\Enums\EstadoFaena. */
-export type EstadoFaena = 'pendiente' | 'en_revision' | 'aprobado' | 'completado' | 'vencido' | 'revocado';
+export type EstadoFaena = 'pendiente' | 'aprobado' | 'completado' | 'vencido' | 'revocado';
 
 /** Espejo de App\Enums\EstadoGuia. */
-export type EstadoGuia = 'pendiente' | 'en_revision' | 'aprobado' | 'anulada';
+export type EstadoGuia = 'pendiente' | 'aprobado' | 'anulada';
 
 /**
  * Espejo de App\Enums\EstadoAsociacion.

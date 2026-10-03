@@ -48,8 +48,8 @@ salen **dos ramas**, según la actividad:
         (una por salida, 30 días;
          reserva y descuenta kg de la autorización)
 
-   Los cuatro —autorización, carnet, faena y guía— se cobran con la MISMA
-   tabla `pagos`, y el papel que se entrega es el RECIBO.
+   Los cuatro —autorización, carnet, faena y guía— se PAGAN EN SIREB; al
+   confirmarse el pago quedan aprobados y se entrega el RECIBO.
 ```
 
 | Rama | Documento anual | Permiso de cada día | Controla kilos |
@@ -82,25 +82,24 @@ El detalle, con ejemplos, está en [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md).
 ## 2. El circuito, igual para los cuatro documentos
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ vencido / revocado / agotado
-(borrador)  ▲                │   └── al enviar sale el RECIBO
-   │        └──[rechazar]────┘
-   └──[eliminar, con motivo]
+PENDIENTE ──(SIREB: liquidación «pagada»)──▶ APROBADO ──▶ vencido / revocado / agotado
+(borrador)                                      └── al aprobar sale el RECIBO
+   └──[corregir / eliminar: anula la liquidación en SIREB]
 ```
 
-| Estado | Editar | Eliminar | Cargar pagos | Enviar | Aprobar / Rechazar |
-| --- | :-: | :-: | :-: | :-: | :-: |
-| **Pendiente** | ✔ | ✔ | ✔ | ✔ | ✘ |
-| **En revisión** | ✘ | ✘ | ✘ | ✘ | ✔ |
-| **Aprobado** | ✘ | ✘ | ✘ | ✘ | ✘ |
+*(02/10/2026: ya no hay `en_revision`, ni firma, ni tabla `pagos`.)*
+
+| Estado | Editar | Eliminar | Verificar pago |
+| --- | :-: | :-: | :-: |
+| **Pendiente** | ✔ | ✔ | ✔ |
+| **Aprobado** | ✘ | ✘ | ✘ |
 
 - **Pendiente es un borrador**: se corrige y, si sobra, se elimina con motivo.
-  Editar y eliminar exigen además que no haya ningún depósito cargado.
-- **Enviar exige el monto cubierto**, y ahí sale el recibo con número propio.
-- **Aprobar exige todas las boletas validadas.** Recién aprobado el documento
-  vale, se imprime y escribe sus fechas de vigencia.
-- **Rechazar devuelve a pendiente**, con el motivo en `auditorias`. No hay un
-  estado «rechazado» final.
+  Las dos cosas anulan antes su liquidación en SIREB; si SIREB no anula (p. ej.
+  ya tiene un pago), no se hacen.
+- **Pagado en SIREB = aprobado.** `ConfirmarPagoService` lo aprueba y emite el
+  recibo cuando SIREB da la liquidación por `pagada`. Recién aprobado el
+  documento vale, se imprime y escribe sus fechas de vigencia.
 - **Revocar** (autorización y carnet) es de supervisión, con motivo, y no se
   revierte. Revocar la autorización deja **sin efecto** a sus carnets y faenas
   sin reescribirlos: su vigencia mira al padre.
@@ -109,31 +108,23 @@ PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO
 
 El circuito lo dicen los enums (`EstadoAprovechamiento`, `EstadoCarnet`,
 `EstadoFaena`, `EstadoGuia`) con `permiteEdicion()`, `permiteEliminacion()`,
-`permiteEnvio()`, `permiteRevision()`… Lo aplican los servicios `Revisar*Service`
-(enviar, aprobar, rechazar) y `Emitir*Service` / `OtorgarCupoService` (crear,
-corregir, eliminar, revocar).
+`estaAbierto()`… Lo aplican `Emitir*Service` / `OtorgarCupoService` (crear,
+corregir, eliminar, revocar), `Revisar*Service::aprobar()` (las reglas propias
+de cada documento al aprobarse) y `ConfirmarPagoService` (pregunta a SIREB).
 
-### El cobro y el control de las boletas
+### El cobro: en SIREB
 
-Los cuatro documentos usan el trait `Pagable` y la tabla polimórfica **`pagos`**
-(`pagable_type` + `pagable_id`). Es una sola tabla porque `nro_transaccion` es
-único **global**: partida en cuatro, la misma boleta podría pagar dos cosas.
+Cada documento registra su **liquidación** en SIREB al crearse (trait
+`LiquidableSireb`, columnas `sireb_*`, `LiquidarSirebService`; la
+`Idempotency-Key` se guarda antes de llamar). El titular paga allá y el
+encargado de SIREB valida la boleta. Jichi pregunta con `GET /liquidaciones/{id}`
+—botón «Verificar pago» y `jichi:verificar-pagos` cada 10 minutos— y, si está
+`pagada`, aprueba. Ver [modulos/SIREB.md](modulos/SIREB.md).
 
-```
-depósito:  PENDIENTE ──▶ VALIDADO     cuadra con el extracto del banco
-               ▲     └─▶ OBSERVADO    no cuadra, con motivo
-               └──[corregir]──┘
-```
-
-Un depósito observado **sigue sumando** —el dinero entró; lo que está en duda es
-el dato— y no se valida directo: primero se corrige. Quién cargó y quién validó
-quedan en dos columnas distintas. Ver [modulos/PAGOS.md](modulos/PAGOS.md).
-
-**El recibo** es una tabla (`recibos`) con correlativo continuo `000001`, que
-Contabilidad audita por huecos, y monto y concepto congelados al emitir. Sale
-**uno por trámite al enviar a revisión**; en **Caja** se cobra y se entrega en
-el mismo acto, y un recibo puede cubrir varios trámites de la misma persona
-(`CobrarService::cobrar()`). Ver [modulos/RECIBOS.md](modulos/RECIBOS.md).
+**El recibo** es una tabla (`recibos`), uno por documento (`recibible`), con
+correlativo continuo `000001` que Contabilidad audita por huecos. Se emite al
+aprobar y congela monto, concepto y la boleta de SIREB (número, banco, fecha).
+Ver [modulos/RECIBOS.md](modulos/RECIBOS.md).
 
 ### La verificación pública
 
@@ -157,13 +148,12 @@ El esquema completo, con el porqué de cada columna e índice, está en
 | Tabla | Qué guarda | Lo que no es obvio |
 | --- | --- | --- |
 | `beneficiarios` | La persona | C.I. único con índice **parcial** (`WHERE deleted_at IS NULL`). Columnas en camelCase desde `primerNombre` |
-| `aprovechamientos_pesq` | La bolsa madre, en kg | Hereda volumen y modalidad de la escala. Sin columna de saldo: consumido y reservado se calculan de las faenas |
+| `aprovechamientos_pesq` | La bolsa madre, en kg | Hereda volumen y modalidad de la escala. Sin columna de saldo: consumido y reservado se calculan de las faenas. Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
 | `carnets` | La credencial anual | `tipo_actor` decide qué emite. El de pescador lleva `aprovechamiento_id`; el de comercializador, NULL |
 | `permisos_faena` | Una salida de pesca | Cuelga **solo** del carnet; llega a la autorización por `hasManyThrough` |
 | `guias_movimiento` | Un traslado | Cuelga solo del carnet; copia la asociación porque va impresa |
 | `guia_detalles` | El cuadro D, una fila por especie | La única FK CASCADE del dominio |
-| `recibos` | El comprobante | Correlativo continuo; monto y concepto congelados |
-| `pagos` | Cada depósito y su control | Polimórfica; `recibo_id` nullable hasta que el trámite emite su recibo |
+| `recibos` | El comprobante, uno por documento pagado | Polimórfico (`recibible`); correlativo continuo; monto, concepto y boleta de SIREB congelados |
 | `codigos` | La llave pública de los cinco documentos | Polimórfica; único completo, un código impreso queda quemado |
 | `asociaciones`, `categorias_aprovechamiento`, `tipos_carnet`, `productos_hidrobiologicos`, `departamentos` | Catálogos | Los edita la unidad desde el panel. Los productos llenan el cuadro D de la guía |
 
@@ -175,8 +165,8 @@ Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 - **Nada del dominio se borra de verdad**: todas las tablas tienen
   `softDeletes()`. Un índice único que la baja deba liberar es parcial; uno de
   papel entregado queda quemado. Tabulado en [MER.md](MER.md).
-- **No hay columnas de saldo ni de monto pagado.** Lo pagado es la suma de
-  `pagos`; el saldo de kilos es una resta sobre las faenas. Una columna así hay
+- **No hay columnas de saldo.** Lo pagado está en SIREB (y en el recibo); el
+  saldo de kilos es una resta sobre las faenas. Una columna así hay
   que mantenerla al día en cada alta y cada corrección, y el día que alguien se
   olvide el sistema cobra o autoriza mal sin avisar.
 - **La faena y la guía cuelgan solo del carnet.** Una segunda clave hacia la
@@ -199,13 +189,13 @@ en un redirect.
 | Servicio | Qué hace |
 | --- | --- |
 | `OtorgarCupoService` | Otorgar, corregir y eliminar la autorización |
-| `RevisarCupoService` | Enviar, aprobar, rechazar y **revocar** la autorización (sin cascada: ver REGLAS-NEGOCIO, Regla 5) |
+| `RevisarCupoService` | Aprobar y **revocar** la autorización (sin cascada: ver REGLAS-NEGOCIO, Regla 5) |
 | `EmitirCarnetService` | Emitir, corregir, eliminar, revocar y reponer el carnet |
-| `RevisarCarnetService` | Enviar, aprobar y rechazar el carnet |
+| `RevisarCarnetService` | Aprobar el carnet (número de registro, vigencia) |
 | `EmitirFaenaService` / `RevisarFaenaService` | Lo mismo para la faena; controla los kilos libres |
 | `EmitirGuiaService` / `RevisarGuiaService` | Lo mismo para la guía, más anular |
-| `CobrarService` | Cargar depósitos y emitir recibos; la Caja |
-| `ControlarPagoService` | Validar, observar y corregir una boleta |
+| `LiquidarSirebService` | La liquidación en SIREB: preparar, enviar y anular |
+| `ConfirmarPagoService` | Pregunta a SIREB; si está pagado, aprueba y emite el recibo |
 | `CorrelativoService` | Los números correlativos, con la fila del contador bloqueada |
 | `CodigoService` | El código de 16 caracteres |
 
@@ -234,7 +224,7 @@ silencio. La lista de lugares a revisar está en «Trampas conocidas» de
 | --- | --- | --- |
 | 1. Bloqueo | `lockForUpdate()` sobre la fila que contiene el recurso escaso | El beneficiario al emitir un carnet; la autorización al emitir o aprobar una faena; el contador del correlativo |
 | 2. Recomprobación | La regla corre **otra vez** dentro de la transacción | El estado del documento, los kilos libres |
-| 3. Índice único | La base rechaza el duplicado pase lo que pase | `pagos.nro_transaccion`, `codigos.codigo`, los números correlativos |
+| 3. Índice único | La base rechaza el duplicado pase lo que pase | `codigos.codigo`, `sireb_idempotency_key`, los números correlativos |
 
 > **Trampa:** releer con `lockForUpdate()` devuelve **otra instancia**. Se
 > escribe sobre la copia bloqueada y se devuelve `$modelo->refresh()` —la
@@ -243,7 +233,7 @@ silencio. La lista de lugares a revisar está en «Trampas conocidas» de
 ### 4.4 El disco no participa de la transacción
 
 Un rollback borra filas pero no archivos. Por eso los adjuntos —la cédula y el
-aval del carnet, la boleta de cada pago— se **suben antes** de abrir la
+aval del carnet— se **suben antes** de abrir la
 transacción, y el `catch` los borra si algo falla. Al borrar, al revés: primero
 la transacción, después los archivos.
 
@@ -263,7 +253,7 @@ copia en vez de leerse por relación:
 | --- | --- |
 | `permisos_faena.monto` | El arancel del día en que se emitió |
 | `guias_movimiento.monto`, `guia_detalles.precio_kg` | El total del cuadro D y la tasa de cada producto al emitir (con el descuento de piscicultura) |
-| `recibos.monto_total`, `recibos.concepto` | Lo que dice el papel entregado |
+| `recibos.monto_total`, `concepto`, `numero_boleta`, `entidad_bancaria`, `fecha_pago` | Lo que dice el papel entregado, con la boleta tal como la validó SIREB |
 | `guias_movimiento.asociacion_id` | El aval impreso en la guía |
 | `aprovechamientos_pesq.volumen_total_kg`, `modalidad` | Lo que se otorgó, aunque la escala cambie |
 | `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar, solo si la tarifa y el servicio están activos y la tarifa es liquidable (ver [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir)) |
@@ -325,15 +315,13 @@ un botón con `usePermisos()` es solo comodidad; siempre van los dos.
 | Bloque | Qué hace |
 | --- | --- |
 | Lectura | Ver cada módulo |
-| **Ventanilla** (operación) | Cargar, corregir el borrador, cobrar, enviar a revisión, imprimir, corregir depósitos |
-| **Supervisión** | Aprobar, rechazar, validar u observar boletas, eliminar, revocar, anular |
+| **Ventanilla** (operación) | Cargar, corregir el borrador, verificar el pago en SIREB, imprimir |
+| **Supervisión** | Eliminar, revocar, anular |
 | Administración | Catálogos, usuarios, configuración |
 
-> ⚠️ **Hoy existe un solo rol, `administrador`, con todos los permisos**: la
-> misma persona puede cargar y aprobar. Las rutas ya están separadas, así que
-> agregar el rol de ventanilla es una línea en `RolSistema`. Además
-> `pagos.revisor_distinto` debería exigir que quien valida una boleta no sea
-> quien la cargó, pero **todavía no está implementado**: ver PENDIENTES.md.
+> ⚠️ **Hoy existe un solo rol, `administrador`, con todos los permisos.** Las
+> rutas ya están separadas, así que agregar el rol de ventanilla es una línea en
+> `RolSistema`. Aprobar ya no es de nadie: lo decide el pago validado en SIREB.
 
 **Login:** con `IBARE_ACTIVO=true` se entra con la cuenta del GAD por OAuth2
 (Ibare) y el login por correo queda solo para administradores. Ver
@@ -369,7 +357,7 @@ permiso.
 | Autorización de Pesca para Aprovechamiento Pesquero | ✅ | `AprovechamientoController`, `OtorgarCupoService`, `RevisarCupoService` | [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md), paso 2 |
 | Carnets | ✅ | `CarnetController`, `EmitirCarnetService` | [modulos/CARNETS.md](modulos/CARNETS.md) |
 | Faenas y guías | ✅ | `FaenaController`, `GuiaController` | [modulos/PERMISOS-OPERATIVOS.md](modulos/PERMISOS-OPERATIVOS.md) |
-| Caja, recibos y pagos | ✅ | `CajaController`, `ReciboController`, `PagoController`, `CobrarService` | [modulos/PAGOS.md](modulos/PAGOS.md), [modulos/RECIBOS.md](modulos/RECIBOS.md) |
+| Cobro en SIREB y recibos | ✅ | `ConfirmarPagoService`, `LiquidarSirebService`, `ReciboController` | [modulos/SIREB.md](modulos/SIREB.md), [modulos/RECIBOS.md](modulos/RECIBOS.md) |
 | Catálogos | ✅ | `AsociacionController`, `CategoriaAprovechamientoController`, `TipoCarnetController`, `ProductoHidrobiologicoController` | — |
 | Verificación pública | ✅ | `VerificacionController` | [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md), paso 7 |
 | Portal del beneficiario (`/mi-cuenta`) | ✅ | `Controllers/Portal/`, `CuentaPortalService` | [modulos/PORTAL.md](modulos/PORTAL.md) |
@@ -377,7 +365,7 @@ permiso.
 | Configuración | ❌ No existe (la tabla sí) | — | [PENDIENTES.md](PENDIENTES.md) |
 
 El menú lateral agrupa: **Ventanilla** (Beneficiarios, Aprov. Pesquero, Carnets,
-Faenas, Guías), **Caja** (Cobros, Recibos), **Catálogos** (Asociaciones, Tipos
+Faenas, Guías), **Pagos** (Recibos), **Catálogos** (Asociaciones, Tipos
 de carnet, Productos) y **Administración** (Reportes) y **Configuración** (Escala). Vive en
 `components/panel/layout/navegacion.ts`.
 

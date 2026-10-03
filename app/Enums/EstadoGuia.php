@@ -5,18 +5,15 @@ namespace App\Enums;
 /**
  * En qué situación está una guía de movimiento — el amparo de UN traslado.
  *
- * Mismo circuito que el carnet, el cupo y la faena: pendiente → en revisión →
- * activa. El operador aprende uno solo.
+ * Mismo circuito que el carnet, el cupo y la faena: pendiente → (pago en SIREB)
+ * → aprobada. El operador aprende uno solo.
  */
 enum EstadoGuia: string
 {
-    /** Cargada y sin cobrar. Es como NACE toda guía: todavía no ampara nada. */
+    /** Cargada y esperando el pago en SIREB. Es como NACE toda guía: todavía no ampara nada. */
     case Pendiente = 'pendiente';
 
-    /** Los depósitos cubren el arancel; falta que alguien firme. */
-    case EnRevision = 'en_revision';
-
-    /** Firmada y vigente: la carga está en camino. Se llamaba `activa` hasta el 25/09/2026. */
+    /** Pagada y vigente: la carga está en camino. */
     case Aprobada = 'aprobado';
 
     /** Dada de baja con motivo. No vuelve atrás: si hace falta, se emite otra. */
@@ -26,7 +23,6 @@ enum EstadoGuia: string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
-            self::EnRevision => 'En revisión',
             self::Aprobada => 'Aprobada',
             self::Anulada => 'Anulada',
         };
@@ -36,7 +32,6 @@ enum EstadoGuia: string
     {
         return match ($this) {
             self::Pendiente => 'sky',
-            self::EnRevision => 'indigo',
             self::Aprobada => 'emerald',
             self::Anulada => 'rose',
         };
@@ -59,8 +54,7 @@ enum EstadoGuia: string
     /**
      * ¿Se pueden corregir sus datos? Solo el BORRADOR.
      *
-     * Al enviarla a revisión sale el recibo y el comerciante se va con el
-     * papel, así que desde ahí lo que no sirve se rechaza, no se edita.
+     * Corregirla anula la liquidación en SIREB y registra otra.
      */
     public function permiteEdicion(): bool
     {
@@ -73,41 +67,19 @@ enum EstadoGuia: string
         return $this === self::Pendiente;
     }
 
-    /** ¿Se puede mandar a que alguien la firme? */
-    public function permiteEnvio(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /** ¿Se puede aprobar o rechazar? Solo lo que está presentado. */
-    public function permiteRevision(): bool
-    {
-        return $this === self::EnRevision;
-    }
-
     /**
-     * ¿Se le pueden seguir cargando abonos? Solo mientras nadie la firmó.
-     *
-     * Sobre una firmada no, aunque quede saldo: lo que se deba se resuelve por
-     * caja, no cargando plata a un papel ya entregado.
-     */
-    public function admitePagos(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /**
-     * ¿Se anula? Solo la FIRMADA, cuyo papel está en la calle: el borrador se
-     * elimina y la presentada se rechaza.
+     * ¿Se anula? Solo la APROBADA, cuyo papel está en la calle: el borrador se
+     * elimina.
      */
     public function permiteAnulacion(): bool
     {
         return $this === self::Aprobada;
     }
 
+    /** Esperando el pago en SIREB. */
     public function estaAbierto(): bool
     {
-        return $this === self::Pendiente || $this === self::EnRevision;
+        return $this === self::Pendiente;
     }
 
     /**

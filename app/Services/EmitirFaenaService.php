@@ -22,6 +22,7 @@ class EmitirFaenaService
     public function __construct(
         private readonly CorrelativoService $correlativos,
         private readonly PrecioSireb $precios,
+        private readonly LiquidarSirebService $liquidaciones,
     ) {}
 
     /**
@@ -62,7 +63,7 @@ class EmitirFaenaService
         // Fuera de la transacción: una llamada a SIREB no debe tener el cupo bloqueado.
         $precio = $this->precioDeLaFaena();
 
-        return DB::transaction(function () use ($carnet, $kilos, $papel, $precio): PermisoFaena {
+        $faena = DB::transaction(function () use ($carnet, $kilos, $papel, $precio): PermisoFaena {
             // La fila del cupo es la que contiene el recurso escaso: es la que
             // se bloquea. Releerla devuelve OTRA instancia, y acá se usa esa a
             // propósito — es la que tiene el saldo al día.
@@ -88,13 +89,6 @@ class EmitirFaenaService
              */
             if ($cupo->estado === EstadoAprovechamiento::Pendiente) {
                 throw PermisoOperativoException::cupoPendienteDePago();
-            }
-
-            /*
-             * Y el otro estado que no habilita: presentado y sin firmar.
-             */
-            if ($cupo->estado === EstadoAprovechamiento::EnRevision) {
-                throw PermisoOperativoException::cupoEnRevision();
             }
 
             // Solo en modo ESTRICTO: la pendiente RESERVA, así que se mide contra
@@ -123,11 +117,16 @@ class EmitirFaenaService
             // Su llave pública, en la misma transacción: sin código, el documento
             // no se puede verificar.
             $faena->asignarCodigo();
+            $this->liquidaciones->preparar($faena);
 
-            // El cupo NO se descuenta acá: la pendiente solo reserva. Descuenta al firmarla.
+            // El cupo NO se descuenta acá: la pendiente solo reserva. Descuenta al aprobarse.
 
             return $faena;
         });
+
+        $this->liquidaciones->enviarSinFrenar($faena);
+
+        return $faena;
     }
 
     /**
@@ -147,17 +146,12 @@ class EmitirFaenaService
         return DB::transaction(function () use ($faena, $kilos, $papel): PermisoFaena {
             $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
 
-            // Se comprueba con la copia bloqueada, no con la que llegó: entre
-            // que la pantalla se dibujó y llegó el submit, otra ventanilla
-            // pudo enviarla a revisión.
+            // Con la copia bloqueada: entre que la pantalla se dibujó y llegó el
+            // submit, el pago pudo aprobarla. Los kilos no cambian lo que se cobra.
             if (! $bloqueada->estado->permiteEdicion()) {
                 throw PermisoOperativoException::faenaNoSePuedeEditar(
                     mb_strtolower($bloqueada->estado->etiqueta()),
                 );
-            }
-
-            if (($pagos = $bloqueada->pagos()->count()) > 0) {
-                throw PermisoOperativoException::faenaTienePagos($pagos);
             }
 
             $bloqueada->loadMissing('carnet');
@@ -196,6 +190,13 @@ class EmitirFaenaService
      */
     public function eliminar(PermisoFaena $faena, string $motivo): void
     {
+        if (! $faena->puedeEliminarse()) {
+            throw PermisoOperativoException::faenaNoSePuedeEliminar(mb_strtolower($faena->estado->etiqueta()));
+        }
+
+        // Primero SIREB: si no anula la liquidación, no se elimina.
+        $this->liquidaciones->anular($faena, 'Eliminado en Jichi: '.$motivo);
+
         DB::transaction(function () use ($faena, $motivo): void {
             $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
 
@@ -203,10 +204,6 @@ class EmitirFaenaService
                 throw PermisoOperativoException::faenaNoSePuedeEliminar(
                     mb_strtolower($bloqueada->estado->etiqueta()),
                 );
-            }
-
-            if (($pagos = $bloqueada->pagos()->count()) > 0) {
-                throw PermisoOperativoException::faenaTienePagos($pagos);
             }
 
             $bloqueada->loadMissing('carnet');

@@ -82,43 +82,12 @@ class CarnetInvalidoException extends RuntimeException
     }
 
     /** Revocar sin motivo escrito no deja nada que explicar después. */
-    /**
-     *  Las tres del circuito de revisión
-     */
-    public static function noSePuedeEnviar(string $estado): self
-    {
-        return new self(
-            "El carnet está {$estado} y solo se presenta a revisión lo que está PENDIENTE. ".
-            'Vuelva a abrir la ficha para ver en qué estado quedó.',
-        );
-    }
-
     public static function noSePuedeRevisar(string $estado): self
     {
         return new self(
-            "El carnet está {$estado} y solo se firma o se rechaza lo que está EN REVISIÓN. ".
+            "El carnet está {$estado} y solo se aprueba el que está PENDIENTE de pago. ".
             'Vuelva a abrir la ficha para ver en qué estado quedó.',
         );
-    }
-
-    /** Falta plata: el carnet no se presenta a medio cobrar. */
-    public static function faltaCubrirElArancel(float $saldo): self
-    {
-        return new self(sprintf(
-            'Faltan %s Bs por cobrar. El carnet se presenta con el arancel cubierto: cargue los '.
-            'depósitos que falten.',
-            number_format($saldo, 2, ',', '.'),
-        ));
-    }
-
-    /** Quedan boletas que nadie controló contra el extracto del banco. */
-    public static function faltaControlarBoletas(int $cuantas): self
-    {
-        return new self(sprintf(
-            'Quedan %d depósito(s) sin validar. Se controlan las boletas contra el extracto del '.
-            'banco antes de firmar: sin eso, la validación no serviría de nada.',
-            $cuantas,
-        ));
     }
 
     /**
@@ -127,9 +96,7 @@ class CarnetInvalidoException extends RuntimeException
     public static function noSePuedeEditar(string $estado): self
     {
         return new self(
-            "El carnet está {$estado} y solo se corrige lo que está PENDIENTE y sin cobrar. ".
-            'Si hay un error en un carnet ya presentado, hay que rechazarlo para que vuelva a '.
-            'ventanilla.',
+            "El carnet está {$estado} y solo se corrige lo que está PENDIENTE.",
         );
     }
 
@@ -139,22 +106,6 @@ class CarnetInvalidoException extends RuntimeException
             "El carnet está {$estado} y solo se elimina lo que está PENDIENTE. Una credencial que ".
             'ya se firmó no se borra: se REVOCA, y queda su historia.',
         );
-    }
-
-    /**
-     * Hay plata cargada contra este carnet: ni se corrige ni se elimina.
-     *
-     * Vale para las dos porque el motivo es el mismo —cambiarle el tipo le
-     * cambiaría el arancel por debajo a algo que alguien ya pagó— y la salida
-     * también: dar de baja los depósitos por caja.
-     */
-    public static function tienePagos(int $cuantos): self
-    {
-        return new self(sprintf(
-            'El carnet tiene %d depósito(s) cargados: no se corrige ni se elimina con plata '.
-            'cobrada encima. Lo que corresponde es dar de baja los depósitos por caja.',
-            $cuantos,
-        ));
     }
 
     /** Ya emitió permisos: el papel está afuera. */
@@ -180,7 +131,7 @@ class CarnetInvalidoException extends RuntimeException
     {
         return new self(
             "El carnet está {$estado}: solo se revoca uno APROBADO. ".
-            'Un pendiente se elimina y uno en revisión se rechaza.',
+            'Un pendiente se elimina.',
         );
     }
 
@@ -192,7 +143,7 @@ class CarnetInvalidoException extends RuntimeException
         );
     }
 
-    /** Se quiso firmar un carnet cuya autorización revocaron mientras esperaba. */
+    /** Se quiso aprobar un carnet cuya autorización revocaron mientras esperaba el pago. */
     public static function cupoRevocado(): self
     {
         return new self(

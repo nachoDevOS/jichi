@@ -2,7 +2,6 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { Clock, FileText, Home, LogOut, Receipt, User, type LucideIcon } from 'lucide-react';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { Toaster } from 'sonner';
-import { ProveedorPago } from '@/components/portal/modal-pago';
 import { useFlash } from '@/hooks/use-flash';
 import { cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
@@ -42,7 +41,7 @@ export default function LayoutPortal({
     const { auth } = usePage<PageProps>().props;
 
     return (
-        <ProveedorPago>
+        <>
             <div className="min-h-screen bg-rio-espuma text-slate-700">
                 <header
                     className="text-white"
@@ -134,6 +133,6 @@ export default function LayoutPortal({
 
                 <Toaster position="top-center" richColors closeButton />
             </div>
-        </ProveedorPago>
+        </>
     );
 }

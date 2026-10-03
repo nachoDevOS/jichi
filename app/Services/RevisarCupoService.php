@@ -8,102 +8,33 @@ use App\Models\AprovechamientoPesq;
 use Illuminate\Support\Facades\DB;
 
 /**
- *  El circuito de revisión de un aprovechamiento
+ * Aprobar (lo llama ConfirmarPagoService cuando SIREB confirma el pago) y revocar
+ * la autorización.
  */
 class RevisarCupoService
 {
-    public function __construct(private readonly CobrarService $caja) {}
-
     /**
-     * PENDIENTE ──▶ EN REVISIÓN.
-     */
-    public function enviar(AprovechamientoPesq $cupo): AprovechamientoPesq
-    {
-        return DB::transaction(function () use ($cupo): AprovechamientoPesq {
-            $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
-
-            if (! $bloqueado->estado->permiteEnvio()) {
-                throw CupoInvalidoException::noSePuedeEnviar($bloqueado->estado->etiqueta());
-            }
-
-            if ($bloqueado->saldoPendiente() > 0.0) {
-                throw CupoInvalidoException::faltaCubrirElMonto($bloqueado->saldoPendiente());
-            }
-
-            $bloqueado->motivoAuditoria = 'Depósitos cargados y monto cubierto: se presenta para revisión.';
-            $bloqueado->update(['estado' => EstadoAprovechamiento::EnRevision]);
-
-            // Devuelve null en un REENVÍO: no hay depósitos sueltos, no se toca
-            // el correlativo y el número que la persona tiene sigue valiendo.
-            // El recibo sale a nombre del titular del cupo: no hace falta
-            // pasárselo, lo lee de `beneficiario_id`.
-            $this->caja->emitirRecibo($bloqueado);
-
-            // La instancia ORIGINAL refrescada, no la copia bloqueada: quien
-            // llamó tiene esa en la mano. Ver CLAUDE.md.
-            return $cupo->refresh();
-        });
-    }
-
-    /**
-     * En revisión ──▶ ACTIVO. Recién acá el cupo autoriza faenas.
+     * PENDIENTE ──▶ APROBADO, con el pago ya confirmado en SIREB. Recién acá autoriza faenas.
      */
     public function aprobar(AprovechamientoPesq $cupo): AprovechamientoPesq
     {
         return DB::transaction(function () use ($cupo): AprovechamientoPesq {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
-            if (! $bloqueado->estado->permiteRevision()) {
+            if (! $bloqueado->estado->estaAbierto()) {
                 throw CupoInvalidoException::noSePuedeRevisar($bloqueado->estado->etiqueta());
             }
 
-            /*
-             * Se vuelve a mirar el monto, aunque el envío ya lo había mirado.
-             */
-            if ($bloqueado->saldoPendiente() > 0.0) {
-                throw CupoInvalidoException::faltaCubrirElMonto($bloqueado->saldoPendiente());
-            }
-
-            // Tercera condición: todas las boletas controladas. El monto cubierto
-            // dice cuánto se DECLARÓ, no que la plata haya entrado.
-            $sinControlar = $bloqueado->pagos()->sinValidar()->count();
-
-            if ($sinControlar > 0) {
-                throw CupoInvalidoException::faltaControlarBoletas($sinControlar);
-            }
-
-            // La emisión se escribe ACÁ: hasta la firma había una solicitud. El
+            // La emisión se escribe ACÁ: hasta el pago había una solicitud. El
             // vencimiento se recalcula sobre ella porque el cupo vale por GESTIÓN.
             $emision = now();
 
-            $bloqueado->motivoAuditoria = 'Depósitos verificados: el aprovechamiento queda habilitado.';
+            $bloqueado->motivoAuditoria = 'Pago confirmado en SIREB: el aprovechamiento queda habilitado.';
             $bloqueado->update([
                 'estado' => EstadoAprovechamiento::Aprobado,
                 'fecha_emision' => $emision->toDateString(),
                 'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
             ]);
-
-            return $cupo->refresh();
-        });
-    }
-
-    /**
-     * En revisión ──▶ PENDIENTE, con el motivo escrito.
-     *
-     * Los pagos NO se tocan: cuelgan del cupo y siguen ahí, así que ventanilla
-     * corrige lo que haya que corregir y vuelve a presentarlo sin recargar nada.
-     */
-    public function rechazar(AprovechamientoPesq $cupo, string $motivo): AprovechamientoPesq
-    {
-        return DB::transaction(function () use ($cupo, $motivo): AprovechamientoPesq {
-            $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
-
-            if (! $bloqueado->estado->permiteRevision()) {
-                throw CupoInvalidoException::noSePuedeRevisar($bloqueado->estado->etiqueta());
-            }
-
-            $bloqueado->motivoAuditoria = $motivo;
-            $bloqueado->update(['estado' => EstadoAprovechamiento::Pendiente]);
 
             return $cupo->refresh();
         });

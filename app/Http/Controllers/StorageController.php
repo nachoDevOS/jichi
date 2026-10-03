@@ -15,7 +15,7 @@ class StorageController extends Controller
     /**
      *  Guarda un archivo y devuelve siempre una ruta, nunca una URL
      *
-     * @param  string  $folder  Carpeta lógica: 'beneficiarios', 'tramites', 'pagos'.
+     * @param  string  $folder  Carpeta lógica: 'beneficiarios', 'carnets'…
      *
      * @throws ValidationException si el archivo supera el límite del sistema.
      */

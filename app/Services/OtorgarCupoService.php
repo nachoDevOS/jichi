@@ -18,7 +18,10 @@ use Illuminate\Support\Facades\Log;
  */
 class OtorgarCupoService
 {
-    public function __construct(private readonly PrecioSireb $precios) {}
+    public function __construct(
+        private readonly PrecioSireb $precios,
+        private readonly LiquidarSirebService $liquidaciones,
+    ) {}
 
     /**
      * Otorga la bolsa madre a una persona.
@@ -31,7 +34,7 @@ class OtorgarCupoService
     ): AprovechamientoPesq {
         $solicitud ??= now();
 
-        return DB::transaction(function () use ($beneficiario, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
+        $cupo = DB::transaction(function () use ($beneficiario, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
             // `lockForUpdate()` devuelve OTRA instancia: acá solo toma el candado,
             // todo lo demás se lee del modelo que llegó.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
@@ -83,8 +86,15 @@ class OtorgarCupoService
             // no se puede verificar.
             $cupo->asignarCodigo();
 
+            // La liquidación y su clave se guardan ACÁ, antes de llamar a SIREB: un reintento usa la misma.
+            $this->liquidaciones->preparar($cupo);
+
             return $cupo;
         });
+
+        $this->liquidaciones->enviarSinFrenar($cupo);
+
+        return $cupo;
     }
 
     /**
@@ -96,7 +106,21 @@ class OtorgarCupoService
         string $tipoEmbarcacion,
         Carbon $solicitud,
     ): AprovechamientoPesq {
-        return DB::transaction(function () use ($cupo, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
+        if (! $cupo->puedeEditarse()) {
+            throw CupoInvalidoException::noSePuedeEditar($cupo->estado->etiqueta());
+        }
+
+        // Corregir el borrador vuelve a pedir el precio, como la guía.
+        ['tramo' => $tramo, 'precio' => $precio] = $this->verificarPrecio($categoria);
+
+        // Otra tarifa u otro monto es otra liquidación: la vieja se anula ANTES de tocar nada.
+        $otraLiquidacion = $this->liquidaciones->anularSiCambia(
+            $cupo,
+            [['tarifa_id' => $precio['tarifa_id'], 'cantidad' => 1]],
+            $precio['monto'],
+        );
+
+        $cupo = DB::transaction(function () use ($cupo, $tramo, $precio, $solicitud, $tipoEmbarcacion, $otraLiquidacion): AprovechamientoPesq {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
             /*
@@ -105,15 +129,6 @@ class OtorgarCupoService
             if (! $bloqueado->puedeEditarse()) {
                 throw CupoInvalidoException::noSePuedeEditar($bloqueado->estado->etiqueta());
             }
-
-            $tramo = CategoriaAprovechamiento::query()->whereKey($categoria->id)->firstOrFail();
-
-            if (! $tramo->estado) {
-                throw CupoInvalidoException::escalaDerogada($tramo->nro_escala);
-            }
-
-            // Corregir el borrador vuelve a pedir el precio, como la guía.
-            $precio = $this->precioDe($tramo);
 
             $bloqueado->update([
                 'categoria_aprov_id' => $tramo->id,
@@ -126,9 +141,17 @@ class OtorgarCupoService
                 'fecha_vencimiento' => $this->vencimientoDe($solicitud),
             ]);
 
+            if ($otraLiquidacion) {
+                $this->liquidaciones->preparar($bloqueado);
+            }
+
             // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
             return $cupo->refresh();
         });
+
+        $this->liquidaciones->enviarSinFrenar($cupo);
+
+        return $cupo;
     }
 
     /**
@@ -136,6 +159,13 @@ class OtorgarCupoService
      */
     public function eliminar(AprovechamientoPesq $cupo, string $motivo): void
     {
+        if (! $cupo->puedeEliminarse()) {
+            throw CupoInvalidoException::noSePuedeEliminar($cupo->estado->etiqueta());
+        }
+
+        // Primero SIREB: si no anula la liquidación, no se elimina, o quedaría una deuda sin trámite.
+        $this->liquidaciones->anular($cupo, 'Eliminado en Jichi: '.$motivo);
+
         DB::transaction(function () use ($cupo, $motivo): void {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
@@ -143,13 +173,7 @@ class OtorgarCupoService
                 throw CupoInvalidoException::noSePuedeEliminar($bloqueado->estado->etiqueta());
             }
 
-            // Los dos mensajes son distintos a propósito: la salida no es la
-            // misma. Lo cobrado se resuelve por caja; las faenas ya emitidas no
-            // se resuelven de ninguna manera, el papel está afuera.
-            if (($pagos = $bloqueado->pagos()->count()) > 0) {
-                throw CupoInvalidoException::tienePagos($pagos);
-            }
-
+            // Las faenas ya emitidas no se resuelven de ninguna manera: el papel está afuera.
             if (($faenas = $bloqueado->faenas()->count()) > 0) {
                 throw CupoInvalidoException::tieneFaenas($faenas);
             }
@@ -230,7 +254,7 @@ class OtorgarCupoService
                 'tramo' => $tramo->id, 'tarifa' => $tramo->tarifa_sireb, 'motivo' => $e->getMessage(),
             ]);
 
-            throw CupoInvalidoException::sinPrecio($tramo->descripcion_kg, $e->sinRespuesta);
+            throw CupoInvalidoException::sireb($tramo->descripcion_kg, $e->sinRespuesta);
         }
     }
 }

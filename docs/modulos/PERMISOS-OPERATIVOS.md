@@ -39,40 +39,35 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 es a propósito: el operador aprende uno solo.
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ (faena: vencido / revocado)
-(borrador)  ▲                │                        │
-   │        └──[rechazar]────┘                        └──▶ (guía: anulada)
-   │                 └── al enviar sale el RECIBO, uno por trámite
-   └──[eliminar, con motivo]──▶ baja lógica
+PENDIENTE ──(pagada en SIREB)──▶ APROBADO ──▶ (faena: vencido / revocado)
+(borrador)                          │   └── al aprobar sale el RECIBO
+   │                                └──▶ (guía: anulada)
+   └──[eliminar, con motivo]──▶ baja lógica (anula antes la liquidación en SIREB)
 ```
 
-| | Editar | Eliminar | Pagar | Enviar | Aprobar / Rechazar | Imprimir |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: |
-| **Pendiente** | ✔ | ✔ | ✔ | ✔ | ✘ | ✘ |
-| **En revisión** | ✘ | ✘ | ✘ | ✘ | ✔ | ✘ |
-| **Aprobado** | ✘ | ✘ | ✘ | ✘ | ✘ | ✔ |
+*(02/10/2026: el pago se hace en SIREB; no hay `en_revision`, ni firma, ni
+depósitos en Jichi. Ver [SIREB.md](SIREB.md).)*
+
+| | Editar | Eliminar | Verificar pago | Imprimir |
+| --- | :-: | :-: | :-: | :-: |
+| **Pendiente** | ✔ | ✔ | ✔ | ✘ |
+| **Aprobado** | ✘ | ✘ | ✘ | ✔ |
 
 Lo dictan los enums —`EstadoFaena` y `EstadoGuia`— y **nada más**: el servicio
 pregunta, el controlador no decide y React recibe la respuesta ya resuelta en
 los campos `puede_*` de la ficha.
 
-- **Rechazar devuelve a PENDIENTE**, con el motivo en `auditorias`. Los pagos y
-  el recibo quedan como estaban: el papel ya está en manos de la persona, y un
-  reenvío no emite un segundo recibo.
-- **EDITAR Y ELIMINAR PIDEN DOS COSAS:** estado PENDIENTE y **ningún depósito
-  cargado** —lo suman `puedeEditarse()` y `puedeEliminarse()` en los dos
-  modelos—. Un depósito significa que la persona pagó por ESTE papel, y mover
-  los kilos o la piscicultura después cambiaría lo que se cobró. Primero se da
-  de baja el depósito.
+- **EDITAR Y ELIMINAR, solo en PENDIENTE**, y anulan antes la liquidación en
+  SIREB (corregir registra otra si cambia lo que se cobra). Si SIREB no anula
+  —ya tiene un pago allá—, no se toca nada.
 - **El CARNET no se edita.** Cambiar de titular no es corregir una salida, es
   emitir otra: el formulario muestra a la persona fija.
-- **EL RECIBO SALE AL ENVIAR, y es UNO por trámite**, no uno por boleta.
-  `CobrarService::emitirRecibo()` solo toma los pagos que quedaron sueltos, así
-  que un reenvío no emite otro. Ver [PAGOS.md](PAGOS.md) y [RECIBOS.md](RECIBOS.md).
-- **Aprobar exige** el arancel cubierto y **todas las boletas validadas**
-  (`sinValidar()` cuenta también las observadas).
+- **SE APRUEBA SOLA CUANDO SIREB LA DA POR PAGADA** (`ConfirmarPagoService`), y
+  ahí sale el recibo, uno por documento. La faena se vuelve a medir contra los
+  kilos libres y contra su autorización: si una regla la frena, queda pendiente
+  con el motivo. Ver [PAGOS.md](PAGOS.md) y [RECIBOS.md](RECIBOS.md).
 - **LAS FECHAS DE VIGENCIA LAS ESCRIBE LA APROBACIÓN.** Mientras es borrador
-  están en NULL: el plazo corre desde la firma, no desde que se cargó. La faena
+  están en NULL: el plazo corre desde la aprobación, no desde que se cargó. La faena
   sale ese día y desembarca 30 días después (`PermisoFaena::desembarqueDesde()`);
   la guía vale 5 días contados con hora (`dateTime`).
 - **Eliminar no devuelve el número.** La baja es lógica y el correlativo sigue
@@ -116,8 +111,7 @@ libre para una faena nueva = otorgado − consumido − reservado
 
 **En modo estricto una faena nueva solo puede pedir lo libre.** Con 150 kg de
 saldo y una pendiente de 150, lo libre es 0 y la siguiente no se registra hasta
-que se elimine la pendiente (una en revisión se rechaza primero, y vuelve a
-pendiente). El mensaje dice cuántos kilos están reservados:
+que se elimine la pendiente. El mensaje dice cuántos kilos están reservados:
 `PermisoOperativoException::excedeLibre()`. En modo flexible la reserva se
 muestra y no frena. El ejemplo completo está en
 [REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md), paso 4.
@@ -232,9 +226,7 @@ lógica no la dispara: `EmitirGuiaService::eliminar()` baja el detalle a mano.
 | `GET /panel/faenas` | `faenas.ver` | Listado, con filtro por estado |
 | `GET /panel/faenas/crear` | `faenas.crear` | Formulario. Acepta `?beneficiario=` y `?carnet=` para llegar con todo elegido |
 | `POST /panel/faenas` | `faenas.crear` | Alta, nace pendiente |
-| `POST /panel/faenas/{faena}/pagos` | `caja.cobrar` | Cargar depósitos desde la ficha |
-| `POST /panel/faenas/{faena}/enviar` | `faenas.enviar` | A revisión; sale el recibo |
-| `PATCH /panel/faenas/{faena}/aprobar` · `/rechazar` | `faenas.aprobar` | La firma, o la devolución con motivo |
+| `POST /panel/faenas/{faena}/verificar-pago` | `faenas.crear` | Pregunta a SIREB; si está pagada, la aprueba y emite el recibo |
 | `GET /panel/faenas/{faena}/editar` · `PATCH /panel/faenas/{faena}` | `faenas.editar` | Corregir el borrador. `editar` va ANTES de `/{faena}` o se toma como id |
 | `DELETE /panel/faenas/{faena}` | `faenas.eliminar` | Baja con motivo |
 | `GET /panel/faenas/{faena}/imprimir` | `faenas.imprimir` | El «Permiso por Faena» en PDF. Solo aprobada |
@@ -303,9 +295,9 @@ de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitida
 | `app/Enums/EstadoFaena.php` / `EstadoGuia.php` | El circuito, y qué descuenta o reserva |
 | `app/Enums/CondicionProducto.php`, `MedioTransporte.php`, `TipoTransporte.php` | Las casillas del talonario de la guía |
 | `app/Services/EmitirFaenaService.php` | Emitir, corregir y eliminar la faena; controla los kilos libres |
-| `app/Services/RevisarFaenaService.php` | Enviar, aprobar y rechazar la faena |
+| `app/Services/RevisarFaenaService.php` | Aprobar la faena cuando SIREB la da por pagada (fechas, kilos libres) |
 | `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar y anular la guía |
-| `app/Services/RevisarGuiaService.php` | Enviar, aprobar y rechazar la guía |
+| `app/Services/RevisarGuiaService.php` | Aprobar la guía cuando SIREB la da por pagada (vigencia de 5 días) |
 | `app/Http/Controllers/Panel/FaenaController.php` / `GuiaController.php` | Listado, formulario, ficha y circuito |
 | `resources/js/pages/panel/faenas/`, `resources/js/pages/panel/guias/` | Las pantallas |
 | `app/Models/ProductoHidrobiologico.php`, `ProductoHidrobiologicoController.php` | El catálogo del cuadro D |

@@ -1,30 +1,15 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import {
-    Ban,
-    CalendarX,
-    Check,
-    Clock,
-    IdCard,
-    Pencil,
-    Printer,
-    Receipt,
-    Send,
-    Trash2,
-    Truck,
-    Undo2,
-    User,
-} from 'lucide-react';
+import { Ban, CalendarX, Clock, IdCard, Pencil, Printer, Receipt, Trash2, Truck, User } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { TarjetaPagos } from '@/components/panel/pagos/tarjeta-pagos';
+import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha, fechaHora } from '@/lib/utils';
 import type { PageProps } from '@/types';
-import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
+import type { ReciboDelCupo } from '@/types/aprovechamientos';
 import type { GuiaFicha } from '@/types/guias';
 
 /**
@@ -36,23 +21,17 @@ import type { GuiaFicha } from '@/types/guias';
  */
 export default function VerGuia({
     guia,
-    pagos,
     recibo,
 }: {
     guia: GuiaFicha;
-    pagos: PagoDelCupo[];
     recibo: ReciboDelCupo | null;
 }) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
 
-    const [aprobando, setAprobando] = useState(false);
-    const [rechazando, setRechazando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
     const [anulando, setAnulando] = useState(false);
 
-    const envio = useForm({});
-    const rechazo = useForm({ motivo: '' });
     const borrado = useForm({ motivo: '' });
     const baja = useForm({ motivo: '' });
 
@@ -99,46 +78,7 @@ export default function VerGuia({
                         </Button>
                     )}
 
-                    {/*
-                        EL CIRCUITO, igual que en la faena: presentar es de
-                        ventanilla y firmar es de supervisión. Las tres banderas
-                        llegan resueltas del servidor.
-                    */}
-                    {puede('guias.enviar') && guia.puede_enviarse && (
-                        <Button
-                            onClick={() => envio.post(route('guias.enviar', guia.id), { preserveScroll: true })}
-                            disabled={envio.processing}
-                        >
-                            <Send className="size-4" />
-                            Enviar a revisión
-                        </Button>
-                    )}
 
-                    {puede('guias.aprobar') && guia.puede_revisarse && (
-                        <>
-                            {/* Apagado mientras falte validar alguna boleta, y
-                                el title dice cuántas: el servidor lo exige
-                                igual, y un botón que promete y falla es peor. */}
-                            <Button
-                                onClick={() => setAprobando(true)}
-                                disabled={envio.processing || !guia.puede_aprobarse}
-                                title={
-                                    guia.puede_aprobarse
-                                        ? undefined
-                                        : `Faltan ${guia.pagos_sin_validar} depósito(s) por validar`
-                                }
-                                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                            >
-                                <Check className="size-4" />
-                                Aprobar
-                            </Button>
-
-                            <Button variant="eliminar" onClick={() => setRechazando(true)}>
-                                <Undo2 className="size-4" />
-                                Rechazar
-                            </Button>
-                        </>
-                    )}
 
                     {/*
                         LA GUÍA EN PAPEL sale recién aprobada: hasta la firma no
@@ -327,16 +267,14 @@ export default function VerGuia({
                         </CardContent>
                     </Card>
 
-                    {/* La misma tarjeta que el carnet, el cupo y la faena. */}
-                    <TarjetaPagos
-                        pagos={pagos}
+                    {/* El cobro: se paga en SIREB, igual que los otros tres documentos. */}
+                    <TarjetaRecaudaciones
+                        monto={guia.monto}
+                        sireb={guia.sireb}
                         recibo={recibo}
-                        saldoPendiente={guia.saldo_pendiente}
-                        titular={guia.comercializador ?? 'el titular'}
-                        admitePagos={guia.admite_pagos}
-                        rutaPagar={route('guias.pagar', guia.id)}
-                        permisoEnviar="guias.enviar"
-                        textoAlEnviar="La guía pasa a EN REVISIÓN y se emite el recibo con el total; ampara el traslado recién cuando esté aprobada."
+                        puedeVerificar={guia.puede_verificar_pago}
+                        rutaVerificar={route('guias.verificar-pago', guia.id)}
+                        permiso="guias.crear"
                     />
                 </div>
 
@@ -360,74 +298,7 @@ export default function VerGuia({
                 </Card>
             </div>
 
-            {/* Aprobar pide casilla: es la FIRMA. Desde acá la guía ampara. */}
-            <ConfirmarAccion
-                abierto={aprobando}
-                tono="afirmativo"
-                titulo="Aprobar la guía"
-                descripcion={
-                    <div className="space-y-2">
-                        <p>
-                            La <strong>{guia.etiqueta}</strong> de{' '}
-                            <strong>{guia.comercializador ?? 'el titular'}</strong> queda APROBADA y
-                            ampara el traslado desde este momento.
-                        </p>
-                        <p>
-                            Los días de validez empiezan a correr AHORA, no desde que se cargó el
-                            borrador. <strong>No se puede deshacer.</strong>
-                        </p>
-                    </div>
-                }
-                confirmacion="Verifiqué las boletas contra el extracto del banco y el expediente está completo."
-                textoConfirmar="Aprobar"
-                procesando={envio.processing}
-                onCancelar={() => setAprobando(false)}
-                onConfirmar={() =>
-                    envio.patch(route('guias.aprobar', guia.id), {
-                        preserveScroll: true,
-                        onSuccess: () => setAprobando(false),
-                    })
-                }
-            />
 
-            {/* Rechazar pide motivo y casilla: es la otra mitad de la firma. */}
-            <ConfirmarConMotivo
-                abierto={rechazando}
-                titulo="Rechazar y devolver a ventanilla"
-                descripcion={
-                    <div className="space-y-2">
-                        <p>
-                            La guía vuelve a <strong>PENDIENTE</strong>.
-                        </p>
-                        <p>
-                            Los depósitos quedan intactos y el recibo ya emitido sigue valiendo: se
-                            corrige lo observado y se vuelve a presentar.
-                        </p>
-                    </div>
-                }
-                etiquetaMotivo="Motivo del rechazo"
-                ayuda="Es lo que va a leer quien tenga que corregirlo. Queda en la auditoría con su nombre."
-                placeholder="La boleta 0012345 no figura en el extracto del banco."
-                confirmacion="El expediente vuelve a ventanilla con este motivo escrito, y queda registrado a mi nombre."
-                textoConfirmar="Rechazar"
-                valor={rechazo.data.motivo}
-                onCambiar={(v) => rechazo.setData('motivo', v)}
-                error={rechazo.errors.motivo}
-                procesando={rechazo.processing}
-                onCancelar={() => {
-                    setRechazando(false);
-                    rechazo.reset();
-                }}
-                onConfirmar={() =>
-                    rechazo.patch(route('guias.rechazar', guia.id), {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setRechazando(false);
-                            rechazo.reset();
-                        },
-                    })
-                }
-            />
 
             {/* ELIMINAR: solo el borrador, y el número queda quemado igual. */}
             <ConfirmarConMotivo
@@ -518,7 +389,7 @@ function Situacion({ guia }: { guia: GuiaFicha }) {
      * el estado: así nacieron los carteles que decían «venció» sobre un
      * expediente que recién se estaba armando.
      */
-    if (guia.estado === 'pendiente' || guia.estado === 'en_revision') {
+    if (guia.estado === 'pendiente') {
         return (
             <Marco
                 clase="bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200"

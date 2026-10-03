@@ -31,6 +31,7 @@ class EmitirGuiaService
     public function __construct(
         private readonly CorrelativoService $correlativos,
         private readonly PrecioSireb $precios,
+        private readonly LiquidarSirebService $liquidaciones,
     ) {}
 
     /**
@@ -63,7 +64,7 @@ class EmitirGuiaService
             throw PermisoOperativoException::guiaSinDetalle();
         }
 
-        return DB::transaction(function () use ($carnet, $datos, $renglones, $solicitud): GuiaMovimiento {
+        $guia = DB::transaction(function () use ($carnet, $datos, $renglones, $solicitud): GuiaMovimiento {
             $guia = GuiaMovimiento::create([
                 // La guía cuelga del CARNET: la persona se lee de él.
                 'carnet_id' => $carnet->id,
@@ -98,9 +99,14 @@ class EmitirGuiaService
             // Su llave pública, en la misma transacción: sin código no se
             // puede verificar.
             $guia->asignarCodigo();
+            $this->liquidaciones->preparar($guia);
 
             return $guia->refresh();
         });
+
+        $this->liquidaciones->enviarSinFrenar($guia);
+
+        return $guia;
     }
 
     /**
@@ -119,20 +125,26 @@ class EmitirGuiaService
             throw PermisoOperativoException::guiaSinDetalle();
         }
 
-        return DB::transaction(function () use ($guia, $datos, $renglones): GuiaMovimiento {
+        if (! $guia->puedeEditarse()) {
+            throw PermisoOperativoException::guiaNoSePuedeEditar(mb_strtolower($guia->estado->etiqueta()));
+        }
+
+        // Otra carga es otro cobro: la liquidación vieja se anula antes de tocar nada.
+        $otraLiquidacion = $this->liquidaciones->anularSiCambia(
+            $guia,
+            array_map(fn (array $r): array => ['tarifa_id' => $r['sireb_tarifa_id'], 'cantidad' => (float) $r['cantidad_kg']], $renglones),
+            $guia->arancelCalculado($this->importeDe($renglones)),
+        );
+
+        $guia = DB::transaction(function () use ($guia, $datos, $renglones, $otraLiquidacion): GuiaMovimiento {
             $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
 
-            // Se comprueba con la copia bloqueada, no con la que llegó: entre
-            // que la pantalla se dibujó y llegó el submit, otra ventanilla
-            // pudo enviarla a revisión.
+            // Con la copia bloqueada: entre que la pantalla se dibujó y llegó el
+            // submit, el pago pudo aprobarla.
             if (! $bloqueada->estado->permiteEdicion()) {
                 throw PermisoOperativoException::guiaNoSePuedeEditar(
                     mb_strtolower($bloqueada->estado->etiqueta()),
                 );
-            }
-
-            if (($pagos = $bloqueada->pagos()->count()) > 0) {
-                throw PermisoOperativoException::guiaTienePagos($pagos);
             }
 
             $bloqueada->update([
@@ -153,9 +165,17 @@ class EmitirGuiaService
             $bloqueada->detalles()->delete();
             $this->guardarDetalle($bloqueada, $renglones);
 
+            if ($otraLiquidacion) {
+                $this->liquidaciones->preparar($bloqueada);
+            }
+
             // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
             return $guia->refresh();
         });
+
+        $this->liquidaciones->enviarSinFrenar($guia);
+
+        return $guia;
     }
 
     /**
@@ -167,6 +187,13 @@ class EmitirGuiaService
             throw PermisoOperativoException::motivoObligatorio();
         }
 
+        if (! $guia->puedeEliminarse()) {
+            throw PermisoOperativoException::guiaNoSePuedeEliminar(mb_strtolower($guia->estado->etiqueta()));
+        }
+
+        // Primero SIREB: si no anula la liquidación, no se elimina.
+        $this->liquidaciones->anular($guia, 'Eliminado en Jichi: '.$motivo);
+
         DB::transaction(function () use ($guia, $motivo): void {
             $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
 
@@ -174,10 +201,6 @@ class EmitirGuiaService
                 throw PermisoOperativoException::guiaNoSePuedeEliminar(
                     mb_strtolower($bloqueada->estado->etiqueta()),
                 );
-            }
-
-            if (($pagos = $bloqueada->pagos()->count()) > 0) {
-                throw PermisoOperativoException::guiaTienePagos($pagos);
             }
 
             // A MANO: la FK es CASCADE, pero eso es del MOTOR y `delete()` con

@@ -4,15 +4,11 @@ import type { EstadoCarnet, TipoActor } from '@/types';
  * Tipos del panel principal.
  */
 
-/** Lo que espera a alguien, de un tipo de documento. Las URL ya llegan con el filtro puesto. */
+/** Lo que espera el pago en SIREB, de un tipo de documento. La URL llega con el filtro puesto. */
 export interface Pendiente {
     documento: string;
-    /** Borradores: ventanilla tiene que cobrarlos y enviarlos. */
-    por_enviar: number;
-    /** En revisión: esperan que alguien controle las boletas y firme. */
-    por_firmar: number;
-    url_por_enviar: string;
-    url_por_firmar: string;
+    por_pagar: number;
+    url_por_pagar: string;
 }
 
 /** Los cuatro números del tablero. «Vigente» lo calcula el servidor mirando estado y fecha. */

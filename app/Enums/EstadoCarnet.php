@@ -8,15 +8,12 @@ namespace App\Enums;
 enum EstadoCarnet: string
 {
     /**
-     * Emitido y todavía sin cobrar. Es como NACE toda credencial: el plástico
-     * no se entrega hasta que el arancel esté pagado y firmado.
+     * Emitido y esperando el pago en SIREB. Es como NACE toda credencial: el
+     * plástico no se entrega hasta que el arancel esté pagado.
      */
     case Pendiente = 'pendiente';
 
-    /** Los depósitos cubren el arancel; falta que alguien firme. */
-    case EnRevision = 'en_revision';
-
-    /** Firmado: recién acá el carnet habilita a trabajar. Se llamaba `activo` hasta el 25/09/2026. */
+    /** SIREB confirmó el pago: recién acá el carnet habilita a trabajar. */
     case Aprobado = 'aprobado';
 
     /**
@@ -31,7 +28,6 @@ enum EstadoCarnet: string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
-            self::EnRevision => 'En revisión',
             self::Aprobado => 'Aprobado',
             self::Revocado => 'Revocado',
             self::Vencido => 'Vencido',
@@ -48,7 +44,6 @@ enum EstadoCarnet: string
     {
         return match ($this) {
             self::Pendiente => 'sky',
-            self::EnRevision => 'indigo',
             self::Aprobado => 'emerald',
             self::Revocado => 'rose',
             self::Vencido => 'slate',
@@ -93,41 +88,18 @@ enum EstadoCarnet: string
     }
 
     /**
-     * ¿Se puede revocar? Solo el APROBADO: el pendiente se elimina, el que está en
-     * revisión se rechaza, y el vencido o revocado ya no habilita nada.
+     * ¿Se puede revocar? Solo el APROBADO: el pendiente se elimina, y el vencido
+     * o revocado ya no habilita nada.
      */
     public function permiteRevocacion(): bool
     {
         return $this === self::Aprobado;
     }
 
-    /** ¿Se le pueden cargar depósitos? Solo mientras nadie lo firmó. */
-    public function permitePagos(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /** ¿Se puede mandar a que alguien lo firme? */
-    public function permiteEnvio(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /** ¿Se puede aprobar o rechazar? Solo lo que está presentado. */
-    public function permiteRevision(): bool
-    {
-        return $this === self::EnRevision;
-    }
-
-    /**
-     * Pendiente + en revisión: nadie lo firmó todavía.
-     *
-     * ⚠️ NO ES PERMISO DE ESCRITURA ni de trabajo. Para lo segundo está
-     * `habilita()`, que solo deja pasar APROBADO.
-     */
+    /** Esperando el pago en SIREB. No es permiso de trabajo: para eso, `habilita()`. */
     public function estaAbierto(): bool
     {
-        return $this === self::Pendiente || $this === self::EnRevision;
+        return $this === self::Pendiente;
     }
 
     /**

@@ -4,27 +4,20 @@ namespace App\Http\Controllers\Panel;
 
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoFaena;
-use App\Exceptions\CobroInvalidoException;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\ActualizarFaenaRequest;
 use App\Http\Requests\Panel\EliminarFaenaRequest;
 use App\Http\Requests\Panel\EmitirFaenaRequest;
-use App\Http\Requests\Panel\RechazarFaenaRequest;
-use App\Http\Requests\Panel\RegistrarDepositosRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\ArancelSireb;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
-use App\Models\Pago;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
-use App\Services\CobrarService;
+use App\Services\ConfirmarPagoService;
 use App\Services\EmitirFaenaService;
-use App\Services\RevisarFaenaService;
 use App\Sireb\VistaSireb;
-use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,10 +61,7 @@ class FaenaController extends Controller
                     // «000042» tecleado tal cual no encuentra al 42.
                     ->orWhere('numero_faena', 'like', '%'.ltrim(preg_replace('/\D/', '', $termino), '0').'%'),
             ))
-            // Evita una consulta agregada POR FILA al calcular el saldo, y
-            // resuelve el recibo sin ir a buscarlo de a uno.
-            ->withSum('pagos', 'monto_parcial')
-            ->with(['pagos:id,pagable_type,pagable_id,recibo_id', 'pagos.recibo:id,numero_recibo'])
+            ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
             ->when($filtros['estado'], fn ($q, $estado) => $q->where('permisos_faena.estado', $estado))
             // Lo último cargado, arriba: ver AprovechamientoController::index().
             ->orderByDesc('permisos_faena.created_at')
@@ -300,20 +290,12 @@ class FaenaController extends Controller
         ]);
 
         // El recibo del trámite —uno solo— y cuántas boletas faltan controlar.
-        $recibo = $faena->recibos()->first();
-        $sinValidar = $faena->pagos()->sinValidar()->count();
+        $recibo = $faena->recibo;
 
         return Inertia::render('panel/faenas/ver', [
             'faena' => [
                 ...$this->resumir($faena),
                 'asociacion' => $faena->carnet?->asociacion?->sigla ?? $faena->carnet?->asociacion?->nombre,
-
-                // Las del circuito, resueltas en el servidor: React no vuelve a
-                // evaluar el estado.
-                'puede_enviarse' => $faena->puedeEnviarseARevision(),
-                'puede_revisarse' => $faena->puedeRevisarse(),
-                'puede_aprobarse' => $faena->puedeRevisarse() && $sinValidar === 0,
-                'pagos_sin_validar' => $sinValidar,
 
                 /*
                  * El cupo del que salieron los kilos.
@@ -327,230 +309,40 @@ class FaenaController extends Controller
                 ] : null,
             ],
 
-            // El detalle de lo cobrado: una fila por boleta, con su control.
-            'pagos' => $faena->pagos()
-                // Precargados: si no, cinco depósitos son diez consultas.
-                ->with(['registradoPor:id,name', 'validadoPor:id,name'])
-                ->latest('created_at')
-                ->get()
-                // El trámite se le pone a mano: `admiteControl()` le pregunta
-                // al `pagable`, y sin esto cada fila lo va a buscar a la base.
-                ->each(fn (Pago $p) => $p->setRelation('pagable', $faena))
-                ->map(fn (Pago $p): array => [
-                    'id' => $p->id,
-                    'monto_parcial' => (float) $p->monto_parcial,
-                    'nro_transaccion' => $p->nro_transaccion,
-                    'fecha_deposito' => $p->fecha_deposito?->toDateString(),
-                    'comprobante_url' => $p->comprobante_url,
-                    'cobrado_en' => $p->created_at?->toIso8601String(),
-                    'estado_validacion' => $p->estado_validacion->value,
-                    'estado_validacion_etiqueta' => $p->estado_validacion->etiqueta(),
-                    'estado_validacion_color' => $p->estado_validacion->color(),
-                    'observacion' => $p->observacion,
-                    'registrado_por' => $p->registradoPor?->name,
-                    'validado_por' => $p->validadoPor?->name,
-                    'validado_en' => $p->validado_en?->toIso8601String(),
-                    'puede_validarse' => $p->admiteControl(),
-                    'puede_corregirse' => $p->admiteCorreccion(),
-                ])
-                ->all(),
-
             // El recibo del trámite: uno solo, emitido al enviar a revisión.
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,
                 'monto_total' => (float) $recibo->monto_total,
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
-                'pagos_count' => $recibo->pagos()->count(),
+                'numero_boleta' => $recibo->numero_boleta,
+                'entidad_bancaria' => $recibo->entidad_bancaria,
+                'fecha_pago' => $recibo->fecha_pago?->toDateString(),
             ] : null,
 
-            'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
         ]);
-    }
-
-    /**
-     *  Cargar los depósitos — POST /panel/faenas/{faena}/pagos
-     *
-     * Mismo circuito que el carnet y el cupo: las boletas entran juntas, tienen
-     * que cubrir el arancel entero y, si el operador lo pide, la faena queda
-     * presentada en el mismo acto.
-     */
-    public function pagar(
-        RegistrarDepositosRequest $request,
-        PermisoFaena $faena,
-        CobrarService $caja,
-        RevisarFaenaService $revision,
-    ): RedirectResponse {
-        $datos = $request->validated();
-
-        // ANTES de subir nada: descubrirlo adentro obligaría a borrar los
-        // archivos ya escritos, que una transacción no deshace.
-        if (! $faena->admitePagos()) {
-            return back()->withErrors([
-                'pagos' => CobroInvalidoException::noAdmiteDepositos(
-                    'La '.mb_strtolower($faena->etiqueta),
-                    $faena->estado->etiqueta(),
-                )->getMessage(),
-            ]);
-        }
-
-        $suma = round(array_sum(array_map(
-            static fn (array $p): float => round((float) $p['monto'], 2),
-            $datos['pagos'],
-        )), 2);
-
-        $saldo = $faena->saldoPendiente();
-
-        if ($suma < $saldo) {
-            return back()->withInput()->withErrors([
-                'pagos' => CobroInvalidoException::noCubreElMonto('esta faena', $suma, $saldo)->getMessage(),
-            ]);
-        }
-
-        $subidos = [];
-
-        try {
-            foreach ($datos['pagos'] as $i => $pago) {
-                $subidos[$i] = app(StorageController::class)
-                    ->file($request->file("pagos.{$i}.comprobante"), 'comprobantes');
-            }
-
-            $depositos = [];
-
-            foreach ($datos['pagos'] as $i => $pago) {
-                $depositos[] = [
-                    'monto' => (float) $pago['monto'],
-                    'nro_transaccion' => $pago['nro_transaccion'],
-                    'fecha_deposito' => $pago['fecha_deposito'],
-                    'comprobante' => $subidos[$i],
-                ];
-            }
-
-            $caja->registrarDepositos($faena, $depositos);
-        } catch (CobroInvalidoException $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            return back()->withInput()->withErrors(['pagos' => $e->getMessage()]);
-        } catch (\Throwable $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            throw $e;
-        }
-
-        $faena->refresh();
-        $cuantos = count($datos['pagos']);
-
-        //  Registrar y enviar son un solo acto cuando el arancel queda cubierto
-        $enviada = false;
-
-        if (($datos['enviar'] ?? false) && $faena->puedeEnviarseARevision()) {
-            $revision->enviar($faena);
-            $faena->refresh();
-            $enviada = true;
-        }
-
-        return redirect()
-            ->route('faenas.show', $faena)
-            ->with('exito', match (true) {
-                $enviada => sprintf(
-                    '%d depósito(s) registrado(s) y enviada a revisión. Se emitió el recibo con el '.
-                    'total; queda esperando la firma de quien la aprueba.',
-                    $cuantos,
-                ),
-                $faena->saldoPendiente() <= 0.0 => sprintf(
-                    '%d depósito(s) registrado(s). El arancel quedó cubierto: ya se puede enviar a revisión.',
-                    $cuantos,
-                ),
-                default => sprintf(
-                    '%d depósito(s) registrado(s). Quedan %s Bs por cobrar.',
-                    $cuantos,
-                    number_format($faena->saldoPendiente(), 2, ',', '.'),
-                ),
-            });
-    }
-
-    /**
-     * Enviar a revisión — POST /panel/faenas/{faena}/enviar
-     */
-    public function enviar(PermisoFaena $faena, RevisarFaenaService $revision): RedirectResponse
-    {
-        try {
-            $revision->enviar($faena);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('faenas.show', $faena)
-            ->with('exito', 'Enviada a revisión. Se emitió el recibo con el total de los depósitos; '.
-                'queda esperando la firma de quien la aprueba.');
-    }
-
-    /**
-     * Aprobar — PATCH /panel/faenas/{faena}/aprobar
-     *
-     * Recién acá el permiso autoriza a salir a pescar.
-     */
-    public function aprobar(PermisoFaena $faena, RevisarFaenaService $revision): RedirectResponse
-    {
-        try {
-            $revision->aprobar($faena);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('faenas.show', $faena)
-            ->with('exito', "Faena N° {$faena->numero_legible} aprobada. Ya autoriza la salida.");
-    }
-
-    /**
-     * Rechazar — PATCH /panel/faenas/{faena}/rechazar
-     */
-    public function rechazar(
-        RechazarFaenaRequest $request,
-        PermisoFaena $faena,
-        RevisarFaenaService $revision,
-    ): RedirectResponse {
-        try {
-            $revision->rechazar($faena, $request->validated()['motivo']);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['motivo' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('faenas.show', $faena)
-            ->with('exito', 'Faena devuelta a ventanilla. Los depósitos quedan intactos: se corrige '.
-                'lo observado y se vuelve a presentar.');
     }
 
     //  Auxiliares
 
     /** El precio de hoy de la fila `faena` de Aranceles, o null sin tarifa o sin SIREB. */
+    /**
+     * Verificar pago — POST /panel/faenas/{faena}/verificar-pago
+     *
+     * Pregunta a SIREB; si está pagado, lo aprueba y emite el recibo.
+     */
+    public function verificarPago(PermisoFaena $faena, ConfirmarPagoService $pagos): RedirectResponse
+    {
+        $resultado = $pagos->verificar($faena);
+
+        return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
     private function tarifaDeReferencia(): ?float
     {
         $tarifa = ArancelSireb::de(ConceptoArancel::Faena)?->tarifa_sireb;
 
         return $tarifa === null ? null : (app(VistaSireb::class)->preciosPorTarifa()[$tarifa] ?? null);
-    }
-
-    /**
-     * El recibo del trámite, sin disparar una consulta por fila.
-     *
-     * `Pagable::recibos()` es una CONSULTA y no una relación, así que en un
-     * listado hay que resolverlo desde los pagos ya precargados.
-     */
-    private function reciboDe(PermisoFaena $faena): ?Recibo
-    {
-        if ($faena->relationLoaded('pagos')) {
-            return $faena->pagos->firstWhere('recibo_id', '!=', null)?->recibo;
-        }
-
-        return $faena->recibos()->first();
     }
 
     /**
@@ -560,7 +352,7 @@ class FaenaController extends Controller
      */
     private function resumir(PermisoFaena $faena): array
     {
-        $recibo = $this->reciboDe($faena);
+        $recibo = $faena->recibo;
 
         return [
             'id' => $faena->id,
@@ -608,12 +400,12 @@ class FaenaController extends Controller
             'motivo_sin_autorizar' => $faena->motivoSinAutorizar(),
             'ya_fue_aprobada' => $faena->yaFueAprobada(),
             'puede_imprimirse' => $faena->puedeImprimirse(),
-            'admite_pagos' => $faena->admitePagos(),
+            // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
+            'sireb' => $faena->resumenSireb(),
+            'puede_verificar_pago' => $faena->estado->estaAbierto(),
 
             // El arancel de la salida y cómo va cobrado.
             'monto' => $faena->montoACobrar(),
-            'saldo_pendiente' => $faena->saldoPendiente(),
-            'pagado' => $faena->estaPagado(),
 
             // El recibo existe desde el ENVÍO; null mientras es borrador.
             'recibo_id' => $recibo?->id,

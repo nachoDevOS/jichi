@@ -100,7 +100,7 @@ class PermisoFaenaImpresionController extends Controller
 
         return [
             'numero' => $faena->numero_legible,
-            'recibo' => $faena->recibos()->value('numero_recibo') ?: '',
+            'recibo' => $faena->recibo?->numero_recibo ?: '',
 
             // El monto es la COPIA CONGELADA de la fila, no la tarifa de hoy.
             'monto' => number_format($faena->montoACobrar(), 2, ',', '.'),

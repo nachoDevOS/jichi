@@ -7,15 +7,10 @@ namespace App\Enums;
  */
 enum EstadoAprovechamiento: string
 {
-    /** Otorgado y todavía sin cobrar. Es el borrador: se edita y se elimina. */
+    /** Otorgado y esperando el pago en SIREB. Es el borrador: se edita y se elimina. */
     case Pendiente = 'pendiente';
 
-    /**
-     * Los depósitos están cargados y cubren el monto; falta que alguien firme.
-     */
-    case EnRevision = 'en_revision';
-
-    /** Firmado. Recién acá autoriza a pescar. */
+    /** SIREB confirmó el pago. Recién acá autoriza a pescar. */
     case Aprobado = 'aprobado';
     case Vencido = 'vencido';
     case Agotado = 'agotado';
@@ -30,7 +25,6 @@ enum EstadoAprovechamiento: string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
-            self::EnRevision => 'En revisión',
             self::Aprobado => 'Aprobado',
             self::Vencido => 'Vencido',
             self::Agotado => 'Agotado',
@@ -42,7 +36,6 @@ enum EstadoAprovechamiento: string
     {
         return match ($this) {
             self::Pendiente => 'sky',
-            self::EnRevision => 'indigo',
             self::Aprobado => 'emerald',
             self::Vencido => 'slate',
             self::Agotado => 'amber',
@@ -60,7 +53,7 @@ enum EstadoAprovechamiento: string
 
     /**
      * ¿Se puede revocar? Solo lo firmado que todavía cuenta: aprobado o agotado.
-     * El borrador se elimina, el presentado se rechaza, el vencido ya no autoriza.
+     * El borrador se elimina; el vencido ya no autoriza.
      */
     public function permiteRevocacion(): bool
     {
@@ -76,28 +69,6 @@ enum EstadoAprovechamiento: string
     }
 
     /**
-     * ¿Se pueden CARGAR depósitos contra él?
-     */
-    public function permitePagos(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /**
-     * ¿Se puede mandar a que alguien lo firme?
-     */
-    public function permiteEnvio(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /** ¿Se puede aprobar o rechazar? Solo lo que está presentado. */
-    public function permiteRevision(): bool
-    {
-        return $this === self::EnRevision;
-    }
-
-    /**
      * ¿Se puede borrar la fila entera?
      */
     public function permiteEliminacion(): bool
@@ -105,15 +76,10 @@ enum EstadoAprovechamiento: string
         return $this === self::Pendiente;
     }
 
-    /**
-     * Pendiente + en revisión: nadie lo firmó todavía.
-     *
-     * ⚠️ NO ES PERMISO DE ESCRITURA. Para eso están `permiteEdicion()`,
-     * `permiteEliminacion()` y `permitePagos()`, que solo dejan PENDIENTE.
-     */
+    /** Esperando el pago en SIREB: todavía no autoriza nada. */
     public function estaAbierto(): bool
     {
-        return $this === self::Pendiente || $this === self::EnRevision;
+        return $this === self::Pendiente;
     }
 
     /**

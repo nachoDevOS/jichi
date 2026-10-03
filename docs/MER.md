@@ -42,11 +42,12 @@ propósito y el porqué de cada decisión vive acá.**
                                                  │ una fila x especie│
                                                  └───────────────────┘
 
-    ┌──────────┐        ┌────────────────────────────────────┐
-    │ recibos  │──────< │ pagos  (polimórfico: pagable_type) │
-    └──────────┘        └───────┬────────────────────────────┘
-                                │
-          ┌─────────────┬───────┴─────┬─────────────┐
+    El pago se hace en SIREB. Cada documento guarda su liquidación (`sireb_*`)
+    y, al confirmarse el pago, recibe UN recibo:
+    ┌──────────────────────────────────────────┐
+    │ recibos  (polimórfico: recibible_type)   │  uno por documento
+    └───────┬──────────────────────────────────┘
+          ┌─┴───────────┬─────────────┬─────────────┐
           ▼             ▼             ▼             ▼
        carnets   aprovechamientos  permisos_      guias
                       _pesq         faena      _movimiento
@@ -69,10 +70,10 @@ propósito y el porqué de cada decisión vive acá.**
 
 ```
 1. beneficiario   se registra una vez
-2. cupo           se otorga (nace PENDIENTE) ─┐
-3. carnet         se emite con ese cupo       ├─ se cobran juntos
-4. caja           un recibo cubre los dos ────┘  y el cupo pasa a ACTIVO
-5. faena / guía   se piden, se cobran y se firman igual; recién aprobadas
+2. cupo           se otorga (nace PENDIENTE) y registra su cobro en SIREB
+3. pago en SIREB  pagado y validado allá → APROBADO, con su recibo
+4. carnet         se emite con ese cupo y recorre el mismo camino
+5. faena / guía   igual: se piden, se pagan en SIREB y recién aprobadas
                   autorizan a trabajar
 ```
 
@@ -188,10 +189,9 @@ mintiendo—.
 | `sireb_historial` | json, nullable | Los pares anteriores, igual que en la escala: trait `HistorialSireb` |
 | `estado` | boolean | |
 
-**El precio se copia al cobrar, no se lee de acá al imprimir.** Un carnet emitido
+**El precio se copia al emitir, no se lee de acá al imprimir.** Un carnet emitido
 en marzo a 80 Bs tiene que seguir diciendo 80 Bs en agosto aunque el arancel haya
-subido a 100. Esta columna sirve para armar el cobro; lo cobrado de verdad queda
-en `pagos`, que no se recalcula.
+subido a 100: queda en `carnets.monto` y, una vez pagado, en su recibo.
 
 **No confundirlo con `carnets.tipo_actor`.** El `tipo_actor` DEL CARNET es la
 REGLA —qué habilita el documento, qué puede emitir—; `tipos_carnet` es el
@@ -293,23 +293,27 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `volumen_total_kg` | decimal(12,2) | **Copiado** del techo del tramo |
 | `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar; corregir el borrador lo vuelve a pedir |
 | `sireb_tarifa_id` | string(36) **null** | La tarifa de SIREB de ese monto, como constancia |
+| `sireb_idempotency_key` | uuid **null**, único global | La `Idempotency-Key` de la venta en SIREB. Se guarda ANTES de llamar; corregir con otra tarifa genera otra (02/10/2026) |
+| `sireb_liquidacion_id`, `sireb_codigo_publico` | null | Lo que devuelve SIREB. Null mientras la venta está por enviar |
+| `sireb_estado` | string(20) **null** | `EstadoLiquidacionSireb`: `por_enviar` / `registrada` / `anulada`. Null si nunca se vendió |
+| `sireb_envio` | json **null** | Constancia: la clave, lo enviado, cuándo, y la respuesta o el error; al anular, el motivo. Las versiones anteriores quedan en `auditorias` |
 | `tipo_embarcacion` | string(120) | El renglón del talonario. **Obligatorio** |
 | `estado` | string(20) | `EstadoAprovechamiento` |
 | `fecha_solicitud` | date | El día que la persona lo pidió |
-| `fecha_emision` | date **null** | El día que lo firmaron. NULL hasta aprobar |
+| `fecha_emision` | date **null** | El día que se aprobó (pago confirmado). NULL hasta aprobar |
 | `fecha_vencimiento` | date | Vence con la gestión |
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO ──▶ AGOTADO | VENCIDO
-(borrador)   ▲               │                        │            │
-             └──[rechazar]───┘                        └─[revocar]──┴──▶ REVOCADO
+PENDIENTE ──(pagada en SIREB)──▶ APROBADO ──▶ AGOTADO | VENCIDO
+(borrador)                          │            │
+                                    └─[revocar]──┴──▶ REVOCADO
 
-  editar     ✔               ✘                     ✘          ✘        ✘        ✘
-  eliminar   ✔               ✘                     ✘          ✘        ✘        ✘
-  pagos      ✔               ✘                     ✘          ✘        ✘        ✘
-  faenas     ✘               ✘                     ✔          ✘        ✘        ✘
-  revocar    ✘               ✘                     ✔          ✔        ✘        ✘
-  imprimir   ✘               ✘                     ✔          ✔        ✔        ✘
+            PENDIENTE   APROBADO   AGOTADO   VENCIDO   REVOCADO
+  editar       ✔           ✘          ✘         ✘         ✘
+  eliminar     ✔           ✘          ✘         ✘         ✘
+  faenas       ✘           ✔          ✘         ✘         ✘
+  revocar      ✘           ✔          ✔         ✘         ✘
+  imprimir     ✘           ✔          ✔         ✔         ✘
 ```
 
 **`revocado` (27/09/2026)** no agrega columnas: el motivo va a `auditorias`, como
@@ -319,30 +323,14 @@ vigencia mira a la autorización (`Carnet::estaVigente()`, `PermisoFaena::estaVi
 y los `scopeVigentes()`). Las reglas completas están en
 [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#una-autorización-vigente-por-persona-y-la-revocación--27092026).
 
-**Se llamaba `activo` y pasó a `aprobado` el 20/09/2026**, a pedido: en este
-circuito el estado no dice «está andando» sino que ALGUIEN LO FIRMÓ, y eso es lo
-que el operador busca en la columna.
+**Se llamaba `activo` y pasó a `aprobado` el 20/09/2026**, a pedido.
 
-**Nace PENDIENTE, y de ahí no sale por cobrarse.** Cobrarlo entero habilita el
-ENVÍO; lo que lo aprueba es la firma, con las boletas ya controladas. Ver
-`RevisarCupoService`.
-
-**LOS DEPÓSITOS ENTRAN TODOS JUNTOS Y CUBRIENDO EL MONTO.** Se admiten varias
-boletas —la persona depositó en dos veces— pero se cargan en un solo acto y
-tienen que sumar el saldo: `CobrarService::registrarDepositos()` mira el
-CONJUNTO y rechaza lo que no cubra. Un parcial guardado dejaba el expediente a
-medio cobrar, sin recibo, sin poder enviarse y sin ninguna señal fuera de la
-ficha.
-
-**De MÁS sí se admite, y es la diferencia con Caja.** La boleta del banco dice
-lo que dice: si depositaron 170 por un trámite de 165, el excedente queda a
-favor de la entidad y el trámite se presenta igual. Con el tope puesto —el que
-sigue valiendo en Caja, `excedeElSaldo()`— ese expediente quedaba trabado con la
-plata ya depositada y sin forma de cargarla. Ver
-[docs/modulos/PAGOS.md](modulos/PAGOS.md).
+**Nace PENDIENTE y pasa a APROBADO cuando SIREB confirma el pago** (02/10/2026):
+lo hace `ConfirmarPagoService`, que llama a `RevisarCupoService::aprobar()`. No
+hay depósitos ni firma en Jichi.
 
 **DOS FECHAS, Y NO UNA.** `fecha_solicitud` es el día que la persona presentó el
-pedido y la escribe el alta; `fecha_emision` es el día que alguien lo firmó y la
+pedido y la escribe el alta; `fecha_emision` es el día que se aprobó y la
 escribe `RevisarCupoService::aprobar()`. Estaban colapsadas en una sola columna,
 escrita al crear: la ficha decía «Otorgado el 20/09» sobre un expediente que
 nadie había aprobado —y que podía terminar rechazado—. Por eso `fecha_emision`
@@ -410,6 +398,7 @@ bajo su nombre.
 | `tipo_actor` | string(20) | `TipoActor`: pescador / comercializador |
 | `monto` | decimal(10,2) | **Copia congelada** del precio de SIREB al emitir (y al corregir el borrador). Es lo que lee `montoACobrar()`: un cambio de tarifa después no toca lo ya emitido (30/09/2026) |
 | `sireb_tarifa_id` | uuid, nullable | La tarifa de SIREB de ese precio |
+| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
 | `estado` | string(20) | `EstadoCarnet` |
 
 **EL CÓDIGO YA NO ES UNA COLUMNA DE ESTA TABLA.** Vivía en `codigo_carnet` y se
@@ -460,7 +449,7 @@ igual que el cupo el 20/09—: lo que dice la columna es que ALGUIEN LO FIRMÓ.
 **REVOCAR: solo el APROBADO, y sus faenas siguen** (25/09/2026). Es el camino de
 la reposición por extravío: se revoca con motivo desde la ficha, el QR pasa a
 «no vigente», y con el mismo cupo se emite el nuevo. Las faenas ya emitidas no
-se tocan. Un pendiente se elimina y uno en revisión se rechaza — ver
+se tocan. Un pendiente se elimina — ver
 `EstadoCarnet::permiteRevocacion()`.
 
 ---
@@ -490,6 +479,7 @@ producto.
 | `numero_faena` | int | Correlativo **global y continuo**. Lo pone el sistema |
 | `monto` | decimal(10,2) | Copia congelada del precio de SIREB al emitir |
 | `sireb_tarifa_id` | uuid, null | La tarifa de SIREB de ese precio (30/09/2026) |
+| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
 | `kilos_extraidos` | decimal(12,2) | |
 | `embarcacion`, `propietario`, `comandante_barco` | string, **null** | Renglones del papel |
 | `matricula_naval`, `nro_kardex` | string, **null** | Renglones del papel |
@@ -521,14 +511,11 @@ no puede mover lo que dice un papel ya entregado. `PermisoFaena::montoACobrar()`
 lee la columna. El precio lo pide `EmitirFaenaService` a SIREB al emitir, con la
 fila `faena` de `aranceles_sireb` (30/09/2026; antes salía del `.env`).
 
-**LA FAENA SE COBRA Y SE FIRMA, igual que el carnet y el cupo —20/09/2026—.**
-Antes nacía ACTIVA y autorizaba en el acto: se emitía el papel sin que hubiera
-entrado un peso. Hoy recorre el mismo circuito que los otros dos trámites:
+**LA FAENA SE PAGA ANTES DE VALER, igual que el carnet y el cupo.** Antes nacía
+ACTIVA y autorizaba en el acto. Hoy recorre el mismo circuito que los otros:
 
 ```
-PENDIENTE ──[depósitos]──▶ [enviar] ──▶ EN REVISIÓN ──[aprobar]──▶ APROBADO
-   ▲                                         │          (autoriza la salida)
-   └──────────────[rechazar, con motivo]─────┘
+PENDIENTE ──(pagada en SIREB)──▶ APROBADO (autoriza la salida)
 ```
 
 **El estado firmado se guarda como `aprobado`, no `activo`** —25/09/2026, igual
@@ -543,15 +530,15 @@ escribía en cascada la revocación de su autorización; ya nada lo escribe: una
 **«Sin efecto»** (`PermisoFaena::sinEfecto()`). Se conserva en el enum por si
 quedó alguna fila así.
 
-`PermisoFaena` usa el trait `Pagable`, el arancel sale de SIREB (fila `faena` de
-`aranceles_sireb`; sin tarifa o sin SIREB no se emite) y el recibo se emite AL ENVIAR, con todos los depósitos sueltos, como
-en los otros dos. El circuito vive en `RevisarFaenaService`.
+`PermisoFaena` usa el trait `LiquidableSireb`, el arancel sale de SIREB (fila
+`faena` de `aranceles_sireb`; sin tarifa o sin SIREB no se emite) y el recibo se
+emite al aprobarse. La aprobación vive en `RevisarFaenaService::aprobar()`.
 
-**Los kilos se DESCUENTAN desde la firma y se RESERVAN desde el registro.**
+**Los kilos se DESCUENTAN desde la aprobación y se RESERVAN desde el registro.**
 `EstadoFaena::consumeCupo()` deja pasar solo a la **aprobada** y a la
 **completada**: es lo que se resta del saldo y lo único que lleva el cupo a
-`agotado`. `EstadoFaena::reservaCupo()` deja pasar a la **pendiente** y a la
-**en revisión**: no restan del saldo, pero apartan sus kilos, y en modo estricto
+`agotado`. `EstadoFaena::reservaCupo()` deja pasar a la **pendiente**: no resta
+del saldo, pero apartan sus kilos, y en modo estricto
 una faena nueva solo puede pedir lo libre —`AprovechamientoPesq::libreKg()` =
 saldo − reservado—. El ejemplo está en
 [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#paso-4--la-operativa-del-pescador-permisos-de-faena).
@@ -632,6 +619,7 @@ salida no ocurrió.
 | `asociacion_id` | FK RESTRICT | El aval impreso, COPIADO del carnet |
 | `numero_guia` | unsigned, único **global** | Correlativo **continuo**: `000308` |
 | `monto` | decimal(10,2) | Total del cuadro D al emitir, con el descuento |
+| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, un ítem por renglón del cuadro D (tarifa por kilo × kilos); igual que en `aprovechamientos_pesq` (02/10/2026) |
 | `origen` / `destino` | string(160) | Bloque B del papel |
 | `origen_*` / `destino_*` | string(100), nullable | Departamento, provincia, distrito o cuenca |
 | `medio_transporte` | string(20), nullable | `MedioTransporte`: el casillero 10 |
@@ -700,20 +688,15 @@ o se le quitaría al transportista casi un día.
 **EL CIRCUITO ES EL MISMO DEL CARNET, EL CUPO Y LA FAENA** —desde el 22/09/2026—:
 
 ```
-PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ APROBADA ──▶ vence a los 5 días
-(en la base: `aprobado`, igual que carnet, cupo y faena — antes `activa`)
-(borrador)       │           │                        │
-                 │           └──[rechazar]────────────┘  └──[anular]──▶ ANULADA
-(el estado CERRADA y «registrar llegada» se quitaron el 28/09/2026)
-                 └── acá sale el RECIBO
+PENDIENTE ──(pagada en SIREB)──▶ APROBADA ──▶ vence a los 5 días
+(en la base: `aprobado`)              └──[anular]──▶ ANULADA
+                                      └── acá sale el RECIBO
 ```
 
 Lo decide `EstadoGuia`, no el controlador: `permiteEdicion()`,
-`permiteEliminacion()`, `permiteEnvio()`, `permiteRevision()` y `admitePagos()`.
-Editar y eliminar valen SOLO en pendiente y **sin un depósito cargado** —lo
-suma `GuiaMovimiento::puedeEditarse()`—: un depósito significa que el
-comerciante pagó por ESTE traslado, y mover el peso o la piscicultura después
-cambiaría lo que se cobró.
+`permiteEliminacion()`, `permiteAnulacion()` y `estaAbierto()`. Editar y
+eliminar valen SOLO en pendiente, y anulan antes la liquidación en SIREB (si ya
+tiene un pago allá, SIREB no deja y no se corrige).
 
 > **ANULAR Y ELIMINAR NO SON LO MISMO.** Eliminar es sobre el BORRADOR —la fila
 > se dio de baja y nunca hubo papel—; anular es sobre una guía YA FIRMADA, cuyo
@@ -784,14 +767,19 @@ inventa una identidad que el talonario no tiene.
 
 ---
 
-### `recibos` — la cabecera del comprobante
+### `recibos` — el comprobante de un documento pagado
+
+*(02/10/2026: ya no cuelga de `pagos`, que se retiró; lo emite
+`ConfirmarPagoService` cuando SIREB confirma el pago.)*
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `beneficiario_id` | FK RESTRICT | A nombre de quién sale |
+| `recibible_type` + `recibible_id` | polimórfico, **únicos juntos** | El documento pagado: un documento, un recibo |
 | `numero_recibo` | string(40), único | Correlativo **continuo**: `000016` |
-| `monto_total` | decimal(12,2) | Suma **congelada** |
+| `monto_total` | decimal(12,2) | Lo pagado en SIREB, **congelado** |
 | `concepto` | text | Tal como se imprime |
+| `numero_boleta`, `entidad_bancaria`, `fecha_pago` | null | La boleta tal como la validó SIREB, copiada: es lo que el papel imprime |
 
 **Por qué el recibo es una tabla y no se arma al vuelo.** Porque `numero_recibo`
 es un CORRELATIVO DE CAJA, y un correlativo es justamente el dato que no se puede
@@ -804,8 +792,8 @@ que daba dos recibos con el mismo número en gestiones distintas; el papel del
 talonario no dice el año por ningún lado, así que en el archivo eran
 indistinguibles. Mismo tratamiento que `permisos_faena.numero_faena`.
 
-Lo reserva `CorrelativoService::siguienteContinuo()` bajo la serie
-`CobrarService::SERIE` —que es la CLAVE del contador, no lo que se imprime— y lo
+Lo reserva `CorrelativoService::siguienteContinuo()` bajo la serie `REC`
+(`ConfirmarPagoService`) —que es la CLAVE del contador, no lo que se imprime— y lo
 rellena `CorrelativoService::rellenar()`. Continuo se implementa guardando la
 serie bajo el **año 0**, que ninguna gestión real ocupa.
 
@@ -813,8 +801,8 @@ serie bajo el **año 0**, que ninguna gestión real ocupa.
 Con ancho fijo el orden alfabético ES el numérico, así que
 `Recibo::scopeOrdenDeSerie()` sigue ordenando bien.
 
-El **monto** y el **concepto** sí son inmutables: se congelan al emitir, así que
-corregir un abono después no cambia el papel entregado.
+El **monto**, el **concepto** y la **boleta** sí son inmutables: se congelan al
+emitir.
 
 **El número va como string y no como entero** aunque el talonario lo escriba
 pelado: la serie lleva prefijo y año, y el año que viene el contador vuelve a 1.
@@ -830,13 +818,8 @@ inmutable** —una reimpresión puede no decir lo mismo que el papel entregado�
 **se perdió emitir a nombre de un tercero**, que era lo que habilitaban las dos
 columnas copiadas.
 
-Como el titular sale de lo cobrado y no de un campo tipeado, un recibo no puede
-amparar trámites de dos personas: `CobrarService::titularDe()` lo rechaza.
-
-**`monto_total` también se guarda, y no es redundante**: es la suma de los pagos en
-el momento de emitir. Recalcularla al leer haría que el papel entregado cambiara si
-después se corrige un abono. Ver `Recibo::montoCalculado()` para el contraste entre
-lo impreso y lo que hay hoy.
+El titular es el del documento pagado (`titularSireb()`): un recibo es de un
+documento y de una persona.
 
 ---
 
@@ -847,14 +830,13 @@ lo impreso y lo que hay hoy.
 | `codigo` | string(16), **único global** | 16 al azar, **sin prefijo** |
 | `codigable_type` + `codigable_id` | polimórfico, **únicos juntos** | Un documento, un código |
 
-**Una tabla y no una columna por tabla.** Es el mismo argumento que sostiene a
-`pagos`: el número tiene que ser único **entre todos los documentos**, no dentro
-de cada uno. Partido en cinco columnas, dos papeles de tipo distinto podrían
+**Una tabla y no una columna por tabla.** El número tiene que ser único **entre
+todos los documentos**, no dentro de cada uno. Partido en cinco columnas, dos papeles de tipo distinto podrían
 llevar el mismo código y `/verificar` no sabría cuál mostrar. Con un solo índice
 lo garantiza el motor, y por eso el código **no lleva prefijo**: no hace falta un
 espacio de nombres si la unicidad es global.
 
-El costo es el mismo que el de `pagos`: **se pierde la clave foránea**. La
+El costo de ser polimórfica: **se pierde la clave foránea**. La
 integridad la sostienen la aplicación y el índice único, no el motor.
 
 **16 caracteres del alfabeto sin `I L O S 0 1 5`** —se confunden de a pares, y el
@@ -888,163 +870,7 @@ adivina cualquiera probando el siguiente.
 
 ---
 
-### `pagos` — el detalle, abono por abono
-
-| Columna | Tipo | Nota |
-| --- | --- | --- |
-| `recibo_id` | FK **CASCADE**, **nullable** | En NULL hasta que el trámite emite su recibo |
-| `registrado_por` | FK users, nullable | Quién lo cargó en el mostrador |
-| `validado_por` | FK users, nullable | Quién controló la boleta |
-| `pagable_type` / `pagable_id` | morphs | Carnet, cupo, faena o guía |
-| `monto_parcial` | decimal(12,2) | **Este abono**, no el total |
-| `nro_transaccion` | string(60), **único** | El número de la boleta del banco |
-| `fecha_deposito` | date | La que dice la boleta, no la de carga |
-| `comprobante` | string | Ruta de la foto o el PDF de la boleta |
-| `estado_validacion` | string(20) | `pendiente` \| `validado` \| `observado` |
-| `observacion` | string, nullable | Por qué se observó |
-| `validado_en` | timestamp, nullable | Cuándo se miró la boleta |
-
-**Por qué es polimórfica.** Se cobran tres cosas distintas y las tres se pagan
-igual. Una tabla por cada una obligaría a repetir el mismo circuito de caja tres
-veces, y peor: `numero_recibo` dejaría de ser único global, así que el mismo papel
-podría amparar un carnet y una guía sin que nada lo impida.
-
-> ⚠️ **El costo: se pierde la clave foránea.** El motor no puede exigir que
-> `pagable_id` exista, porque no sabe en qué tabla buscarlo. La integridad la
-> sostienen los RESTRICT de las otras tablas y la aplicación, no la base.
-
-> ⚠️ **No se precarga con `with('pagable.beneficiario')`.** Eloquent no sabe qué
-> es `pagable` hasta que lee la fila, así que lo escrito así se **ignora en
-> silencio** y el N+1 sigue ahí. Va con `morphWith`, declarando qué traer para
-> cada tipo. Ver `CajaController::index()`.
-
-**CASCADE y no RESTRICT, al revés que en el resto del sistema**: un pago que
-perdió su recibo no se puede imprimir ni entra en ningún arqueo. Si algún día se
-anula un recibo entero, su detalle se va con él.
-
-> ⚠️ **`recibo_id` ES NULLABLE, Y ES LO QUE SOSTIENE «UN RECIBO POR TRÁMITE».**
->
-> El aprovechamiento es un TRÁMITE, y su comprobante es UNO SOLO con el total de
-> todos los depósitos: la persona entrega sus boletas —una o cinco— y se lleva un
-> papel. Ese papel se emite al pasar a **EN REVISIÓN**, que es cuando el
-> expediente se presenta; hasta entonces los depósitos ya están cargados y
-> todavía no hay recibo que ponerles.
->
-> ```
-> PENDIENTE   ──< pago 330,00 (boleta 1242134)   recibo_id NULL
->             ──< pago  82,50 (boleta 42341234)  recibo_id NULL
->      │
-> [enviar a revisión]  ──▶  recibo 000001 (412,50) ──< los dos pagos
-> ```
->
-> Exigiéndolo desde el INSERT —como estaba— cada depósito tenía que traer su
-> propio recibo para poder escribirse, y eso es exactamente lo que estaba mal:
-> **dos boletas de un mismo cupo salían como 000001 y 000002**, se
-> gastaban dos números de una serie que Contabilidad audita y el arqueo del día
-> mostraba dos cobros donde hubo uno.
->
-> **En Caja llega lleno desde el primer momento**: ahí se cobra y se entrega el
-> papel en el mismo acto. Los dos caminos conviven, y por eso la columna admite
-> NULL en vez de haberse movido a otro lado.
->
-> Lo escriben `CobrarService::registrarDepositos()` (lo deja en NULL) y
-> `CobrarService::emitirRecibo()` (lo llena), que llama
-> `RevisarCupoService::enviar()` dentro de su misma transacción: o el cupo se
-> presenta CON su papel o no se presenta.
->
-> Consecuencia para quien consulte la tabla: **un pago sin `recibo_id` es plata
-> que entró y todavía no tiene comprobante**, no un dato roto. Suma en el arqueo
-> —`CajaController::arqueoDelDia()` cuenta pagos, no recibos— y el listado de
-> Caja lo muestra como «Sin recibo».
-
-**NO HAY COLUMNA `metodo_pago`, y no es un olvido.** En esta unidad no se cobra
-en efectivo ni por QR: **todo pago es un depósito bancario**. Una columna con un
-solo valor posible no informa nada, y peor, invita a suponer que alguna vez hubo
-otra cosa. Por eso las tres columnas de la boleta son OBLIGATORIAS.
-
-> ⚠️ **`estado_validacion` NO ES EL ESTADO DEL PAGO: ES EL DE SU CONTROL.**
->
-> ```
-> PENDIENTE ──▶ VALIDADO    la boleta cuadra con el extracto del banco
->     ▲     └─▶ OBSERVADO   no cuadra, con el motivo escrito
->     └──[corregir]──┘
-> ```
->
-> Que el dinero entró ya lo dice que la fila exista. Esto contesta si alguien
-> MIRÓ esa boleta contra el extracto y qué encontró.
->
-> **Un OBSERVADO sigue sumando en `Pagable::montoPagado()`**: está cargado y la
-> plata está; lo que se puso en duda es si la boleta respalda lo que dice.
-> Sacarlo de la suma dejaría al trámite figurando sin cubrir por una observación
-> que puede estar equivocada.
->
-> **Un observado no se valida: se corrige.** `EstadoValidacionPago::admiteControl()`
-> solo deja pasar lo que nadie miró, así que el botón «Validar» no existe sobre
-> él. Darlo por bueno sin que el dato cambie es aprobar justo lo que se marcó
-> como malo. Al corregirlo vuelve a PENDIENTE y se le borra el control entero
-> —`validado_por` y `validado_en` incluidos—: quien validó lo hizo sobre otros
-> números.
->
-> **El control es parte de la REVISIÓN.** Solo corre con el trámite EN REVISIÓN:
-> en pendiente el expediente todavía puede cambiar entero, y aprobado ya no
-> admite reparos. Ver `AprovechamientoPesq::admiteControlDePagos()`.
->
-> **Y frena la aprobación**: `RevisarCupoService::aprobar()` exige las tres cosas
-> —estado, monto cubierto y **todas las boletas validadas**—. Sin la tercera, la
-> validación sería decorativa.
-
-**QUIÉN CARGÓ Y QUIÉN VALIDÓ VAN EN DOS COLUMNAS DISTINTAS.** No son el mismo
-acto ni la misma responsabilidad: uno tipeó la boleta en el mostrador, el otro la
-comparó contra el extracto y la dio por buena. En una sola, «quién responde por
-esta plata» deja de tener respuesta. Y son dos PERMISOS distintos —
-`pagos.corregir` de ventanilla, `pagos.controlar` de supervisión— porque con uno
-solo la misma persona objetaría y resolvería su propia objeción.
-
-Van en `pagos` y no solo en `auditorias` porque son un DATO del pago: se muestran
-en la ficha y se filtran. La auditoría dice qué pasó; esto dice quién responde.
-
-**Y por eso el arqueo del día son DOS números, no un reparto por método:**
-
-| Número | Qué responde |
-| --- | --- |
-| `created_at` de hoy | Lo CARGADO: cuadra el trabajo del día |
-| `fecha_deposito` de hoy | Lo DEPOSITADO: se cruza contra el extracto del banco |
-
-Un depósito hecho el viernes y registrado el lunes entra en el primero y no en el
-segundo, y esa diferencia es justamente la que hay que poder ver.
-
-**LA BOLETA DEL BANCO VIVE EN EL PAGO, no en el recibo.** Si la persona hizo
-dos depósitos, son dos boletas distintas y cada una respalda su monto; guardada
-en el recibo, la segunda pisaría a la primera.
-
-`nro_transaccion` es **único global entre los pagos vivos**, con índice parcial
-`WHERE deleted_at IS NULL`. Es lo que impide
-cargar la misma boleta dos veces —contra el mismo trámite o contra otro—, que es
-la forma más fácil de que algo figure pagado sin que haya entrado la plata. El parcial deja
-fuera las filas dadas de baja, para que un cobro anulado libere su boleta.
-
-**Cuando un mismo depósito cubre varias líneas**, la segunda en adelante llevan
-el número con un sufijo —«0012345678-2»—, porque es único global y la columna ya
-no admite NULL. Se sigue leyendo cuál es la boleta, y el índice no choca.
-
-> El archivo lo sube `StorageController::file()` —regla 11— **antes de abrir la
-> transacción**, porque un rollback no deshace escrituras en disco. Si el cobro
-> falla, el `catch` lo borra con `Archivos::borrar()`.
-
-**Por qué `monto_parcial` y no `monto`.** Porque el nombre dice la regla: un
-trámite se puede pagar en cuotas. Un carnet de 80 Bs admite dos filas de 40, cada
-una con su recibo y su fecha. **Lo que se debe NO se guarda en ninguna columna**:
-es el precio menos la suma de estas filas, y se calcula al leer con el trait
-`Pagable` — guardado, quedaría desfasado en cuanto alguien corrija un abono.
-
-**`morphs()` crea las dos columnas MÁS el índice compuesto**
-`(pagable_type, pagable_id)`, que es el que resuelve la consulta caliente:
-«cuánto se pagó de ESTE carnet». En ese orden y no al revés, porque el tipo es lo
-que primero acota.
-
----
-
-## 3. Borrado lógico: las doce tablas lo tienen
+## 3. Borrado lógico: todas las tablas del dominio lo tienen
 
 **Todas** las tablas del dominio llevan `softDeletes()` y su modelo usa el trait.
 Nada del dominio se borra de verdad: se da de baja, la fila queda con
@@ -1072,6 +898,7 @@ o queda quemado:
 | `guias_movimiento (numero_guia)` | **global** | La hoja del talonario se gastó |
 | `recibos.numero_recibo` | **global** | Correlativo que Contabilidad audita: el hueco es lo que la hace auditable |
 | `permisos_faena (numero_faena)` | **global** | La hoja del talonario se gastó |
+| `aprovechamientos_pesq.sireb_idempotency_key` | **global** | Ya viajó a SIREB: reusarla devolvería la venta vieja |
 
 > El criterio en una línea: **el catálogo libera, el papel entregado no.**
 
@@ -1085,11 +912,9 @@ global excluye lo dado de baja. La de «una bolsa vigente por persona» es la qu
 importa acá: si NO excluyera las bajas, dar de baja un cupo dejaría a esa persona
 sin poder recibir otro nunca más.
 
-> ⚠️ **`pagos.recibo_id` es `cascadeOnDelete`, y eso es del MOTOR: no se dispara
-> con una baja lógica.** Dar de baja un recibo dejaría sus pagos vivos y visibles
-> en caja, colgando de un comprobante que ya no está. Hoy nada da de baja
-> recibos; el día que algo lo haga, la baja tiene que arrastrar el detalle a
-> mano.
+> ⚠️ **`guia_detalles.guia_movimiento_id` es `cascadeOnDelete`, y eso es del
+> MOTOR: no se dispara con una baja lógica.** Dar de baja una guía dejaría sus
+> renglones vivos: `EmitirGuiaService` los baja a mano.
 
 ---
 
@@ -1100,9 +925,9 @@ sin poder recibir otro nunca más.
 | **Enums en columnas `string`**, nunca ENUM nativo de PostgreSQL | Sumar un estado no exige `ALTER TYPE` ni bloquear la tabla. Los valores válidos los impone el enum de PHP y el cast del modelo |
 | **Todas las tablas del dominio llevan `softDeletes()`** | Cada fila respalda un papel con el nombre de alguien: se da de baja, no se borra |
 | **Índices únicos con borrado lógico: parciales en catálogos, globales en papeles** | Ver la sección 3 |
-| **RESTRICT por defecto**, CASCADE solo en `pagos → recibos` | Borrar no puede llevarse por delante un historial que respalda papeles entregados |
+| **RESTRICT por defecto**, CASCADE solo en `guia_detalles → guias_movimiento` | Borrar no puede llevarse por delante un historial que respalda papeles entregados |
 | **El orden del `Schema::create()` es siempre el mismo**: `id` → claves foráneas → datos → estado → fechas del negocio → índices → `timestamps()` → `softDeletes()` | Las diez tablas terminan iguales. No cambia el esquema: es convención de lectura |
-| **Lo copiado se congela** (`volumen_total_kg`, `modalidad`, `monto_total`, `concepto`) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
+| **Lo copiado se congela** (`volumen_total_kg`, `modalidad`, `monto`, `monto_total`, `concepto`, la boleta del recibo) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
 | **Lo calculable NO se guarda** (saldo en kg, saldo en Bs) | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
 
 **Tablas de soporte**, fuera del dominio: `users`, `correlativos`,

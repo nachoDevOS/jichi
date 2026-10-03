@@ -30,6 +30,13 @@ return new class extends Migration
 
             $table->decimal('monto', 10, 2)->default(0)->comment('Copia congelada del arancel');
 
+            // La liquidación en SIREB (ahí se paga). La clave se guarda ANTES de llamar. Ver MER.md.
+            $table->uuid('sireb_idempotency_key')->nullable()->unique()->comment('Header Idempotency-Key');
+            $table->uuid('sireb_liquidacion_id')->nullable()->comment('Id de la liquidación en SIREB');
+            $table->string('sireb_codigo_publico', 40)->nullable()->comment('Con el que se paga en SIREB');
+            $table->string('sireb_estado', 20)->nullable()->comment('EstadoLiquidacionSireb');
+            $table->json('sireb_envio')->nullable()->comment('Lo enviado a SIREB y su respuesta o error');
+
             // BLOQUE B — la ubicación, ida y vuelta.
             $table->string('origen', 160);
             $table->string('origen_departamento', 100)->nullable();

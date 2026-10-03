@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autorización y pago en SIREB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+    --bg: #0b1118;
+    --lienzo: #0f1720;
+    --tinta: #e6edf5;
+    --apagado: #8a97a8;
+    --linea: #263241;
+    --panel: #22c5dc;
+    --jichi: #34d399;
+    --sireb: #a78bfa;
+    --recaud: #fb7185;
+    --ok: #4ade80;
+    --aviso: #fbbf24;
+    --mal: #f87171;
+    --nodo: #121c27;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--tinta);
+    font-family: 'Instrument Sans', system-ui, sans-serif;
+}
+main { max-width: 1480px; margin: 0 auto; padding: 28px 16px 40px; }
+h1 { font-size: 26px; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+h1::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--panel); box-shadow: 0 0 12px var(--panel); }
+.bajada { color: var(--apagado); margin: 0 0 20px; font-size: 14px; }
+.lienzo {
+    background: var(--lienzo) radial-gradient(circle, #1b2633 1px, transparent 1px) 0 0 / 22px 22px;
+    border: 1px solid var(--linea);
+    border-radius: 14px;
+    overflow-x: auto;
+}
+svg { display: block; min-width: 1100px; width: 100%; height: auto; }
+.carril { fill: none; stroke: #2b3a4b; stroke-dasharray: 6 6; }
+.carril-ex { fill: none; stroke: #6b2d33; stroke-dasharray: 6 6; }
+.titulo-carril { fill: var(--apagado); font: 500 12px 'IBM Plex Mono', monospace; }
+.fase { fill: #7c8aa0; font: 500 11px 'IBM Plex Mono', monospace; }
+.fase-fondo { fill: #141f2b; }
+.nodo rect { fill: var(--nodo); stroke-width: 1.6; }
+.nodo .t { fill: var(--tinta); font: 700 14px 'IBM Plex Mono', monospace; }
+.nodo .s { fill: var(--apagado); font: 400 10.5px 'IBM Plex Mono', monospace; }
+.nodo .chip { font: 600 9px 'IBM Plex Mono', monospace; }
+.flecha { fill: none; stroke-width: 1.8; }
+.etq { fill: #9fb0c3; font: 400 10.5px 'IBM Plex Mono', monospace; }
+.leyenda, .notas { margin-top: 18px; display: grid; gap: 10px; }
+.leyenda { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); font-size: 13px; }
+.leyenda span { display: inline-flex; align-items: center; gap: 8px; }
+.leyenda i { width: 18px; height: 12px; border-radius: 3px; border: 2px solid; display: inline-block; }
+.notas { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.nota { background: var(--nodo); border: 1px solid var(--linea); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; line-height: 1.5; }
+.nota b { color: var(--tinta); }
+.nota code { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #c4b5fd; }
+</style>
+</head>
+<body>
+<main>
+    <h1>Autorización de Pesca: registro, pago en SIREB y aprobación</h1>
+    <p class="bajada">El circuito desde el 02/10/2026: Jichi registra y aprueba; el pago se carga y se valida en Recaudaciones (SIREB). Carnet, faena y guía siguen el mismo camino.</p>
+
+    <div class="lienzo">
+    <svg viewBox="0 0 1440 830" role="img" aria-label="Diagrama de carriles del registro, el pago en SIREB y la aprobación de la autorización">
+        <defs>
+            <marker id="f-verde" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#34d399"/></marker>
+            <marker id="f-violeta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/></marker>
+            <marker id="f-celeste" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22c5dc"/></marker>
+            <marker id="f-rosa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#fb7185"/></marker>
+            <marker id="f-ambar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#fbbf24"/></marker>
+            <marker id="f-rojo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f87171"/></marker>
+        </defs>
+
+        <!-- Fases -->
+        <rect class="fase-fondo" x="100" y="26" width="490" height="22" rx="6"/>
+        <text class="fase" x="345" y="41" text-anchor="middle">1 · Registro y liquidación</text>
+        <rect class="fase-fondo" x="640" y="26" width="220" height="22" rx="6"/>
+        <text class="fase" x="750" y="41" text-anchor="middle">2 · Pago en Recaudaciones</text>
+        <rect class="fase-fondo" x="910" y="26" width="490" height="22" rx="6"/>
+        <text class="fase" x="1155" y="41" text-anchor="middle">3 · Verificación y aprobación</text>
+
+        <!-- Carriles -->
+        <rect class="carril" x="80" y="62" width="1340" height="138" rx="10"/>
+        <text class="titulo-carril" x="96" y="82">01 / Ventanilla · panel de Jichi</text>
+        <rect class="carril" x="80" y="210" width="1340" height="160" rx="10"/>
+        <text class="titulo-carril" x="652" y="230">02 / Jichi · servidor</text>
+        <rect class="carril" x="80" y="380" width="1340" height="130" rx="10"/>
+        <text class="titulo-carril" x="652" y="400">03 / SIREB · API</text>
+        <rect class="carril" x="80" y="520" width="1340" height="130" rx="10"/>
+        <text class="titulo-carril" x="100" y="540">04 / Recaudaciones · encargado</text>
+        <rect class="carril-ex" x="80" y="664" width="1340" height="146" rx="10"/>
+        <text class="titulo-carril" x="96" y="684" style="fill:#e07a82">EX / Lo que puede salir</text>
+
+        <!-- Flechas: el camino feliz -->
+        <path class="flecha" stroke="#22c5dc" marker-end="url(#f-celeste)" d="M210,170 V245"/>
+        <text class="etq" x="218" y="212">registrar</text>
+
+        <path class="flecha" stroke="#a78bfa" marker-start="url(#f-violeta)" marker-end="url(#f-violeta)" d="M210,315 V410"/>
+        <text class="etq" x="218" y="366">tarifa activa</text>
+        <text class="etq" x="218" y="379">y liquidable</text>
+
+        <path class="flecha" stroke="#34d399" marker-end="url(#f-verde)" d="M320,270 H370"/>
+        <text class="etq" x="345" y="262" text-anchor="middle">ok</text>
+
+        <path class="flecha" stroke="#a78bfa" marker-end="url(#f-violeta)" d="M455,315 V410"/>
+        <text class="etq" x="447" y="360" text-anchor="end">POST</text>
+        <text class="etq" x="447" y="373" text-anchor="end">misma clave</text>
+        <path class="flecha" stroke="#a78bfa" marker-end="url(#f-violeta)" d="M525,410 V315"/>
+        <text class="etq" x="533" y="360">id +</text>
+        <text class="etq" x="533" y="373">código público</text>
+
+        <path class="flecha" stroke="#fb7185" marker-end="url(#f-rosa)" d="M590,445 H750 V550"/>
+        <text class="etq" x="600" y="437">código de pago</text>
+
+        <path class="flecha" stroke="#fb7185" marker-end="url(#f-rosa)" d="M860,585 H910"/>
+        <text class="etq" x="885" y="577" text-anchor="middle">boleta</text>
+
+        <path class="flecha" stroke="#fb7185" marker-end="url(#f-rosa)" d="M1020,550 V480"/>
+        <text class="etq" x="1028" y="520">pagada</text>
+
+        <path class="flecha" stroke="#22c5dc" marker-end="url(#f-celeste)" d="M1020,170 V245"/>
+        <text class="etq" x="1028" y="212">verificar</text>
+
+        <path class="flecha" stroke="#34d399" marker-end="url(#f-verde)" d="M860,280 H910"/>
+        <text class="etq" x="885" y="272" text-anchor="middle">10 min</text>
+
+        <path class="flecha" stroke="#a78bfa" marker-end="url(#f-violeta)" d="M990,315 V410"/>
+        <text class="etq" x="982" y="366" text-anchor="end">GET</text>
+        <path class="flecha" stroke="#a78bfa" marker-end="url(#f-violeta)" d="M1050,410 V315"/>
+        <text class="etq" x="1058" y="360">estado</text>
+        <text class="etq" x="1058" y="373">+ pago</text>
+
+        <path class="flecha" stroke="#4ade80" marker-end="url(#f-verde)" d="M1130,280 H1180"/>
+        <text class="etq" x="1155" y="272" text-anchor="middle">pagada</text>
+
+        <path class="flecha" stroke="#4ade80" marker-end="url(#f-verde)" d="M1290,245 V170"/>
+        <text class="etq" x="1298" y="212">aprueba</text>
+
+        <!-- Flechas: lo que puede salir -->
+        <path class="flecha" stroke="#f87171" stroke-dasharray="6 5" marker-end="url(#f-rojo)" d="M100,290 H86 V740 H100"/>
+        <text class="etq" x="92" y="610" style="fill:#f0a3a3">no activa /</text>
+        <text class="etq" x="92" y="623" style="fill:#f0a3a3">SIREB caído</text>
+
+        <path class="flecha" stroke="#fbbf24" stroke-dasharray="6 5" marker-end="url(#f-ambar)" d="M370,300 H352 V740 H370"/>
+        <text class="etq" x="358" y="610" style="fill:#f5d27a">no</text>
+        <text class="etq" x="358" y="623" style="fill:#f5d27a">responde</text>
+
+        <path class="flecha" stroke="#fbbf24" stroke-dasharray="6 5" marker-end="url(#f-ambar)" d="M1130,300 H1155 V740 H1130"/>
+        <text class="etq" x="1162" y="560" style="fill:#f5d27a">sin pago /</text>
+        <text class="etq" x="1162" y="573" style="fill:#f5d27a">falta validar</text>
+
+        <path class="flecha" stroke="#f87171" stroke-dasharray="6 5" marker-end="url(#f-rojo)" d="M1130,455 H1290 V705"/>
+        <text class="etq" x="1298" y="600" style="fill:#f0a3a3">anulada /</text>
+        <text class="etq" x="1298" y="613" style="fill:#f0a3a3">vencida</text>
+
+        <!-- Nodos -->
+        <g class="nodo"><rect x="100" y="100" width="220" height="70" rx="9" stroke="#22c5dc"/>
+            <text class="chip" x="306" y="116" text-anchor="end" fill="#22c5dc">PANEL</text>
+            <text class="t" x="114" y="134">Registrar</text>
+            <text class="s" x="114" y="154">pescador · escala · embarcación</text></g>
+
+        <g class="nodo"><rect x="910" y="100" width="220" height="70" rx="9" stroke="#22c5dc"/>
+            <text class="chip" x="1116" y="116" text-anchor="end" fill="#22c5dc">PANEL</text>
+            <text class="t" x="924" y="134">Verificar pago</text>
+            <text class="s" x="924" y="154">botón de la ficha</text></g>
+
+        <g class="nodo"><rect x="1180" y="100" width="220" height="70" rx="9" stroke="#4ade80"/>
+            <text class="chip" x="1386" y="116" text-anchor="end" fill="#4ade80">PANEL</text>
+            <text class="t" x="1194" y="134">APROBADA</text>
+            <text class="s" x="1194" y="154">recibo · imprimir · faenas</text></g>
+
+        <g class="nodo"><rect x="100" y="245" width="220" height="70" rx="9" stroke="#34d399"/>
+            <text class="chip" x="306" y="261" text-anchor="end" fill="#34d399">JICHI</text>
+            <text class="t" x="114" y="279">Verificar tarifa</text>
+            <text class="s" x="114" y="299">PrecioSireb (sin caché)</text></g>
+
+        <g class="nodo"><rect x="370" y="245" width="220" height="70" rx="9" stroke="#34d399"/>
+            <text class="chip" x="576" y="261" text-anchor="end" fill="#34d399">JICHI</text>
+            <text class="t" x="384" y="279">Guardar PENDIENTE</text>
+            <text class="s" x="384" y="299">transacción + Idempotency-Key</text></g>
+
+        <g class="nodo"><rect x="640" y="245" width="220" height="70" rx="9" stroke="#34d399"/>
+            <text class="chip" x="846" y="261" text-anchor="end" fill="#34d399">CRON</text>
+            <text class="t" x="654" y="279">verificar-pagos</text>
+            <text class="s" x="654" y="299">automático, cada 10 min</text></g>
+
+        <g class="nodo"><rect x="910" y="245" width="220" height="70" rx="9" stroke="#34d399"/>
+            <text class="chip" x="1116" y="261" text-anchor="end" fill="#34d399">JICHI</text>
+            <text class="t" x="924" y="279">Consultar</text>
+            <text class="s" x="924" y="299">ConfirmarPagoService</text></g>
+
+        <g class="nodo"><rect x="1180" y="245" width="220" height="70" rx="9" stroke="#4ade80"/>
+            <text class="chip" x="1386" y="261" text-anchor="end" fill="#4ade80">JICHI</text>
+            <text class="t" x="1194" y="279">Aprobar + recibo</text>
+            <text class="s" x="1194" y="299">una transacción</text></g>
+
+        <g class="nodo"><rect x="100" y="410" width="220" height="70" rx="9" stroke="#a78bfa"/>
+            <text class="chip" x="306" y="426" text-anchor="end" fill="#a78bfa">API</text>
+            <text class="t" x="114" y="444">Tarifa</text>
+            <text class="s" x="114" y="464">GET …/servicios/{s}/tarifas/{t}</text></g>
+
+        <g class="nodo"><rect x="370" y="410" width="220" height="70" rx="9" stroke="#a78bfa"/>
+            <text class="chip" x="576" y="426" text-anchor="end" fill="#a78bfa">API</text>
+            <text class="t" x="384" y="444">Crear liquidación</text>
+            <text class="s" x="384" y="464">POST /liquidaciones</text></g>
+
+        <g class="nodo"><rect x="910" y="410" width="220" height="70" rx="9" stroke="#a78bfa"/>
+            <text class="chip" x="1116" y="426" text-anchor="end" fill="#a78bfa">API</text>
+            <text class="t" x="924" y="444">Detalle</text>
+            <text class="s" x="924" y="464">GET /liquidaciones/{id}</text></g>
+
+        <g class="nodo"><rect x="640" y="550" width="220" height="70" rx="9" stroke="#fb7185"/>
+            <text class="chip" x="846" y="566" text-anchor="end" fill="#fb7185">SIREB</text>
+            <text class="t" x="654" y="584">El titular paga</text>
+            <text class="s" x="654" y="604">con el código público</text></g>
+
+        <g class="nodo"><rect x="910" y="550" width="220" height="70" rx="9" stroke="#fb7185"/>
+            <text class="chip" x="1116" y="566" text-anchor="end" fill="#fb7185">SIREB</text>
+            <text class="t" x="924" y="584">Valida la boleta</text>
+            <text class="s" x="924" y="604">liquidación → pagada</text></g>
+
+        <g class="nodo"><rect x="100" y="705" width="220" height="70" rx="9" stroke="#f87171"/>
+            <text class="chip" x="306" y="721" text-anchor="end" fill="#f87171">✗</text>
+            <text class="t" x="114" y="739">No se registra</text>
+            <text class="s" x="114" y="759">aviso rojo con el motivo</text></g>
+
+        <g class="nodo"><rect x="370" y="705" width="220" height="70" rx="9" stroke="#fbbf24"/>
+            <text class="chip" x="576" y="721" text-anchor="end" fill="#fbbf24">!</text>
+            <text class="t" x="384" y="739">Queda por enviar</text>
+            <text class="s" x="384" y="759">guardada · reintenta la clave</text></g>
+
+        <g class="nodo"><rect x="910" y="705" width="220" height="70" rx="9" stroke="#fbbf24"/>
+            <text class="chip" x="1116" y="721" text-anchor="end" fill="#fbbf24">!</text>
+            <text class="t" x="924" y="739">Sigue PENDIENTE</text>
+            <text class="s" x="924" y="759">aviso: qué le falta</text></g>
+
+        <g class="nodo"><rect x="1180" y="705" width="220" height="70" rx="9" stroke="#f87171"/>
+            <text class="chip" x="1386" y="721" text-anchor="end" fill="#f87171">✗</text>
+            <text class="t" x="1194" y="739">Anulada/vencida</text>
+            <text class="s" x="1194" y="759">corregir o eliminar</text></g>
+    </svg>
+    </div>
+
+    <div class="leyenda">
+        <span><i style="border-color:#22c5dc"></i>Panel de Jichi (ventanilla)</span>
+        <span><i style="border-color:#34d399"></i>Servidor de Jichi</span>
+        <span><i style="border-color:#a78bfa"></i>Llamada a la API de SIREB</span>
+        <span><i style="border-color:#fb7185"></i>Recaudaciones (SIREB)</span>
+        <span><i style="border-color:#fbbf24"></i>Queda esperando</span>
+        <span><i style="border-color:#f87171"></i>No sigue</span>
+    </div>
+
+    <div class="notas">
+        <div class="nota"><b>La clave se guarda antes de llamar.</b> La <code>Idempotency-Key</code> (un uuid) queda en la autorización dentro de la transacción; el POST va después del commit. Ante red, timeout o 5xx se reintenta con la <b>misma</b> clave, y SIREB devuelve la liquidación original: no hay dos deudas.</div>
+        <div class="nota"><b>SIREB no avisa: Jichi pregunta</b> por el <b>id</b> de la liquidación (<code>sireb_liquidacion_id</code>), no por el código público. Lo hace el botón «Verificar pago» y <code>jichi:verificar-pagos</code> cada 10 minutos (necesita el cron de Laravel).</div>
+        <div class="nota"><b>Aprobar mantiene las reglas de Jichi</b> (<code>RevisarCupoService::aprobar()</code>): fecha de emisión y vencimiento de la gestión. El recibo copia el monto y la boleta que validó SIREB: número, banco y fecha.</div>
+        <div class="nota"><b>Corregir o eliminar un pendiente</b> anula antes su liquidación en SIREB (<code>PATCH …/anular</code>); corregir registra otra con clave nueva. Si SIREB no anula —ya tiene un pago—, no se cambia nada.</div>
+    </div>
+</main>
+</body>
+</html>

@@ -7,7 +7,7 @@ import { PanelAvisos } from '@/components/panel/dashboard/panel-avisos';
 import { TablaUltimosCarnets } from '@/components/panel/dashboard/tabla-ultimos-carnets';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn } from '@/lib/utils';
+import { bs } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { Avisos, Pendiente, RecaudacionMes, Resumen, UltimoCarnet } from '@/types/dashboard';
 
@@ -87,11 +87,11 @@ export default function Dashboard({
 }
 
 /**
- * Lo primero que se mira al llegar: qué hay que cobrar y enviar, y qué hay que firmar.
- * Cada número lleva al listado ya filtrado.
+ * Lo primero que se mira al llegar: qué espera el pago en SIREB. Cada número lleva al
+ * listado ya filtrado; el pago se confirma solo, o con «Verificar pago» en la ficha.
  */
 function TrabajoPendiente({ pendientes }: { pendientes: Pendiente[] }) {
-    const total = pendientes.reduce((s, p) => s + p.por_enviar + p.por_firmar, 0);
+    const total = pendientes.reduce((s, p) => s + p.por_pagar, 0);
 
     return (
         <Card>
@@ -113,7 +113,7 @@ function TrabajoPendiente({ pendientes }: { pendientes: Pendiente[] }) {
                 <CardContent>
                     <p className="flex items-center gap-2 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
                         <CheckCircle2 className="size-4.5 shrink-0" />
-                        Ningún borrador sin enviar y ningún trámite esperando firma.
+                        Ningún trámite esperando el pago.
                     </p>
                 </CardContent>
             ) : (
@@ -125,12 +125,8 @@ function TrabajoPendiente({ pendientes }: { pendientes: Pendiente[] }) {
                                 <tr>
                                     <th className="px-5 py-2.5 font-medium">Documento</th>
                                     <th className="px-5 py-2.5 text-center font-medium">
-                                        Por cobrar y enviar
-                                        <span className="block font-normal">ventanilla</span>
-                                    </th>
-                                    <th className="px-5 py-2.5 text-center font-medium">
-                                        Por firmar
-                                        <span className="block font-normal">supervisión</span>
+                                        Esperando el pago
+                                        <span className="block font-normal">en Recaudaciones</span>
                                     </th>
                                 </tr>
                             </thead>
@@ -139,10 +135,7 @@ function TrabajoPendiente({ pendientes }: { pendientes: Pendiente[] }) {
                                     <tr key={p.documento}>
                                         <td className="px-5 py-3 font-medium">{p.documento}</td>
                                         <td className="px-5 py-3 text-center">
-                                            <Cantidad valor={p.por_enviar} href={p.url_por_enviar} tono="ambar" />
-                                        </td>
-                                        <td className="px-5 py-3 text-center">
-                                            <Cantidad valor={p.por_firmar} href={p.url_por_firmar} tono="azul" />
+                                            <Cantidad valor={p.por_pagar} href={p.url_por_pagar} />
                                         </td>
                                     </tr>
                                 ))}
@@ -156,7 +149,7 @@ function TrabajoPendiente({ pendientes }: { pendientes: Pendiente[] }) {
 }
 
 /** Un cero se ve apagado y no es enlace: solo llama la atención lo que tiene trabajo. */
-function Cantidad({ valor, href, tono }: { valor: number; href: string; tono: 'ambar' | 'azul' }) {
+function Cantidad({ valor, href }: { valor: number; href: string }) {
     if (valor === 0) {
         return <span className="text-muted-foreground/60 tabular-nums">0</span>;
     }
@@ -164,12 +157,7 @@ function Cantidad({ valor, href, tono }: { valor: number; href: string; tono: 'a
     return (
         <Link
             href={href}
-            className={cn(
-                'inline-flex min-w-10 items-center justify-center rounded-full px-3 py-1 font-semibold tabular-nums transition-colors',
-                tono === 'ambar'
-                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300'
-                    : 'bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-500/15 dark:text-sky-300',
-            )}
+            className="inline-flex min-w-10 items-center justify-center rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-800 tabular-nums transition-colors hover:bg-amber-200 dark:bg-amber-500/15 dark:text-amber-300"
         >
             {valor}
         </Link>

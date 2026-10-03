@@ -85,15 +85,6 @@ return [
         'estricto' => (bool) env('APROVECHAMIENTO_ESTRICTO', true),
     ],
 
-    /*
-    | «Pagar con QR» del portal: HOY es una demostración, sin banco detrás. Nada
-    | se cobra ni se registra, así que encendido en producción un beneficiario
-    | creería haber pagado. Por defecto solo en local; ver docs/modulos/PORTAL.md.
-    */
-    'portal' => [
-        'pago_qr' => (bool) env('PORTAL_PAGO_QR', env('APP_ENV') === 'local'),
-    ],
-
     // Login centralizado del GAD (OAuth2). Apagado = login propio por correo.
     // Encendido, el login local queda solo para administradores. Ver docs/modulos/IBARE.md.
     'ibare' => [

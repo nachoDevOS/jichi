@@ -13,6 +13,31 @@ emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
 por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
 que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
+## 🔴 El pago se hace en SIREB: falta probarlo de punta a punta — 02/10/2026
+
+Los cuatro documentos registran su liquidación en SIREB y se aprueban solos
+cuando SIREB los da por pagados (`ConfirmarPagoService`); se retiraron la tabla
+`pagos`, la Caja, el control de boletas y `en_revision`. Probado con SIREB
+simulado y con la consulta real de una liquidación de test.sireb (solo lectura).
+**Falta:** pagar una liquidación en test.sireb, validarla allá y ver que Jichi
+aprueba y emite el recibo; y corregir/eliminar un pendiente para ver la
+anulación. Ver [modulos/PAGOS.md](modulos/PAGOS.md).
+
+## 🔴 En producción hace falta el cron de Laravel — 02/10/2026
+
+`jichi:verificar-pagos` está programado cada 10 minutos en `routes/console.php`,
+pero corre solo si el servidor tiene el cron de `php artisan schedule:run` (cada
+minuto). Sin él nada se aprueba solo: queda el botón «Verificar pago» de cada
+ficha.
+
+## 🟠 La guía de piscicultura no viaja a SIREB con su descuento — 02/10/2026
+
+La liquidación de la guía manda un ítem por renglón (tarifa por kilo × kilos):
+SIREB cobra la tarifa entera. El 50% de piscicultura (`factorArancel()`) no
+tiene cómo expresarse ahí. Hoy no pasa porque la casilla está oculta; antes de
+reactivarla hay que acordar con Recaudaciones una tarifa propia de
+piscicultura.
+
 ## ✅ «Registrar» la autorización vuelve a guardar — 02/10/2026
 
 Se quitó el modo de solo verificación. `otorgar()` verifica la tarifa en SIREB
@@ -55,19 +80,11 @@ una SQLite descartable. Ver [modulos/PORTAL.md](modulos/PORTAL.md).
   (`ResumenPortal`). Después de migrar, conviene recorrer el portal de un
   beneficiario con carnet, faena y guía.
 
-## 🔴 «Pagar con QR» del portal es una demostración — 28/09/2026
+## 🟠 Separación de funciones: un solo rol
 
-La pantalla dice que el pago se registra solo, pero **no hay banco detrás y no
-se registra nada**. Está encendido solo en local (`jichi.portal.pago_qr`). Antes
-de encenderlo en producción hay que conectarlo a un cobro QR real (el banco
-avisa el pago y el sistema lo carga como depósito validado). Ver
-[modulos/PORTAL.md](modulos/PORTAL.md).
-
-## 🔴 Separación de funciones: hoy la misma persona carga y aprueba
-
-- **Hay un solo rol, `administrador`, con todos los permisos.** Es una decisión
-  —ver el comentario de `RolSistema`—, pero significa que cualquier usuario
-  aprueba lo que él mismo cargó. Los permisos ya están repartidos por bloque
+- **Hay un solo rol, `administrador`, con todos los permisos.** Aprobar ya no es
+  de nadie —lo decide el pago validado en SIREB, 02/10/2026—, pero eliminar,
+  revocar y anular siguen siendo de cualquiera. Los permisos ya están repartidos por bloque
   (`$lectura`, `$operacion`, `$supervision`, `$administracion`) y cada ruta
   declara su `permiso:`, así que el rol de ventanilla es una línea:
 
@@ -75,12 +92,9 @@ avisa el pago y el sistema lo carga como depósito validado). Ver
   self::Operador => [...$lectura, ...$operacion],
   ```
 
-- **`pagos.revisor_distinto` NO ESTÁ IMPLEMENTADO** (encontrado el 27/09/2026).
-  La clave existe en `ConfiguracionSeeder` y apagada por defecto, pero ningún
-  código la lee: `ControlarPagoService::validar()` deja validar a quien cargó la
-  boleta aunque se encienda. Hay que agregar la comprobación antes de encenderla,
-  y encenderla recién cuando haya un segundo usuario —con uno solo el circuito
-  queda trabado—.
+- La clave `pagos.revisor_distinto` salió de `ConfiguracionSeeder` (ya no hay
+  control de boletas en Jichi). Si quedó en la tabla `configuraciones` de una base
+  vieja, no la lee nadie.
 - **No hay pantalla de usuarios**: se crean por consola (`php artisan tinker`).
   El borrador `GuardarUsuarioRequest` se quitó el 28/09/2026 por no tener ruta
   ni controlador; está en el historial de git (commit `8511537`).
@@ -115,34 +129,25 @@ escritas contra el modelo anterior** —hablan de trámites, rubros o
 porque tienen partes que siguen valiendo y separarlas pide leerlas una por una.
 Ante una contradicción, mandan REGLAS-NEGOCIO.md y MER.md.
 
-## 🟠 RECIBOS.md y PAGOS.md siguen escritos contra el modelo anterior
+## 🟠 RECIBOS.md conserva historia del modelo anterior
 
-`docs/modulos/RECIBOS.md` habla de `tramite_id`, `ReciboTramiteService` y la
-migración `2026_09_14_*`, que ya no existen; `PAGOS.md` habla de la «ficha del
-trámite». Hay que reescribirlos sobre `recibos`, `CobrarService` y
-`ControlarPagoService`. Mientras tanto, ante una duda, mandan MER.md y
-ARQUITECTURA.md.
+`PAGOS.md` se reescribió el 02/10/2026. `RECIBOS.md` tiene arriba el estado de
+hoy y debajo historia (`tramite_id`, `ReciboTramiteService`…); la maquetación del
+PDF sigue valiendo. Ante una duda, mandan MER.md y ARQUITECTURA.md.
 
 ## 🟠 No hay pruebas automáticas
 
 Se retiraron el 27/09/2026 a pedido del responsable (204 de PHP y 13 de React;
 están en el commit `7dc0ac6`). Todo cambio se verifica a mano en el navegador.
-Si se retoman, lo que más daño evita es, en este orden: el circuito de cobro y
-aprobación, la reserva de kilos de la faena y que todo archivo pase por
+Si se retoman, lo que más daño evita es, en este orden: la liquidación en
+SIREB y la aprobación por pago (con `Http::fake`), la reserva de kilos de la faena y que todo archivo pase por
 `StorageController`.
-
-## 🟠 No se puede quitar un depósito
-
-Un depósito cargado mal se **corrige** (`POST /panel/pagos/{pago}/corregir`),
-pero no hay ruta para **quitarlo**: la misma boleta cargada dos veces, o la de
-otra persona en el trámite equivocado, no tiene salida desde la pantalla.
 
 ## 🟠 El recibo no se puede anular
 
 En el talonario de papel se anulaba escribiendo «ANULADO» sobre las tres copias.
-Una vez emitido, el recibo digital queda. Está sin definir con la unidad qué
-pasa con la plata en ese caso. Ojo al construirlo: `pagos.recibo_id` es CASCADE
-y eso no se dispara con una baja lógica (ver «Trampas» en CLAUDE.md).
+Una vez emitido, el recibo digital queda. Está sin definir con la unidad —y con
+Recaudaciones, que es donde está el pago— qué pasa con la plata en ese caso.
 
 ---
 
@@ -372,10 +377,12 @@ falta la pantalla para editarla agrupada por `grupo`, subir el logo y el escudo
 
 ## Orden sugerido
 
-1. Separación de funciones: `revisor_distinto`, rol de ventanilla y pantalla
-   mínima de usuarios — antes de poner el sistema en manos de varias personas.
-2. El comando diario de vencimiento — libera los kilos reservados por faenas
+1. Probar el pago en SIREB de punta a punta y dejar el cron de Laravel en el
+   servidor.
+2. Separación de funciones: rol de ventanilla y pantalla mínima de usuarios —
+   antes de poner el sistema en manos de varias personas.
+3. El comando diario de vencimiento — libera los kilos reservados por faenas
    abandonadas.
-3. Confirmar los catálogos contra la resolución (los precios ya son plata).
-4. Reportes.
-5. Configuración.
+4. Confirmar los catálogos contra la resolución (los precios ya son plata).
+5. Reportes.
+6. Configuración.

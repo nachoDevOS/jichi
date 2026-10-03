@@ -9,7 +9,7 @@ use App\Enums\TipoTransporte;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
-use App\Traits\Pagable;
+use App\Traits\LiquidableSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -50,7 +50,7 @@ use Illuminate\Support\Carbon;
 ])]
 class GuiaMovimiento extends Model
 {
-    use Auditable, Codificable, Pagable, SoftDeletes;
+    use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
     protected $table = 'guias_movimiento';
 
@@ -123,7 +123,7 @@ class GuiaMovimiento extends Model
     }
 
     /**
-     * El titular, con el nombre de columna que espera `CobrarService`.
+     * El titular, con el mismo nombre de columna que el carnet y el cupo.
      *
      * Ver PermisoFaena::beneficiarioId(): el accesor deja a la guía hablando
      * el mismo idioma que el carnet sin duplicar la clave en la tabla.
@@ -174,8 +174,22 @@ class GuiaMovimiento extends Model
         return round($importeTotal * $this->factorArancel(), 2);
     }
 
+    public function titularSireb(): Beneficiario
+    {
+        return $this->carnet->beneficiario;
+    }
+
+    /** Un ítem por renglón del cuadro D: la tarifa por kilo del producto, por sus kilos. */
+    public function itemsSireb(): array
+    {
+        return $this->detalles
+            ->map(fn (GuiaDetalle $d): array => ['tarifa_id' => $d->sireb_tarifa_id, 'cantidad' => (float) $d->cantidad_kg])
+            ->values()
+            ->all();
+    }
+
     /**
-     * Lo que se cobra por ESTA guía. Exigido por el trait Pagable. Sale de la
+     * Lo que se cobra por ESTA guía. Sale de la
      * COLUMNA, calculada al emitir: cambiar el catálogo no mueve un papel entregado.
      */
     public function montoACobrar(): float
@@ -183,58 +197,22 @@ class GuiaMovimiento extends Model
         return (float) $this->monto;
     }
 
-    /** ¿Se le pueden cargar depósitos hoy? Exigido por el trait Pagable. */
-    public function admitePagos(): bool
-    {
-        return $this->estado->admitePagos();
-    }
-
-    /**
-     * ¿Se pueden corregir sus datos?
-     *
-     * El estado no alcanza: un depósito ya cargado significa que el
-     * comerciante pagó por ESTE traslado, y mover el peso o la piscicultura
-     * después cambiaría lo que se cobró. Se da de baja el depósito primero.
-     */
+    /** ¿Se pueden corregir sus datos? Solo pendiente. */
     public function puedeEditarse(): bool
     {
-        return $this->estado->permiteEdicion() && $this->montoPagado() <= 0.0;
+        return $this->estado->permiteEdicion();
     }
 
     /** ¿Se puede borrar la fila entera? Mismo corte que la edición. */
     public function puedeEliminarse(): bool
     {
-        return $this->estado->permiteEliminacion() && $this->montoPagado() <= 0.0;
+        return $this->estado->permiteEliminacion();
     }
 
-    /** ¿Se puede presentar a revisión? Estado Y arancel cubierto. */
-    public function puedeEnviarseARevision(): bool
-    {
-        return $this->estado->permiteEnvio() && $this->estaPagado();
-    }
-
-    /** ¿Está sobre la mesa de quien firma? */
-    public function puedeRevisarse(): bool
-    {
-        return $this->estado->permiteRevision();
-    }
-
-    /** ¿Ya pasó por la firma? Es lo que habilita a imprimir el papel. */
+    /** ¿Ya se aprobó? Es lo que habilita a imprimir el papel. */
     public function yaFueAprobada(): bool
     {
         return ! $this->estado->estaAbierto();
-    }
-
-    /** ¿Se pueden CONTROLAR sus boletas? Solo con la guía presentada. */
-    public function admiteControlDePagos(): bool
-    {
-        return $this->estado === EstadoGuia::EnRevision;
-    }
-
-    /** Corregir se habilita antes: es lo único que levanta una observación. */
-    public function admiteCorreccionDePagos(): bool
-    {
-        return $this->estado->estaAbierto();
     }
 
     /**
@@ -252,10 +230,8 @@ class GuiaMovimiento extends Model
         return match (true) {
             $this->sinEfecto() => 'Sin efecto: su carnet fue revocado y el titular todavía no tiene otro '.
                 'carnet de comercializador vigente. Vuelve a valer cuando se apruebe el carnet nuevo.',
-            $this->estado === EstadoGuia::Pendiente => 'La guía está PENDIENTE: falta cubrir el '.
-                'arancel y enviarla a revisión.',
-            $this->estado === EstadoGuia::EnRevision => 'La guía está presentada y esperando la '.
-                'firma de quien la aprueba.',
+            $this->estado === EstadoGuia::Pendiente => 'La guía está PENDIENTE: falta que se pague '.
+                'en Recaudaciones.',
             $this->estado === EstadoGuia::Anulada => 'La guía fue anulada.',
             default => 'Pasó su fecha de vencimiento.',
         };

@@ -9,8 +9,8 @@ use RuntimeException;
  */
 class CupoInvalidoException extends RuntimeException
 {
-    /** Falló el tramo elegido (tarifa o escala), no la persona: se avisa arriba, no bajo un campo. */
-    public bool $delTramo = false;
+    /** No es culpa de un campo del formulario (escala o SIREB): va en el aviso de arriba. */
+    public bool $avisoGeneral = false;
 
     /**
      *  Una persona, una bolsa madre vigente a la vez
@@ -20,7 +20,7 @@ class CupoInvalidoException extends RuntimeException
         return new self(sprintf(
             '%s ya tiene un aprovechamiento vigente hasta el %s, con %s kg sin usar. '.
             'No se otorga un segundo cupo. Si el que tiene todavía está pendiente de pago, '.
-            'corríjalo al tramo que corresponda; si ya se cobró, hay que esperar a que venza o revocarlo.',
+            'corríjalo al tramo que corresponda; si ya se pagó, hay que esperar a que venza o revocarlo.',
             $persona,
             $vence,
             number_format($saldo, 2, ',', '.'),
@@ -36,73 +36,28 @@ class CupoInvalidoException extends RuntimeException
             "La escala {$nroEscala} fue derogada y ya no se puede otorgar. ".
             'Vuelva a abrir el formulario para ver los tramos vigentes.',
         );
-        $e->delTramo = true;
+        $e->avisoGeneral = true;
 
         return $e;
     }
 
-    /** Recaudaciones no dio el precio del tramo. Texto para ventanilla: el motivo técnico va al log. */
-    public static function sinPrecio(string $tramo, bool $sinRespuesta): self
+    /** SIREB no dio el precio o no aceptó la venta. Texto para ventanilla: el detalle va al log. */
+    public static function sireb(string $tramo, bool $noResponde): self
     {
-        $e = new self($sinRespuesta
-            ? 'No se pudo consultar el precio en Recaudaciones porque el sistema no responde en este momento. '.
-              'Espere unos minutos y vuelva a intentarlo.'
+        $e = new self($noResponde
+            ? 'Recaudaciones no responde en este momento. Espere unos minutos y vuelva a intentarlo.'
             : "La escala de la autorización «{$tramo}» no está habilitada para cobrar en este momento. ".
               'Elija otra escala o consulte con el encargado del sistema.');
-        $e->delTramo = true;
+        $e->avisoGeneral = true;
 
         return $e;
-    }
-
-    /** Se quiso presentar un cupo que ya no está en el borrador. */
-    public static function noSePuedeEnviar(string $estado): self
-    {
-        return new self(sprintf(
-            'Este aprovechamiento está %s y no se puede enviar a revisión. '.
-            'Solo se presenta lo que está pendiente de pago.',
-            mb_strtolower($estado),
-        ));
-    }
-
-    /**
-     * Se quiso presentar o aprobar un cupo con saldo sin cubrir.
-     */
-    public static function faltaCubrirElMonto(float $saldo): self
-    {
-        return new self(sprintf(
-            'Todavía faltan %s Bs por cobrar. Un aprovechamiento se presenta a revisión '.
-            'cuando los depósitos cubren el monto entero.',
-            number_format($saldo, 2, ',', '.'),
-        ));
-    }
-
-    /**
-     * Se quiso firmar con boletas sin controlar.
-     */
-    public static function faltaControlarBoletas(int $cuantas): self
-    {
-        return new self(sprintf(
-            'Quedan %d depósito(s) sin validar. Un aprovechamiento se aprueba cuando cada boleta '.
-            'se comparó contra el extracto del banco; un depósito observado se corrige antes de firmar.',
-            $cuantas,
-        ));
     }
 
     /** Se quiso aprobar o rechazar algo que no está presentado. */
     public static function noSePuedeRevisar(string $estado): self
     {
         return new self(sprintf(
-            'Este aprovechamiento está %s: solo se aprueba o se rechaza lo que está EN REVISIÓN.',
-            mb_strtolower($estado),
-        ));
-    }
-
-    /** Se quiso cargar un depósito contra un cupo que ya no los admite. */
-    public static function noAdmitePagos(string $estado): self
-    {
-        return new self(sprintf(
-            'Este aprovechamiento está %s y ya no admite pagos. '.
-            'Solo se cobra mientras está pendiente; si hay que corregir algo cobrado, se resuelve por caja.',
+            'Este aprovechamiento está %s: solo se aprueba el que está PENDIENTE de pago.',
             mb_strtolower($estado),
         ));
     }
@@ -110,14 +65,13 @@ class CupoInvalidoException extends RuntimeException
     /**
      * Se quiso corregir un cupo que ya salió del borrador.
      *
-     * El mensaje dice el estado en el que está, porque la salida es distinta en
-     * cada caso: uno cobrado se corrige por caja, uno vencido ya no se corrige.
+     * El mensaje dice el estado en el que está: la salida es distinta en cada caso.
      */
     public static function noSePuedeEditar(string $estado): self
     {
         return new self(sprintf(
             'Este aprovechamiento está %s y ya no se puede editar. '.
-            'Solo se corrige mientras está pendiente de pago, antes de que exista un recibo que lo respalde.',
+            'Solo se corrige mientras está pendiente de pago.',
             mb_strtolower($estado),
         ));
     }
@@ -127,7 +81,7 @@ class CupoInvalidoException extends RuntimeException
     {
         return new self(sprintf(
             'Este aprovechamiento está %s y ya no se puede eliminar. '.
-            'Un cupo con pagos o faenas encima no se borra: se corrige por caja, para no dejar plata colgando de algo que no existe.',
+            'Solo se elimina mientras está pendiente de pago y sin faenas.',
             mb_strtolower($estado),
         ));
     }
@@ -139,16 +93,6 @@ class CupoInvalidoException extends RuntimeException
             'No se puede eliminar: ya tiene %d faena(s) emitida(s) colgando. '.
             'Esos permisos salieron de un talonario de papel y no pueden quedar sin el cupo que los respalda.',
             $cuantas,
-        ));
-    }
-
-    /** Tiene pagos: borrarlo dejaría los abonos huérfanos. */
-    public static function tienePagos(int $cuantos): self
-    {
-        return new self(sprintf(
-            'No se puede eliminar: ya tiene %d pago(s) registrado(s). '.
-            'Lo cobrado se resuelve por caja, no borrando la fila.',
-            $cuantos,
         ));
     }
 

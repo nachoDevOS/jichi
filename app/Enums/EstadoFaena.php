@@ -7,13 +7,10 @@ namespace App\Enums;
  */
 enum EstadoFaena: string
 {
-    /** Cargada y sin cobrar. Es como NACE toda faena: todavía no autoriza nada. */
+    /** Cargada y esperando el pago en SIREB. Es como NACE toda faena: todavía no autoriza nada. */
     case Pendiente = 'pendiente';
 
-    /** Los depósitos cubren el arancel; falta que alguien firme. */
-    case EnRevision = 'en_revision';
-
-    /** Firmada y en curso: el pescador está afuera. Se llamaba `activo` hasta el 25/09/2026. */
+    /** Pagada y en curso: el pescador está afuera. */
     case Aprobado = 'aprobado';
 
     /** Volvió y descargó. Los kilos quedaron firmes contra el cupo. */
@@ -32,7 +29,6 @@ enum EstadoFaena: string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
-            self::EnRevision => 'En revisión',
             self::Aprobado => 'Aprobado',
             self::Completado => 'Completado',
             self::Vencido => 'Vencido',
@@ -44,7 +40,6 @@ enum EstadoFaena: string
     {
         return match ($this) {
             self::Pendiente => 'sky',
-            self::EnRevision => 'indigo',
             self::Aprobado => 'emerald',
             self::Completado => 'teal',
             self::Vencido => 'slate',
@@ -55,9 +50,9 @@ enum EstadoFaena: string
     /**
      * ¿Sus kilos pesan contra el cupo de la bolsa madre?
      *
-     * Solo desde la firma (19/09/2026, a pedido del responsable). Una faena
-     * pendiente o en revisión es una SOLICITUD: todavía no autoriza a pescar,
-     * así que no puede estar restándole kilos a la bolsa.
+     * Solo desde la aprobación (19/09/2026, a pedido del responsable). Una faena
+     * pendiente es una SOLICITUD: todavía no autoriza a pescar, así que no puede
+     * estar restándole kilos a la bolsa.
      *
      * En modo estricto la solicitud no descuenta pero RESERVA —ver `reservaCupo()`—,
      * así que el cupo no se sobrecompromete. `RevisarFaenaService::aprobar()`
@@ -74,7 +69,7 @@ enum EstadoFaena: string
      */
     public function reservaCupo(): bool
     {
-        return $this === self::Pendiente || $this === self::EnRevision;
+        return $this === self::Pendiente;
     }
 
     /** ¿Autoriza a estar pescando hoy? Solo la aprobada. */
@@ -94,8 +89,7 @@ enum EstadoFaena: string
     /**
      * ¿Se pueden corregir sus datos? Solo el BORRADOR.
      *
-     * Al enviarla a revisión sale el recibo y el pescador se va con el papel,
-     * así que desde ahí lo que no sirve se rechaza, no se edita.
+     * Corregirla anula la liquidación en SIREB y registra otra.
      */
     public function permiteEdicion(): bool
     {
@@ -108,33 +102,10 @@ enum EstadoFaena: string
         return $this === self::Pendiente;
     }
 
-    /** ¿Se le pueden cargar depósitos? Solo mientras nadie la firmó. */
-    public function permitePagos(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /** ¿Se puede mandar a que alguien la firme? */
-    public function permiteEnvio(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
-    /** ¿Se puede aprobar o rechazar? Solo lo que está presentado. */
-    public function permiteRevision(): bool
-    {
-        return $this === self::EnRevision;
-    }
-
-    /**
-     * Pendiente + en revisión: nadie la firmó todavía.
-     *
-     * ⚠️ NO ES PERMISO DE TRABAJO —para eso está `habilita()`— ni de
-     * escritura: eso lo dicen `permiteEdicion()` y `permiteEliminacion()`.
-     */
+    /** Esperando el pago en SIREB. No es permiso de trabajo: para eso, `habilita()`. */
     public function estaAbierto(): bool
     {
-        return $this === self::Pendiente || $this === self::EnRevision;
+        return $this === self::Pendiente;
     }
 
     /**

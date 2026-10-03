@@ -143,7 +143,7 @@ class BeneficiarioController extends Controller
 
             'gestion' => $gestion,
 
-            // Lo que debe en total, sumando carnets, cupos y guías sin cubrir.
+            // Lo que falta pagar en SIREB, sumando sus documentos pendientes.
             'deuda' => $beneficiario->deudaTotal(),
 
             // Su cuenta del portal /mi-cuenta. Sin `cuenta_portal` de nombre: esa es la del flash.
@@ -175,8 +175,7 @@ class BeneficiarioController extends Controller
                     'vigente' => $f->estaVigente(),
                     'caducada' => $f->estaCaducada(),
                     'monto' => $f->montoACobrar(),
-                    // Mismo corte que Caja: solo se debe lo que todavía admite depósitos.
-                    'debe' => $f->admitePagos() ? $f->saldoPendiente() : 0.0,
+                    'debe' => $f->porPagar(),
                     'fecha_solicitud' => $f->fecha_solicitud?->toDateString(),
                     'fecha_salida' => $f->fecha_salida?->toDateString(),
                     'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
@@ -205,7 +204,7 @@ class BeneficiarioController extends Controller
                     'vigente' => $g->estaVigente(),
                     'caducada' => $g->estaCaducada(),
                     'monto' => $g->montoACobrar(),
-                    'debe' => $g->admitePagos() ? $g->saldoPendiente() : 0.0,
+                    'debe' => $g->porPagar(),
                     'fecha_solicitud' => $g->fecha_solicitud?->toDateString(),
                     // Un MOMENTO: la guía vale por horas, no por días.
                     'fecha_vencimiento' => $g->fecha_vencimiento?->toIso8601String(),
@@ -219,7 +218,6 @@ class BeneficiarioController extends Controller
                     'numero' => $r->numero_recibo,
                     'concepto' => $r->concepto,
                     'monto_total' => (float) $r->monto_total,
-                    'depositos' => $r->pagos_count,
                     'emitido_en' => $r->created_at?->toIso8601String(),
                 ])
                 ->all(),
@@ -242,7 +240,7 @@ class BeneficiarioController extends Controller
                     'vigente' => $a->estaVigente(),
                     // Antes de la firma no hay saldo que mostrar: no se consumió.
                     'ya_fue_aprobado' => $a->yaFueAprobado(),
-                    'saldo_pendiente' => $a->saldoPendiente(),
+                    'saldo_pendiente' => $a->porPagar(),
                     'fecha_solicitud' => $a->fecha_solicitud?->toDateString(),
                     'fecha_emision' => $a->fecha_emision?->toDateString(),
                     'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
@@ -452,7 +450,7 @@ class BeneficiarioController extends Controller
             'estado_color' => $carnet->colorEstado(),
             'vigente' => $carnet->estaVigente(),
             'monto' => $carnet->montoACobrar(),
-            'saldo_pendiente' => $carnet->saldoPendiente(),
+            'saldo_pendiente' => $carnet->porPagar(),
             'fecha_emision' => $carnet->fecha_emision?->toDateString(),
             'fecha_vencimiento' => $carnet->fecha_vencimiento?->toDateString(),
         ];

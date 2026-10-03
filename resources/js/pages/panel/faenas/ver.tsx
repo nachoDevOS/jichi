@@ -1,18 +1,17 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { BadgeCheck, CalendarX, Check, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Send, Trash2, Undo2, User, Waves } from 'lucide-react';
+import { BadgeCheck, CalendarX, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Trash2, User, Waves } from 'lucide-react';
 import { useState } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
-import { TarjetaPagos } from '@/components/panel/pagos/tarjeta-pagos';
+import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha } from '@/lib/utils';
-import type { PagoDelCupo, ReciboDelCupo } from '@/types/aprovechamientos';
+import type { ReciboDelCupo } from '@/types/aprovechamientos';
 import type { FaenaFicha } from '@/types/faenas';
 
 /**
@@ -24,22 +23,14 @@ import type { FaenaFicha } from '@/types/faenas';
  */
 export default function VerFaena({
     faena,
-    pagos,
     recibo,
-    diasVigencia,
 }: {
     faena: FaenaFicha;
-    pagos: PagoDelCupo[];
     recibo: ReciboDelCupo | null;
-    diasVigencia: number;
 }) {
     const { puede } = usePermisos();
-    const [aprobando, setAprobando] = useState(false);
-    const [rechazando, setRechazando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
 
-    const envio = useForm({});
-    const rechazo = useForm({ motivo: '' });
     const borrado = useForm({ motivo: '' });
 
     return (
@@ -97,48 +88,7 @@ export default function VerFaena({
                         </Button>
                     )}
 
-                    {/*
-                        EL CIRCUITO, igual que en el carnet y el cupo: presentar
-                        es de ventanilla y firmar es de supervisión. Las tres
-                        banderas llegan resueltas del servidor.
-                    */}
-                    {puede('faenas.enviar') && faena.puede_enviarse && (
-                        <Button
-                            onClick={() =>
-                                envio.post(route('faenas.enviar', faena.id), { preserveScroll: true })
-                            }
-                            disabled={envio.processing}
-                        >
-                            <Send className="size-4" />
-                            Enviar a revisión
-                        </Button>
-                    )}
 
-                    {puede('faenas.aprobar') && faena.puede_revisarse && (
-                        <>
-                            {/* Apagado mientras falte validar alguna boleta, y
-                                el title dice cuántas: el servidor lo exige
-                                igual, y un botón que promete y falla es peor. */}
-                            <Button
-                                onClick={() => setAprobando(true)}
-                                disabled={envio.processing || !faena.puede_aprobarse}
-                                title={
-                                    faena.puede_aprobarse
-                                        ? undefined
-                                        : `Faltan ${faena.pagos_sin_validar} depósito(s) por validar`
-                                }
-                                className="bg-emerald-600 text-white hover:bg-emerald-700"
-                            >
-                                <Check className="size-4" />
-                                Aprobar
-                            </Button>
-
-                            <Button variant="eliminar" onClick={() => setRechazando(true)}>
-                                <Undo2 className="size-4" />
-                                Rechazar
-                            </Button>
-                        </>
-                    )}
 
                     {/*
                         EL PERMISO EN PAPEL sale recién con la faena aprobada:
@@ -284,16 +234,6 @@ export default function VerFaena({
                             <Renglon etiqueta="Desembarque el" valor={fecha(faena.fecha_desembarque)} />
                             <Renglon etiqueta="Arancel" valor={bs(faena.monto)} />
 
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="text-muted-foreground">Cobro</span>
-                                {faena.pagado ? (
-                                    <span className="font-medium text-emerald-700 dark:text-emerald-400">Pagado</span>
-                                ) : (
-                                    <span className="font-medium text-amber-700 dark:text-amber-400">
-                                        debe {bs(faena.saldo_pendiente)}
-                                    </span>
-                                )}
-                            </div>
                         </CardContent>
                     </Card>
 
@@ -313,7 +253,7 @@ export default function VerFaena({
                                     <Renglon etiqueta="Disponible hoy" valor={`${faena.cupo.saldo_kg} kg`} />
                                     <Renglon etiqueta="Esta faena" valor={`${faena.kilos_extraidos} kg`} />
                                     {/* Sin firmar todavía: cuánto quedaría si se aprueba. */}
-                                    {(faena.estado === 'pendiente' || faena.estado === 'en_revision') && (
+                                    {faena.estado === 'pendiente' && (
                                         <Renglon
                                             etiqueta="Queda al aprobar"
                                             valor={`${Math.max(0, Math.round((faena.cupo.saldo_kg - faena.kilos_extraidos) * 100) / 100)} kg`}
@@ -339,87 +279,18 @@ export default function VerFaena({
                     </Card>
                 </div>
 
-                {/* La misma tarjeta que el carnet y el cupo, y a lo ancho como en ellos. */}
-                <TarjetaPagos
-                    pagos={pagos}
+                {/* El cobro: se paga en SIREB, igual que los otros tres documentos. */}
+                <TarjetaRecaudaciones
+                    monto={faena.monto}
+                    sireb={faena.sireb}
                     recibo={recibo}
-                    saldoPendiente={faena.saldo_pendiente}
-                    titular={faena.beneficiario ?? 'el titular'}
-                    admitePagos={faena.admite_pagos}
-                    rutaPagar={route('faenas.pagar', faena.id)}
-                    permisoEnviar="faenas.enviar"
-                    textoAlEnviar="La faena pasa a EN REVISIÓN y se emite el recibo con el total; autoriza la salida recién cuando esté aprobada."
+                    puedeVerificar={faena.puede_verificar_pago}
+                    rutaVerificar={route('faenas.verificar-pago', faena.id)}
+                    permiso="faenas.crear"
                 />
             </div>
 
-            {/* Aprobar pide casilla: es la FIRMA. Desde acá la faena autoriza. */}
-            <ConfirmarAccion
-                abierto={aprobando}
-                tono="afirmativo"
-                titulo="Aprobar la faena"
-                descripcion={
-                    <div className="space-y-2">
-                        <p>
-                            La <strong>{faena.etiqueta}</strong> de{' '}
-                            <strong>{faena.beneficiario ?? 'el titular'}</strong> queda APROBADA y
-                            autoriza la salida desde <strong>hoy</strong> por {diasVigencia} días.
-                            Las fechas de salida y desembarque se fijan al aprobar.
-                        </p>
-                        <p>
-                            <strong>No se puede deshacer.</strong>
-                        </p>
-                    </div>
-                }
-                confirmacion="Verifiqué las boletas contra el extracto del banco y el expediente está completo."
-                textoConfirmar="Aprobar"
-                procesando={envio.processing}
-                onCancelar={() => setAprobando(false)}
-                onConfirmar={() =>
-                    envio.patch(route('faenas.aprobar', faena.id), {
-                        preserveScroll: true,
-                        onSuccess: () => setAprobando(false),
-                    })
-                }
-            />
 
-            {/* Rechazar pide motivo y casilla: es la otra mitad de la firma. */}
-            <ConfirmarConMotivo
-                abierto={rechazando}
-                titulo="Rechazar y devolver a ventanilla"
-                descripcion={
-                    <div className="space-y-2">
-                        <p>
-                            La faena vuelve a <strong>PENDIENTE</strong>.
-                        </p>
-                        <p>
-                            Los depósitos quedan intactos y el recibo ya emitido sigue valiendo: se
-                            corrige lo observado y se vuelve a presentar.
-                        </p>
-                    </div>
-                }
-                etiquetaMotivo="Motivo del rechazo"
-                ayuda="Es lo que va a leer quien tenga que corregirlo. Queda en la auditoría con su nombre."
-                placeholder="La boleta 0012345 no figura en el extracto del banco."
-                confirmacion="El expediente vuelve a ventanilla con este motivo escrito, y queda registrado a mi nombre."
-                textoConfirmar="Rechazar"
-                valor={rechazo.data.motivo}
-                onCambiar={(v) => rechazo.setData('motivo', v)}
-                error={rechazo.errors.motivo}
-                procesando={rechazo.processing}
-                onCancelar={() => {
-                    setRechazando(false);
-                    rechazo.reset();
-                }}
-                onConfirmar={() =>
-                    rechazo.patch(route('faenas.rechazar', faena.id), {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setRechazando(false);
-                            rechazo.reset();
-                        },
-                    })
-                }
-            />
 
             {/* ELIMINAR: la misma ventana que en el listado. */}
             <ConfirmarConMotivo
@@ -475,7 +346,7 @@ function Situacion({ faena }: { faena: FaenaFicha }) {
      * evaluar el estado: así nacieron los carteles que decían «venció» sobre
      * un expediente que recién se estaba armando.
      */
-    if (faena.estado === 'pendiente' || faena.estado === 'en_revision') {
+    if (faena.estado === 'pendiente') {
         return (
             <Marco
                 clase="bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200"

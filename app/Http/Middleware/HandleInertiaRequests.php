@@ -72,6 +72,8 @@ class HandleInertiaRequests extends Middleware
                 'exito' => fn () => $request->session()->get('exito'),
                 'error' => fn () => $request->session()->get('error'),
                 'info' => fn () => $request->session()->get('info'),
+                // Amarillo: se hizo, pero falta algo (p. ej. registrar en Recaudaciones).
+                'aviso' => fn () => $request->session()->get('aviso'),
                 // La clave temporal del portal: se muestra UNA vez, para dictarla o imprimirla.
                 'cuenta_portal' => fn () => $request->session()->get('cuenta_portal'),
             ],

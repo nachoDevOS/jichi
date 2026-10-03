@@ -20,7 +20,10 @@ use Illuminate\Support\Facades\DB;
  */
 class EmitirCarnetService
 {
-    public function __construct(private PrecioSireb $precios) {}
+    public function __construct(
+        private readonly PrecioSireb $precios,
+        private readonly LiquidarSirebService $liquidaciones,
+    ) {}
 
     /**
      * Emite la credencial.
@@ -41,7 +44,7 @@ class EmitirCarnetService
         // Fuera de la transacción: una llamada a SIREB no debe tener filas bloqueadas.
         $precio = $this->precioDe($tipo);
 
-        return DB::transaction(function () use ($beneficiario, $asociacion, $tipo, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
+        $carnet = DB::transaction(function () use ($beneficiario, $asociacion, $tipo, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
             // Releer con lockForUpdate() devuelve OTRA instancia: acá solo sirve
             // para tomar el candado, no se escribe sobre ella.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
@@ -118,9 +121,14 @@ class EmitirCarnetService
             // Su llave pública, en la misma transacción: sin código, el documento
             // no se puede verificar.
             $carnet->asignarCodigo();
+            $this->liquidaciones->preparar($carnet);
 
             return $carnet;
         });
+
+        $this->liquidaciones->enviarSinFrenar($carnet);
+
+        return $carnet;
     }
 
     /**
@@ -140,21 +148,24 @@ class EmitirCarnetService
         ?string $archivoCi = null,
         ?string $archivoAsociacion = null,
     ): Carnet {
-        // Corregir el borrador vuelve a pedir el precio, igual que la autorización.
-        $precio = $this->precioDe($tipo);
+        if (! $carnet->puedeEditarse()) {
+            throw CarnetInvalidoException::noSePuedeEditar($carnet->estado->etiqueta());
+        }
 
-        return DB::transaction(function () use ($carnet, $asociacion, $tipo, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
+        // Corregir el borrador vuelve a pedir el precio; si cambia, la liquidación vieja se anula antes.
+        $precio = $this->precioDe($tipo);
+        $otraLiquidacion = $this->liquidaciones->anularSiCambia(
+            $carnet,
+            [['tarifa_id' => $precio['tarifa_id'], 'cantidad' => 1]],
+            $precio['monto'],
+        );
+
+        $carnet = DB::transaction(function () use ($carnet, $asociacion, $tipo, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio, $otraLiquidacion): Carnet {
             $bloqueado = Carnet::query()->whereKey($carnet->id)->lockForUpdate()->firstOrFail();
 
-            // Con la copia BLOQUEADA: entre abrir el formulario y guardar, otra
-            // ventanilla pudo cobrarlo. Las dos condiciones van separadas porque
-            // `puedeEditarse()` a secas daba un mensaje que no explicaba nada.
+            // Con la copia BLOQUEADA: entre abrir el formulario y guardar, el pago pudo aprobarlo.
             if (! $bloqueado->estado->permiteEdicion()) {
                 throw CarnetInvalidoException::noSePuedeEditar($bloqueado->estado->etiqueta());
-            }
-
-            if ($bloqueado->montoPagado() > 0.0) {
-                throw CarnetInvalidoException::tienePagos($bloqueado->pagos()->count());
             }
 
             $this->comprobarCatalogos($asociacion, $tipo);
@@ -200,9 +211,17 @@ class EmitirCarnetService
                 ...($archivoAsociacion !== null ? ['archivo_asociacion' => $archivoAsociacion] : []),
             ]);
 
+            if ($otraLiquidacion) {
+                $this->liquidaciones->preparar($bloqueado);
+            }
+
             // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
             return $carnet->refresh();
         });
+
+        $this->liquidaciones->enviarSinFrenar($carnet);
+
+        return $carnet;
     }
 
     /**
@@ -218,6 +237,13 @@ class EmitirCarnetService
             throw CarnetInvalidoException::motivoObligatorio();
         }
 
+        if (! $carnet->puedeEliminarse()) {
+            throw CarnetInvalidoException::noSePuedeEliminar($carnet->estado->etiqueta());
+        }
+
+        // Primero SIREB: si no anula la liquidación, no se elimina.
+        $this->liquidaciones->anular($carnet, 'Eliminado en Jichi: '.$motivo);
+
         DB::transaction(function () use ($carnet, $motivo): void {
             $bloqueado = Carnet::query()->whereKey($carnet->id)->lockForUpdate()->firstOrFail();
 
@@ -225,12 +251,7 @@ class EmitirCarnetService
                 throw CarnetInvalidoException::noSePuedeEliminar($bloqueado->estado->etiqueta());
             }
 
-            // Los tres mensajes son distintos a propósito: la salida no es la
-            // misma. Lo cobrado se resuelve por caja; un permiso ya emitido no
-            // se resuelve de ninguna manera, el papel está afuera.
-            if (($pagos = $bloqueado->pagos()->count()) > 0) {
-                throw CarnetInvalidoException::tienePagos($pagos);
-            }
+            // Un permiso ya emitido no se resuelve de ninguna manera: el papel está afuera.
 
             if (($faenas = $bloqueado->faenas()->count()) > 0) {
                 throw CarnetInvalidoException::tienePermisos($faenas, 'faena(s)');

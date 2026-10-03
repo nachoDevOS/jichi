@@ -17,7 +17,6 @@ class DatabaseSeeder extends Seeder
 
     /** Datos del dominio que se vacían en cada siembra; usuarios, roles y catálogos quedan. */
     private const TABLAS_DEL_DOMINIO = [
-        'pagos',
         'codigos',
         'recibos',
         'guia_detalles',

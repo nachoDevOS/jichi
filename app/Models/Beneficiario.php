@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
+use App\Enums\EstadoFaena;
+use App\Enums\EstadoGuia;
 use App\Enums\TipoActor;
 use App\Support\Archivos;
 use App\Support\Sql;
@@ -218,22 +221,14 @@ class Beneficiario extends Model
             ->first();
     }
 
-    /**
-     * Lo que debe en total, sumando lo pendiente de sus tres tipos de trámite.
-     */
+    /** Lo que falta pagar en SIREB: la suma de sus documentos pendientes. */
     public function deudaTotal(): float
     {
-        $pendiente = fn ($coleccion): float => $coleccion->sum(
-            fn ($tramite): float => $tramite->saldoPendiente(),
-        );
-
         return round(
-            $pendiente($this->carnets()->with('tipoCarnet')->withSum('pagos', 'monto_parcial')->get())
-            + $pendiente($this->aprovechamientos()->with('categoria')->withSum('pagos', 'monto_parcial')->get())
-            // Guías y faenas con el mismo corte que Caja: solo lo que todavía admite
-            // depósitos. Las faenas faltaban, y la ficha decía menos que Caja.
-            + $pendiente($this->guias()->withSum('pagos', 'monto_parcial')->get()->filter->admitePagos())
-            + $pendiente($this->faenas()->withSum('pagos', 'monto_parcial')->get()->filter->admitePagos()),
+            (float) $this->carnets()->where('carnets.estado', EstadoCarnet::Pendiente)->sum('carnets.monto')
+            + (float) $this->aprovechamientos()->where('aprovechamientos_pesq.estado', EstadoAprovechamiento::Pendiente)->sum('aprovechamientos_pesq.monto')
+            + (float) $this->guias()->where('guias_movimiento.estado', EstadoGuia::Pendiente)->sum('guias_movimiento.monto')
+            + (float) $this->faenas()->where('permisos_faena.estado', EstadoFaena::Pendiente)->sum('permisos_faena.monto'),
             2,
         );
     }

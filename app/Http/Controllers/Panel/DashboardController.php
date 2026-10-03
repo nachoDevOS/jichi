@@ -11,8 +11,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
-use App\Models\Pago;
 use App\Models\PermisoFaena;
+use App\Models\Recibo;
 use App\Support\Sql;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -43,38 +43,25 @@ class DashboardController extends Controller
     }
 
     /**
-     * Lo que espera a alguien, documento por documento: borradores sin enviar y presentados sin firmar.
+     * Lo que espera el pago en SIREB, documento por documento.
      *
      * @return array<int, array<string, mixed>>
      */
     private function pendientes(): array
     {
         $documentos = [
-            ['Autorizaciones de pesca', 'aprovechamientos.index', AprovechamientoPesq::query(), EstadoAprovechamiento::Pendiente, EstadoAprovechamiento::EnRevision],
-            ['Carnets', 'carnets.index', Carnet::query(), EstadoCarnet::Pendiente, EstadoCarnet::EnRevision],
-            ['Permisos de faena', 'faenas.index', PermisoFaena::query(), EstadoFaena::Pendiente, EstadoFaena::EnRevision],
-            ['Guías de transporte', 'guias.index', GuiaMovimiento::query(), EstadoGuia::Pendiente, EstadoGuia::EnRevision],
+            ['Autorizaciones de pesca', 'aprovechamientos.index', AprovechamientoPesq::query(), EstadoAprovechamiento::Pendiente],
+            ['Carnets', 'carnets.index', Carnet::query(), EstadoCarnet::Pendiente],
+            ['Permisos de faena', 'faenas.index', PermisoFaena::query(), EstadoFaena::Pendiente],
+            ['Guías de transporte', 'guias.index', GuiaMovimiento::query(), EstadoGuia::Pendiente],
         ];
 
         return collect($documentos)
-            ->map(function (array $d): array {
-                [$nombre, $ruta, $consulta, $pendiente, $enRevision] = $d;
-
-                // Una sola consulta por tabla: agrupa los dos estados de una vez.
-                $conteo = $consulta
-                    ->whereIn('estado', [$pendiente, $enRevision])
-                    ->groupBy('estado')
-                    ->select('estado', DB::raw('COUNT(*) as cantidad'))
-                    ->pluck('cantidad', 'estado');
-
-                return [
-                    'documento' => $nombre,
-                    'por_enviar' => (int) ($conteo[$pendiente->value] ?? 0),
-                    'por_firmar' => (int) ($conteo[$enRevision->value] ?? 0),
-                    'url_por_enviar' => route($ruta, ['estado' => $pendiente->value]),
-                    'url_por_firmar' => route($ruta, ['estado' => $enRevision->value]),
-                ];
-            })
+            ->map(fn (array $d): array => [
+                'documento' => $d[0],
+                'por_pagar' => $d[2]->where('estado', $d[3])->count(),
+                'url_por_pagar' => route($d[1], ['estado' => $d[3]->value]),
+            ])
             ->all();
     }
 
@@ -98,12 +85,12 @@ class DashboardController extends Controller
             'faenas_vigentes' => PermisoFaena::vigentes()->count(),
             'guias_vigentes' => GuiaMovimiento::vigentes()->count(),
 
-            // Por `created_at`: es cuando entró la plata, no la fecha que dice la boleta.
-            'cobrado_hoy' => (float) Pago::whereDate('created_at', now()->toDateString())->sum('monto_parcial'),
-            'cobrado_mes' => (float) Pago::whereBetween(
+            // Por los recibos: se emiten cuando SIREB confirma el pago.
+            'cobrado_hoy' => (float) Recibo::whereDate('created_at', now()->toDateString())->sum('monto_total'),
+            'cobrado_mes' => (float) Recibo::whereBetween(
                 'created_at',
                 [now()->startOfMonth(), now()->endOfMonth()],
-            )->sum('monto_parcial'),
+            )->sum('monto_total'),
         ];
     }
 
@@ -119,12 +106,12 @@ class DashboardController extends Controller
         // La expresión que reduce un timestamp a 'YYYY-MM' cambia entre motores: vive en App\Support\Sql.
         $periodo = Sql::periodoMes('created_at');
 
-        $totales = Pago::query()
+        $totales = Recibo::query()
             ->where('created_at', '>=', $desde)
             ->groupBy($periodo)
             ->select(
                 DB::raw($periodo->getValue(DB::connection()->getQueryGrammar()).' as periodo'),
-                DB::raw('SUM(monto_parcial) as total'),
+                DB::raw('SUM(monto_total) as total'),
             )
             ->pluck('total', 'periodo');
 
@@ -158,7 +145,6 @@ class DashboardController extends Controller
                 'tipoCarnet',
                 'aprovechamiento:id,estado',
             ])
-            ->withSum('pagos', 'monto_parcial')
             ->latest('fecha_emision')
             ->limit(10)
             ->get()
@@ -174,7 +160,7 @@ class DashboardController extends Controller
                 'estado_etiqueta' => $c->etiquetaEstado(),
                 'estado_color' => $c->colorEstado(),
                 'monto' => $c->montoACobrar(),
-                'saldo_pendiente' => $c->saldoPendiente(),
+                'saldo_pendiente' => $c->porPagar(),
                 // Es un DÍA, no un instante: va con toDateString() o en UTC-4 se mostraría el día anterior.
                 'fecha_emision' => $c->fecha_emision?->toDateString(),
             ])

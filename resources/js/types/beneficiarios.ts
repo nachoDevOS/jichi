@@ -132,7 +132,7 @@ export interface CarnetResumen {
     estado_color: string;
     vigente: boolean;
     monto: number;
-    /** Lo que falta cobrar. Se corta en cero: pagar de más no da saldo a favor. */
+    /** Lo que falta pagar en SIREB: el monto mientras esté pendiente. */
     saldo_pendiente: number;
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
@@ -220,7 +220,6 @@ export interface ReciboDelBeneficiario {
     numero: string;
     concepto: string | null;
     monto_total: number;
-    depositos: number;
     /** Un MOMENTO. */
     emitido_en: string | null;
 }

@@ -3,6 +3,7 @@
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SoloBeneficiario;
 use App\Http\Middleware\SoloFuncionario;
+use App\Sireb\SirebException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -46,4 +47,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // SIREB frenó una acción del panel (anular al corregir o eliminar): aviso rojo, nada cambió.
+        $exceptions->render(fn (SirebException $e, Request $request) => $request->expectsJson()
+            ? null
+            : back()->withInput()->with('error', $e->paraVentanilla()));
     })->create();

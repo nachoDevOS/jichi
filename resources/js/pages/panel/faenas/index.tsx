@@ -226,14 +226,11 @@ export default function IndiceFaenas({
                                                     {fecha(f.fecha_desembarque)}
                                                 </td>
 
-                                                {/* Lo cobrado, no solo la tarifa: es lo que dice
-                                                    si al expediente le falta plata. */}
+                                                {/* El arancel; mientras está pendiente, falta pagarlo en SIREB. */}
                                                 <td className="px-5 py-2.5 text-right tabular-nums">
                                                     {bs(f.monto, institucion.moneda)}
-                                                    {!f.pagado && (
-                                                        <p className="text-xs text-amber-700 dark:text-amber-300">
-                                                            faltan {bs(f.saldo_pendiente, institucion.moneda)}
-                                                        </p>
+                                                    {f.puede_verificar_pago && (
+                                                        <p className="text-xs text-amber-700 dark:text-amber-300">por pagar</p>
                                                     )}
                                                 </td>
 

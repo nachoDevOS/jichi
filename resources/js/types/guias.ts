@@ -1,4 +1,5 @@
 import type { EstadoGuia } from '@/types';
+import type { VentaSireb } from '@/types/aprovechamientos';
 
 /**
  * Tipos del módulo Guías — el amparo de UN traslado de producto.
@@ -115,19 +116,19 @@ export interface GuiaFila extends RenglonesGuia {
     /** Las dos puertas del borrador: PENDIENTE y sin un depósito cargado. */
     puede_editarse: boolean;
     puede_eliminarse: boolean;
-    /** Solo una guía FIRMADA se anula: el borrador se elimina y la presentada se rechaza. */
+    /** Solo una guía APROBADA se anula: el borrador se elimina. */
     puede_anularse: boolean;
     /** Ya pasó por la firma: es lo que habilita a imprimir el papel. */
     ya_fue_aprobada: boolean;
-    admite_pagos: boolean;
     /** Por qué todavía no ampara. Null cuando sí ampara. */
     motivo_sin_amparar: string | null;
 
     monto: number;
-    saldo_pendiente: number;
-    pagado: boolean;
+    /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
+    sireb: VentaSireb | null;
+    puede_verificar_pago: boolean;
 
-    /** Existe desde el ENVÍO; null mientras es borrador. */
+    /** Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
 
@@ -144,11 +145,6 @@ export interface GuiaFicha extends GuiaFila {
     asociacion_nombre: string | null;
     detalles: DetalleGuia[];
 
-    /** Las del circuito, resueltas en el servidor. */
-    puede_enviarse: boolean;
-    puede_revisarse: boolean;
-    puede_aprobarse: boolean;
-    pagos_sin_validar: number;
 }
 
 /** La guía como la abre el formulario de corrección. */

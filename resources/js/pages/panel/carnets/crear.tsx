@@ -440,8 +440,8 @@ export default function CrearCarnet({
                                     {tipo.precio !== null ? bs(tipo.precio, institucion.moneda) : '—'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    Se cobra después, en la ficha: el carnet queda PENDIENTE hasta
-                                    que el arancel esté cubierto y alguien lo apruebe.
+                                    Se paga en Recaudaciones: el carnet queda PENDIENTE hasta que
+                                    el pago se valide allá, y entonces queda aprobado solo.
                                 </p>
                             </div>
                         )}

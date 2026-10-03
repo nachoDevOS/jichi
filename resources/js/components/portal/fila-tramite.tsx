@@ -1,21 +1,21 @@
 import { Check, ExternalLink, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { detalleDocumento, ICONO_DOCUMENTO } from '@/components/portal/documento';
-import { BotonPagarQr, ConMontoResaltado, EstadoChip } from '@/components/portal/piezas';
+import { ConMontoResaltado, EstadoChip } from '@/components/portal/piezas';
 import { VisorVistaPrevia } from '@/components/portal/visor-vista-previa';
 import { cn } from '@/lib/utils';
 import type { PapelPortal } from '@/types/portal';
 
-const PASOS = ['Solicitado', 'Pago', 'Revisión', 'Aprobado'];
+const PASOS = ['Solicitado', 'Pago en Recaudaciones', 'Aprobado'];
 
 /** Qué paso está en marcha: sale de la `etapa` que calcula el servidor. */
-const PASO_ACTUAL: Record<NonNullable<PapelPortal['etapa']>, number> = { pago: 1, envio: 2, revision: 2 };
+const PASO_ACTUAL: Record<NonNullable<PapelPortal['etapa']>, number> = { pago: 1 };
 
 /**
  * Un trámite abierto, compacto: qué es, la línea de pasos del circuito, qué le
- * falta y, si debe algo, el mismo «Pagar con QR» de las tarjetas.
+ * falta y el código con el que se paga en SIREB.
  */
-export function FilaTramite({ tramite, moneda }: { tramite: PapelPortal; moneda: string }) {
+export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
     const { icono: Icono, tono } = ICONO_DOCUMENTO[tramite.clase];
     const actual = tramite.etapa ? PASO_ACTUAL[tramite.etapa] : 0;
     const [viendo, setViendo] = useState(false);
@@ -34,7 +34,7 @@ export function FilaTramite({ tramite, moneda }: { tramite: PapelPortal; moneda:
             </div>
 
             {/* La línea de pasos: hecho con ✓, el paso en marcha en dorado y pulsando, lo que viene en gris. */}
-            <ol className="mt-3 grid grid-cols-4" aria-label="Avance del trámite">
+            <ol className="mt-3 grid grid-cols-3" aria-label="Avance del trámite">
                 {PASOS.map((paso, i) => {
                     const hecho = i < actual;
                     const enMarcha = i === actual;
@@ -110,17 +110,11 @@ export function FilaTramite({ tramite, moneda }: { tramite: PapelPortal; moneda:
                     )}
                 </div>
 
-                {tramite.qr_pago && (
-                    <BotonPagarQr
-                        className="sm:w-auto"
-                        pago={{
-                            concepto: tramite.tipo,
-                            codigo: tramite.codigo,
-                            monto: tramite.debe,
-                            moneda,
-                            qr: tramite.qr_pago,
-                        }}
-                    />
+                {/* Con este código se paga en Recaudaciones. */}
+                {tramite.codigo_pago && (
+                    <p className="shrink-0 rounded-full bg-rio-espuma px-3 py-1.5 text-xs text-rio-profundo">
+                        Código de pago <strong className="font-mono tracking-wider">{tramite.codigo_pago}</strong>
+                    </p>
                 )}
             </div>
 

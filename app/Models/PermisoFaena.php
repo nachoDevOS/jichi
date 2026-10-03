@@ -8,7 +8,7 @@ use App\Enums\TipoActor;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
-use App\Traits\Pagable;
+use App\Traits\LiquidableSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -40,7 +40,7 @@ use Illuminate\Support\Carbon;
 ])]
 class PermisoFaena extends Model
 {
-    use Auditable, Codificable, Pagable, SoftDeletes;
+    use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
     /** «PermisoFaena» pluraliza a «permiso_faenas», que no es la tabla. */
     protected $table = 'permisos_faena';
@@ -95,9 +95,8 @@ class PermisoFaena extends Model
     /**
      * El titular, alcanzado por el carnet.
      *
-     * `CobrarService` lo pide como `beneficiario_id` —la columna que tienen el
-     * carnet y el cupo— así que el accesor deja a la faena hablando el mismo
-     * idioma sin duplicar la clave en la tabla.
+     * Como `beneficiario_id` —la columna que tienen el carnet y el cupo—, así que
+     * el accesor deja a la faena hablando el mismo idioma sin duplicar la clave.
      */
     protected function beneficiarioId(): Attribute
     {
@@ -120,10 +119,20 @@ class PermisoFaena extends Model
         );
     }
 
-    //  El circuito: cobrar, presentar y firmar
+    //  El circuito: pagar en SIREB y aprobar
+
+    public function titularSireb(): Beneficiario
+    {
+        return $this->carnet->beneficiario;
+    }
+
+    public function itemsSireb(): array
+    {
+        return [['tarifa_id' => $this->sireb_tarifa_id, 'cantidad' => 1]];
+    }
 
     /**
-     * Lo que sale ESTE permiso. Exigido por el trait Pagable. Es el precio de
+     * Lo que sale ESTE permiso. Es el precio de
      * SIREB congelado al emitir: un cambio de tarifa no mueve un papel entregado.
      */
     public function montoACobrar(): float
@@ -131,49 +140,25 @@ class PermisoFaena extends Model
         return (float) $this->monto;
     }
 
-    /** ¿Se le pueden cargar depósitos hoy? Exigido por el trait Pagable. */
-    public function admitePagos(): bool
-    {
-        return $this->estado->permitePagos();
-    }
-
-    /**
-     * ¿Se pueden corregir sus datos?
-     *
-     * El estado no alcanza: un depósito ya cargado significa que el pescador
-     * pagó por ESTA salida, y mover los kilos o las fechas después cambiaría
-     * lo que se cobró. Se da de baja el depósito primero.
-     */
+    /** ¿Se pueden corregir sus datos? Solo pendiente. */
     public function puedeEditarse(): bool
     {
-        return $this->estado->permiteEdicion() && $this->montoPagado() <= 0.0;
+        return $this->estado->permiteEdicion();
     }
 
     /** ¿Se puede borrar la fila entera? Mismo corte que la edición. */
     public function puedeEliminarse(): bool
     {
-        return $this->estado->permiteEliminacion() && $this->montoPagado() <= 0.0;
+        return $this->estado->permiteEliminacion();
     }
 
-    /** ¿Se puede presentar a revisión? Estado Y arancel cubierto. */
-    public function puedeEnviarseARevision(): bool
-    {
-        return $this->estado->permiteEnvio() && $this->estaPagado();
-    }
-
-    /** ¿Está sobre la mesa de quien firma? */
-    public function puedeRevisarse(): bool
-    {
-        return $this->estado->permiteRevision();
-    }
-
-    /** ¿Ya pasó por la firma? Es lo que habilita a salir a pescar. */
+    /** ¿Ya se aprobó? Es lo que habilita a salir a pescar. */
     public function yaFueAprobada(): bool
     {
         return ! $this->estado->estaAbierto();
     }
 
-    /** ¿Se imprime el permiso? Firmado, no revocado y con la autorización viva. */
+    /** ¿Se imprime el permiso? Aprobado, no revocado y con la autorización viva. */
     public function puedeImprimirse(): bool
     {
         return $this->yaFueAprobada()
@@ -233,18 +218,6 @@ class PermisoFaena extends Model
         return $this->sinEfecto() ? 'rose' : $this->estado->color();
     }
 
-    /** ¿Se pueden CONTROLAR sus boletas? Solo con la faena presentada. */
-    public function admiteControlDePagos(): bool
-    {
-        return $this->estado === EstadoFaena::EnRevision;
-    }
-
-    /** Corregir se habilita antes: es lo único que levanta una observación. */
-    public function admiteCorreccionDePagos(): bool
-    {
-        return $this->estado->estaAbierto();
-    }
-
     /**
      * Por qué esta faena todavía no autoriza a salir. Null cuando sí autoriza.
      *
@@ -262,10 +235,8 @@ class PermisoFaena extends Model
                 'Pesquero fue revocada, así que ya no autoriza la salida.',
             $this->sinEfecto() => 'Sin efecto: su carnet fue revocado y el titular todavía no tiene otro '.
                 'carnet de pescador vigente. Vuelve a valer cuando se apruebe el carnet nuevo.',
-            $this->estado === EstadoFaena::Pendiente => 'La faena está PENDIENTE: falta cubrir el '.
-                'arancel y enviarla a revisión.',
-            $this->estado === EstadoFaena::EnRevision => 'La faena está presentada y esperando la '.
-                'firma de quien la aprueba.',
+            $this->estado === EstadoFaena::Pendiente => 'La faena está PENDIENTE: falta que se pague '.
+                'en Recaudaciones.',
             $this->estado === EstadoFaena::Completado => 'La salida ya se cerró: los kilos quedaron '.
                 'firmes contra el cupo.',
             $this->estado === EstadoFaena::Vencido => 'Pasó su fecha de desembarque sin cerrarse.',

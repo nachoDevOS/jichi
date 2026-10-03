@@ -67,7 +67,7 @@ export default function EditarCarnet({
     return (
         <LayoutPanel
             titulo="Corregir carnet"
-            descripcion="Solo mientras está PENDIENTE y sin cobrar. El titular y la actividad no se corrigen."
+            descripcion="Solo mientras está PENDIENTE de pago. El titular y la actividad no se corrigen."
         >
             <Head title="Corregir carnet" />
 

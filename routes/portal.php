@@ -6,7 +6,6 @@ use App\Http\Controllers\Portal\DescargarReciboController;
 use App\Http\Controllers\Portal\EnCursoController;
 use App\Http\Controllers\Portal\InicioController;
 use App\Http\Controllers\Portal\PagosController;
-use App\Http\Controllers\Portal\PagoSimuladoController;
 use App\Http\Controllers\Portal\PapelesController;
 use App\Http\Controllers\Portal\PerfilController;
 use App\Http\Controllers\Portal\VistaPreviaController;
@@ -41,10 +40,7 @@ Route::prefix('mi-cuenta')->name('portal.')->group(function () {
         Route::get('/pagos', PagosController::class)->name('pagos');
         Route::get('/mis-datos', [PerfilController::class, 'show'])->name('perfil');
 
-        // El PNG del QR simulado que muestra el modal. Por código público, y solo si es suyo.
-        Route::get('/pagar/{codigo}/qr', PagoSimuladoController::class)->name('pagar.qr');
-
-        // El PDF del panel, solo de lo vigente hoy. Mismo control de dueño que pagar.
+        // El PDF del panel, solo de lo vigente hoy, y solo si es suyo.
         Route::get('/descargar/{codigo}', DescargarController::class)->name('descargar');
         Route::get('/recibos/{codigo}/descargar', DescargarReciboController::class)->name('recibos.descargar');
 

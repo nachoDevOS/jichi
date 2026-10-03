@@ -1,3 +1,16 @@
+# El recibo hoy — 02/10/2026
+
+> **Esto manda sobre todo lo de abajo.** El recibo es la tabla `recibos`, **uno
+> por documento pagado** (`recibible_type` + `recibible_id`). Lo emite
+> `ConfirmarPagoService` cuando SIREB da la liquidación por `pagada`, y congela
+> el monto, el concepto y la boleta tal como la validó SIREB (`numero_boleta`,
+> `entidad_bancaria`, `fecha_pago`). Correlativo continuo `000001` (serie `REC`).
+> Ya no hay tabla `pagos`, ni Caja, ni recibo armado al vuelo. El PDF sigue siendo
+> `recibo-oficial.blade.php`, con `App\Support\ReciboImpreso` (un renglón: el
+> documento pagado; en «N°», la boleta y el banco). Ver [PAGOS.md](PAGOS.md).
+>
+> Lo de abajo es historia, salvo la maquetación del PDF, que sigue valiendo.
+
 > # ⚠️ DESACTUALIZADO desde el 18/09/2026
 >
 > El núcleo de datos se rehízo desde cero: ya no existen `rubros`,

@@ -70,12 +70,6 @@ export interface CupoFila {
     puede_editarse: boolean;
     puede_eliminarse: boolean;
 
-    /**
-     * Las tres del circuito de revisión, resueltas en el servidor.
-     */
-    admite_pagos: boolean;
-    puede_enviarse: boolean;
-    puede_revisarse: boolean;
     /** Si pasó por la firma. Revocado también cuenta: se firmó, después se dio de baja. */
     ya_fue_aprobado: boolean;
     /** Firmada y no revocada: el mismo corte que la impresión del carnet. */
@@ -83,19 +77,29 @@ export interface CupoFila {
     /** Aprobada o agotada: lo único que se revoca. */
     puede_revocarse: boolean;
 
-    /** El recibo del trámite. Existe desde el ENVÍO; null mientras es borrador. */
+    /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
 
     monto: number;
-    saldo_pendiente: number;
-    pagado: boolean;
+    /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
+    sireb: VentaSireb | null;
+    puede_verificar_pago: boolean;
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     fecha_solicitud: string | null;
     /** El día que lo firmaron. `null` mientras el cupo no esté aprobado. */
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
+}
+
+/** La liquidación del documento en SIREB, donde se paga. La comparten los cuatro documentos. */
+export interface VentaSireb {
+    estado: 'por_enviar' | 'registrada' | 'anulada';
+    estado_etiqueta: string;
+    estado_color: string;
+    /** Con el que se consulta y paga en SIREB. Null hasta que SIREB responde. */
+    codigo_publico: string | null;
 }
 
 /** El cupo con el detalle que solo pinta la ficha. */
@@ -106,63 +110,22 @@ export interface CupoFicha extends CupoFila {
     /** [piso, techo] del tramo, para contrastarlo con lo otorgado. */
     escala_rango: [number, number] | null;
 
-    /**
-     * Cuántas boletas quedan sin dar por buenas —sin validar u observadas—.
-     */
-    pagos_sin_validar: number;
-    puede_aprobarse: boolean;
     /** Firmado y en fecha: puede respaldar una cédula nueva. */
     puede_emitir_carnet: boolean;
 }
 
-/**
- * Un depósito que pagó este cupo, en la ficha.
- */
-export interface PagoDelCupo {
-    id: number;
-    monto_parcial: number;
-    nro_transaccion: string;
-    comprobante_url: string | null;
-    /** Un DÍA —lo que dice la boleta—: se muestra con fecha(). */
-    fecha_deposito: string | null;
-    /** Un MOMENTO —cuándo entró la plata—: se muestra con fechaHora(). */
-    cobrado_en: string | null;
-
-    /**
-     *  El control de la boleta, que no es el estado del pago
-     */
-    estado_validacion: 'pendiente' | 'validado' | 'observado';
-    estado_validacion_etiqueta: string;
-    estado_validacion_color: string;
-    /** Qué se le objetó. Es lo único que le dice a ventanilla qué corregir. */
-    observacion: string | null;
-
-    /** Quién lo cargó y quién lo controló: dos personas, dos columnas. */
-    registrado_por: string | null;
-    validado_por: string | null;
-    /** Un MOMENTO —cuándo se miró la boleta—: se muestra con fechaHora(). */
-    validado_en: string | null;
-
-    /**
-     * Las dos llegan RESUELTAS del servidor, y no se recalculan acá: dependen
-     * del estado del TRÁMITE además del estado del pago —controlar solo corre
-     * en revisión— y una copia de esa regla en la pantalla se queda vieja sola.
-     */
-    puede_validarse: boolean;
-    puede_corregirse: boolean;
-}
-
-/**
- * El recibo del trámite: uno solo, con todos los depósitos adentro.
- */
+/** El recibo de un documento: uno, emitido cuando SIREB confirmó el pago. Lo comparten los cuatro. */
 export interface ReciboDelCupo {
     id: number;
     numero_recibo: string;
     monto_total: number;
+    /** La boleta tal como la validó SIREB. */
+    numero_boleta: string | null;
+    entidad_bancaria: string | null;
+    /** Un DÍA, el de la boleta: se muestra con fecha(). */
+    fecha_pago: string | null;
     /** Un MOMENTO —cuándo se emitió—: se muestra con fechaHora(). */
     emitido_en: string | null;
-    /** Cuántos depósitos ampara. El papel es UNO por trámite. */
-    pagos_count?: number;
 }
 
 /** Una cédula que se apoya en este cupo, en la ficha. */

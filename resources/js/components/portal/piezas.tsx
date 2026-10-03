@@ -1,13 +1,10 @@
 import {
-    ChevronRight,
     Eye,
     EyeOff,
     MapPin,
     Download,
-    QrCode,
 } from 'lucide-react';
 import { useState, type InputHTMLAttributes, type PropsWithChildren, type ReactNode } from 'react';
-import { useModalPago, type Pago } from '@/components/portal/modal-pago';
 import { cn } from '@/lib/utils';
 
 /**
@@ -37,33 +34,6 @@ export function EstadoChip({ color, children }: PropsWithChildren<{ color: strin
         >
             {children}
         </span>
-    );
-}
-
-/** El botón «Pagar con QR»: abre el modal global. Lo usan la tarjeta y la lista de «En curso». */
-export function BotonPagarQr({ pago, className = '' }: { pago: Pago; className?: string }) {
-    const abrirPago = useModalPago();
-
-    // El monto no va en el botón: lo dicen el «Qué falta» y el modal.
-    return (
-        <button
-            type="button"
-            onClick={() => abrirPago(pago)}
-            className={cn(
-                'group flex w-full items-center gap-2 rounded-full bg-linear-to-r from-rio to-rio-profundo py-2 pr-3 pl-3.5 text-left text-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:translate-y-0',
-                className,
-            )}
-        >
-            <QrCode className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-sm leading-none font-bold">
-                Pagar con QR
-                <span className="ml-1.5 text-[11px] font-medium text-white/70 sm:hidden">desde su banco</span>
-                <span className="ml-1.5 hidden text-[11px] font-medium text-white/70 sm:inline">
-                    desde la app de su banco
-                </span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-white/70 transition-transform group-hover:translate-x-0.5" />
-        </button>
     );
 }
 

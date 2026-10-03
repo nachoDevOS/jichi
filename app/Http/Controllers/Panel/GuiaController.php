@@ -6,28 +6,21 @@ use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
 use App\Enums\MedioTransporte;
 use App\Enums\TipoTransporte;
-use App\Exceptions\CobroInvalidoException;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\ActualizarGuiaRequest;
 use App\Http\Requests\Panel\AnularGuiaRequest;
 use App\Http\Requests\Panel\EliminarGuiaRequest;
 use App\Http\Requests\Panel\EmitirGuiaRequest;
-use App\Http\Requests\Panel\RechazarGuiaRequest;
-use App\Http\Requests\Panel\RegistrarDepositosRequest;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
-use App\Models\Pago;
 use App\Models\ProductoHidrobiologico;
 use App\Models\Recibo;
-use App\Services\CobrarService;
+use App\Services\ConfirmarPagoService;
 use App\Services\EmitirGuiaService;
-use App\Services\RevisarGuiaService;
 use App\Sireb\VistaSireb;
-use App\Support\Archivos;
 use App\Support\Paginacion;
 use App\Support\Sql;
 use Illuminate\Http\RedirectResponse;
@@ -65,16 +58,12 @@ class GuiaController extends Controller
             // cinco partes del nombre y las tres de la cédula, porque
             // `nombreCompleto` y `documento_identidad` las concatenan.
             ->with([
+                'recibo:id,recibible_type,recibible_id,numero_recibo',
                 'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
                 'carnet.codigo',
                 'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'asociacion:id,nombre,sigla',
-                // El recibo del listado sale de los pagos ya cargados: ver reciboDe().
-                'pagos:id,pagable_type,pagable_id,recibo_id,monto_parcial',
-                'pagos.recibo:id,numero_recibo',
             ])
-            // Evita una consulta agregada POR FILA al calcular el saldo.
-            ->withSum('pagos', 'monto_parcial')
             ->when($filtros['buscar'], function ($q, $termino) {
                 $operador = Sql::like($q->getConnection());
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], mb_strtoupper($termino)).'%';
@@ -279,51 +268,15 @@ class GuiaController extends Controller
         ]);
 
         // El recibo del trámite —uno solo— y cuántas boletas faltan controlar.
-        $recibo = $guia->recibos()->first();
-        $sinValidar = $guia->pagos()->sinValidar()->count();
+        $recibo = $guia->recibo;
 
         return Inertia::render('panel/guias/ver', [
             'guia' => [
                 ...$this->resumir($guia),
                 'asociacion_nombre' => $guia->asociacion?->nombre,
 
-                // Las del circuito, resueltas en el servidor: React no vuelve a
-                // evaluar el estado.
-                'puede_enviarse' => $guia->puedeEnviarseARevision(),
-                'puede_revisarse' => $guia->puedeRevisarse(),
-                'puede_aprobarse' => $guia->puedeRevisarse() && $sinValidar === 0,
-                'pagos_sin_validar' => $sinValidar,
-
                 'detalles' => $this->resumirDetalle($guia),
             ],
-
-            // El detalle de lo cobrado: una fila por boleta, con su control.
-            'pagos' => $guia->pagos()
-                // Precargados: si no, cinco depósitos son diez consultas.
-                ->with(['registradoPor:id,name', 'validadoPor:id,name'])
-                ->latest('created_at')
-                ->get()
-                // El trámite se le pone a mano: `admiteControl()` le pregunta
-                // al `pagable`, y sin esto cada fila lo va a buscar a la base.
-                ->each(fn (Pago $p) => $p->setRelation('pagable', $guia))
-                ->map(fn (Pago $p): array => [
-                    'id' => $p->id,
-                    'monto_parcial' => (float) $p->monto_parcial,
-                    'nro_transaccion' => $p->nro_transaccion,
-                    'fecha_deposito' => $p->fecha_deposito?->toDateString(),
-                    'comprobante_url' => $p->comprobante_url,
-                    'cobrado_en' => $p->created_at?->toIso8601String(),
-                    'estado_validacion' => $p->estado_validacion->value,
-                    'estado_validacion_etiqueta' => $p->estado_validacion->etiqueta(),
-                    'estado_validacion_color' => $p->estado_validacion->color(),
-                    'observacion' => $p->observacion,
-                    'registrado_por' => $p->registradoPor?->name,
-                    'validado_por' => $p->validadoPor?->name,
-                    'validado_en' => $p->validado_en?->toIso8601String(),
-                    'puede_validarse' => $p->admiteControl(),
-                    'puede_corregirse' => $p->admiteCorreccion(),
-                ])
-                ->all(),
 
             // El recibo del trámite: uno solo, emitido al enviar a revisión.
             'recibo' => $recibo ? [
@@ -331,172 +284,11 @@ class GuiaController extends Controller
                 'numero_recibo' => $recibo->numero_recibo,
                 'monto_total' => (float) $recibo->monto_total,
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
-                'pagos_count' => $recibo->pagos()->count(),
+                'numero_boleta' => $recibo->numero_boleta,
+                'entidad_bancaria' => $recibo->entidad_bancaria,
+                'fecha_pago' => $recibo->fecha_pago?->toDateString(),
             ] : null,
         ]);
-    }
-
-    /**
-     *  Cargar los depósitos — POST /panel/guias/{guia}/pagos
-     *
-     * Mismo circuito que el carnet, el cupo y la faena: las boletas entran
-     * juntas, tienen que cubrir el arancel entero y, si el operador lo pide, la
-     * guía queda presentada en el mismo acto.
-     */
-    public function pagar(
-        RegistrarDepositosRequest $request,
-        GuiaMovimiento $guia,
-        CobrarService $caja,
-        RevisarGuiaService $revision,
-    ): RedirectResponse {
-        $datos = $request->validated();
-
-        // ANTES de subir nada: descubrirlo adentro obligaría a borrar los
-        // archivos ya escritos, que una transacción no deshace.
-        if (! $guia->admitePagos()) {
-            return back()->withErrors([
-                'pagos' => CobroInvalidoException::noAdmiteDepositos(
-                    'La guía',
-                    $guia->estado->etiqueta(),
-                )->getMessage(),
-            ]);
-        }
-
-        $suma = round(array_sum(array_map(
-            static fn (array $p): float => round((float) $p['monto'], 2),
-            $datos['pagos'],
-        )), 2);
-
-        $saldo = $guia->saldoPendiente();
-
-        if ($suma < $saldo) {
-            return back()->withInput()->withErrors([
-                'pagos' => CobroInvalidoException::noCubreElMonto('esta guía', $suma, $saldo)->getMessage(),
-            ]);
-        }
-
-        $subidos = [];
-
-        try {
-            foreach ($datos['pagos'] as $i => $pago) {
-                $subidos[$i] = app(StorageController::class)
-                    ->file($request->file("pagos.{$i}.comprobante"), 'comprobantes');
-            }
-
-            $depositos = [];
-
-            foreach ($datos['pagos'] as $i => $pago) {
-                $depositos[] = [
-                    'monto' => (float) $pago['monto'],
-                    'nro_transaccion' => $pago['nro_transaccion'],
-                    'fecha_deposito' => $pago['fecha_deposito'],
-                    'comprobante' => $subidos[$i],
-                ];
-            }
-
-            // UNA sola llamada con todas las boletas, nunca una por depósito en un
-            // foreach: partirlo gasta dos números de recibo. Ver CLAUDE.md.
-            $caja->registrarDepositos($guia, $depositos);
-        } catch (CobroInvalidoException $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            return back()->withInput()->withErrors(['pagos' => $e->getMessage()]);
-        } catch (\Throwable $e) {
-            foreach ($subidos as $ruta) {
-                Archivos::borrar($ruta);
-            }
-
-            throw $e;
-        }
-
-        $guia->refresh();
-        $cuantos = count($datos['pagos']);
-
-        //  Registrar y enviar son un solo acto cuando el arancel queda cubierto
-        $enviada = false;
-
-        if (($datos['enviar'] ?? false) && $guia->puedeEnviarseARevision()) {
-            $revision->enviar($guia);
-            $guia->refresh();
-            $enviada = true;
-        }
-
-        return redirect()
-            ->route('guias.show', $guia)
-            ->with('exito', match (true) {
-                $enviada => sprintf(
-                    '%d depósito(s) registrado(s) y enviada a revisión. Se emitió el recibo con el '.
-                    'total; queda esperando la firma de quien la aprueba.',
-                    $cuantos,
-                ),
-                $guia->saldoPendiente() <= 0.0 => sprintf(
-                    '%d depósito(s) registrado(s). El arancel quedó cubierto: ya se puede enviar a revisión.',
-                    $cuantos,
-                ),
-                default => sprintf(
-                    '%d depósito(s) registrado(s). Quedan %s Bs por cobrar.',
-                    $cuantos,
-                    number_format($guia->saldoPendiente(), 2, ',', '.'),
-                ),
-            });
-    }
-
-    /**
-     * Enviar a revisión — POST /panel/guias/{guia}/enviar
-     */
-    public function enviar(GuiaMovimiento $guia, RevisarGuiaService $revision): RedirectResponse
-    {
-        try {
-            $revision->enviar($guia);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('guias.show', $guia)
-            ->with('exito', 'Enviada a revisión. Se emitió el recibo con el total de los depósitos; '.
-                'queda esperando la firma de quien la aprueba.');
-    }
-
-    /**
-     * Aprobar — PATCH /panel/guias/{guia}/aprobar
-     */
-    public function aprobar(GuiaMovimiento $guia, RevisarGuiaService $revision): RedirectResponse
-    {
-        try {
-            $revision->aprobar($guia);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['general' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('guias.show', $guia)
-            ->with('exito', sprintf(
-                'Guía aprobada. Ampara el traslado hasta el %s: ya se puede imprimir.',
-                $guia->refresh()->fecha_vencimiento?->format('d/m/Y H:i') ?? '—',
-            ));
-    }
-
-    /**
-     * Rechazar — PATCH /panel/guias/{guia}/rechazar
-     */
-    public function rechazar(
-        RechazarGuiaRequest $request,
-        GuiaMovimiento $guia,
-        RevisarGuiaService $revision,
-    ): RedirectResponse {
-        try {
-            $revision->rechazar($guia, $request->validated()['motivo']);
-        } catch (PermisoOperativoException $e) {
-            return back()->withErrors(['motivo' => $e->getMessage()]);
-        }
-
-        return redirect()
-            ->route('guias.show', $guia)
-            ->with('exito', 'Guía devuelta a ventanilla con el motivo escrito. Los depósitos y el '.
-                'recibo no se tocaron.');
     }
 
     /**
@@ -513,6 +305,18 @@ class GuiaController extends Controller
         return redirect()
             ->route('guias.show', $guia)
             ->with('exito', 'Guía anulada. El número queda ocupado: la hoja del talonario se gastó.');
+    }
+
+    /**
+     * Verificar pago — POST /panel/guias/{guia}/verificar-pago
+     *
+     * Pregunta a SIREB; si está pagado, lo aprueba y emite el recibo.
+     */
+    public function verificarPago(GuiaMovimiento $guia, ConfirmarPagoService $pagos): RedirectResponse
+    {
+        $resultado = $pagos->verificar($guia);
+
+        return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     //  Auxiliares
@@ -548,21 +352,6 @@ class GuiaController extends Controller
             'diasVigencia' => GuiaMovimiento::DIAS_VIGENCIA,
             'descuentoPiscicultura' => GuiaMovimiento::DESCUENTO_PISCICULTURA,
         ];
-    }
-
-    /**
-     * El recibo del trámite, sin una consulta por fila.
-     *
-     * `Pagable::recibos()` es una CONSULTA y no una relación, así que en un
-     * listado hay que resolverlo desde los pagos ya precargados.
-     */
-    private function reciboDe(GuiaMovimiento $guia): ?Recibo
-    {
-        if ($guia->relationLoaded('pagos')) {
-            return $guia->pagos->firstWhere('recibo_id', '!=', null)?->recibo;
-        }
-
-        return $guia->recibos()->first();
     }
 
     /**
@@ -627,7 +416,7 @@ class GuiaController extends Controller
      */
     private function resumir(GuiaMovimiento $guia): array
     {
-        $recibo = $this->reciboDe($guia);
+        $recibo = $guia->recibo;
 
         return [
             'id' => $guia->id,
@@ -668,14 +457,14 @@ class GuiaController extends Controller
             'puede_eliminarse' => $guia->puedeEliminarse(),
             'puede_anularse' => $guia->estado->permiteAnulacion(),
             'ya_fue_aprobada' => $guia->yaFueAprobada(),
-            'admite_pagos' => $guia->admitePagos(),
+            // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
+            'sireb' => $guia->resumenSireb(),
+            'puede_verificar_pago' => $guia->estado->estaAbierto(),
             // Por qué todavía no ampara. Se resuelve en el servidor: React no
             // vuelve a evaluar el estado.
             'motivo_sin_amparar' => $guia->motivoSinAmparar(),
 
             'monto' => $guia->montoACobrar(),
-            'saldo_pendiente' => $guia->saldoPendiente(),
-            'pagado' => $guia->estaPagado(),
 
             // El recibo existe desde el ENVÍO; null mientras es borrador.
             'recibo_id' => $recibo?->id,

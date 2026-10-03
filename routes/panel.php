@@ -5,7 +5,6 @@ use App\Http\Controllers\Panel\ArancelSirebController;
 use App\Http\Controllers\Panel\AsociacionController;
 use App\Http\Controllers\Panel\AutorizacionPescaController;
 use App\Http\Controllers\Panel\BeneficiarioController;
-use App\Http\Controllers\Panel\CajaController;
 use App\Http\Controllers\Panel\CarnetController;
 use App\Http\Controllers\Panel\CarnetImpresionController;
 use App\Http\Controllers\Panel\CategoriaAprovechamientoController;
@@ -14,7 +13,6 @@ use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\FaenaController;
 use App\Http\Controllers\Panel\GuiaController;
 use App\Http\Controllers\Panel\GuiaImpresionController;
-use App\Http\Controllers\Panel\PagoController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
 use App\Http\Controllers\Panel\ProductoHidrobiologicoController;
 use App\Http\Controllers\Panel\ReciboController;
@@ -103,7 +101,7 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     });
 
     // Corregir el borrador. El estado manda: el servicio lo comprueba con la
-    // fila bloqueada, porque entre abrir el formulario y guardar pudo cobrarse.
+    // fila bloqueada, porque entre abrir el formulario y guardar pudo aprobarse.
     Route::middleware('permiso:aprovechamientos.editar')->group(function () {
         Route::get('/aprovechamientos/{aprovechamiento}/editar', [AprovechamientoController::class, 'edit'])
             ->name('aprovechamientos.edit');
@@ -112,23 +110,10 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->name('aprovechamientos.update');
     });
 
-    // Los depósitos, desde la ficha del cupo.
-    Route::post('/aprovechamientos/{aprovechamiento}/pagos', [AprovechamientoController::class, 'pagar'])
-        ->middleware('permiso:caja.cobrar')
-        ->name('aprovechamientos.pagar');
-
-    // El circuito de revisión.
-    Route::post('/aprovechamientos/{aprovechamiento}/enviar', [AprovechamientoController::class, 'enviar'])
-        ->middleware('permiso:aprovechamientos.enviar')
-        ->name('aprovechamientos.enviar');
-
-    Route::middleware('permiso:aprovechamientos.aprobar')->group(function () {
-        Route::patch('/aprovechamientos/{aprovechamiento}/aprobar', [AprovechamientoController::class, 'aprobar'])
-            ->name('aprovechamientos.aprobar');
-
-        Route::patch('/aprovechamientos/{aprovechamiento}/rechazar', [AprovechamientoController::class, 'rechazar'])
-            ->name('aprovechamientos.rechazar');
-    });
+    // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
+    Route::post('/aprovechamientos/{aprovechamiento}/verificar-pago', [AprovechamientoController::class, 'verificarPago'])
+        ->middleware('permiso:aprovechamientos.crear')
+        ->name('aprovechamientos.verificar-pago');
 
     // Revocar es una sanción, como en el carnet: permiso propio y motivo obligatorio.
     Route::patch('/aprovechamientos/{aprovechamiento}/revocar', [AprovechamientoController::class, 'revocar'])
@@ -180,22 +165,10 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware('permiso:carnets.eliminar')
         ->name('carnets.destroy');
 
-    // Los depósitos, desde la ficha. Mismo permiso: es un cobro de mostrador.
-    Route::post('/carnets/{carnet}/pagos', [CarnetController::class, 'pagar'])
-        ->middleware('permiso:caja.cobrar')
-        ->name('carnets.pagar');
-
-    Route::post('/carnets/{carnet}/enviar', [CarnetController::class, 'enviar'])
-        ->middleware('permiso:carnets.enviar')
-        ->name('carnets.enviar');
-
-    Route::middleware('permiso:carnets.aprobar')->group(function () {
-        Route::patch('/carnets/{carnet}/aprobar', [CarnetController::class, 'aprobar'])
-            ->name('carnets.aprobar');
-
-        Route::patch('/carnets/{carnet}/rechazar', [CarnetController::class, 'rechazar'])
-            ->name('carnets.rechazar');
-    });
+    // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
+    Route::post('/carnets/{carnet}/verificar-pago', [CarnetController::class, 'verificarPago'])
+        ->middleware('permiso:carnets.crear')
+        ->name('carnets.verificar-pago');
 
     Route::patch('/carnets/{carnet}/revocar', [CarnetController::class, 'revocar'])
         ->middleware('permiso:carnets.revocar')
@@ -231,25 +204,13 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->name('faenas.store');
     });
 
-    // El circuito de cobro y firma: presentar es de ventanilla, firmar no.
-    Route::post('/faenas/{faena}/pagos', [FaenaController::class, 'pagar'])
-        ->middleware('permiso:caja.cobrar')
-        ->name('faenas.pagar');
-
-    Route::post('/faenas/{faena}/enviar', [FaenaController::class, 'enviar'])
-        ->middleware('permiso:faenas.enviar')
-        ->name('faenas.enviar');
-
-    Route::middleware('permiso:faenas.aprobar')->group(function () {
-        Route::patch('/faenas/{faena}/aprobar', [FaenaController::class, 'aprobar'])
-            ->name('faenas.aprobar');
-
-        Route::patch('/faenas/{faena}/rechazar', [FaenaController::class, 'rechazar'])
-            ->name('faenas.rechazar');
-    });
+    // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
+    Route::post('/faenas/{faena}/verificar-pago', [FaenaController::class, 'verificarPago'])
+        ->middleware('permiso:faenas.crear')
+        ->name('faenas.verificar-pago');
 
     // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
-    // PENDIENTE y sin peso cargado: lo decide PermisoFaena::puedeEditarse().
+    // PENDIENTE: lo decide PermisoFaena::puedeEditarse().
     Route::get('/faenas/{faena}/editar', [FaenaController::class, 'edit'])
         ->middleware('permiso:faenas.editar')
         ->name('faenas.edit');
@@ -287,25 +248,13 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->name('guias.store');
     });
 
-    // El circuito de cobro y firma, igual que el de la faena.
-    Route::post('/guias/{guia}/pagos', [GuiaController::class, 'pagar'])
-        ->middleware('permiso:caja.cobrar')
-        ->name('guias.pagar');
-
-    Route::post('/guias/{guia}/enviar', [GuiaController::class, 'enviar'])
-        ->middleware('permiso:guias.enviar')
-        ->name('guias.enviar');
-
-    Route::middleware('permiso:guias.aprobar')->group(function () {
-        Route::patch('/guias/{guia}/aprobar', [GuiaController::class, 'aprobar'])
-            ->name('guias.aprobar');
-
-        Route::patch('/guias/{guia}/rechazar', [GuiaController::class, 'rechazar'])
-            ->name('guias.rechazar');
-    });
+    // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
+    Route::post('/guias/{guia}/verificar-pago', [GuiaController::class, 'verificarPago'])
+        ->middleware('permiso:guias.crear')
+        ->name('guias.verificar-pago');
 
     // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
-    // PENDIENTE y sin depósito cargado: lo dice GuiaMovimiento::puedeEditarse().
+    // PENDIENTE: lo dice GuiaMovimiento::puedeEditarse().
     Route::get('/guias/{guia}/editar', [GuiaController::class, 'edit'])
         ->middleware('permiso:guias.editar')
         ->name('guias.edit');
@@ -333,19 +282,12 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->name('guias.show');
 
     /*
-    | 5. Caja — el circuito del dinero
+    | 5. Recibos — el comprobante de lo pagado en SIREB
     */
 
-    Route::middleware('permiso:caja.ver')->group(function () {
-        Route::get('/caja', [CajaController::class, 'index'])->name('caja.index');
-        Route::get('/recibos', [ReciboController::class, 'index'])->name('recibos.index');
-    });
-
-    Route::middleware('permiso:caja.cobrar')->group(function () {
-        // 'cobrar' ANTES de cualquier ruta con parámetro: se tomaría como id.
-        Route::get('/caja/cobrar', [CajaController::class, 'create'])->name('caja.create');
-        Route::post('/caja', [CajaController::class, 'store'])->name('caja.store');
-    });
+    Route::get('/recibos', [ReciboController::class, 'index'])
+        ->middleware('permiso:recibos.ver')
+        ->name('recibos.index');
 
     // Imprimir tiene su propio permiso, no el de ver.
     Route::get('/recibos/{recibo}/imprimir', [ReciboController::class, 'imprimir'])
@@ -353,23 +295,8 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->name('recibos.imprimir');
 
     Route::get('/recibos/{recibo}', [ReciboController::class, 'show'])
-        ->middleware('permiso:caja.ver')
+        ->middleware('permiso:recibos.ver')
         ->name('recibos.show');
-
-    // El control de las boletas: la segunda mitad de la revisión.
-    Route::middleware('permiso:pagos.controlar')->group(function () {
-        Route::patch('/pagos/{pago}/validar', [PagoController::class, 'validar'])
-            ->name('pagos.validar');
-
-        Route::patch('/pagos/{pago}/observar', [PagoController::class, 'observar'])
-            ->name('pagos.observar');
-    });
-
-    // POST y no PATCH porque puede traer un ARCHIVO: PHP no puebla `$_FILES`
-    // en un PATCH.
-    Route::post('/pagos/{pago}/corregir', [PagoController::class, 'corregir'])
-        ->middleware('permiso:pagos.corregir')
-        ->name('pagos.corregir');
 
     /*
     | Catálogos — lo que sale de una resolución y casi no se toca

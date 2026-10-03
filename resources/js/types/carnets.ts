@@ -1,4 +1,5 @@
 import type { EstadoCarnet, TipoActor } from '@/types';
+import type { VentaSireb } from '@/types/aprovechamientos';
 
 /**
  * Tipos del módulo Carnets — la credencial anual.
@@ -40,7 +41,7 @@ export interface CarnetFila {
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
     registrado_en: string | null;
 
-    /** El recibo del trámite. Existe desde el ENVÍO; null mientras es borrador. */
+    /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
 
@@ -48,9 +49,7 @@ export interface CarnetFila {
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
-    /** Si se le pueden cargar depósitos hoy. Solo mientras está pendiente. */
-    admite_pagos: boolean;
-    /** Corregir y eliminar: solo sobre el borrador, y sin plata cargada. */
+    /** Corregir y eliminar: solo sobre el borrador. */
     puede_editarse: boolean;
     puede_eliminarse: boolean;
     /** Si pasó por la firma. */
@@ -68,8 +67,9 @@ export interface CarnetFila {
     motivo_sin_permisos: string | null;
 
     monto: number;
-    saldo_pendiente: number;
-    pagado: boolean;
+    /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
+    sireb: VentaSireb | null;
+    puede_verificar_pago: boolean;
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     /** El día que se pidió. La emisión la escribe la aprobación. */
@@ -113,15 +113,6 @@ export interface GuiaDelCarnet {
 export interface CarnetFicha extends CarnetFila {
     /** Solo el APROBADO: ver EstadoCarnet::permiteRevocacion(). */
     puede_revocarse: boolean;
-    /**
-     * Las del circuito de revisión, resueltas en el servidor. React no vuelve
-     * a evaluar el estado: pregunta por estas.
-     */
-    puede_enviarse: boolean;
-    puede_revisarse: boolean;
-    puede_aprobarse: boolean;
-    /** Cuántas boletas quedan sin controlar. Bloquean la aprobación. */
-    pagos_sin_validar: number;
 
     /** Los dos respaldos de la emisión, listos para abrir. */
     archivo_ci_url: string | null;

@@ -31,7 +31,8 @@ class ResumenPortal
             'codigo' => $a->codigo_legible,
             'verificar' => self::urlVerificar($a->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($a),
-            'qr_pago' => self::urlPagar($a),
+            // Con este código se paga en SIREB.
+            'codigo_pago' => $a->sireb_codigo_publico,
             'descargar' => self::urlDescargar($a),
             'escala' => $a->categoria?->descripcion_kg,
             'volumen_total_kg' => (float) $a->volumen_total_kg,
@@ -44,14 +45,13 @@ class ResumenPortal
             'estado_color' => $a->estado->color(),
             'vigente' => $a->estaVigente(),
             'en_tramite' => $a->estado->estaAbierto(),
-            'en_revision' => $a->estado->permiteRevision(),
             'siguiente_paso' => self::siguientePaso($a),
             'etapa' => self::etapa($a),
             'situacion' => self::situacion($a),
             'vence_el' => $a->fecha_vencimiento?->toDateString(),
             'dias_restantes' => self::diasRestantes($a),
             'motivo_baja' => self::motivoBaja($a),
-            'debe' => $a->admitePagos() ? $a->saldoPendiente() : 0.0,
+            'debe' => $a->porPagar(),
             'fecha_solicitud' => $a->fecha_solicitud?->toDateString(),
             'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
         ];
@@ -67,7 +67,8 @@ class ResumenPortal
             'codigo' => $c->codigo_legible,
             'verificar' => self::urlVerificar($c->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($c),
-            'qr_pago' => self::urlPagar($c),
+            // Con este código se paga en SIREB.
+            'codigo_pago' => $c->sireb_codigo_publico,
             // El carnet NO se descarga desde el portal: perdido, se repone en ventanilla.
             'descargar' => null,
             'asociacion' => $c->asociacion?->nombre,
@@ -77,14 +78,13 @@ class ResumenPortal
             'estado_color' => $c->colorEstado(),
             'vigente' => $c->estaVigente(),
             'en_tramite' => $c->estado->estaAbierto(),
-            'en_revision' => $c->estado->permiteRevision(),
             'siguiente_paso' => self::siguientePaso($c),
             'etapa' => self::etapa($c),
             'situacion' => self::situacion($c),
             'vence_el' => $c->fecha_vencimiento?->toDateString(),
             'dias_restantes' => self::diasRestantes($c),
             'motivo_baja' => self::motivoBaja($c),
-            'debe' => $c->admitePagos() ? $c->saldoPendiente() : 0.0,
+            'debe' => $c->porPagar(),
             'fecha_emision' => $c->fecha_emision?->toDateString(),
             'fecha_vencimiento' => $c->fecha_vencimiento?->toDateString(),
         ];
@@ -100,7 +100,8 @@ class ResumenPortal
             'codigo' => $f->codigo_legible,
             'verificar' => self::urlVerificar($f->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($f),
-            'qr_pago' => self::urlPagar($f),
+            // Con este código se paga en SIREB.
+            'codigo_pago' => $f->sireb_codigo_publico,
             'descargar' => self::urlDescargar($f),
             'kilos' => (float) $f->kilos_extraidos,
             'embarcacion' => $f->embarcacion,
@@ -109,14 +110,13 @@ class ResumenPortal
             'estado_color' => $f->colorEstado(),
             'vigente' => $f->estaVigente(),
             'en_tramite' => $f->estado->estaAbierto(),
-            'en_revision' => $f->estado->permiteRevision(),
             'siguiente_paso' => self::siguientePaso($f),
             'etapa' => self::etapa($f),
             'situacion' => self::situacion($f),
             'vence_el' => $f->fecha_desembarque?->toDateString(),
             'dias_restantes' => self::diasRestantes($f),
             'motivo_baja' => self::motivoBaja($f),
-            'debe' => $f->admitePagos() ? $f->saldoPendiente() : 0.0,
+            'debe' => $f->porPagar(),
             'fecha_salida' => $f->fecha_salida?->toDateString(),
             'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
         ];
@@ -132,7 +132,8 @@ class ResumenPortal
             'codigo' => $g->codigo_legible,
             'verificar' => self::urlVerificar($g->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($g),
-            'qr_pago' => self::urlPagar($g),
+            // Con este código se paga en SIREB.
+            'codigo_pago' => $g->sireb_codigo_publico,
             'descargar' => self::urlDescargar($g),
             'ruta' => $g->ruta,
             'kilos' => (float) $g->peso_total_kg,
@@ -140,14 +141,13 @@ class ResumenPortal
             'estado_color' => $g->colorEstado(),
             'vigente' => $g->estaVigente(),
             'en_tramite' => $g->estado->estaAbierto(),
-            'en_revision' => $g->estado->permiteRevision(),
             'siguiente_paso' => self::siguientePaso($g),
             'etapa' => self::etapa($g),
             'situacion' => self::situacion($g),
             'vence_el' => $g->fecha_vencimiento?->toIso8601String(),
             'dias_restantes' => self::diasRestantes($g),
             'motivo_baja' => self::motivoBaja($g),
-            'debe' => $g->admitePagos() ? $g->saldoPendiente() : 0.0,
+            'debe' => $g->porPagar(),
             // Un MOMENTO: la guía vale por horas, no por días.
             'fecha_vencimiento' => $g->fecha_vencimiento?->toIso8601String(),
         ];
@@ -183,19 +183,10 @@ class ResumenPortal
             ->values();
     }
 
-    /**
-     * En qué punto del circuito está un trámite abierto, para la línea de avance
-     * del portal: `pago` (falta plata), `envio` (cubierto, falta presentarlo) o
-     * `revision` (lo controla la Unidad). Null si no está abierto.
-     */
+    /** En qué punto está un trámite abierto: `pago` (espera el pago en SIREB). Null si no está abierto. */
     private static function etapa(Model $documento): ?string
     {
-        return match (true) {
-            $documento->estado->permiteRevision() => 'revision',
-            ! $documento->estado->permiteEnvio() => null,
-            $documento->saldoPendiente() > 0 => 'pago',
-            default => 'envio',
-        };
+        return $documento->estado->estaAbierto() ? 'pago' : null;
     }
 
     /** Los estados de baja: revocado por la Unidad, o la guía anulada. */
@@ -256,15 +247,13 @@ class ResumenPortal
     /** Qué le falta a un trámite abierto, dicho para el titular. Null si no está abierto. */
     private static function siguientePaso(Model $documento): ?string
     {
-        return match (true) {
-            $documento->estado->permiteRevision() => 'La Unidad de Pesca lo está revisando.',
-            ! $documento->estado->permiteEnvio() => null,
-            // El QR se ofrece solo si el botón existe: ver `jichi.portal.pago_qr`.
-            $documento->saldoPendiente() > 0 => config('jichi.portal.pago_qr')
-                ? 'Falta pagar '.self::bs($documento->saldoPendiente()).': con QR o por depósito bancario.'
-                : 'Falta pagar '.self::bs($documento->saldoPendiente()).': depósito bancario y comprobante en ventanilla.',
-            default => 'Pago completo: ventanilla lo envía a revisión.',
-        };
+        if (! $documento->estado->estaAbierto()) {
+            return null;
+        }
+
+        return 'Falta pagar '.self::bs($documento->porPagar()).' en Recaudaciones'
+            .($documento->sireb_codigo_publico ? ' con el código '.$documento->sireb_codigo_publico : '')
+            .'. Una vez validado el pago, queda aprobado solo.';
     }
 
     private static function bs(float $monto): string
@@ -289,16 +278,6 @@ class ResumenPortal
 
         return $codigo !== null && $documento->estaVigente()
             ? route('portal.descargar', ['codigo' => $codigo], false)
-            : null;
-    }
-
-    /** El PNG del «Pagar» simulado, solo si todavía admite depósitos y falta plata. */
-    private static function urlPagar(Model $documento): ?string
-    {
-        $codigo = $documento->codigo?->codigo;
-
-        return config('jichi.portal.pago_qr') && $codigo !== null && $documento->admitePagos() && $documento->saldoPendiente() > 0
-            ? route('portal.pagar.qr', ['codigo' => $codigo], false)
             : null;
     }
 

@@ -47,7 +47,6 @@ class ConfiguracionSeeder extends Seeder
             /*
              * ¿Quien carga un depósito puede validarlo él mismo?
              */
-            ['pagos.revisor_distinto', '0', 'boolean', 'general', 'Exigir que el depósito lo valide otra persona', false],
 
             // Moneda. Vivía en el grupo 'caja'; cuando el arqueo se sacó del
             // sistema se mudó acá, porque la moneda es de todo el sistema y no

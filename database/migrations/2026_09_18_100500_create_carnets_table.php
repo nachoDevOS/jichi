@@ -36,6 +36,13 @@ return new class extends Migration
             $table->decimal('monto', 10, 2)->default(0)->comment('Precio de SIREB al emitir');
             $table->uuid('sireb_tarifa_id')->nullable()->comment('Tarifa de SIREB de ese precio');
 
+            // La liquidación en SIREB (ahí se paga). La clave se guarda ANTES de llamar. Ver MER.md.
+            $table->uuid('sireb_idempotency_key')->nullable()->unique()->comment('Header Idempotency-Key');
+            $table->uuid('sireb_liquidacion_id')->nullable()->comment('Id de la liquidación en SIREB');
+            $table->string('sireb_codigo_publico', 40)->nullable()->comment('Con el que se paga en SIREB');
+            $table->string('sireb_estado', 20)->nullable()->comment('EstadoLiquidacionSireb');
+            $table->json('sireb_envio')->nullable()->comment('Lo enviado a SIREB y su respuesta o error');
+
             // Correlativo por gestión, asignado al aprobar. Índice y no único:
             // lo garantiza CorrelativoService. Ver MER.md.
             $table->unsignedInteger('nro_registro')->nullable()->index()->comment('Correlativo anual, al aprobar');

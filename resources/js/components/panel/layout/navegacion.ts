@@ -1,20 +1,4 @@
-import {
-    BadgeCheck,
-    BarChart3,
-    Building2,
-    Coins,
-    Fish,
-    LayoutDashboard,
-    ReceiptText,
-    Ruler,
-    Ship,
-    Tags,
-    Truck,
-    Users,
-    Wallet,
-    Waves,
-    type LucideIcon,
-} from 'lucide-react';
+import { BadgeCheck, BarChart3, Building2, Coins, Fish, LayoutDashboard, ReceiptText, Ruler, Ship, Tags, Truck, Users, Waves, type LucideIcon } from 'lucide-react';
 
 /**
  * Un ítem del menú lateral.
@@ -52,9 +36,8 @@ export const NAVEGACION: ItemNavegacion[] = [
     { titulo: 'Faenas', tituloCompleto: 'Permisos de faena', ruta: 'faenas.index', icono: Ship, permiso: 'faenas.ver', grupo: 'Ventanilla' },
     { titulo: 'Guías', tituloCompleto: 'Guías de movimiento', ruta: 'guias.index', icono: Truck, permiso: 'guias.ver', grupo: 'Ventanilla' },
 
-    // --- El dinero, que atraviesa todo lo anterior.
-    { titulo: 'Cobros', ruta: 'caja.index', icono: Wallet, permiso: 'caja.ver', grupo: 'Caja' },
-    { titulo: 'Recibos', ruta: 'recibos.index', icono: ReceiptText, permiso: 'caja.ver', grupo: 'Caja' },
+    // --- Lo pagado en Recaudaciones (SIREB): un recibo por documento.
+    { titulo: 'Recibos', ruta: 'recibos.index', icono: ReceiptText, permiso: 'recibos.ver', grupo: 'Pagos' },
 
     // --- Lo que sale de una resolución y casi no se toca.
     { titulo: 'Asociaciones', ruta: 'asociaciones.index', icono: Building2, permiso: 'catalogos.ver', grupo: 'Catálogos' },

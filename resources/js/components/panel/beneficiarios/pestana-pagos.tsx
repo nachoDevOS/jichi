@@ -1,6 +1,6 @@
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { Printer, Receipt, Wallet } from 'lucide-react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { usePermisos } from '@/hooks/use-permisos';
 import { bs, cn, fechaHora, hace } from '@/lib/utils';
@@ -8,15 +8,13 @@ import type { ReciboDelBeneficiario } from '@/types/beneficiarios';
 import { Cifra } from './partes-ficha';
 
 /**
- * Los comprobantes que se llevó y lo que todavía debe.
+ * Sus recibos y lo que todavía falta pagar en Recaudaciones.
  */
 export function PestanaPagos({
-    beneficiarioId,
     recibos,
     deuda,
     moneda,
 }: {
-    beneficiarioId: number;
     recibos: ReciboDelBeneficiario[];
     deuda: number;
     moneda: string;
@@ -31,19 +29,12 @@ export function PestanaPagos({
                 <Cifra icono={Receipt} etiqueta="Recibos" valor={String(recibos.length)} detalle={recibos[0] ? `el último ${hace(recibos[0].emitido_en)}` : 'Ninguno emitido'} />
                 <Cifra
                     icono={Wallet}
-                    etiqueta="Por cobrar"
+                    etiqueta="Por pagar"
                     valor={bs(deuda, moneda)}
-                    detalle={deuda > 0 ? 'carnets, cupos, faenas y guías' : 'Está al día'}
+                    detalle={deuda > 0 ? 'pendiente en Recaudaciones' : 'Está al día'}
                     className={deuda > 0 ? 'border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10' : undefined}
                 />
             </div>
-
-            {deuda > 0 && puede('caja.cobrar') && (
-                <Button onClick={() => router.visit(route('caja.create', { beneficiario: beneficiarioId }))}>
-                    <Wallet className="size-4" />
-                    Cobrar {bs(deuda, moneda)}
-                </Button>
-            )}
 
             {recibos.length === 0 ? (
                 <div className="rounded-lg border border-border">
@@ -65,7 +56,7 @@ export function PestanaPagos({
                             {recibos.map((r) => (
                                 <tr key={r.id} className="hover:bg-secondary/50">
                                     <td className="px-4 py-2.5">
-                                        {puede('caja.ver') ? (
+                                        {puede('recibos.ver') ? (
                                             <Link
                                                 href={route('recibos.show', r.id)}
                                                 className="font-mono font-medium tabular-nums text-primary hover:underline"
@@ -82,9 +73,6 @@ export function PestanaPagos({
                                     </td>
                                     <td className="px-4 py-2.5">
                                         {r.concepto ?? '—'}
-                                        <p className="text-xs text-muted-foreground">
-                                            {r.depositos} {r.depositos === 1 ? 'depósito' : 'depósitos'}
-                                        </p>
                                     </td>
                                     <td className="px-4 py-2.5 text-right font-medium tabular-nums">{bs(r.monto_total, moneda)}</td>
                                     <td className="px-4 py-2.5">
