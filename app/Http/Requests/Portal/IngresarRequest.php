@@ -72,15 +72,25 @@ class IngresarRequest extends FormRequest
     /** La cuenta activa del beneficiario con esa C.I., o null. */
     private function cuenta(): ?User
     {
-        $beneficiario = Beneficiario::query()->where('ci', $this->ci())->first();
+        // Primero lo tipeado tal cual (la C.I. se guarda así); si no, el número sin complemento ni expedido.
+        $candidatas = array_values(array_unique([$this->tipeado(), $this->ci()]));
+        $beneficiario = Beneficiario::query()->whereIn('ci', $candidatas)->get()
+            ->sortBy(fn (Beneficiario $b) => array_search($b->ci, $candidatas, true))
+            ->first();
 
         return $beneficiario?->cuenta()->where('activo', true)->first();
     }
 
-    /** Solo dígitos y letras: «1234567 BN» o «1.234.567» dan lo mismo. */
+    /** Lo tipeado, sin puntos de miles: «1.234.567» es 1234567. */
+    private function tipeado(): string
+    {
+        return strtoupper(str_replace('.', '', trim((string) $this->input('ci'))));
+    }
+
+    /** El número solo: «1234567-1A BN» o «1234567 BN» dan 1234567. */
     private function ci(): string
     {
-        return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $this->input('ci')) ?? '');
+        return preg_split('/[\s\-]+/', $this->tipeado())[0];
     }
 
     private function ensureIsNotRateLimited(): void

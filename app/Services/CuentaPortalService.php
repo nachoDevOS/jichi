@@ -52,27 +52,33 @@ class CuentaPortalService
      */
     public function resetear(Beneficiario $beneficiario): string
     {
-        $cuenta = $beneficiario->cuenta()->first()
-            ?? throw CuentaPortalException::sinCuenta($beneficiario->nombreCompleto);
+        // Cuenta bloqueada: dos ventanillas a la vez no entregan dos claves de las que solo vale una.
+        return DB::transaction(function () use ($beneficiario): string {
+            $cuenta = $beneficiario->cuenta()->lockForUpdate()->first()
+                ?? throw CuentaPortalException::sinCuenta($beneficiario->nombreCompleto);
 
-        $clave = $this->claveTemporal();
+            $clave = $this->claveTemporal();
 
-        $cuenta->update([
-            'password' => $clave,
-            'activo' => true,
-            'debe_cambiar_password' => true,
-        ]);
+            $cuenta->update([
+                'password' => $clave,
+                'activo' => true,
+                'debe_cambiar_password' => true,
+            ]);
 
-        return $clave;
+            return $clave;
+        });
     }
 
     /** Corta el acceso sin borrar la cuenta: resetear la vuelve a abrir. */
     public function desactivar(Beneficiario $beneficiario): void
     {
-        $cuenta = $beneficiario->cuenta()->first()
-            ?? throw CuentaPortalException::sinCuenta($beneficiario->nombreCompleto);
+        // Bloqueada igual que en resetear(): uno de los dos gana entero, no a medias.
+        DB::transaction(function () use ($beneficiario): void {
+            $cuenta = $beneficiario->cuenta()->lockForUpdate()->first()
+                ?? throw CuentaPortalException::sinCuenta($beneficiario->nombreCompleto);
 
-        $cuenta->update(['activo' => false]);
+            $cuenta->update(['activo' => false]);
+        });
     }
 
     /** La que elige el propio beneficiario al entrar: deja de ser temporal. */

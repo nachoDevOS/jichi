@@ -6,7 +6,7 @@ import { useFlash } from '@/hooks/use-flash';
 import { cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
-/** Las cuatro secciones: pocas, porque se usa desde el celular y de vez en cuando. */
+/** Las cinco secciones: pocas, porque se usa desde el celular y de vez en cuando. */
 // `corto` es el del menú de abajo: cinco en 320 px no entran con el nombre largo.
 const SECCIONES: { ruta: string; texto: string; corto: string; icono: LucideIcon }[] = [
     { ruta: 'portal.inicio', texto: 'Inicio', corto: 'Inicio', icono: Home },

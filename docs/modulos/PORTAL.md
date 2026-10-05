@@ -54,6 +54,8 @@ ventanilla ──[Resetear]──▶ clave temporal nueva (también reactiva)
            └─[Desactivar]──▶ no entra más; su sesión abierta se corta en la próxima visita
 ```
 
+- La tarjeta está en la pestaña **Datos** de la ficha; en el encabezado va el
+  atajo «Portal: habilitado / desactivado / sin acceso», que lleva ahí.
 - La lógica vive en `CuentaPortalService` (dar acceso, resetear, desactivar y
   cambiar la clave); el panel la llama desde `Panel/CuentaPortalController`, con
   el permiso `beneficiarios.portal`.
@@ -70,6 +72,10 @@ ventanilla ──[Resetear]──▶ clave temporal nueva (también reactiva)
 - La C.I. se adivina (7 dígitos): `throttle:10,1` por IP en la ruta, y 5
   intentos por C.I. + IP en `IngresarRequest`.
 - **El mismo mensaje exista o no la cuenta**, para no revelar quién tiene una.
+- **Cómo se lee la C.I. tipeada** (04/10/2026): sin puntos de miles, se busca
+  primero tal cual —la C.I. se guarda como se cargó, guion incluido— y después
+  solo el número, sin complemento ni expedido («1234567-1A BN» → `1234567`). El
+  tope de intentos va por ese número, así que las variantes comparten contador.
 - Cada intento queda en `accesos`, con `CI 1234567` en la columna `email`.
 
 ## Qué muestra
