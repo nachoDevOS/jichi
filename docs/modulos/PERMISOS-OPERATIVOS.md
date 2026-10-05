@@ -24,10 +24,10 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
 | Además exige | Autorización de pesca **aprobada**, en fecha y con kilos libres | Nada más que el carnet vigente |
 | Arancel | Precio de SIREB (fila `faena` de Catálogos › Aranceles), copiado en `permisos_faena.monto` | **El total del cuadro D** (kilos × precio por kilo de SIREB de cada producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
-| Número | `numero_faena`, correlativo continuo del sistema | `numero_guia`, correlativo continuo del sistema |
+| Número | `permisos_faena.nro`, correlativo continuo del sistema | `guias_movimiento.nro`, correlativo continuo del sistema |
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
 | Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |
-| Vale | 30 días desde la firma | 5 días desde la firma (se cuentan con hora) |
+| Vale | 30 días desde la aprobación | 5 días desde la aprobación (se cuentan con hora) |
 | Termina en | `aprobado` (no se registra la vuelta) | `aprobado` (no se registra la llegada), o `anulada` |
 | Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
 
@@ -39,27 +39,34 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 es a propósito: el operador aprende uno solo.
 
 ```
-PENDIENTE ──(pagada en SIREB)──▶ APROBADO ──▶ (faena: vencido / revocado)
-(borrador)                          │   └── al aprobar sale el RECIBO
-   │                                └──▶ (guía: anulada)
-   └──[eliminar, con motivo]──▶ baja lógica (anula antes la liquidación en SIREB)
+            ┌─(pagada en SIREB)──▶ APROBADO ──▶ (guía: anulada)
+PENDIENTE ──┤                         └── al aprobar sale el RECIBO
+(borrador)  └─(vencida en SIREB, sin pago)──▶ NO PAGADO (libera los kilos)
+   └──[eliminar, con motivo]──▶ baja lógica (consulta SIREB y anula la liquidación)
 ```
 
 *(02/10/2026: el pago se hace en SIREB; no hay `en_revision`, ni firma, ni
-depósitos en Jichi. Ver [SIREB.md](SIREB.md).)*
+depósitos en Jichi. 03/10/2026: «Cargar pago» desde la ficha, y `no_pagado` en
+vez de `vencido`. Ver [SIREB.md](SIREB.md).)*
 
-| | Editar | Eliminar | Verificar pago | Imprimir |
-| --- | :-: | :-: | :-: | :-: |
-| **Pendiente** | ✔ | ✔ | ✔ | ✘ |
-| **Aprobado** | ✘ | ✘ | ✘ | ✔ |
+| | Editar | Eliminar | Cargar pago | Verificar pago | Imprimir |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| **Pendiente**, sin pago en SIREB | ✔ | ✔ | ✔ | ✔ | ✘ |
+| **Pendiente**, pago en revisión | ✘ (*) | ✘ | ✘ | ✔ | ✘ |
+| **Aprobado** | ✘ | ✘ | ✘ | ✘ | ✔ |
+| **No pagado** | ✘ | ✘ | ✘ | ✘ | ✘ |
+
+(*) Si la corrección cambia lo que se cobra: hay que anular la liquidación, y con
+un pago cargado SIREB no lo permite.
 
 Lo dictan los enums —`EstadoFaena` y `EstadoGuia`— y **nada más**: el servicio
 pregunta, el controlador no decide y React recibe la respuesta ya resuelta en
 los campos `puede_*` de la ficha.
 
 - **EDITAR Y ELIMINAR, solo en PENDIENTE**, y anulan antes la liquidación en
-  SIREB (corregir registra otra si cambia lo que se cobra). Si SIREB no anula
-  —ya tiene un pago allá—, no se toca nada.
+  SIREB (corregir registra otra si cambia lo que se cobra). **Antes de anular,
+  Jichi consulta la liquidación**: con un pago en revisión no se toca nada; con el
+  pago validado, al eliminar se aprueba en su lugar. Ver [PAGOS.md](PAGOS.md).
 - **El CARNET no se edita.** Cambiar de titular no es corregir una salida, es
   emitir otra: el formulario muestra a la persona fija.
 - **SE APRUEBA SOLA CUANDO SIREB LA DA POR PAGADA** (`ConfirmarPagoService`), y
@@ -79,7 +86,7 @@ los campos `puede_*` de la ficha.
 - **No hay cierre** *(28/09/2026)*: se quitó «Registrar llegada» con su ruta,
   su permiso `guias.cerrar` y el estado `cerrada`. La guía aprobada vale sus 5
   días y vence; vencer es su final normal, no un trabajo pendiente.
-- **Anular** (`EmitirGuiaService::anular()`) da de baja una guía **ya firmada**,
+- **Anular** (`EmitirGuiaService::anular()`) da de baja una guía **ya aprobada**,
   cuyo papel está en la calle, con motivo obligatorio. Es de supervisión
   (`guias.anular`) y no se revierte. **Anular no es eliminar**: eliminar es
   sobre el borrador, donde nunca hubo papel. Las dos queman el número.
@@ -89,18 +96,19 @@ Anular lo dice `EstadoGuia::permiteAnulacion()`
 ficha. Hasta el 27/09/2026 el servicio aceptaba anular un borrador o una guía en
 revisión aunque la pantalla no lo ofreciera.
 
-**La faena no se anula**: no tiene ese estado. Una faena aprobada solo deja de
-valer por fecha (`vencido`) o porque revocaron su autorización (`revocado`).
+**La faena no se anula**: no tiene ese estado. Una faena aprobada deja de valer
+por fecha —sigue `aprobado`; la vigencia la dice `fecha_desembarque`— o porque
+quedó sin efecto (revocaron su autorización, o su carnet sin reemplazo).
 
 ---
 
 ## 2. Los kilos de la faena contra la autorización
 
-**Descuenta** solo la faena APROBADA (y la completada): recién firmada autoriza
+**Descuenta** solo la faena APROBADA (y la completada): recién aprobada autoriza
 a pescar, y recién ahí sus kilos pasan a «consumido». Lo dice
 `EstadoFaena::consumeCupo()`.
 
-**Reserva** la faena PENDIENTE y la EN REVISIÓN: no resta del saldo ni agota la
+**Reserva** la faena PENDIENTE: no resta del saldo ni agota la
 autorización, pero aparta sus kilos. Lo dice `EstadoFaena::reservaCupo()`.
 
 ```
@@ -147,7 +155,7 @@ fila en silencio.
 
 **Historia:** hasta el 21/09/2026 la pendiente descontaba; entre el 21 y el 27
 no reservaba nada, y tres solicitudes por el volumen entero pasaban las tres y
-chocaban al firmar la segunda, con el arancel ya cobrado. Desde el 27/09/2026
+chocaban al aprobar la segunda, con el arancel ya cobrado. Desde el 27/09/2026
 reserva sin descontar.
 
 ---

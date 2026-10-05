@@ -1,20 +1,27 @@
 # Estructura del proyecto
 
-Mapa de dónde está cada cosa y, sobre todo, **dónde va un archivo nuevo**.
+Mapa de dónde está cada cosa y, sobre todo, **dónde va un archivo nuevo**. Qué
+hace cada archivo existente está en [MAPA-ARCHIVOS.md](MAPA-ARCHIVOS.md).
+
+> Reescrito el 03/10/2026 contra el disco: el árbol anterior era del modelo de
+> `rubros` y `tramites`.
 
 ---
 
 ## La regla que ordena todo
 
-El sistema tiene dos mitades que no se mezclan:
+El sistema tiene **tres mitades** que no se mezclan, y la división se repite
+igual en el backend y en el frontend:
 
-- **Panel** — administración interna, requiere sesión. Todo lo que sea del panel
-  vive en una carpeta `panel/`.
-- **Público** — lo que ve el ciudadano sin login. Todo va en una carpeta
-  `publico/`.
+| | Panel (funcionarios) | Público (sin sesión) | Portal (beneficiario) |
+| --- | --- | --- | --- |
+| Rutas | `routes/panel.php`, `/panel` | `routes/publico.php` | `routes/portal.php`, `/mi-cuenta` |
+| Controladores | `Http/Controllers/Panel/` | `Http/Controllers/Publico/` | `Http/Controllers/Portal/` |
+| Pantallas | `pages/panel/` | `pages/publico/` | `pages/portal/` |
+| Componentes | `components/panel/` | `components/publico/` | `components/portal/` |
+| Layout | `layout-panel.tsx` | `layout-publico.tsx` / `layout-institucional.tsx` | `layout-portal.tsx` |
 
-Esa división se repite igual en el backend y en el frontend. Si sabés de qué
-mitad es lo que estás escribiendo, ya sabés dónde ponerlo.
+Si sabés de qué mitad es lo que estás escribiendo, ya sabés dónde ponerlo.
 
 ---
 
@@ -22,56 +29,49 @@ mitad es lo que estás escribiendo, ya sabés dónde ponerlo.
 
 ```
 app/
-├── Enums/                  Los valores fijos del negocio
-│   ├── TipoTramite.php          emision_inicial | actualizacion
-│   ├── EstadoTramite.php        pendiente → en_revision → aprobado | rechazado
-│   │                            (y las transiciones que valen desde cada uno)
-│   ├── EstadoCarnet.php         vigente | vencido | anulado
-│   ├── EstadoRubro.php          activo | inactivo
-│   ├── FormaPago.php            deposito | efectivo  (casillas del recibo)
-│   ├── ConceptoRecibo.php       las 6 casillas de DESCRIPCIÓN del recibo
-│   └── RolSistema.php           los roles y TODOS sus permisos
+├── Enums/                  Los valores fijos del negocio y sus TRANSICIONES
+│   ├── EstadoAprovechamiento.php  pendiente · aprobado · agotado · revocado · no_pagado
+│   ├── EstadoCarnet.php           pendiente · aprobado · revocado · no_pagado
+│   ├── EstadoFaena.php            pendiente · aprobado · completado · revocado · no_pagado
+│   ├── EstadoGuia.php             pendiente · aprobado · anulada · no_pagado
+│   ├── EstadoLiquidacionSireb.php por_enviar · registrada · anulada
+│   ├── TipoActor.php              pescador · comercializador (qué emite cada carnet)
+│   ├── ModalidadAprovechamiento.php, ConceptoArancel.php, ConceptoRecibo.php,
+│   │   CondicionProducto.php, MedioTransporte.php, TipoTransporte.php, EstadoAsociacion.php
+│   └── RolSistema.php             los roles y TODOS sus permisos
 │
 ├── Http/
 │   ├── Controllers/
-│   │   ├── Auth/           Iniciar y cerrar sesión
-│   │   ├── Panel/          ← ADMINISTRACIÓN (pide sesión)
-│   │   │   ├── DashboardController.php
-│   │   │   ├── BeneficiarioController.php   ← la plantilla a copiar
-│   │   │   ├── TramiteController.php        el circuito del expediente
-│   │   │   ├── PagoController.php           libro de caja + alta de depósito
-│   │   │   ├── CarnetController.php         consulta, suspensión, anulación
-│   │   │   ├── RubroController.php          catálogo de actividades
-│   │   │   └── ReciboController.php         el PDF del talonario del SEDAG
-│   │   └── Publico/        ← VISTA PÚBLICA (sin sesión)
-│   │       └── VerificacionController.php
-│   │
-│   ├── Requests/           Las reglas de validación de cada formulario
-│   │   ├── Auth/
-│   │   └── Panel/
-│   │
-│   └── Middleware/
-│       └── HandleInertiaRequests.php   Lo que se manda a TODAS las pantallas
+│   │   ├── Auth/                  iniciar y cerrar sesión (correo)
+│   │   ├── Panel/                 ← ADMINISTRACIÓN (sesión + permiso:)
+│   │   │   ├── BeneficiarioController.php     ← la plantilla a copiar
+│   │   │   ├── AprovechamientoController.php  Carnet, Faena, GuiaController.php
+│   │   │   ├── *ImpresionController.php, AutorizacionPescaController.php  los PDF
+│   │   │   ├── ReciboController.php, DashboardController.php, CuentaPortalController.php
+│   │   │   └── Asociacion, CategoriaAprovechamiento, TipoCarnet,
+│   │   │       ProductoHidrobiologico, ArancelSirebController.php   catálogos
+│   │   ├── Publico/               ← SIN SESIÓN: portada y verificación
+│   │   ├── Portal/                ← BENEFICIARIO: solo lectura
+│   │   └── StorageController.php  el ÚNICO que escribe archivos
+│   ├── Requests/{Auth,Panel,Portal}/   las reglas de cada formulario
+│   └── Middleware/                HandleInertiaRequests, SoloFuncionario, SoloBeneficiario
 │
-├── Models/                 Una clase por tabla de la base de datos
-│
-├── Exceptions/
-│   └── SolicitudInvalidaException.php  Una regla de negocio dijo que no.
-│                                       Sus mensajes salen tal cual en pantalla.
+├── Models/                 Una clase por tabla
+├── Exceptions/             Una regla de negocio dijo que no: CupoInvalido,
+│                           CarnetInvalido, PermisoOperativo, CuentaPortal
 ├── Services/               ← ACÁ VIVEN LAS REGLAS, no en los controladores
-│   ├── SolicitudCarnetService.php  EL CASO DE USO CENTRAL: Reglas A, B y C
-│   ├── PagoTramiteService.php      pagos parciales (1 a N) de un trámite
-│   ├── ArchivoTramiteService.php   subir/descartar adjuntos alrededor de una
-│   │                               transacción (el disco no hace rollback)
-│   ├── ReciboTramiteService.php    emite el RECIBO OFICIAL al pasar a revisión
-│   └── CorrelativoService.php      Numeración sin repetidos. Lo usa el recibo
-├── Support/
-│   ├── Sql.php             Lo que cambia entre PostgreSQL y SQLite
-│   ├── Archivos.php        Armar el enlace de un adjunto (ruta local o s3)
-│   ├── SituacionCarnet.php Qué tiene esta persona en esta gestión
-│   └── Paginacion.php      Los tamaños de página permitidos
-└── Traits/
-    └── Auditable.php       Bitácora automática de altas, cambios y bajas
+│   ├── OtorgarCupoService.php, EmitirCarnetService.php,
+│   │   EmitirFaenaService.php, EmitirGuiaService.php     crear, corregir, eliminar
+│   ├── Revisar{Cupo,Carnet,Faena,Guia}Service.php        aprobar (y revocar)
+│   ├── LiquidarSirebService.php    la liquidación en SIREB
+│   ├── ConfirmarPagoService.php    pregunta a SIREB: aprueba o «No pagado»
+│   ├── CargarPagoService.php       carga el pago en SIREB
+│   ├── CorrelativoService.php, CodigoService.php, CuentaPortalService.php
+├── Sireb/                  El cliente de Recaudaciones (SirebService, PrecioSireb, VistaSireb)
+├── AuthIbare/              El login con Ibare, módulo cerrado
+├── Support/                Piezas sin estado: Sql, Archivos, CodigoQr, ResumenPortal…
+├── Traits/                 Auditable, Codificable, LiquidableSireb, HistorialSireb
+└── Console/Commands/       jichi:verificar-pagos, jichi:sireb
 ```
 
 ### Dónde va un archivo nuevo del backend
@@ -79,10 +79,13 @@ app/
 | Estoy escribiendo... | Va en |
 | --- | --- |
 | Una pantalla del panel | `app/Http/Controllers/Panel/` |
-| Algo que ve el ciudadano | `app/Http/Controllers/Publico/` |
-| Las reglas de un formulario | `app/Http/Requests/Panel/` |
-| Una lista de valores fijos | `app/Enums/` |
-| Lógica que usan varios controladores | `app/Services/` |
+| Algo que ve el ciudadano sin sesión | `app/Http/Controllers/Publico/` |
+| Algo del portal del beneficiario | `app/Http/Controllers/Portal/` |
+| Las reglas de un formulario | `app/Http/Requests/{Panel,Portal}/` |
+| Una lista de valores fijos o un estado | `app/Enums/` (columna `string`) |
+| Una regla de negocio | `app/Services/` — el formulario y un comando la comparten |
+| Una llamada a SIREB | `app/Sireb/SirebService.php` |
+| Un comando de consola | `app/Console/Commands/` (se programa en `routes/console.php`) |
 
 ---
 
@@ -90,11 +93,15 @@ app/
 
 ```
 routes/
-├── web.php        Solo incluye a los otros tres. Laravel carga ESTE.
-├── publico.php    /  y  /verificar    sin sesión
+├── web.php        Solo incluye a publico, auth, panel y portal. Laravel carga ESTE.
+├── publico.php    /  y  /verificar/{codigo?}                       sin sesión
 ├── auth.php       /login  /logout
-└── panel.php      /panel/...          con sesión y con permisos
+├── panel.php      /panel/...           middleware funcionario + permiso: en cada ruta
+├── portal.php     /mi-cuenta/...       middleware beneficiario, ninguna ruta recibe un id
+└── console.php    el scheduler: jichi:verificar-pagos cada 10 minutos
 ```
+
+Las rutas de Ibare las carga su provider (`app/AuthIbare/rutas.php`).
 
 Cada ruta del panel declara el permiso que exige:
 
@@ -105,8 +112,7 @@ Route::get('/beneficiarios', [BeneficiarioController::class, 'index'])
 ```
 
 **El orden importa.** `/beneficiarios/crear` tiene que ir antes de
-`/beneficiarios/{beneficiario}`, o Laravel tomaría la palabra "crear" como si
-fuera un id.
+`/beneficiarios/{beneficiario}`, o Laravel tomaría la palabra «crear» como id.
 
 ---
 
@@ -117,79 +123,42 @@ resources/js/
 ├── app.tsx                 Punto de entrada. Arranca Inertia y React.
 │
 ├── pages/                  UNA PANTALLA = UN ARCHIVO
-│   ├── auth/
-│   │   └── login.tsx
-│   ├── panel/              ← ADMINISTRACIÓN
+│   ├── auth/login.tsx
+│   ├── panel/                  ← ADMINISTRACIÓN
 │   │   ├── dashboard.tsx
-│   │   ├── beneficiarios/      index · crear · editar · ver
-│   │   ├── tramites/           index · crear · ver · editar
-│   │   ├── carnets/            index · ver
-│   │   ├── pagos/              index (libro de caja)
-│   │   └── rubros/             index · crear · editar
-│   └── publico/            ← VISTA PÚBLICA
-│       ├── inicio.tsx          la portada institucional (/)
-│       └── verificar.tsx       el acta de verificación por QR
+│   │   ├── beneficiarios/          index · crear · editar · ver
+│   │   ├── aprovechamientos/       index · crear · editar · ver
+│   │   ├── carnets/  faenas/  guias/   index · crear · editar · ver
+│   │   ├── recibos/                index · ver
+│   │   └── catalogos/              asociaciones, escala, tipos-carnet, productos,
+│   │                               aranceles (cada uno con -formulario e -historial)
+│   ├── publico/                ← SIN SESIÓN: inicio (portada), verificar
+│   └── portal/                 ← BENEFICIARIO: ingresar, inicio, en-curso,
+│                                 papeles, pagos, perfil, clave
 │
-├── layouts/                El marco que envuelve a las pantallas
-│   ├── layout-panel.tsx        con barra lateral y menú
-│   ├── layout-publico.tsx      el acta: angosta, verde, imprimible
-│   └── layout-institucional.tsx  la portada: ancha, azul, con nav y pie
+├── layouts/                layout-panel, layout-publico (el acta), layout-institucional
+│                           (la portada), layout-portal
 │
-├── components/             Piezas reutilizables
-│   ├── ui/                     genéricas, sirven en cualquier lado
-│   │   ├── button.tsx  card.tsx  input.tsx  label.tsx  select.tsx
-│   │   ├── textarea.tsx  badge.tsx
-│   │   ├── campo.tsx           etiqueta + control + mensaje de error
-│   │   ├── paginacion.tsx      la barra de páginas de cualquier listado
-│   │   ├── estado-vacio.tsx    "todavía no hay nada acá"
-│   │   └── confirmar-accion.tsx  ventana de "¿seguro?"
-│   │
-│   ├── comunes/                usadas por el panel Y por lo público
-│   │   ├── logo-jichi.tsx
-│   │   └── toggle-apariencia.tsx
-│   │
-│   ├── panel/                  solo administración
-│   │   ├── layout/                 barra-lateral, barra-superior, navegacion
-│   │   ├── dashboard/              los bloques del panel principal
-│   │   ├── beneficiarios/          formulario compartido por alta y edición
-│   │   ├── tramites/               buscador de beneficiario, campo de pagos
-│   │   └── rubros/                 formulario compartido por alta y edición
-│   │
-│   └── publico/                solo vista pública
-│       ├── hoja-oficial.tsx        el papel con membrete
-│       ├── buscador-codigo.tsx     código + firma escritos a mano
-│       ├── ficha-carnet.tsx        el acta de verificación
-│       ├── splash-verificacion.tsx
-│       └── institucional/         las piezas de la PORTADA (/)
-│           ├── cabecera.tsx           escudo, anclas y acceso al panel
-│           ├── pie.tsx                contacto y enlaces
-│           ├── franja-tricolor.tsx    la franja de los documentos oficiales
-│           ├── seccion.tsx            el envoltorio de cada bloque
-│           ├── hero.tsx               portada
-│           ├── servicios.tsx          «¿Qué trámite necesita?»: los caminos del pescador y del comercializador
-│           ├── pasos.tsx              los cuatro pasos de ventanilla y qué llevar
-│           ├── verificacion.tsx       reusa buscador-codigo.tsx
-│           ├── preguntas.tsx          acordeón
-│           └── contacto.tsx           dónde se atiende
+├── components/
+│   ├── ui/                     genéricas: button, card, input, label, select, textarea,
+│   │                           badge, campo, paginacion, estado-vacio, confirmar-accion,
+│   │                           confirmar-con-motivo, selector-archivo
+│   ├── comunes/                panel Y público: logo-jichi, retrato, texto-copiable,
+│   │                           toggle-apariencia
+│   ├── panel/
+│   │   ├── layout/                 barra-lateral, barra-superior, navegacion.ts (el menú)
+│   │   ├── pagos/                  tarjeta-recaudaciones: el cobro de las cuatro fichas
+│   │   ├── beneficiarios/  aprovechamientos/  guias/  catalogos/  dashboard/  comunes/
+│   ├── portal/                 fila-papel, fila-tramite, visor-vista-previa, piezas
+│   └── publico/                hoja-oficial, ficha-documento, buscador-codigo,
+│                               splash-verificacion, institucional/ (la portada)
 │
-├── hooks/                  Lógica reutilizable de React
-│   ├── use-apariencia.ts       modo claro / oscuro
-│   ├── use-flash.ts            mensajes de Laravel → avisos flotantes
-│   └── use-permisos.ts         ¿el usuario puede hacer esto?
-│
-├── lib/                    Funciones sueltas, sin React
-│   ├── utils.ts                bs(), fecha(), fechaHora(), iniciales(), cn()
-│   └── graficos.ts             paleta y estilos de los gráficos
-│
-└── types/                  La forma de los datos que manda Laravel
-    ├── index.d.ts              lo compartido por todo el sistema
-    ├── dashboard.ts            tipos del panel principal
-    ├── beneficiarios.ts        tipos del módulo Beneficiarios
-    ├── tramites.ts             tipos del módulo Trámites
-    ├── carnets.ts              tipos del módulo Carnets
-    ├── rubros.ts               tipos del catálogo de rubros
-    ├── pagos.ts                tipos del libro de caja
-    └── publico.ts              tipos de la vista pública
+├── hooks/                  use-apariencia, use-archivos, use-flash, use-permisos
+├── lib/                    utils (bs, fecha, fechaInput, fechaHora, cn), graficos,
+│                           rueda-numerica
+└── types/                  index.d.ts (estados y lo compartido) + uno por módulo:
+                            aprovechamientos, beneficiarios, carnets, faenas, guias,
+                            catalogos, recibos, dashboard, portal, publico
 ```
 
 ### Dónde va un archivo nuevo del frontend
@@ -198,9 +167,10 @@ resources/js/
 | --- | --- |
 | Una pantalla nueva del panel | `pages/panel/<modulo>/` |
 | Una pantalla pública | `pages/publico/` |
+| Una pantalla del portal | `pages/portal/` |
 | Un botón, input o tarjeta genérico | `components/ui/` |
-| Una tabla o formulario de un módulo | `components/panel/<modulo>/` |
-| Algo que usan el panel Y lo público | `components/comunes/` |
+| Una pieza de un módulo | `components/panel/<modulo>/` |
+| Algo que usan dos mitades | `components/comunes/` |
 | Los tipos de un módulo | `types/<modulo>.ts` |
 
 ---
@@ -217,87 +187,81 @@ FormularioBeneficiario.tsx       ✗
 **2. Los componentes de `ui/` conservan su nombre en inglés.**
 
 `Button`, `Card`, `Input`, `Label`, `Badge`, `Select`, `Textarea` son el
-vocabulario estándar de React: cualquier tutorial que se busque los llama así.
-Todo lo demás —lo que es propio de este sistema— va en español: `Campo`,
-`Paginacion`, `EstadoVacio`, `ConfirmarAccion`, `BuscadorBeneficiario`.
+vocabulario estándar de React. Todo lo demás —lo propio de este sistema— va en
+español: `Campo`, `Paginacion`, `EstadoVacio`, `ConfirmarAccion`,
+`TextoCopiable`, `TarjetaRecaudaciones`.
 
-**3. Las columnas nuevas de `beneficiarios` van en camelCase.**
+**3. Las columnas de `beneficiarios` van en camelCase desde `primerNombre`.**
 
 `primerNombre`, `segundoNombre`, `apellidoPaterno`, `apellidoMaterno`,
-`apellidoCasado`, `fechaNacimiento`. Es la única tabla así, y conserva
-`ci_nit` y `complemento` con guión bajo.
-
-Consecuencia práctica: **en PostgreSQL esas columnas necesitan comillas dobles
-en toda consulta escrita a mano.**
+`apellidoCasado`, `fechaNacimiento`… Es la única tabla así; `ci` y `complemento`
+van en minúscula. **En PostgreSQL esas columnas necesitan comillas dobles en
+toda consulta escrita a mano:**
 
 ```sql
 SELECT primerNombre FROM beneficiarios;     -- ERROR: column "primernombre" does not exist
 SELECT "primerNombre" FROM beneficiarios;   -- así sí
 ```
 
-Laravel y Eloquent no se ven afectados porque entrecomillan solos. El que lo
-paga es quien abra pgAdmin.
+Eloquent entrecomilla solo. El que lo paga es quien escribe un `whereRaw` o abre
+pgAdmin; ver `Beneficiario::SQL_NOMBRE`.
 
 ---
 
 ## Base de datos (`database/`)
 
-> **Una tabla nueva del dominio toca SIETE lugares.** Se ve con el módulo de
-> faenas y guías, que se agregó entero el 16/09/2026:
+> **Una tabla nueva del dominio toca SIETE lugares:**
 >
 > | Dónde | Qué |
 > | --- | --- |
-> | `database/migrations/` | La tabla, **muy** comentada: es el mejor lugar para explicar el esquema |
+> | `database/migrations/` | La tabla, con su orden fijo y comentarios cortos (regla 12 de CLAUDE.md) |
 > | `app/Enums/` | Sus estados y dominios cerrados, en columnas `string` |
-> | `app/Models/` | El modelo, sus relaciones y las preguntas que sabe contestar |
+> | `app/Models/` | El modelo, `SoftDeletes`, sus relaciones y las preguntas que sabe contestar |
 > | `app/Services/` | Las reglas de negocio — **nunca en el controlador** |
 > | `app/Http/Controllers/Panel/` + `Requests/` | La pantalla y su validación |
 > | `resources/js/pages/panel/` + `types/` | El frontend |
-> | `docs/MER.md` + `docs/ARQUITECTURA.md` + esta guía | La documentación |
->
-> Y si la tabla cambia una existente —como `pagos` al volverse polimórfica—,
-> hay que barrer lo que la usaba: relaciones, eager loading, tipos de
-> TypeScript y componentes.
-
+> | `docs/MER.md` + `docs/ARQUITECTURA.md` + `docs/MAPA-ARCHIVOS.md` | La documentación |
 
 ```
 database/
-├── migrations/     La estructura de las tablas, en orden cronológico
+├── migrations/     2026_09_01_*: soporte (usuarios, correlativos, configuración,
+│                   auditoría, accesos, permisos) · 2026_09_18_*: el núcleo, una por tabla
 ├── seeders/
+│   ├── DatabaseSeeder.php      el orden: RolPermiso → Configuracion → Usuario → …
 │   ├── RolPermisoSeeder.php    el rol administrador con TODOS los permisos
-│   ├── ConfiguracionSeeder.php datos de la institución, editables desde el panel
-│   ├── RubroSeeder.php         el catálogo de actividades con sus tarifas
+│   ├── ConfiguracionSeeder.php datos de la institución (updateOrCreate: pisa)
 │   ├── UsuarioSeeder.php       la cuenta admin@admin.com
-│   └── DemoSeeder.php          datos de prueba (NO corre en producción)
-└── factories/      Generadores de datos falsos para los seeders
+│   ├── CatalogoSeeder.php      asociaciones, escala, tipos de carnet, productos y
+│   │                           aranceles, con sus tarifas de SIREB (firstOrCreate)
+│   └── BeneficiarioSeeder.php  datos de prueba: NO corre en producción
+└── factories/BeneficiarioFactory.php
 ```
+
+Mientras el núcleo se esté armando, **una columna nueva va DENTRO de la
+migración de su tabla** y se rearma la base (`migrate:fresh --seed`), probándolo
+antes en una SQLite descartable. Ver la regla 12 de CLAUDE.md.
 
 ---
 
 ## Configuración (`config/`)
 
-Casi todos los archivos de `config/` son los que trae Laravel. Los propios son:
-
-- **`config/jichi.php`** — los ajustes del sistema. Todo valor que venga del
-  `.env` tiene que pasar por acá.
+- **`config/jichi.php`** — los ajustes del sistema: SIREB, Ibare, el modo
+  estricto de la autorización, la semilla de departamentos. Todo valor que venga
+  del `.env` pasa por acá.
 
   > **Regla que no se rompe nunca:** `env()` solo dentro de `config/`. En el
-  > resto del código, `config('jichi.lo_que_sea')`. Con `config:cache`
-  > activo (que es lo normal en producción), `env()` devuelve `null` fuera de
-  > `config/` y el error es silencioso.
+  > resto del código, `config('jichi.lo_que_sea')`. Con `config:cache` activo,
+  > `env()` devuelve `null` fuera de `config/` y el error es silencioso.
 
 - **`config/permission.php`** y **`config/dompdf.php`** — publicados por sus
-  paquetes. Se dejan tal cual vienen, con sus comentarios originales: modificar
-  un config publicado hace mucho más difícil comparar contra la versión nueva
-  cuando el paquete se actualice.
+  paquetes, sin tocar.
 
 ---
 
 ## Verificación
 
 No hay carpeta `tests/`: las pruebas automáticas se retiraron el 27/09/2026 a
-pedido del responsable (están en el historial de git, commit `7dc0ac6`). Lo que
-queda para verificar antes de dar algo por terminado:
+pedido del responsable (commit `7dc0ac6`).
 
 ```sh
 npx tsc --noEmit        # tipos
@@ -307,7 +271,8 @@ npm run build           # que compile
 
 > ⚠️ Los tres revisan **tipos y formato**, no las reglas de negocio. Todo cambio
 > se verifica **abriendo la pantalla y probando el caso a mano**, incluidos los
-> bordes.
+> bordes. `tsc` tampoco revisa los nombres de ruta: al quitar una, cruzar contra
+> `php artisan route:list --json`.
 
 ---
 
@@ -315,29 +280,24 @@ npm run build           # que compile
 
 ```
 docs/
-├── ARQUITECTURA.md  ← EMPEZAR ACÁ. Reemplaza a leer el código
+├── REGLAS-NEGOCIO.md   LA ESPECIFICACIÓN: cuando el código no coincide, manda ella
+├── ARQUITECTURA.md     ← EMPEZAR ACÁ. Reemplaza a leer el código
 ├── MAPA-ARCHIVOS.md    qué hace cada archivo y qué tiene de no obvio
+├── MER.md              las tablas, columna por columna, y el porqué
 ├── ESTRUCTURA.md       este archivo: dónde va un archivo NUEVO
 ├── GUIA-INERTIA.md     cómo se conectan Laravel y React, paso a paso
-├── INSTALACION.md      levantar el proyecto en una máquina nueva
+├── INSTALACION.md, DOCKER-TECNICO.md   levantar el proyecto
 ├── PENDIENTES.md       qué falta y qué problemas siguen abiertos
-├── modulos/            un módulo en profundidad
-│   └── RECIBOS.md          el RECIBO OFICIAL del SEDAG
-└── sesiones/           bitácora de trabajo
-    ├── _plantilla.md   el formato a copiar
-    └── MM-AAAA/        una carpeta por mes
-        └── AAAA-MM-DD.md   un archivo por día trabajado
+├── NOTAS-CODIGO.md     el porqué largo de una decisión puntual, por archivo
+├── modulos/            SIREB, PAGOS, RECIBOS, CARNETS, PERMISOS-OPERATIVOS, PORTAL, IBARE
+├── diagramas/          los flujos del pescador y del comercializador (HTML)
+└── sesiones/           bitácora: _plantilla.md y MM-AAAA/AAAA-MM-DD.md
 ```
 
-**Los dos primeros existen para no tener que leer el sistema entero.** Si al
-terminar un trabajo sabés algo que no está ahí, agregalo: es lo que hace que el
-próximo no tenga que redescubrirlo.
+**Estos archivos existen para no tener que leer el sistema entero.** Si al
+terminar un trabajo sabés algo que no está ahí, agregalo.
 
 **Toda sesión de trabajo se registra** en `sesiones/MM-AAAA/AAAA-MM-DD.md`,
-copiando `_plantilla.md`. Cada trabajo lleva el problema, la tabla de archivos
-modificados y la solución con su porqué.
-
-El último bloque de cada archivo es el **informe para presentación**, y se
-escribe distinto al resto: en lenguaje simple, sin términos técnicos, porque se
-copia a Word y lo lee gente que no programa. No es un resumen del documento —es
-la misma historia contada para otro lector.
+copiando `_plantilla.md`: el problema, la tabla de archivos modificados y la
+solución con su porqué. El último bloque es el **informe para presentación**, en
+lenguaje simple, porque se copia a Word y lo lee gente que no programa.

@@ -33,9 +33,15 @@
 - Cuando un pescador solicita un cupo se genera un registro en
   **`aprovechamientos_pesq`** que **hereda** la modalidad y el volumen total de
   kilos de la escala elegida.
-- Su ciclo de vida pasa por los estados `pendiente`, `aprobado`, `vencido`,
-  `agotado` o `revocado`, dependiendo de la vigencia de la gestión. Pasa de
-  `pendiente` a `aprobado` cuando SIREB confirma el pago (ver Paso 6).
+- Su ciclo de vida pasa por los estados `pendiente`, `aprobado`, `agotado`,
+  `revocado` o `no_pagado`. Pasa de `pendiente` a `aprobado` cuando SIREB
+  confirma el pago, y a `no_pagado` cuando la liquidación vence sin ningún pago
+  (ver Paso 6). **La vigencia no es un estado**: pasada su fecha sigue
+  `aprobado`, y si vale hoy lo dicen las fechas.
+- *(03/10/2026)* **El tramo de la escala no se cambia nunca**, en ningún estado:
+  ni los kilos, ni el monto, ni las fechas. Corregir el borrador cambia **solo el
+  tipo de embarcación**, así que no toca la liquidación de SIREB. Si el tramo se
+  eligió mal, se elimina y se otorga de nuevo, con el motivo escrito.
 
 ### Una autorización vigente por persona, y la revocación — 27/09/2026
 
@@ -54,7 +60,8 @@ anterior está:
 | --- | :-: | --- |
 | `pendiente` en fecha | ✘ | Es un trámite en curso: se corrige o se elimina, no se duplica |
 | `aprobado` en fecha | ✘ | Está vigente |
-| `aprobado` con la fecha pasada / `vencido` | ✔ | Ya no está vigente, aunque diga «aprobado» en el historial |
+| `aprobado` con la fecha pasada | ✔ | Ya no está vigente, aunque siga diciendo «aprobado» |
+| `no_pagado` | ✔ | Nunca se pagó: no ocupa el lugar |
 | `agotado` (pescó todos los kilos) | ✔ | No le queda nada que autorizar |
 | `revocado` (aunque siga en fecha) | ✔ | La unidad la dio de baja |
 
@@ -62,7 +69,7 @@ anterior está:
 o `agotado` antes de su vencimiento. Pide permiso `aprovechamientos.revocar`
 (supervisión), motivo escrito de al menos 10 caracteres y la casilla de
 confirmación; el motivo queda en `auditorias`. **No se revierte.** Una
-`pendiente` se elimina y una vencida ya no autoriza nada: ninguna de las dos se
+`pendiente` se elimina y una no pagada nunca autorizó nada: ninguna de las dos se
 revoca.
 
 **Regla 4 — Qué deja de poder hacerse con una autorización revocada:**
@@ -148,8 +155,9 @@ dentro de una transacción deshecha con `rollBack()`.
 - **Regla para el comercializador:** su `aprovechamiento_id` se registra en
   **NULL**, porque no realiza actividades extractivas.
 - Todo carnet se clasifica según su `tipo_carnet_id` y cuenta con el **aval
-  obligatorio** de una asociación (`asociacion_id`) y un **código único global**
-  (`codigo_carnet`).
+  obligatorio** de una asociación (`asociacion_id`), un **número de registro**
+  (`nro`, seis dígitos, por gestión, asignado al aprobar) y un **código de
+  verificación** único global (tabla `codigos`, ver Paso 7).
 - **Circuito:** nace `pendiente` → se paga en SIREB → `aprobado`. Recién
   aprobado se imprime y habilita a trabajar. Un carnet pendiente se **elimina**.
 - **Revocar** es dar de baja un carnet `aprobado` antes de su vencimiento, con
@@ -162,7 +170,7 @@ dentro de una transacción deshecha con `rollBack()`.
   esté **aprobado**, sus faenas o guías figuran **«Sin efecto»** y el QR dice
   «no vigente: el titular no tiene un carnet vigente que la ampare». Aprobado el
   nuevo, vuelven a valer solas hasta su propia fecha. Vale también en el cambio
-  de año: una guía firmada el 30/12 que vence el 04/01 no vale del 1 al 4 hasta
+  de año: una guía aprobada el 30/12 que vence el 04/01 no vale del 1 al 4 hasta
   que se apruebe el carnet de la gestión nueva. Anular una guía, al revés, no
   toca el carnet. Ver `Carnet::amparaSusPapeles()`.
 - **Una persona no tiene dos carnets vigentes de la misma actividad.** Para
@@ -174,13 +182,13 @@ dentro de una transacción deshecha con `rollBack()`.
 
 - Depende **estrictamente del carnet** del pescador: cada permiso se vincula de
   forma directa **únicamente a un `carnet_id`**.
-- Controla la salida mediante un **número de faena correlativo** y registra los
-  `kilos_extraidos` de cada salida.
+- Controla la salida mediante un **número de faena correlativo** (`nro`, seis
+  dígitos, continuo) y registra los `kilos_extraidos` de cada salida.
 - Esos kilos impactan **indirectamente** en el volumen total del aprovechamiento
   raíz al que está asociado el carnet.
 - Vigencia **máxima de 30 días** por salida: al aprobarla, `fecha_salida` es
   ese día y `fecha_desembarque` salida + 30. Estados `pendiente`,
-  `aprobado`, `completado`, `vencido` o `revocado` (este último
+  `aprobado`, `completado`, `no_pagado` o `revocado` (este último
   es histórico: desde el 27/09/2026 revocar la autorización ya no lo escribe;
   la faena queda «sin efecto», ver Regla 5).
 - **Calca el talonario «PERMISO POR FAENA».** El Área de Fiscalización y
@@ -202,7 +210,7 @@ dentro de una transacción deshecha con `rollBack()`.
   | --- | :-: | :-: |
   | `pendiente` | ✘ | ✔ |
   | `aprobado` | ✔ | — |
-  | `vencido`, `revocado` | ✘ | ✘ |
+  | `no_pagado`, `revocado` | ✘ | ✘ |
 
   - **Descontar** mueve los kilos a «consumido». Solo la aprobada descuenta, y
     solo lo consumido puede dejar la autorización `agotado`.
@@ -275,8 +283,8 @@ boletas en Jichi y la firma de supervisión.)*
 
 - **Los cuatro documentos se pagan en Recaudaciones (SIREB).** Al registrarse,
   cada uno registra su **liquidación** en SIREB (la deuda, con su código público)
-  y queda `pendiente`. El titular paga allá y el encargado de SIREB valida la
-  boleta. **Jichi no carga ni controla pagos.**
+  y queda `pendiente`. El titular paga y el encargado de SIREB **valida** el
+  pago. **Jichi no valida pagos**: como mucho los carga (ver abajo).
 - **Pagado en SIREB = aprobado en Jichi.** Cuando SIREB da la liquidación por
   `pagada` (pago `confirmado`), el documento pasa solo a `aprobado`: no hay
   `en_revision` ni firma. Jichi pregunta con el botón **«Verificar pago»** de la
@@ -286,11 +294,35 @@ boletas en Jichi y la firma de supervisión.)*
   medir contra los kilos libres. Si una regla lo frena, queda `pendiente` con el
   motivo.
 - **El recibo se emite al aprobar, uno por documento**, con número correlativo
-  (`numero_recibo`) y **congelando** el monto, el concepto y la boleta tal como la
-  validó SIREB (número, banco y fecha de pago).
-- **Corregir o eliminar un pendiente anula su liquidación en SIREB** (corregir
-  registra otra si cambia lo que se cobra). Si SIREB no anula —p. ej. ya tiene un
-  pago—, no se corrige ni se elimina.
+  (`numero_recibo`) y **congelando** el monto, el concepto y el pago tal como lo
+  validó SIREB (N° de transacción, banco y fecha de pago).
+- **Corregir o eliminar un pendiente anula su liquidación en SIREB.** Corregir
+  registra otra si cambia lo que se cobra; la autorización no la cambia nunca,
+  porque solo se corrige la embarcación, y entonces no toca SIREB.
+- *(03/10/2026)* **El pago se puede CARGAR desde Jichi** («Cargar pago», N° de
+  transacción y banco), solo si la liquidación está pendiente —ni vencida, ni
+  pagada, ni anulada— y sin ningún pago cargado. Jichi lo consulta en SIREB
+  antes de cargar. Validarlo sigue siendo de Recaudaciones.
+- *(03/10/2026)* **Dos plazos distintos.** El plazo **de pago** lo da SIREB
+  (`plazo_pago_dias` del servicio: 5 días desde que se registra la liquidación).
+  Si al verificar SIREB dice `vencida` y **no hay ningún pago**, el trámite pasa
+  a **`no_pagado`**: no sigue su curso, libera el lugar de la persona y los kilos
+  reservados, y el comando deja de consultarlo. Si venció con un pago en
+  revisión, sigue pendiente y se consulta con Recaudaciones. La **vigencia** del
+  trámite es otra cosa y empieza al aprobarse: autorización y carnet hasta el
+  31/12, faena 30 días, guía 5 días.
+- *(03/10/2026)* **Antes de anular la liquidación —al eliminar, o al corregir
+  cambiando lo que se cobra— Jichi la consulta en SIREB** (`GET /liquidaciones/{id}`).
+  **Solo se elimina un trámite pendiente cuya liquidación no tiene ningún pago
+  cargado.**
+
+  | SIREB dice | Al eliminar |
+  | --- | --- |
+  | Sin pago | Se anula la liquidación y se elimina |
+  | Vencida, sin pago | Se elimina sin pedir la anulación (una vencida no se anula) |
+  | Pago en revisión | **No se elimina**: «tiene un pago cargado que todavía está en revisión» |
+  | Pago validado / pagada | **No se elimina: se aprueba** en ese momento, como con «Verificar pago», y la ficha lo avisa |
+  | No responde | **No se elimina**: sin saber si está pagado, no se borra |
 
 ## Paso 7 — La verificación pública (código de 16 caracteres)
 
@@ -313,8 +345,9 @@ boletas en Jichi y la firma de supervisión.)*
 - **Lo que el código NO cubre es la fotocopia:** un QR válido pegado en un papel
   falso da «vigente». Quien controla compara el nombre de la pantalla con el
   C.I. de la persona.
-- El **correlativo** (N° de faena, N° de recibo, N° de registro) sigue existiendo
-  aparte: es el que Contabilidad audita por huecos. Conviven, no compiten.
+- El **correlativo** —la columna `nro` de autorización, carnet, faena y guía, y
+  el N° de recibo; todos de seis dígitos— sigue existiendo aparte: es el que
+  Contabilidad audita por huecos. Conviven, no compiten.
 
 ## Paso 8 — El portal del beneficiario (`/mi-cuenta`) — 28/09/2026
 
@@ -326,7 +359,7 @@ boletas en Jichi y la firma de supervisión.)*
   No hace trámites ni corrige datos (se hace en ventanilla con la cédula).
 - **Descarga en PDF lo que está vigente hoy** —autorización, faena y guía—, el
   mismo documento que sale en ventanilla. **El carnet no:** si se pierde, se hace la
-  reposición en ventanilla. Lo vencido, revocado o sin efecto no se
+  reposición en ventanilla. Lo fuera de fecha, revocado, no pagado o sin efecto no se
   imprime.
 - **Recuperar la contraseña es en ventanilla** («Resetear contraseña»): muchos
   pescadores no tienen correo. También se puede **desactivar** el acceso.
@@ -409,8 +442,8 @@ el formulario solo si ese carnet ya está revocado.
 
 ## Estado de la implementación
 
-**Los siete pasos están implementados tal como se describen arriba** (al
-27/09/2026). Dónde se hace cumplir cada regla que no se ve en el esquema:
+**Los ocho pasos están implementados tal como se describen arriba** (al
+03/10/2026). Dónde se hace cumplir cada regla que no se ve en el esquema:
 
 | Regla | Dónde se hace cumplir |
 | --- | --- |
@@ -418,6 +451,11 @@ el formulario solo si ese carnet ya está revocado.
 | Pescador SIN cupo no saca carnet | `EmitirCarnetService::emitir()` → `pescadorSinCupo()` |
 | Nada vale antes de pagarse en SIREB | `ConfirmarPagoService` (aprueba solo con la liquidación `pagada`) + los `Revisar*Service::aprobar()`; imprimir exige `yaFueAprobado()` |
 | Cada documento registra su cobro en SIREB y no lo duplica | `LiquidarSirebService` (clave guardada antes de llamar) + el trait `LiquidableSireb` |
+| Liquidación vencida sin pago → «No pagado» | `ConfirmarPagoService::verificar()` → `marcarNoPagado()`; los scopes con listas cerradas liberan el lugar y los kilos |
+| Cargar el pago solo si la liquidación está pendiente y sin pago | `CargarPagoService::cargar()` (consulta antes) + SIREB (`422 PAGO_YA_EXISTE` / `LIQUIDACION_NO_PAGABLE`) |
+| No se elimina con un pago cargado; con el pago validado, se aprueba | `LiquidarSirebService::anular()` (`pagoEnRevision()` / `liquidacionPagada()`) + `ConfirmarPagoService::alNoPoderEliminar()` en los cuatro `destroy()` |
+| La autorización solo corrige la embarcación | `OtorgarCupoService::editar()` + `EditarCupoRequest` |
+| Los números impresos no son el id | Columna `nro` + `CorrelativoService::siguienteContinuo()` (el registro del carnet, por gestión) |
 | Los dos adjuntos del carnet, 3 MB | `EmitirCarnetRequest` + `StorageController` |
 | Comercializador NUNCA lleva cupo | `EmitirCarnetService` + `EmitirCarnetRequest` (`prohibitedIf`) |
 | La faena solo cuelga del carnet | `permisos_faena.carnet_id` es la única FK; el cupo llega por `hasManyThrough` |

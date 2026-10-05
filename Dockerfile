@@ -11,7 +11,7 @@ FROM serversideup/php:${PHP_VERSION}-fpm-nginx AS base
 
 USER root
 # gd con freetype/jpeg/webp: QR, foto del carnet y texto girado de la guía.
-# intl, bcmath: Laravel y maatwebsite/excel. pdo_pgsql y zip ya vienen.
+# intl, bcmath: Laravel. pdo_pgsql y zip ya vienen.
 RUN install-php-extensions gd intl bcmath
 USER www-data
 

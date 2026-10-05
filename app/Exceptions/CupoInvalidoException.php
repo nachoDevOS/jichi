@@ -53,7 +53,7 @@ class CupoInvalidoException extends RuntimeException
         return $e;
     }
 
-    /** Se quiso aprobar o rechazar algo que no está presentado. */
+    /** Se quiso aprobar algo que ya no está pendiente de pago. */
     public static function noSePuedeRevisar(string $estado): self
     {
         return new self(sprintf(
@@ -117,7 +117,7 @@ class CupoInvalidoException extends RuntimeException
     {
         return new self(
             "No se puede revocar una autorización {$estado}: el borrador se elimina, ".
-            'lo presentado se rechaza y lo vencido ya no autoriza nada.',
+            'y la no pagada nunca autorizó nada.',
         );
     }
 }

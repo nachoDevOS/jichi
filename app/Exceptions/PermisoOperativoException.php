@@ -32,8 +32,8 @@ class PermisoOperativoException extends RuntimeException
         $detalle = match ($estado) {
             EstadoCarnet::Pendiente => 'Está PENDIENTE: falta que se pague en Recaudaciones.',
             EstadoCarnet::Revocado => 'Está REVOCADO, y eso no se revierte: hay que emitir uno nuevo.',
-            EstadoCarnet::Vencido => 'Está VENCIDO. Hay que emitir el carnet de la gestión en curso '.
-                'antes de poder emitir este papel.',
+            EstadoCarnet::NoPagado => 'Está NO PAGADO: venció el plazo de pago en Recaudaciones. Hay que '.
+                'emitir otro carnet.',
             // El estado dice «activo» pero la fecha ya pasó: la columna la
             // escribe un comando diario y entre corrida y corrida miente.
             EstadoCarnet::Aprobado => 'Pasó su fecha de vencimiento.',

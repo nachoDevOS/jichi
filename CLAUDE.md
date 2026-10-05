@@ -70,9 +70,15 @@ para no equivocarse:
   (`EstadoAprovechamiento`, `EstadoCarnet`, `EstadoFaena`, `EstadoGuia`):
 
   ```
-  PENDIENTE ──(SIREB: «pagada»)──▶ APROBADO ──▶ vencido / revocado / agotado
-  (borrador: se corrige y se elimina)     └── al aprobar sale el RECIBO
+                ┌─(SIREB: «pagada»)──▶ APROBADO ──▶ revocado / agotado
+  PENDIENTE ────┤                          └── al aprobar sale el RECIBO
+  (borrador)    └─(SIREB: «vencida», sin pago)──▶ NO PAGADO (no sigue su curso)
   ```
+
+  **Dos plazos que no se mezclan** (03/10/2026): el de PAGO lo pone SIREB
+  (`plazo_pago_dias`, 5 días) y si vence sin pago el trámite queda `no_pagado`;
+  la VIGENCIA del trámite (31/12, 30 días, 5 días) NO es un estado: un aprobado
+  sigue `aprobado` y si vale hoy lo dicen sus fechas (`estaVigente()`).
 
   Al crearse registra su liquidación en SIREB; el pago se carga y se valida
   ALLÁ. Jichi pregunta (`ConfirmarPagoService`, botón «Verificar pago» y
@@ -346,10 +352,12 @@ Los tres tienen que pasar.
   hubiera ocurrido. La convención del servicio: se escribe sobre la copia
   bloqueada y se devuelve `$modelo->refresh()` —la original—. Ver
   `EmitirFaenaService::corregir()`.
-- **El estado guardado de un documento puede mentir.** `vencido` lo tendría que
-  escribir un comando diario que **todavía no existe** (ver PENDIENTES), así que
-  un carnet del año pasado sigue diciendo `aprobado`. Para saber si vale HOY se
-  mira además la fecha: `Carnet::estaVigente()` y el scope `vigentes()`.
+- **`aprobado` no quiere decir «vale hoy».** Un aprobado no cambia de estado al
+  pasar su fecha —es a propósito: el estado guarda el último hecho, la vigencia
+  la dicen las fechas—, así que un carnet del año pasado sigue `aprobado`. Para
+  saber si vale HOY: `estaVigente()` y el scope `vigentes()`. **No hay estado
+  `vencido`**: el que existía se rehízo como `no_pagado` (03/10/2026), que es el
+  plazo de PAGO, no la vigencia.
 - **EL CÓDIGO DE UN DOCUMENTO NO ES UNA COLUMNA SUYA: vive en `codigos`.**
   Desde el 22/09/2026 los cinco documentos que se entregan —carnet,
   aprovechamiento, faena, guía y recibo— comparten una tabla polimórfica con un
@@ -359,7 +367,8 @@ Los tres tienen que pasar.
   `with('codigo')`** o hace N+1 en silencio — y en `carnets` el accesor va en
   `#[Appends]`, así que basta con serializar la fila.
 - **El código de verificación NO reemplaza al correlativo, y al revés tampoco.**
-  `numero_recibo`, `numero_faena` y `nro_registro` son consecutivos **a
+  `numero_recibo`, `permisos_faena.nro`, `guias_movimiento.nro`, `aprovechamientos_pesq.nro` y
+  `carnets.nro` son consecutivos **a
   propósito**: Contabilidad audita sus huecos. El código es imposible de
   adivinar **a propósito**: es la llave de una pantalla pública, y un `000002`
   lo prueba cualquiera. Un número al azar no tiene huecos que auditar. Conviven,
@@ -716,14 +725,14 @@ Los tres tienen que pasar.
 - **Blade escapa las entidades HTML de su interpolación de dos llaves.** Un
   `&nbsp;` puesto ahí se imprime como texto literal `&nbsp;` en el PDF. Se
   resuelve con un elemento de ancho fijo, no con la entidad.
-- **`simplesoftwareio/simple-qrcode` NO PUEDE generar PNG acá.** Su salida PNG
+- **`simplesoftwareio/simple-qrcode` NO PUEDE generar PNG acá** (retirado el
+  03/10/2026; se requiere `bacon/bacon-qr-code` directo). Su salida PNG
   exige la extensión `imagick`, que no está instalada (`php -m` lista `gd`), y
   revienta con «Extension 'Imagick' is required». Solo le queda SVG, y un QR es
   justamente donde no conviene depender de un renderizador aproximado: medio
   punto de corrimiento y la cámara deja de leerlo, cosa que no se descubre hasta
   que alguien intenta verificar un carnet en la calle. El QR se arma con
-  `App\Support\CodigoQr`, que pide la matriz a BaconQrCode —la librería que ese
-  paquete trae adentro— y la pinta con `gd`.
+  `App\Support\CodigoQr`, que pide la matriz a BaconQrCode y la pinta con `gd`.
 - **El atributo `width` de un `<img>` se mide en PÍXELES, no en puntos.** En
   una maqueta donde todo lo demás va en `pt`, un `width="44"` sale de **33 pt**
   —un 25% más chico— y no lo marca nada. Mordió con el QR de los documentos: el
@@ -804,9 +813,9 @@ Los tres tienen que pasar.
   `CorrelativoService` lleva `(serie, anio)` y reinicia cada enero, que es lo
   incorrecto para una hoja preimpresa: el talonario del SEDAG va en `002190` y
   no volvió a 1. Se resuelve guardando la serie bajo el **año 0**, que ninguna
-  gestión real ocupa; ver `CorrelativoService::siguienteContinuo()`. Hoy los dos
-  documentos que se imprimen —recibo y permiso de faena— son continuos y de seis
-  dígitos; lo único que sigue contando por gestión es el número de registro del
+  gestión real ocupa; ver `CorrelativoService::siguienteContinuo()`. Hoy los papeles
+  numerados —recibo, autorización, permiso de faena y guía— son continuos y de
+  seis dígitos (la autorización imprimía el `id` hasta el 03/10/2026); lo único que sigue contando por gestión es el número de registro del
   carnet, que no va en ningún papel. Antes de elegir la serie, preguntarse si
   ese número lo reinicia alguien de verdad.
 - **DomPDF no rota texto: no tiene `transform` ni `writing-mode`.** Lo escrito

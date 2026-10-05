@@ -45,7 +45,7 @@ return new class extends Migration
 
             // Correlativo por gestión, asignado al aprobar. Índice y no único:
             // lo garantiza CorrelativoService. Ver MER.md.
-            $table->unsignedInteger('nro_registro')->nullable()->index()->comment('Correlativo anual, al aprobar');
+            $table->unsignedInteger('nro')->nullable()->index()->comment('Correlativo anual, al aprobar');
 
             // Nullable: muchos carnets se cargan para poner al día lo emitido
             // en papel, donde esos escaneos no existen. El formulario sí los exige.
@@ -56,7 +56,7 @@ return new class extends Migration
 
             $table->date('fecha_solicitud');
             $table->date('fecha_emision')->nullable()->comment('Se llena al aprobar');
-            $table->date('fecha_vencimiento')->index()->comment('Índice: lo lee el comando diario');
+            $table->date('fecha_vencimiento')->index()->comment('Índice: lo filtra el scope vigentes()');
 
             $table->index(['beneficiario_id', 'estado']);
             $table->index(['tipo_actor', 'estado']);

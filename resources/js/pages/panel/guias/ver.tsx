@@ -1,6 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Ban, CalendarX, Clock, IdCard, Pencil, Printer, Receipt, Trash2, Truck, User } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,9 +16,8 @@ import type { GuiaFicha } from '@/types/guias';
 /**
  *  La ficha de una guía
  *
- * El traslado se cobra y se firma como el carnet, el cupo y la faena
- * —pendiente → en revisión → activa—, así que la tarjeta de pagos y los
- * botones del circuito son los mismos componentes.
+ * El traslado se paga en SIREB como el carnet, la autorización y la faena
+ * —pendiente → aprobada—, así que la tarjeta de pagos es la misma.
  */
 export default function VerGuia({
     guia,
@@ -143,7 +143,15 @@ export default function VerGuia({
                                     cómo se lo nombra; el código de 16 caracteres
                                     es la llave con la que se verifica. */}
                                 <Dato etiqueta="Carnet" valor={`N° ${guia.carnet_registro ?? '—'}`} />
-                                <Dato etiqueta="Código del carnet" valor={guia.carnet_codigo ?? '—'} />
+                                <Dato
+                                    etiqueta="Código del carnet"
+                                    valor={guia.carnet_codigo ? <TextoCopiable texto={guia.carnet_codigo} className="-ml-1.5" /> : '—'}
+                                />
+                                {/* La llave del QR de la guía impresa. */}
+                                <Dato
+                                    etiqueta="Código"
+                                    valor={guia.codigo ? <TextoCopiable texto={guia.codigo} className="-ml-1.5" /> : '—'}
+                                />
                             </dl>
 
                             {guia.es_piscicultura && (
@@ -274,6 +282,8 @@ export default function VerGuia({
                         recibo={recibo}
                         puedeVerificar={guia.puede_verificar_pago}
                         rutaVerificar={route('guias.verificar-pago', guia.id)}
+                        puedeCargar={guia.puede_cargar_pago}
+                        rutaCargar={route('guias.cargar-pago', guia.id)}
                         permiso="guias.crear"
                     />
                 </div>
@@ -467,7 +477,7 @@ function Marco({
     );
 }
 
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+function Dato({ etiqueta, valor }: { etiqueta: string; valor: ReactNode }) {
     return (
         <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</dt>

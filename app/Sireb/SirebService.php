@@ -84,7 +84,7 @@ class SirebService
             Cache::forget(self::CACHE_SERVICIOS);
         }
 
-        return Cache::remember(self::CACHE_SERVICIOS, now()->addMinutes(10), function (): array {
+        return Cache::remember(self::CACHE_SERVICIOS, now()->addMinutes(config('jichi.sireb.cache_minutos')), function (): array {
             $servicios = [];
             $pagina = 1;
 
@@ -151,6 +151,27 @@ class SirebService
     public function liquidacion(string $liquidacionId): ?array
     {
         return $this->get(self::RUTA_LIQUIDACIONES.'/'.$this->id($liquidacionId))['data'] ?? null;
+    }
+
+    /**
+     * Carga la boleta con que se pagó. Queda `pendiente` hasta que la valida un encargado
+     * de SIREB. Sin Idempotency-Key, pero reintentar es seguro: un segundo pago da `PAGO_YA_EXISTE`.
+     *
+     * @throws SirebException
+     */
+    public function registrarPagoManual(string $liquidacionId, string $numeroBoleta, string $entidadBancaria): array
+    {
+        $ruta = self::RUTA_LIQUIDACIONES.'/'.$this->id($liquidacionId).'/pago-manual';
+        $respuesta = $this->enviar('post', $ruta, [
+            'numero_boleta' => mb_substr($numeroBoleta, 0, 50),
+            'entidad_bancaria' => mb_substr($entidadBancaria, 0, 100),
+        ], reintentos: self::REINTENTOS);
+
+        if (in_array($respuesta->status(), [404, 422], true)) {
+            throw SirebException::liquidacionRechazada((string) $respuesta->json('codigo'));
+        }
+
+        return $this->cuerpo($respuesta, $ruta)['data'] ?? [];
     }
 
     /**

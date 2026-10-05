@@ -9,7 +9,7 @@ import type { VentaSireb } from '@/types/aprovechamientos';
 export interface FaenaFila {
     id: number;
     /** Correlativo GLOBAL y continuo del talonario. Lo genera el sistema. */
-    numero_faena: number;
+    nro: number;
     /** El mismo, con los seis ceros del papel: «002190». */
     numero_legible: string;
     /** «Faena N° 002190», armado por el servidor. */
@@ -70,6 +70,8 @@ export interface FaenaFila {
     /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
     sireb: VentaSireb | null;
     puede_verificar_pago: boolean;
+    /** Pendiente, con la liquidación registrada y sin pago cargado. SIREB lo confirma al cargar. */
+    puede_cargar_pago: boolean;
 
     /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;

@@ -16,14 +16,14 @@ enum EstadoFaena: string
     /** Volvió y descargó. Los kilos quedaron firmes contra el cupo. */
     case Completado = 'completado';
 
-    /** Se le pasó la fecha límite sin cerrarse. Libera el volumen reservado. */
-    case Vencido = 'vencido';
-
     /**
      * Cortada por la unidad al revocar su Autorización de Pesca para Aprovechamiento
      * Pesquero, estando aprobada y en fecha. Ya no autoriza la salida.
      */
     case Revocado = 'revocado';
+
+    /** Venció el plazo de pago en SIREB sin ningún pago: no sigue su curso y libera los kilos reservados. NO es la vigencia, que la dicen las fechas. */
+    case NoPagado = 'no_pagado';
 
     public function etiqueta(): string
     {
@@ -31,8 +31,8 @@ enum EstadoFaena: string
             self::Pendiente => 'Pendiente',
             self::Aprobado => 'Aprobado',
             self::Completado => 'Completado',
-            self::Vencido => 'Vencido',
             self::Revocado => 'Revocado',
+            self::NoPagado => 'No pagado',
         };
     }
 
@@ -42,8 +42,8 @@ enum EstadoFaena: string
             self::Pendiente => 'sky',
             self::Aprobado => 'emerald',
             self::Completado => 'teal',
-            self::Vencido => 'slate',
             self::Revocado => 'rose',
+            self::NoPagado => 'slate',
         };
     }
 

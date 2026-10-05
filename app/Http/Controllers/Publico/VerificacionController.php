@@ -290,7 +290,7 @@ class VerificacionController extends Controller
             ])),
 
             $documento instanceof PermisoFaena => array_values(array_filter([
-                $this->renglon('Nº de faena', str_pad((string) $documento->numero_faena, 6, '0', STR_PAD_LEFT), true),
+                $this->renglon('Nº de faena', $documento->numero_legible, true),
                 $this->renglon('Kilos autorizados', $documento->kilos_extraidos.' kg'),
             ])),
 

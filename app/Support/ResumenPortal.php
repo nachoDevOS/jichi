@@ -160,13 +160,12 @@ class ResumenPortal
             'numero' => $r->numero_recibo,
             'concepto' => $r->concepto,
             'monto_total' => (float) $r->monto_total,
-            'depositos' => $r->pagos_count,
             'emitido_en' => $r->created_at?->toIso8601String(),
         ];
     }
 
     /**
-     * Los trámites abiertos de la persona —pendientes y en revisión—, del más
+     * Los trámites abiertos de la persona —pendientes de pago—, del más
      * nuevo al más viejo dentro de cada tipo. Los usan «En curso» y el inicio.
      *
      * @return Collection<int, array<string, mixed>>
@@ -192,6 +191,9 @@ class ResumenPortal
     /** Los estados de baja: revocado por la Unidad, o la guía anulada. */
     private const DE_BAJA = [EstadoAprovechamiento::Revocado, EstadoCarnet::Revocado, EstadoFaena::Revocado, EstadoGuia::Anulada];
 
+    /** Nunca se pagaron: no son papeles vencidos, así que van con los dados de baja. */
+    private const NO_PAGADOS = [EstadoAprovechamiento::NoPagado, EstadoCarnet::NoPagado, EstadoFaena::NoPagado, EstadoGuia::NoPagada];
+
     /**
      * Dónde va en «Mis papeles»: `vigente`, `vencido` (incluye la autorización
      * agotada) o `revocado` (incluye lo anulado y lo que quedó sin efecto). Null
@@ -210,7 +212,7 @@ class ResumenPortal
     /** La autorización no tiene «sin efecto»: la que se revoca es ella. */
     private static function deBaja(Model $documento): bool
     {
-        return in_array($documento->estado, self::DE_BAJA, true)
+        return in_array($documento->estado, [...self::DE_BAJA, ...self::NO_PAGADOS], true)
             || (! $documento instanceof AprovechamientoPesq && $documento->sinEfecto());
     }
 
@@ -229,6 +231,10 @@ class ResumenPortal
     {
         if ($documento->estado === EstadoAprovechamiento::Agotado) {
             return 'Se usaron todos los kilos autorizados.';
+        }
+
+        if (in_array($documento->estado, self::NO_PAGADOS, true)) {
+            return 'No se pagó a tiempo en Recaudaciones: no siguió su curso.';
         }
 
         if (in_array($documento->estado, self::DE_BAJA, true)) {

@@ -146,14 +146,6 @@
         /* Sin cédula cargada, atenuada — igual que los renglones. */
         .documento.molde { color: #8a8f85; }
 
-        /* ---------------------------------------------------------------
-           EL RENGLÓN PARTIDO EN TRES — REGISTRO + GESTIÓN + CUPO
-           --------------------------------------------------------------- */
-        .campo.triple .valor.angosto { width: 24pt; }
-        .campo.triple .rotulo.segundo { left: 78pt; width: 30pt; }
-        .campo.triple .dospuntos.segundo { left: 108pt; }
-        .campo.triple .valor.segundo { left: 111.5pt; width: 19pt; }
-        .campo.triple .valor.tercero { left: 137pt; width: 35.5pt; }
 
         /* Va SIEMPRE, con foto o sin ella: es lo que hacía la unidad en papel
            cuando la persona traía la foto después. */
@@ -272,13 +264,12 @@
         .campo .valor.molde { color: #8a8f85; }
 
         /* ---------------------------------------------------------------
-           EL SEGUNDO PAR DEL RENGLÓN — hoy solo GESTIÓN, junto al REGISTRO
+           EL SEGUNDO PAR DEL RENGLÓN — el CUPO, junto al REGISTRO (solo pescador)
         --------------------------------------------------------------- */
         .campo .valor.angosto { width: 42pt; }
 
-        /* «GESTIÓN» a 5,2 pt mide 25,8: en los 26 de antes quedaba al límite, así
-           que la caja se corrió a 94 y se abrió a 30. El valor del registro
-           cierra en 92, así que hay lugar. */
+        /* La caja del rótulo mide 32 pt: «CUPO» entra; uno más largo se desborda
+           en silencio (caracteres × 0,605 × cuerpo). */
         .campo .rotulo.segundo { left: 96pt; width: 32pt; }
         .campo .dospuntos.segundo { left: 128pt; }
         .campo .valor.segundo { left: 131.5pt; width: 41pt; }
@@ -531,22 +522,13 @@
             <div class="valor @if ($campo['valor'] === '') molde @endif @isset($campo['segundo']) angosto @endisset"
                  style="font-size: {{ $campo['cuerpo'] }}pt; height: {{ $campo['alto'] }}pt;">{{ $campo['valor'] !== '' ? $campo['valor'] : $campo['molde'] }}</div>
 
-            {{-- Solo el último renglón lleva acompañantes: GESTIÓN siempre, y el
-                 CUPO cuando la actividad se autoriza por volumen. Con cupo el
-                 renglón usa el reparto `triple` —ver la hoja de estilos— porque
-                 tres valores no entran en dos mitades. --}}
+            {{-- Solo el último renglón lleva acompañante: el CUPO, cuando la
+                 actividad se autoriza por volumen. Ver renglonRegistro(). --}}
             @isset ($campo['segundo'])
                 <div class="rotulo segundo">@include('documentos.partes.texto-perfilado', ['texto' => $campo['segundo']['rotulo']])</div>
                 <div class="dospuntos segundo">@include('documentos.partes.texto-perfilado', ['texto' => ':'])</div>
                 <div class="valor segundo @if ($campo['segundo']['valor'] === '') molde @endif"
                      style="font-size: {{ $campo['segundo']['cuerpo'] }}pt; height: {{ $campo['segundo']['alto'] }}pt;">{{ $campo['segundo']['valor'] !== '' ? $campo['segundo']['valor'] : $campo['segundo']['molde'] }}</div>
-            @endisset
-
-            {{-- El TERCER valor va SIN rótulo: es el cupo, y «800 KG» se lee
-                 solo. Ver CarnetImpresionController::renglonRegistro(). --}}
-            @isset ($campo['tercero'])
-                <div class="valor tercero @if ($campo['tercero']['valor'] === '') molde @endif"
-                     style="font-size: {{ $campo['tercero']['cuerpo'] }}pt; height: {{ $campo['tercero']['alto'] ?? 9.5 }}pt;">{{ $campo['tercero']['valor'] !== '' ? $campo['tercero']['valor'] : $campo['tercero']['molde'] }}</div>
             @endisset
         </div>
     @endforeach

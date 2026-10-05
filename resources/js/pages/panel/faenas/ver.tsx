@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { BadgeCheck, CalendarX, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Trash2, User, Waves } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
@@ -17,9 +18,8 @@ import type { FaenaFicha } from '@/types/faenas';
 /**
  *  La ficha de una faena
  *
- * La salida se cobra y se firma como el carnet y el aprovechamiento —pendiente
- * → en revisión → aprobada—, así que la tarjeta de pagos y los botones del
- * circuito son los mismos componentes.
+ * La salida se paga en SIREB como el carnet y la autorización —pendiente →
+ * aprobada—, así que la tarjeta de pagos es la misma.
  */
 export default function VerFaena({
     faena,
@@ -167,7 +167,10 @@ export default function VerFaena({
                                     etiqueta="Carnet"
                                     valor={`N° ${faena.carnet_registro ?? '—'}`}
                                 />
-                                <Dato etiqueta="Código del carnet" valor={faena.carnet_codigo ?? '—'} />
+                                <Dato
+                                    etiqueta="Código del carnet"
+                                    valor={faena.carnet_codigo ? <TextoCopiable texto={faena.carnet_codigo} className="-ml-1.5" /> : '—'}
+                                />
                             </dl>
                         </CardContent>
                     </Card>
@@ -222,9 +225,9 @@ export default function VerFaena({
                             </div>
 
                             {/* La llave del QR del permiso impreso. */}
-                            <div className="flex justify-between gap-3">
+                            <div className="flex items-center justify-between gap-3">
                                 <span className="text-muted-foreground">Código</span>
-                                <span className="text-right font-mono font-medium">{faena.codigo ?? '—'}</span>
+                                {faena.codigo ? <TextoCopiable texto={faena.codigo} className="-mr-1.5" /> : <span>—</span>}
                             </div>
 
                             <Renglon etiqueta="N° de faena" valor={faena.numero_legible} />
@@ -269,8 +272,8 @@ export default function VerFaena({
                                     <p className="text-xs text-muted-foreground">
                                         {faena.consume_cupo
                                             ? 'Esta faena está descontando sus kilos del saldo.'
-                                            : faena.estado === 'vencido' || faena.estado === 'revocado'
-                                              ? `Esta faena ${faena.estado === 'vencido' ? 'venció' : 'fue revocada'}: sus kilos volvieron al cupo.`
+                                            : faena.estado === 'no_pagado' || faena.estado === 'revocado'
+                                              ? `Esta faena ${faena.estado === 'no_pagado' ? 'no se pagó a tiempo' : 'fue revocada'}: sus kilos volvieron al cupo.`
                                               : 'Todavía no descuenta: la bolsa se mueve recién cuando se aprueba.'}
                                     </p>
                                 </>
@@ -286,6 +289,8 @@ export default function VerFaena({
                     recibo={recibo}
                     puedeVerificar={faena.puede_verificar_pago}
                     rutaVerificar={route('faenas.verificar-pago', faena.id)}
+                    puedeCargar={faena.puede_cargar_pago}
+                    rutaCargar={route('faenas.cargar-pago', faena.id)}
                     permiso="faenas.crear"
                 />
             </div>
@@ -436,7 +441,7 @@ function Renglon({ etiqueta, valor }: { etiqueta: string; valor: string }) {
     );
 }
 
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+function Dato({ etiqueta, valor }: { etiqueta: string; valor: ReactNode }) {
     return (
         <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</dt>

@@ -76,7 +76,7 @@ class EmitirGuiaService
 
                 // El número lo pone el sistema, no el operador: correlativo
                 // global y continuo, como el talonario de papel.
-                'numero_guia' => $this->correlativos->siguienteContinuo(GuiaMovimiento::SERIE),
+                'nro' => $this->correlativos->siguienteContinuo(GuiaMovimiento::SERIE),
 
                 ...$this->renglonesDelPapel($datos),
 

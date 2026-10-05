@@ -22,7 +22,7 @@ return new class extends Migration
 
             // Correlativo global y continuo, lo genera el sistema. Único y no
             // parcial: la hoja del talonario se gastó.
-            $table->unsignedInteger('numero_faena')->unique()->comment('Del talonario: 000001');
+            $table->unsignedInteger('nro')->unique()->comment('Del talonario: 000001');
 
             $table->decimal('monto', 10, 2)->default(0)->comment('Precio de SIREB congelado al emitir');
             $table->uuid('sireb_tarifa_id')->nullable()->comment('Tarifa de SIREB de ese precio');

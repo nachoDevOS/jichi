@@ -2,6 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoAprovechamiento;
+use App\Enums\EstadoCarnet;
+use App\Enums\EstadoFaena;
+use App\Enums\EstadoGuia;
 use App\Enums\EstadoLiquidacionSireb;
 use App\Exceptions\CarnetInvalidoException;
 use App\Exceptions\CupoInvalidoException;
@@ -63,10 +67,24 @@ class ConfirmarPagoService
 
         $pago = $liquidacion['pago'] ?? null;
 
+        // La ficha muestra la boleta mientras se valida. Solo si cambió: el comando corre cada 10 min y audita.
+        if (($documento->sireb_envio['pago'] ?? null) !== $pago) {
+            $documento->update(['sireb_envio' => [...($documento->sireb_envio ?? []), 'pago' => $pago]]);
+        }
+
+        // Venció el plazo de pago sin ningún pago: el trámite no sigue su curso. No es su vigencia.
+        if (($liquidacion['estado'] ?? null) === 'vencida' && $pago === null) {
+            $this->marcarNoPagado($documento);
+
+            return $this->no('venció el plazo de pago en Recaudaciones sin ningún pago. El trámite quedó «No pagado» y ya no sigue su curso.');
+        }
+
         if (($liquidacion['estado'] ?? null) !== 'pagada' || ($pago['estado'] ?? null) !== 'confirmado') {
             return $this->no(match (true) {
-                in_array($liquidacion['estado'] ?? null, ['anulada', 'vencida'], true) => 'su cobro quedó '.$liquidacion['estado']
-                    .' en Recaudaciones. Corrija el trámite para generar uno nuevo, o elimínelo.',
+                ($liquidacion['estado'] ?? null) === 'vencida' => 'venció el plazo de pago con un pago todavía en revisión. '
+                    .'Consulte con Recaudaciones.',
+                ($liquidacion['estado'] ?? null) === 'anulada' => 'su cobro fue anulado en Recaudaciones. '
+                    .'Corrija el trámite para generar uno nuevo, o elimínelo.',
                 $pago !== null => 'el pago está cargado en Recaudaciones y falta que lo validen allá.',
                 default => 'todavía no se registró ningún pago en Recaudaciones (código '.$documento->sireb_codigo_publico.').',
             });
@@ -82,14 +100,35 @@ class ConfirmarPagoService
                 };
 
                 $this->emitirRecibo($documento, $liquidacion, $pago);
-                $documento->update(['sireb_envio' => [...($documento->sireb_envio ?? []), 'pago' => $pago]]);
             });
         } catch (CupoInvalidoException|CarnetInvalidoException|PermisoOperativoException $e) {
             // Pagado, pero una regla de Jichi lo frena (p. ej. la autorización fue revocada).
             return $this->no('está pagado en Recaudaciones, pero no se pudo aprobar: '.$e->getMessage());
         }
 
-        return ['aprobado' => true, 'mensaje' => 'Pago confirmado en Recaudaciones: quedó aprobado y se emitió el recibo.'];
+        return ['aprobado' => true, 'mensaje' => 'Pago confirmado en Recaudaciones: quedó aprobado y se emitió '.$this->documentoEmitido($documento).'.'];
+    }
+
+    /**
+     * Se intentó eliminar y SIREB tiene un pago: no se borra. Se verifica igual —la ficha
+     * muestra el pago y, si ya está validado, el trámite se aprueba—.
+     *
+     * @return array{aprobado: bool, mensaje: string}
+     */
+    public function alNoPoderEliminar(Model $documento): array
+    {
+        $resultado = $this->verificar($documento);
+
+        return [
+            'aprobado' => $resultado['aprobado'],
+            'mensaje' => match (true) {
+                $resultado['aprobado'] => 'No se eliminó: el pago ya fue validado en Recaudaciones. El trámite quedó aprobado y se emitió '
+                    .$this->documentoEmitido($documento).'.',
+                ($documento->sireb_envio['pago']['estado'] ?? null) === 'pendiente' => 'No se eliminó: tiene un pago cargado en Recaudaciones '
+                    .'que todavía está en revisión. Cuando lo validen, quedará aprobado.',
+                default => 'No se eliminó. '.$resultado['mensaje'],
+            },
+        ];
     }
 
     /** El recibo con la boleta tal como la validó SIREB, congelada. */
@@ -122,6 +161,40 @@ class ConfirmarPagoService
                 .($documento->categoria?->descripcion_kg ? ' - '.$documento->categoria->descripcion_kg : ''),
             $documento instanceof PermisoFaena => $documento->etiqueta.' - '.$kilos($documento->kilos_extraidos).' kg',
             $documento instanceof GuiaMovimiento => $documento->etiqueta,
+        };
+    }
+
+    /** Pendiente → no pagado, con la fila bloqueada. Libera lo que ocupaba: el lugar de la persona, los kilos reservados. */
+    private function marcarNoPagado(Model $documento): void
+    {
+        DB::transaction(function () use ($documento): void {
+            $bloqueado = $documento::query()->whereKey($documento->getKey())->lockForUpdate()->firstOrFail();
+
+            if (! $bloqueado->estado->estaAbierto()) {
+                return;
+            }
+
+            $bloqueado->motivoAuditoria = 'Venció el plazo de pago en SIREB sin ningún pago.';
+            $bloqueado->update(['estado' => match (true) {
+                $bloqueado instanceof AprovechamientoPesq => EstadoAprovechamiento::NoPagado,
+                $bloqueado instanceof Carnet => EstadoCarnet::NoPagado,
+                $bloqueado instanceof PermisoFaena => EstadoFaena::NoPagado,
+                $bloqueado instanceof GuiaMovimiento => EstadoGuia::NoPagada,
+            }]);
+        });
+
+        // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
+        $documento->refresh();
+    }
+
+    /** Lo que recibe la persona al aprobarse, para el aviso: «la autorización», «el carnet»… */
+    private function documentoEmitido(Model $documento): string
+    {
+        return match (true) {
+            $documento instanceof AprovechamientoPesq => 'la autorización',
+            $documento instanceof Carnet => 'el carnet',
+            $documento instanceof PermisoFaena => 'el permiso de faena',
+            $documento instanceof GuiaMovimiento => 'la guía',
         };
     }
 

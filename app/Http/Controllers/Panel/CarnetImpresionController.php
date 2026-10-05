@@ -166,15 +166,8 @@ class CarnetImpresionController extends Controller
     }
 
     /**
-     *  Las medidas de la columna de datos
-     *
-     * En puntos, y calzadas con las coordenadas del Blade. Ver las cuentas del
-     * encabezado de esa plantilla.
-     */
-    private const ANCHO_DATOS = 176.0;
-
-    /**
-     * El ancho útil de la tira del valor, en puntos.
+     * El ancho útil de la tira del valor, en puntos, calzado con las
+     * coordenadas del Blade. Ver las cuentas del encabezado de esa plantilla.
      */
     private const ANCHO_VALOR = 121.0;
 
@@ -182,15 +175,6 @@ class CarnetImpresionController extends Controller
      * El ancho util de cada mitad del renglon partido, en puntos.
      */
     private const ANCHO_VALOR_ANGOSTO = 38.0;
-
-    /**
-     * El renglon partido en tres — registro + GESTION + CUPO.
-     */
-    private const ANCHO_TRIPLE_REGISTRO = 20.0;
-
-    private const ANCHO_TRIPLE_GESTION = 15.0;
-
-    private const ANCHO_TRIPLE_CUPO = 31.5;
 
     /**
      * Cuantos caracteres entran en el TITULO a cuerpo pleno.
@@ -349,7 +333,7 @@ class CarnetImpresionController extends Controller
         /*
          *  La gestión ya no se imprime, y no es un olvido
          */
-        // «REGISTRO» con su número anual —«00001»— y no el código de 16: en el
+        // «REGISTRO» con su número anual —«000001»— y no el código de 16: en el
         // plástico entra un número que se dicta y se busca en el libro. El
         // código sigue existiendo, y es el que usa la verificación pública.
         if ($cupo === null) {

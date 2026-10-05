@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { usePermisos } from '@/hooks/use-permisos';
-import { bs, cn, fecha } from '@/lib/utils';
+import { bs, cn, fecha, fechaInput } from '@/lib/utils';
 import type { CarnetResumen, CupoResumen, FaenaDelBeneficiario } from '@/types/beneficiarios';
 import { AvisoRegistroAnterior, CredencialMini, HistorialCarnets, Seccion, TarjetaPeriodo } from './partes-ficha';
 
@@ -334,10 +334,12 @@ function diasEntre(desde: string | null, hasta: string | null): number | null {
 
 /** La bolsa madre con su saldo: lo que dice si puede salir mañana. */
 function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
-    const vencido = cupo.estado === 'vencido';
+    // La vigencia la dice la fecha, no el estado: aprobada sigue aprobada aunque pase su fecha.
+    const vencido = cupo.ya_fue_aprobado && cupo.fecha_vencimiento !== null && cupo.fecha_vencimiento.slice(0, 10) < fechaInput(new Date());
     const revocado = cupo.estado === 'revocado';
-    // Ninguna de las dos autoriza: lo que sobró no se puede pescar.
-    const cerrado = vencido || revocado;
+    const noPagado = cupo.estado === 'no_pagado';
+    // Ninguna autoriza: lo que sobró no se puede pescar.
+    const cerrado = vencido || revocado || noPagado;
     const escaso = !cerrado && cupo.volumen_total_kg > 0 && cupo.saldo_kg / cupo.volumen_total_kg < 0.2;
     const colorLibre = cerrado ? 'bg-slate-300 dark:bg-slate-600' : escaso ? 'bg-amber-500' : 'bg-sky-600';
 
@@ -364,8 +366,13 @@ function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
                             <span className="text-3xl font-semibold tabular-nums text-foreground">{cupo.saldo_kg} kg</span> sin
                             pescar
                         </p>
+                    ) : noPagado ? (
+                        <p className="text-sm text-muted-foreground">
+                            <span className="font-semibold text-foreground">No pagada:</span> venció el plazo de pago en
+                            Recaudaciones y no siguió su curso. No autoriza nada.
+                        </p>
                     ) : vencido ? (
-                        // Vencida no autoriza nada: lo que sobró no se puede pescar.
+                        // Fuera de fecha no autoriza nada: lo que sobró no se puede pescar.
                         <p className="text-sm text-muted-foreground">
                             Venció el {fecha(cupo.fecha_vencimiento)} con{' '}
                             <span className="text-3xl font-semibold tabular-nums text-foreground">{cupo.saldo_kg} kg</span> sin

@@ -22,7 +22,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'carnet_id',
-    'numero_faena',
+    'nro',
     'monto',
     'sireb_tarifa_id',
     'kilos_extraidos',
@@ -115,7 +115,7 @@ class PermisoFaena extends Model
     protected function numeroLegible(): Attribute
     {
         return Attribute::get(
-            fn (): string => CorrelativoService::rellenar($this->numero_faena),
+            fn (): string => CorrelativoService::rellenar($this->nro),
         );
     }
 
@@ -239,7 +239,8 @@ class PermisoFaena extends Model
                 'en Recaudaciones.',
             $this->estado === EstadoFaena::Completado => 'La salida ya se cerró: los kilos quedaron '.
                 'firmes contra el cupo.',
-            $this->estado === EstadoFaena::Vencido => 'Pasó su fecha de desembarque sin cerrarse.',
+            $this->estado === EstadoFaena::NoPagado => 'No se pagó a tiempo en Recaudaciones: no siguió su curso '.
+                'y sus kilos volvieron al cupo.',
             // Estado histórico: hasta el 27/09/2026 la revocación lo escribía en cascada.
             $this->estado === EstadoFaena::Revocado => 'Fue revocada junto con su Autorización de Pesca '.
                 'para Aprovechamiento Pesquero: ya no autoriza la salida.',

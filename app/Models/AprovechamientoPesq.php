@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
 use App\Enums\ModalidadAprovechamiento;
+use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
 use App\Traits\LiquidableSireb;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'beneficiario_id',
     'categoria_aprov_id',
+    'nro',
     'modalidad',
     'volumen_total_kg',
     'monto',
@@ -41,6 +43,9 @@ class AprovechamientoPesq extends Model
 
     /** «AprovechamientoPesq» no pluraliza a «aprovechamientos_pesq» por sí solo. */
     protected $table = 'aprovechamientos_pesq';
+
+    /** La serie del correlativo continuo del N° impreso. Ver CorrelativoService. */
+    public const SERIE = 'AUTORIZACION-PESCA';
 
     /**
      * Ver el comentario de Asociacion::$attributes: un default de la base NO
@@ -186,11 +191,10 @@ class AprovechamientoPesq extends Model
      */
     public function sincronizarEstadoPorSaldo(): void
     {
-        // Un cupo VENCIDO no se toca: su problema es la fecha, no los kilos, y
-        // devolverlo a `aprobado` porque le sobró volumen sería mentir.
-        // Tampoco uno REVOCADO: anular una faena lo devolvería a `aprobado` y
-        // reviviría una autorización dada de baja.
-        if ($this->estado === EstadoAprovechamiento::Vencido || $this->estado === EstadoAprovechamiento::Revocado) {
+        // Solo se mueve entre aprobado y agotado. Un REVOCADO volvería a `aprobado` al
+        // anular una faena —reviviría una autorización dada de baja—, y un pendiente o
+        // no pagado nunca se aprobó.
+        if (! in_array($this->estado, [EstadoAprovechamiento::Aprobado, EstadoAprovechamiento::Agotado], true)) {
             return;
         }
 
@@ -203,13 +207,10 @@ class AprovechamientoPesq extends Model
         }
     }
 
-    /**
-     * El N° de la autorización impresa: el id con seis ceros, «000001». Ver
-     * `AutorizacionPescaController`: no hay correlativo propio.
-     */
+    /** El N° de la autorización impresa, con los ceros del talonario: «000001». */
     public function numeroLegible(): string
     {
-        return str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
+        return CorrelativoService::rellenar($this->nro);
     }
 
     /**
@@ -263,15 +264,14 @@ class AprovechamientoPesq extends Model
     /**
      * ¿Pasó alguna vez por la firma? Es lo que habilita la autorización en papel.
      *
-     * A vencido y agotado se llega desde ACTIVO, así que los tres tuvieron su
-     * aprobación; pendiente no. Un cupo vencido se reimprime
-     * igual: puede hacer falta reponer el papel de una gestión cerrada.
+     * A agotado y revocado se llega desde APROBADO, así que tuvieron su
+     * aprobación; pendiente y no pagado no. Fuera de fecha se reimprime igual:
+     * puede hacer falta reponer el papel de una gestión cerrada.
      */
     public function yaFueAprobado(): bool
     {
         return in_array($this->estado, [
             EstadoAprovechamiento::Aprobado,
-            EstadoAprovechamiento::Vencido,
             EstadoAprovechamiento::Agotado,
             // Revocado también pasó por la firma; lo que pierde es la impresión.
             EstadoAprovechamiento::Revocado,

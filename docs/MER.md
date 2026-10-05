@@ -289,9 +289,10 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | --- | --- | --- |
 | `beneficiario_id` | FK RESTRICT | |
 | `categoria_aprov_id` | FK RESTRICT | Bajo qué tramo se otorgó |
+| `nro` | unsigned, único **global** | El N° impreso: correlativo **continuo** (`AUTORIZACION-PESCA`), `000001`. Lo pone el sistema al otorgar; antes del 03/10/2026 se imprimía el `id` |
 | `modalidad` | string(30) | **Copiada** del tramo |
 | `volumen_total_kg` | decimal(12,2) | **Copiado** del techo del tramo |
-| `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar; corregir el borrador lo vuelve a pedir |
+| `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar. Corregir no lo toca: solo cambia la embarcación (03/10/2026) |
 | `sireb_tarifa_id` | string(36) **null** | La tarifa de SIREB de ese monto, como constancia |
 | `sireb_idempotency_key` | uuid **null**, único global | La `Idempotency-Key` de la venta en SIREB. Se guarda ANTES de llamar; corregir con otra tarifa genera otra (02/10/2026) |
 | `sireb_liquidacion_id`, `sireb_codigo_publico` | null | Lo que devuelve SIREB. Null mientras la venta está por enviar |
@@ -304,16 +305,17 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `fecha_vencimiento` | date | Vence con la gestión |
 
 ```
-PENDIENTE ──(pagada en SIREB)──▶ APROBADO ──▶ AGOTADO | VENCIDO
-(borrador)                          │            │
-                                    └─[revocar]──┴──▶ REVOCADO
+PENDIENTE ──(pagada en SIREB)──▶ APROBADO ──▶ AGOTADO
+(borrador) │                        │            │
+           │                        └─[revocar]──┴──▶ REVOCADO
+           └──(vencida sin pago en SIREB)──▶ NO_PAGADO
 
-            PENDIENTE   APROBADO   AGOTADO   VENCIDO   REVOCADO
-  editar       ✔           ✘          ✘         ✘         ✘
-  eliminar     ✔           ✘          ✘         ✘         ✘
-  faenas       ✘           ✔          ✘         ✘         ✘
-  revocar      ✘           ✔          ✔         ✘         ✘
-  imprimir     ✘           ✔          ✔         ✔         ✘
+            PENDIENTE   APROBADO   AGOTADO   REVOCADO   NO_PAGADO
+  editar       ✔           ✘          ✘          ✘          ✘
+  eliminar     ✔           ✘          ✘          ✘          ✘
+  faenas       ✘           ✔ (en fecha) ✘        ✘          ✘
+  revocar      ✘           ✔          ✔          ✘          ✘
+  imprimir     ✘           ✔          ✔          ✘          ✘
 ```
 
 **`revocado` (27/09/2026)** no agrega columnas: el motivo va a `auditorias`, como
@@ -338,7 +340,7 @@ es **nullable**: en NULL significa «todavía no se otorgó», sin posibilidad d
 contradicción, igual que las fechas de impreso y entregado del carnet.
 
 **Y el vencimiento se recalcula al aprobar**, sobre la emisión: el cupo vale por
-la GESTIÓN, así que un expediente pedido el 28/12 y firmado en enero vence con
+la GESTIÓN, así que un expediente pedido el 28/12 y aprobado en enero vence con
 el año nuevo y no con el que ya terminó.
 
 **UN CUPO NO SE AMPLÍA.** La función existió y se retiró: el volumen otorgado
@@ -399,7 +401,12 @@ bajo su nombre.
 | `monto` | decimal(10,2) | **Copia congelada** del precio de SIREB al emitir (y al corregir el borrador). Es lo que lee `montoACobrar()`: un cambio de tarifa después no toca lo ya emitido (30/09/2026) |
 | `sireb_tarifa_id` | uuid, nullable | La tarifa de SIREB de ese precio |
 | `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
-| `estado` | string(20) | `EstadoCarnet` |
+| `nro` | unsigned **null**, índice (no único) | El número de registro: correlativo **por gestión**, asignado AL APROBAR. Se imprime con seis dígitos (`registro_legible`). Ver abajo por qué no es único |
+| `archivo_ci`, `archivo_asociacion` | string(255) **null** | Escaneos de la cédula y la carta del gremio. Nullable para cargar lo emitido en papel; el formulario sí los exige. Se suben con `StorageController` ANTES de la transacción |
+| `estado` | string(20) | `EstadoCarnet`: `pendiente`, `aprobado`, `revocado`, `no_pagado` |
+| `fecha_solicitud` | date | El día que se pidió |
+| `fecha_emision` | date **null** | El día que se aprobó |
+| `fecha_vencimiento` | date, índice | El 31/12 de la gestión de la aprobación. **Es la vigencia: no hay estado `vencido`** |
 
 **EL CÓDIGO YA NO ES UNA COLUMNA DE ESTA TABLA.** Vivía en `codigo_carnet` y se
 mudó a **`codigos`** el 22/09/2026, cuando los otros cuatro documentos pasaron a
@@ -426,7 +433,7 @@ RESTRICT trabaría la baja sin proteger nada que importe.
 **El código es único GLOBAL y no por tipo**: un control en ruta lee un código y
 tiene que llegar a UN documento, sin preguntar antes de qué tipo es.
 
-**`nro_registro` lleva índice y NO único.** Es el número impreso en el plástico:
+**`carnets.nro` lleva índice y NO único.** Es el número impreso en el plástico:
 correlativo por gestión, compartido entre pescadores y comercializadores y
 asignado AL APROBAR (un pendiente no ocupa número y uno rechazado no gasta uno).
 El único sería «uno por año», y el año no es una columna —es el de
@@ -443,8 +450,8 @@ que va impreso, y eso ya está decidido al otorgarlo; el carnet también nace si
 pagar y los dos se cobran juntos en el mismo recibo. Por eso `EmitirCarnetService`
 usa el scope `enCurso()` —pendiente o aprobado, en fecha— y no `vigentes()`.
 
-**El estado firmado se llama `aprobado`, no `activo`** —cambiado el 25/09/2026,
-igual que el cupo el 20/09—: lo que dice la columna es que ALGUIEN LO FIRMÓ.
+**El estado pagado se llama `aprobado`, no `activo`** —cambiado el 25/09/2026,
+igual que el cupo el 20/09—: lo que dice la columna es que SE PAGÓ Y SE APROBÓ.
 
 **REVOCAR: solo el APROBADO, y sus faenas siguen** (25/09/2026). Es el camino de
 la reposición por extravío: se revoca con motivo desde la ficha, el QR pasa a
@@ -476,7 +483,7 @@ producto.
 | Columna | Tipo | Nota |
 | --- | --- | --- |
 | `carnet_id` | FK RESTRICT | **La única**: de él cuelga la faena |
-| `numero_faena` | int | Correlativo **global y continuo**. Lo pone el sistema |
+| `nro` | int | Correlativo **global y continuo**. Lo pone el sistema |
 | `monto` | decimal(10,2) | Copia congelada del precio de SIREB al emitir |
 | `sireb_tarifa_id` | uuid, null | La tarifa de SIREB de ese precio (30/09/2026) |
 | `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
@@ -485,7 +492,7 @@ producto.
 | `matricula_naval`, `nro_kardex` | string, **null** | Renglones del papel |
 | `region_desde` / `region_hasta` | string(150), **null** | La región amparada |
 | `fecha_solicitud` | date | El día que se pidió |
-| `fecha_salida` | date, null | La escribe la APROBACIÓN: el día de la firma |
+| `fecha_salida` | date, null | La escribe la APROBACIÓN: el día en que se aprobó |
 | `fecha_desembarque` | date, null, index | La escribe la APROBACIÓN: salida + 30 días. Es el techo |
 | `estado` | string(20) | `EstadoFaena`; nace `pendiente` |
 
@@ -498,7 +505,7 @@ ni de comandantes —un catálogo cerrado obligaría a dar de alta uno con el
 pescador esperando en la ventanilla—.
 
 **LAS FECHAS NO SE TIPEAN: LAS ESCRIBE LA APROBACIÓN** —25/09/2026, a pedido
-del responsable—. La salida es el día de la firma y el desembarque, salida +
+del responsable—. La salida es el día de la aprobación y el desembarque, salida +
 `PermisoFaena::DIAS_VIGENCIA` (30). Antes el operador tipeaba salida y
 desembarque, y había además `fecha_limite` (el techo) y `fecha_emision` (la
 firma): con las fechas fijadas por la aprobación, esas dos eran copias de las
@@ -518,11 +525,11 @@ ACTIVA y autorizaba en el acto. Hoy recorre el mismo circuito que los otros:
 PENDIENTE ──(pagada en SIREB)──▶ APROBADO (autoriza la salida)
 ```
 
-**El estado firmado se guarda como `aprobado`, no `activo`** —25/09/2026, igual
+**El estado pagado se guarda como `aprobado`, no `activo`** —25/09/2026, igual
 que el carnet y el cupo—.
 
 **NO SE REGISTRA LA VUELTA** —retirado el 25/09/2026 a pedido—. La faena
-aprobada queda así: los kilos autorizados cuentan como consumidos desde la firma.
+aprobada queda así: los kilos autorizados cuentan como consumidos desde la aprobación.
 `EstadoFaena::Completado` sigue en el enum, pero hoy nada lleva a ese estado.
 
 **`revocado` es un estado HISTÓRICO de la faena.** Durante el 27/09/2026 lo
@@ -544,10 +551,10 @@ saldo − reservado—. El ejemplo está en
 [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#paso-4--la-operativa-del-pescador-permisos-de-faena).
 
 Historia: hasta el 21/09/2026 la pendiente descontaba; ese día se pasó a
-descontar desde la firma, y el cupo se podía sobrecomprometer —tres solicitudes
-por el volumen entero pasaban las tres y chocaban al firmar la segunda—. El
+descontar desde la aprobación, y el cupo se podía sobrecomprometer —tres solicitudes
+por el volumen entero pasaban las tres y chocaban al aprobar la segunda—. El
 27/09/2026 volvió la reserva, pero separada del descuento: el saldo sigue siendo
-el volumen realmente firmado y el sobrecompromiso deja de ser posible en modo
+el volumen realmente aprobado y el sobrecompromiso deja de ser posible en modo
 estricto. `RevisarFaenaService::aprobar()` vuelve a medir igual, por si la faena
 nació en modo flexible.
 
@@ -577,7 +584,7 @@ sigue calculando con una sola consulta.
 
 **EL NÚMERO ES UN CORRELATIVO GLOBAL Y CONTINUO, y lo pone el SISTEMA**
 —cambiado el 21/09/2026—. Arranca en `000001`, no reinicia por gestión y su
-único es `numero_faena` a secas.
+único es `permisos_faena.nro` a secas.
 
 Era correlativo DENTRO DEL CARNET y lo tipeaba el operador, con el argumento de
 que cada carnet es un talonario. No lo es: el talonario de papel es **uno solo
@@ -593,7 +600,7 @@ el año 0**, que ninguna gestión real ocupa: la tabla `correlativos` lleva
 `(serie, anio)` y pasarle el año de verdad lo haría reiniciar cada enero.
 
 `Carnet::siguienteNumeroFaena()` fue eliminado, y con él los
-`withMax('faenas', 'numero_faena')` que lo alimentaban.
+`withMax('faenas', 'nro')` que lo alimentaban.
 
 **`fecha_desembarque` se guarda calculada** en vez de derivarla al leer: si
 mañana la resolución cambia el plazo a quince días, los permisos ya emitidos
@@ -617,7 +624,7 @@ salida no ocurrió.
 | --- | --- | --- |
 | `carnet_id` | FK RESTRICT | **La única**: de él cuelga la guía |
 | `asociacion_id` | FK RESTRICT | El aval impreso, COPIADO del carnet |
-| `numero_guia` | unsigned, único **global** | Correlativo **continuo**: `000308` |
+| `nro` | unsigned, único **global** | Correlativo **continuo**: `000308` |
 | `monto` | decimal(10,2) | Total del cuadro D al emitir, con el descuento |
 | `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, un ítem por renglón del cuadro D (tarifa por kilo × kilos); igual que en `aprovechamientos_pesq` (02/10/2026) |
 | `origen` / `destino` | string(160) | Bloque B del papel |
@@ -642,13 +649,13 @@ renglones en blanco y había que completarlo a mano, que es lo que el sistema
 viene a evitar.
 
 **EL NÚMERO LO PONE EL SISTEMA, no el operador.** Era `codigo_guia`, tipeado a
-mano y único global. Ahora es `numero_guia`, correlativo **continuo** de seis
+mano y único global. Ahora es `guias_movimiento.nro`, correlativo **continuo** de seis
 dígitos por `CorrelativoService::siguienteContinuo()` —el talonario del SEDAG va
 en 000308 y no reinicia en enero—. Mismo tratamiento que
-`permisos_faena.numero_faena` y que `recibos.numero_recibo`.
+`permisos_faena.nro` y que `recibos.numero_recibo`.
 
 **LAS DOS FECHAS DE VIGENCIA SON NULLABLE, y eso es el circuito.** La guía nace
-PENDIENTE y hasta la firma no ampara nada, así que no hay nada que venza:
+PENDIENTE y hasta la aprobación no ampara nada, así que no hay nada que venza:
 `RevisarGuiaService::aprobar()` escribe las dos. Contarlas desde que se cargó el
 borrador le comería al camión los días que el expediente estuvo esperando en
 ventanilla.
@@ -678,7 +685,7 @@ escrito en tres lados, el día que la resolución cambie el 50% a 40% se corrige
 dos y el tercero sigue cobrando mal sin que nadie lo note.
 
 **Las fechas de vigencia son `dateTime` y no `date`** porque los cinco días se
-cuentan desde la HORA de emisión: una guía firmada a las 18:00 del lunes vence a
+cuentan desde la HORA de emisión: una guía aprobada a las 18:00 del lunes vence a
 las 18:00 del sábado, no a la medianoche del viernes. Con `date` se le regalaría
 o se le quitaría al transportista casi un día.
 
@@ -699,7 +706,7 @@ eliminar valen SOLO en pendiente, y anulan antes la liquidación en SIREB (si ya
 tiene un pago allá, SIREB no deja y no se corrige).
 
 > **ANULAR Y ELIMINAR NO SON LO MISMO.** Eliminar es sobre el BORRADOR —la fila
-> se dio de baja y nunca hubo papel—; anular es sobre una guía YA FIRMADA, cuyo
+> se dio de baja y nunca hubo papel—; anular es sobre una guía YA APROBADA, cuyo
 > papel está en la calle. Las dos queman el número del talonario igual.
 
 ---
@@ -790,7 +797,7 @@ Contabilidad audita esa serie.
 `000016`: seis dígitos, nada más. Era `REC-2026-0016` y reiniciaba en enero, lo
 que daba dos recibos con el mismo número en gestiones distintas; el papel del
 talonario no dice el año por ningún lado, así que en el archivo eran
-indistinguibles. Mismo tratamiento que `permisos_faena.numero_faena`.
+indistinguibles. Mismo tratamiento que `permisos_faena.nro`.
 
 Lo reserva `CorrelativoService::siguienteContinuo()` bajo la serie `REC`
 (`ConfirmarPagoService`) —que es la CLAVE del contador, no lo que se imprime— y lo
@@ -861,14 +868,26 @@ dos viven en `App\Traits\Codificable`.
 > no falla: hace N+1 en silencio. Y en `carnets` el accesor va en `#[Appends]`,
 > así que el N+1 aparece con solo serializar la fila.
 
-**El código NO reemplaza a los correlativos** —`numero_recibo`, `numero_faena`,
-`nro_registro`—. Son dos números con trabajos opuestos: el correlativo es
+**El código NO reemplaza a los correlativos** —`numero_recibo`, `permisos_faena.nro`,
+`guias_movimiento.nro`, `aprovechamientos_pesq.nro`, `carnets.nro`—. Son dos números con trabajos opuestos: el correlativo es
 consecutivo **a propósito**, porque Contabilidad audita sus huecos; el código es
 imposible de adivinar **a propósito**, porque es la llave de una pantalla
 pública. Un código al azar no tiene huecos que auditar, y un correlativo lo
 adivina cualquiera probando el siguiente.
 
 ---
+
+### Tablas de soporte — no son del dominio
+
+| Tabla | Columnas | Nota |
+| --- | --- | --- |
+| `users` | `name`, `email` (único), `password`, `beneficiario_id`, `ci`, `mamore_id` (único), `cargo`, `telefono`, `activo`, `ultimo_acceso_at`, `debe_cambiar_password` + soft delete | **Con `beneficiario_id` = cuenta del portal**: nunca entra al panel ni lleva roles. Una por beneficiario: índice parcial `users_beneficiario_unico` (`WHERE deleted_at IS NULL`). `mamore_id` vincula con Ibare. Las columnas propias llegan en la migración `2026_09_01_100000`, la única «de parche»: `users` es la tabla de Laravel |
+| `correlativos` | `serie`, `anio`, `ultimo_numero` | Único `(serie, anio)`. Las series continuas —recibo `REC`, `AUTORIZACION-PESCA`, `PERMISO-FAENA`, `GUIA-TRANSPORTE`— van bajo el **año 0**; el registro del carnet (`CARNET`), por gestión. `CorrelativoService` bloquea la fila |
+| `configuraciones` | `clave` (única), `valor`, `tipo`, `grupo`, `etiqueta`, `descripcion`, `publico` | Lo que la unidad cambia sin tocar código: datos de la portada, firmante del carnet. Las siembra `ConfiguracionSeeder` |
+| `auditorias` | `user_id`, `evento`, `auditable_type`/`_id`, `valores_anteriores`, `valores_nuevos`, `descripcion`, `ip`, `user_agent`, `url` | La escribe el trait `Auditable` (alta, cambio, baja). El motivo de una baja va en `descripcion` vía `motivoAuditoria` |
+| `accesos` | `user_id`, `email`, `evento`, `ip`, `user_agent`, `session_id` | Bitácora de ingresos y salidas, también los fallidos |
+
+Más las de Laravel (`cache`, `jobs`, `sessions`…) y las de `spatie/laravel-permission`.
 
 ## 3. Borrado lógico: todas las tablas del dominio lo tienen
 
@@ -894,10 +913,11 @@ o queda quemado:
 | `tipos_carnet.nombre` | **parcial** | Ídem |
 | `productos_hidrobiologicos.nombre` | **parcial** (en el Request) | Ídem |
 | `beneficiarios.ci` | **parcial** | Una ficha dada de baja libera la cédula |
-| `carnets.codigo_carnet` | **global** | El plástico ya salió y está en la calle |
-| `guias_movimiento (numero_guia)` | **global** | La hoja del talonario se gastó |
+| `codigos.codigo` | **global** | El código de un documento entregado ya salió impreso |
+| `guias_movimiento (nro)` | **global** | La hoja del talonario se gastó |
 | `recibos.numero_recibo` | **global** | Correlativo que Contabilidad audita: el hueco es lo que la hace auditable |
-| `permisos_faena (numero_faena)` | **global** | La hoja del talonario se gastó |
+| `permisos_faena (nro)` | **global** | La hoja del talonario se gastó |
+| `aprovechamientos_pesq.nro` | **global** | Ídem |
 | `aprovechamientos_pesq.sireb_idempotency_key` | **global** | Ya viajó a SIREB: reusarla devolvería la venta vieja |
 
 > El criterio en una línea: **el catálogo libera, el papel entregado no.**

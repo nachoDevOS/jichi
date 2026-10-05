@@ -12,8 +12,7 @@ Departamental del Beni.
 | Base de datos | PostgreSQL 18 |
 | Roles y permisos | spatie/laravel-permission |
 | PDF | barryvdh/laravel-dompdf |
-| Excel | maatwebsite/excel |
-| QR | simplesoftwareio/simple-qrcode |
+| QR | bacon/bacon-qr-code (pintado con gd) |
 | Rutas en JS | tightenco/ziggy |
 | Gráficos | recharts |
 | Toasts | sonner |
@@ -71,15 +70,20 @@ php artisan storage:link
 ```
 
 El seeder crea el rol `administrador` con todos sus permisos, la configuración
-institucional, los dos rubros del catálogo —Pescador y Comercializador— y la
-cuenta `admin@admin.com`.
+institucional y la cuenta `admin@admin.com`.
 
-Fuera de producción carga además datos de prueba, a propósito POCOS: 16
-beneficiarios (4 de ellos sin carnet), 12 carnets y 15 trámites. No se siembran
-al azar sino siguiendo un guion fijo, de modo que estén representadas todas las
-situaciones que el sistema tiene que poder mostrar —aprobado, pendiente con pago
-parcial, rechazado, rubro suspendido, carnet anulado, carnet de la gestión
-anterior— una vez cada una. Ver `database/seeders/DemoSeeder.php`.
+Fuera de producción además siembra los **catálogos** (`CatalogoSeeder`:
+asociaciones, la escala oficial, los tipos de carnet, los productos y los
+aranceles, con sus tarifas de SIREB), **vacía el dominio** y carga un **padrón de
+prueba** (`BeneficiarioSeeder`): unas fichas armadas a mano para los casos
+difíciles —el nombre más largo, la apellidada de casada— y el resto con la
+factory. No se siembran autorizaciones, carnets, faenas ni guías: se registran
+desde las pantallas, porque cada una necesita su precio y su liquidación en
+SIREB.
+
+> Para registrar trámites hace falta que SIREB responda: sin precio no se emite.
+> `php artisan jichi:sireb` prueba la conexión. Ver
+> [modulos/SIREB.md](modulos/SIREB.md).
 
 ### Usuarios sembrados
 
@@ -93,7 +97,7 @@ despliegue.**
 | Administrador | admin@admin.com |
 
 Por ahora hay una sola cuenta y un solo rol. Supervisor, operador de ventanilla y
-solo-lectura se agregarán cuando la unidad defina quién firma qué; los permisos
+solo-lectura se agregarán cuando la unidad defina quién hace qué; los permisos
 que van a usar ya están repartidos por bloque en `app/Enums/RolSistema.php`.
 
 ## 4. Levantar
@@ -115,9 +119,9 @@ Para entender cómo Laravel se comunica con React en este sistema, empezar por
 
 ## Qué falta
 
-Los módulos Trámites, Documentos, Reportes y Configuración todavía no
-están construidos: aparecen en gris en el menú lateral. El detalle de qué
-implica cada uno está en [PENDIENTES.md](PENDIENTES.md).
+Los módulos **Reportes** y **Configuración** todavía no están construidos: el
+primero aparece en gris en el menú lateral. Los usuarios se crean por consola.
+El detalle está en [PENDIENTES.md](PENDIENTES.md).
 
-El módulo **Beneficiarios** ya está completo y sirve de plantilla comentada para
-los otros cuatro.
+El módulo **Beneficiarios** sirve de plantilla comentada para cualquier módulo
+nuevo; ver [GUIA-INERTIA.md](GUIA-INERTIA.md).

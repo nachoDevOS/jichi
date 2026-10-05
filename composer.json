@@ -7,14 +7,13 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "bacon/bacon-qr-code": "^2.0",
         "barryvdh/laravel-dompdf": "^3.1",
         "firebase/php-jwt": "^7.0",
         "inertiajs/inertia-laravel": "^3.3",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
-        "maatwebsite/excel": "^4.0",
-        "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/laravel-permission": "^8.3",
         "tightenco/ziggy": "^2.6"
     },
@@ -23,9 +22,7 @@
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
-        "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.6",
-        "phpunit/phpunit": "^12.5.12"
+        "nunomaduro/collision": "^8.6"
     },
     "autoload": {
         "psr-4": {
@@ -76,7 +73,6 @@
         "preferred-install": "dist",
         "sort-packages": true,
         "allow-plugins": {
-            "pestphp/pest-plugin": true,
             "php-http/discovery": true
         }
     },

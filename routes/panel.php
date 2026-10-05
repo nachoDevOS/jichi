@@ -115,6 +115,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware('permiso:aprovechamientos.crear')
         ->name('aprovechamientos.verificar-pago');
 
+    // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
+    Route::post('/aprovechamientos/{aprovechamiento}/cargar-pago', [AprovechamientoController::class, 'cargarPago'])
+        ->middleware('permiso:aprovechamientos.crear')
+        ->name('aprovechamientos.cargar-pago');
+
     // Revocar es una sanción, como en el carnet: permiso propio y motivo obligatorio.
     Route::patch('/aprovechamientos/{aprovechamiento}/revocar', [AprovechamientoController::class, 'revocar'])
         ->middleware('permiso:aprovechamientos.revocar')
@@ -170,6 +175,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware('permiso:carnets.crear')
         ->name('carnets.verificar-pago');
 
+    // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
+    Route::post('/carnets/{carnet}/cargar-pago', [CarnetController::class, 'cargarPago'])
+        ->middleware('permiso:carnets.crear')
+        ->name('carnets.cargar-pago');
+
     Route::patch('/carnets/{carnet}/revocar', [CarnetController::class, 'revocar'])
         ->middleware('permiso:carnets.revocar')
         ->name('carnets.revocar');
@@ -208,6 +218,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::post('/faenas/{faena}/verificar-pago', [FaenaController::class, 'verificarPago'])
         ->middleware('permiso:faenas.crear')
         ->name('faenas.verificar-pago');
+
+    // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
+    Route::post('/faenas/{faena}/cargar-pago', [FaenaController::class, 'cargarPago'])
+        ->middleware('permiso:faenas.crear')
+        ->name('faenas.cargar-pago');
 
     // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
     // PENDIENTE: lo decide PermisoFaena::puedeEditarse().
@@ -252,6 +267,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::post('/guias/{guia}/verificar-pago', [GuiaController::class, 'verificarPago'])
         ->middleware('permiso:guias.crear')
         ->name('guias.verificar-pago');
+
+    // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
+    Route::post('/guias/{guia}/cargar-pago', [GuiaController::class, 'cargarPago'])
+        ->middleware('permiso:guias.crear')
+        ->name('guias.cargar-pago');
 
     // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
     // PENDIENTE: lo dice GuiaMovimiento::puedeEditarse().

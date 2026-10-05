@@ -85,6 +85,8 @@ export interface CupoFila {
     /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
     sireb: VentaSireb | null;
     puede_verificar_pago: boolean;
+    /** Pendiente, con la liquidación registrada y sin pago cargado. SIREB lo confirma al cargar. */
+    puede_cargar_pago: boolean;
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     fecha_solicitud: string | null;
@@ -100,6 +102,21 @@ export interface VentaSireb {
     estado_color: string;
     /** Con el que se consulta y paga en SIREB. Null hasta que SIREB responde. */
     codigo_publico: string | null;
+    /** La boleta que informó SIREB en la última verificación. Sin imagen: SIREB no la expone. */
+    pago: PagoSireb | null;
+    /** false = todavía no se verificó: sin pago no se sabe si se cargó. */
+    pago_consultado: boolean;
+}
+
+export interface PagoSireb {
+    estado: 'pendiente' | 'confirmado' | null;
+    monto_pagado: number;
+    numero_boleta: string | null;
+    entidad_bancaria: string | null;
+    /** Un DÍA: se muestra con fecha(). */
+    fecha_pago: string | null;
+    /** Un instante: se muestra con fechaHora(). */
+    fecha_validacion: string | null;
 }
 
 /** El cupo con el detalle que solo pinta la ficha. */
@@ -152,7 +169,7 @@ export interface CarnetDelCupo {
 /** Una faena colgada del cupo, en la ficha. */
 export interface FaenaDelCupo {
     id: number;
-    numero_faena: number;
+    nro: number;
     /** Con los seis ceros del talonario: «000001». Lo arma el servidor. */
     numero_legible: string;
     /** De qué carnet cuelga: un cupo puede respaldar más de uno. */

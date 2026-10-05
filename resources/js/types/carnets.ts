@@ -70,6 +70,8 @@ export interface CarnetFila {
     /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
     sireb: VentaSireb | null;
     puede_verificar_pago: boolean;
+    /** Pendiente, con la liquidación registrada y sin pago cargado. SIREB lo confirma al cargar. */
+    puede_cargar_pago: boolean;
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     /** El día que se pidió. La emisión la escribe la aprobación. */

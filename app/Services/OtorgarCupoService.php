@@ -21,6 +21,7 @@ class OtorgarCupoService
     public function __construct(
         private readonly PrecioSireb $precios,
         private readonly LiquidarSirebService $liquidaciones,
+        private readonly CorrelativoService $correlativos,
     ) {}
 
     /**
@@ -54,6 +55,8 @@ class OtorgarCupoService
             $cupo = AprovechamientoPesq::create([
                 'beneficiario_id' => $beneficiario->id,
                 'categoria_aprov_id' => $tramo->id,
+                // Correlativo propio, no el id: el talonario no puede tener huecos de filas ajenas.
+                'nro' => $this->correlativos->siguienteContinuo(AprovechamientoPesq::SERIE),
                 'monto' => $precio['monto'],
                 'sireb_tarifa_id' => $precio['tarifa_id'],
 
@@ -98,60 +101,28 @@ class OtorgarCupoService
     }
 
     /**
-     *  Corregir un cupo que todavía es borrador
+     * Corregir el borrador: solo la embarcación. El tramo no cambia nunca —ni los
+     * kilos ni el monto—, así que la liquidación de SIREB queda como está.
      */
-    public function editar(
-        AprovechamientoPesq $cupo,
-        CategoriaAprovechamiento $categoria,
-        string $tipoEmbarcacion,
-        Carbon $solicitud,
-    ): AprovechamientoPesq {
+    public function editar(AprovechamientoPesq $cupo, string $tipoEmbarcacion): AprovechamientoPesq
+    {
         if (! $cupo->puedeEditarse()) {
             throw CupoInvalidoException::noSePuedeEditar($cupo->estado->etiqueta());
         }
 
-        // Corregir el borrador vuelve a pedir el precio, como la guía.
-        ['tramo' => $tramo, 'precio' => $precio] = $this->verificarPrecio($categoria);
-
-        // Otra tarifa u otro monto es otra liquidación: la vieja se anula ANTES de tocar nada.
-        $otraLiquidacion = $this->liquidaciones->anularSiCambia(
-            $cupo,
-            [['tarifa_id' => $precio['tarifa_id'], 'cantidad' => 1]],
-            $precio['monto'],
-        );
-
-        $cupo = DB::transaction(function () use ($cupo, $tramo, $precio, $solicitud, $tipoEmbarcacion, $otraLiquidacion): AprovechamientoPesq {
+        return DB::transaction(function () use ($cupo, $tipoEmbarcacion): AprovechamientoPesq {
             $bloqueado = AprovechamientoPesq::query()->whereKey($cupo->id)->lockForUpdate()->firstOrFail();
 
-            /*
-             * Se comprueba con la copia bloqueada, no con la que llegó.
-             */
+            // Se comprueba con la copia bloqueada, no con la que llegó.
             if (! $bloqueado->puedeEditarse()) {
                 throw CupoInvalidoException::noSePuedeEditar($bloqueado->estado->etiqueta());
             }
 
-            $bloqueado->update([
-                'categoria_aprov_id' => $tramo->id,
-                'monto' => $precio['monto'],
-                'sireb_tarifa_id' => $precio['tarifa_id'],
-                'modalidad' => $tramo->modalidad,
-                'volumen_total_kg' => $tramo->kilos_max,
-                'tipo_embarcacion' => $tipoEmbarcacion,
-                'fecha_solicitud' => $solicitud->toDateString(),
-                'fecha_vencimiento' => $this->vencimientoDe($solicitud),
-            ]);
-
-            if ($otraLiquidacion) {
-                $this->liquidaciones->preparar($bloqueado);
-            }
+            $bloqueado->update(['tipo_embarcacion' => $tipoEmbarcacion]);
 
             // La original refrescada, no la copia bloqueada. Ver CLAUDE.md.
             return $cupo->refresh();
         });
-
-        $this->liquidaciones->enviarSinFrenar($cupo);
-
-        return $cupo;
     }
 
     /**

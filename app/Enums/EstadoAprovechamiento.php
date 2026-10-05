@@ -12,7 +12,6 @@ enum EstadoAprovechamiento: string
 
     /** SIREB confirmó el pago. Recién acá autoriza a pescar. */
     case Aprobado = 'aprobado';
-    case Vencido = 'vencido';
     case Agotado = 'agotado';
 
     /**
@@ -21,14 +20,17 @@ enum EstadoAprovechamiento: string
      */
     case Revocado = 'revocado';
 
+    /** Venció el plazo de pago en SIREB sin ningún pago: no sigue su curso. NO es la vigencia, que la dicen las fechas. */
+    case NoPagado = 'no_pagado';
+
     public function etiqueta(): string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::Aprobado => 'Aprobado',
-            self::Vencido => 'Vencido',
             self::Agotado => 'Agotado',
             self::Revocado => 'Revocado',
+            self::NoPagado => 'No pagado',
         };
     }
 
@@ -37,9 +39,9 @@ enum EstadoAprovechamiento: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::Aprobado => 'emerald',
-            self::Vencido => 'slate',
             self::Agotado => 'amber',
             self::Revocado => 'rose',
+            self::NoPagado => 'slate',
         };
     }
 
@@ -53,7 +55,7 @@ enum EstadoAprovechamiento: string
 
     /**
      * ¿Se puede revocar? Solo lo firmado que todavía cuenta: aprobado o agotado.
-     * El borrador se elimina; el vencido ya no autoriza.
+     * El borrador se elimina; el no pagado nunca autorizó.
      */
     public function permiteRevocacion(): bool
     {

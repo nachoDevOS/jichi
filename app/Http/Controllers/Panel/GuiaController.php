@@ -10,6 +10,7 @@ use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\ActualizarGuiaRequest;
 use App\Http\Requests\Panel\AnularGuiaRequest;
+use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EliminarGuiaRequest;
 use App\Http\Requests\Panel\EmitirGuiaRequest;
 use App\Models\Beneficiario;
@@ -17,9 +18,10 @@ use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
 use App\Models\ProductoHidrobiologico;
-use App\Models\Recibo;
+use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirGuiaService;
+use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Paginacion;
 use App\Support\Sql;
@@ -31,9 +33,9 @@ use Inertia\Response;
 /**
  *  Guías de movimiento — un traslado de producto (paso 4, rama comercializador)
  *
- * Mismo circuito que la faena: nace PENDIENTE, se le cargan los depósitos, se
- * presenta a revisión —ahí sale el recibo— y recién con la firma ampara el
- * traslado y se puede imprimir.
+ * Mismo circuito que la faena: nace PENDIENTE con su liquidación en SIREB y,
+ * cuando SIREB la da por pagada, queda aprobada —ahí sale el recibo—; recién
+ * entonces ampara el traslado y se puede imprimir.
  */
 class GuiaController extends Controller
 {
@@ -59,7 +61,7 @@ class GuiaController extends Controller
             // `nombreCompleto` y `documento_identidad` las concatenan.
             ->with([
                 'recibo:id,recibible_type,recibible_id,numero_recibo',
-                'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
+                'carnet:id,beneficiario_id,tipo_actor,nro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
                 'carnet.codigo',
                 'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'asociacion:id,nombre,sigla',
@@ -74,7 +76,7 @@ class GuiaController extends Controller
 
                 $q->where(fn ($s) => $s
                     ->whereHas('carnet.beneficiario', fn ($b) => $b->buscar($termino))
-                    ->when($digitos !== '', fn ($n) => $n->orWhere('numero_guia', 'like', '%'.$digitos.'%'))
+                    ->when($digitos !== '', fn ($n) => $n->orWhere('guias_movimiento.nro', 'like', '%'.$digitos.'%'))
                     // El origen y el destino son lo que un control pregunta:
                     // «¿qué salió para Santa Cruz esta semana?».
                     ->orWhere('origen', $operador, $like)
@@ -185,7 +187,7 @@ class GuiaController extends Controller
         }
 
         $guia->load([
-            'carnet:id,beneficiario_id,tipo_actor,nro_registro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
+            'carnet:id,beneficiario_id,tipo_actor,nro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'detalles',
@@ -238,7 +240,7 @@ class GuiaController extends Controller
     /**
      * Eliminar — DELETE /panel/guias/{guia}
      */
-    public function destroy(EliminarGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
+    public function destroy(EliminarGuiaRequest $request, GuiaMovimiento $guia, ConfirmarPagoService $pagos): RedirectResponse
     {
         $numero = $guia->numero_legible;
 
@@ -246,6 +248,14 @@ class GuiaController extends Controller
             $this->servicio->eliminar($guia, $request->validated()['motivo']);
         } catch (PermisoOperativoException $e) {
             return back()->withErrors(['motivo' => $e->getMessage()]);
+        } catch (SirebException $e) {
+            if (! $e->frenaPorPago()) {
+                throw $e;
+            }
+
+            $resultado = $pagos->alNoPoderEliminar($guia);
+
+            return redirect()->route('guias.show', $guia)->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
         }
 
         return redirect()
@@ -260,11 +270,12 @@ class GuiaController extends Controller
     public function show(GuiaMovimiento $guia): Response
     {
         $guia->load([
-            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,nro_registro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
+            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,nro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'asociacion:id,nombre,sigla',
             'detalles',
+            'codigo',
         ]);
 
         // El recibo del trámite —uno solo— y cuántas boletas faltan controlar.
@@ -273,6 +284,8 @@ class GuiaController extends Controller
         return Inertia::render('panel/guias/ver', [
             'guia' => [
                 ...$this->resumir($guia),
+                // Solo en la ficha: en el listado haría una consulta por fila.
+                'codigo' => $guia->codigo_legible,
                 'asociacion_nombre' => $guia->asociacion?->nombre,
 
                 'detalles' => $this->resumirDetalle($guia),
@@ -317,6 +330,19 @@ class GuiaController extends Controller
         $resultado = $pagos->verificar($guia);
 
         return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /**
+     * Cargar pago — POST /panel/guias/{guia}/cargar-pago
+     *
+     * Lo carga en SIREB, que lo valida allá.
+     */
+    public function cargarPago(CargarPagoRequest $request, GuiaMovimiento $guia, CargarPagoService $carga): RedirectResponse
+    {
+        $datos = $request->validated();
+        $resultado = $carga->cargar($guia, $datos['numero_transaccion'], $datos['banco']);
+
+        return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     //  Auxiliares
@@ -420,7 +446,7 @@ class GuiaController extends Controller
 
         return [
             'id' => $guia->id,
-            'numero_guia' => $guia->numero_guia,
+            'nro' => $guia->nro,
             // Con los seis ceros del talonario: «000308».
             'numero_legible' => $guia->numero_legible,
             'etiqueta' => $guia->etiqueta,
@@ -460,6 +486,7 @@ class GuiaController extends Controller
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $guia->resumenSireb(),
             'puede_verificar_pago' => $guia->estado->estaAbierto(),
+            'puede_cargar_pago' => $guia->puedeCargarPago(),
             // Por qué todavía no ampara. Se resuelve en el servidor: React no
             // vuelve a evaluar el estado.
             'motivo_sin_amparar' => $guia->motivoSinAmparar(),

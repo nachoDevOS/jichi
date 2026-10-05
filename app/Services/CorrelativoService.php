@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
  * Entrega números correlativos, bloqueando la fila del contador.
  *
  * Dos usos, y son distintos: `siguienteContinuo()` para lo que se IMPRIME en un
- * papel —recibos y permisos de faena, que no reinician nunca— y
+ * papel —recibo, autorización, faena y guía, que no reinician nunca— y
  * `siguienteNumero()` con gestión para lo que sí se cuenta por año, como el
  * número de registro del carnet.
  */

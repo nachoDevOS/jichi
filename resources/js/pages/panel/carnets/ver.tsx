@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Ban, ExternalLink, Paperclip, Pencil, Printer, Receipt, Ship, Trash2, Truck, User, Waves } from 'lucide-react';
 import { useState } from 'react';
+import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
@@ -356,7 +357,10 @@ export default function VerCarnet({
                             mono
                         />
 
-                        <Dato etiqueta="Código" valor={carnet.codigo} mono />
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-muted-foreground">Código</span>
+                            <TextoCopiable texto={carnet.codigo} className="-mr-1.5" />
+                        </div>
                         <Dato etiqueta="Documento" valor={carnet.documento_identidad ?? '—'} mono />
                         <Dato etiqueta="Tipo" valor={carnet.tipo ?? '—'} />
                         <Dato etiqueta="Asociación" valor={carnet.asociacion_nombre ?? '—'} />
@@ -395,6 +399,8 @@ export default function VerCarnet({
                     recibo={recibo}
                     puedeVerificar={carnet.puede_verificar_pago}
                     rutaVerificar={route('carnets.verificar-pago', carnet.id)}
+                    puedeCargar={carnet.puede_cargar_pago}
+                    rutaCargar={route('carnets.cargar-pago', carnet.id)}
                     permiso="carnets.crear"
                 />
             </div>
@@ -579,7 +585,15 @@ export default function VerCarnet({
                     setEliminando(false);
                     borrado.reset();
                 }}
-                onConfirmar={() => borrado.delete(route('carnets.destroy', carnet.id))}
+                onConfirmar={() =>
+                    borrado.delete(route('carnets.destroy', carnet.id), {
+                        // Borrado va al listado; con el pago ya validado vuelve acá aprobado.
+                        onSuccess: () => {
+                            setEliminando(false);
+                            borrado.reset();
+                        },
+                    })
+                }
             />
 
             {/* REVOCAR: el carnet deja de valer, también al escanearlo. Sus faenas siguen. */}

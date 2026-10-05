@@ -1,8 +1,8 @@
 # Qué falta y qué sigue abierto
 
-> Reescrito el 27/09/2026: se sacó todo lo que hablaba del modelo anterior
-> (trámites, rubros, el recibo armado al vuelo) y lo ya resuelto. Si hace falta,
-> está en el historial de git.
+> Reescrito el 27/09/2026 y puesto al día con el código el 03/10/2026. Lo del
+> modelo anterior (trámites, rubros, el recibo armado al vuelo) y lo ya resuelto
+> están en el historial de git.
 
 ---
 
@@ -13,15 +13,38 @@ emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
 por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
 que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
-## 🔴 El pago se hace en SIREB: falta probarlo de punta a punta — 02/10/2026
+## 🔴 Hay que rearmar la base de trabajo — 03/10/2026
 
-Los cuatro documentos registran su liquidación en SIREB y se aprueban solos
-cuando SIREB los da por pagados (`ConfirmarPagoService`); se retiraron la tabla
-`pagos`, la Caja, el control de boletas y `en_revision`. Probado con SIREB
+Cambiaron migraciones ya corridas (regla 12): la columna `nro` en
+`aprovechamientos_pesq`, `carnets`, `permisos_faena` y `guias_movimiento`
+(reemplaza a `numero_faena`, `numero_guia`, `nro_registro` y al id impreso), y
+comentarios de columnas. Los estados `vencido` pasaron a `no_pagado`. **Hasta
+correr `php artisan migrate:fresh --seed` la base de trabajo no coincide con el
+código** y las pantallas responden `column "nro" does not exist`. Verificado
+sobre SQLite descartables. Antes ya hacía falta por las columnas del portal
+(`users.beneficiario_id`, `debe_cambiar_password`) y de Ibare (`users.mamore_id`).
+
+## 🔴 El pago en SIREB: falta probarlo de punta a punta — 02/10/2026
+
+Los cuatro documentos registran su liquidación en SIREB, el pago se puede cargar
+desde Jichi («Cargar pago»), y se aprueban solos cuando SIREB los da por pagados
+o pasan a «No pagado» si la liquidación vence sin pago. Probado con SIREB
 simulado y con la consulta real de una liquidación de test.sireb (solo lectura).
-**Falta:** pagar una liquidación en test.sireb, validarla allá y ver que Jichi
-aprueba y emite el recibo; y corregir/eliminar un pendiente para ver la
-anulación. Ver [modulos/PAGOS.md](modulos/PAGOS.md).
+**Falta, contra test.sireb:** cargar un pago desde Jichi, validarlo allá y ver la
+aprobación y el recibo; dejar vencer una liquidación sin pago; eliminar un
+pendiente y ver la anulación. Ver [modulos/PAGOS.md](modulos/PAGOS.md).
+
+## 🟠 Lo que falta definir con Recaudaciones — 03/10/2026
+
+- **Vencida con un pago en revisión:** ¿SIREB la deja `pendiente` hasta validar,
+  o pasa a `vencida`? Hoy Jichi, si la ve vencida con pago, la deja pendiente y
+  avisa «consulte con Recaudaciones».
+- **La imagen del comprobante:** la API no la expone (el `Pago` trae N°, banco,
+  fechas, monto y estado). Hace falta un `comprobante_url` o un endpoint.
+- **Una liquidación anulada desde SIREB** deja el documento pendiente sin salida
+  automática; se corrige o se elimina a mano.
+- **El plazo de pago no se muestra en la ficha** («Pagar hasta…»): la fecha está
+  en `sireb_envio.respuesta.fecha_vencimiento`.
 
 ## 🔴 En producción hace falta el cron de Laravel — 02/10/2026
 
@@ -60,15 +83,6 @@ una guía con cinco productos de tarifas distintas puede tardar ~15 s en
 registrarse. Medirlo en la pantalla; si molesta, la guía puede volver a pedir el
 servicio entero (`servicio($id)`, que trae todas sus tarifas con su `estado`).
 
-## 🔴 Hay que volver a migrar para el portal — 28/09/2026
-
-El portal del beneficiario agregó columnas a `users` DENTRO de las migraciones
-existentes (regla 12): `beneficiario_id`, `debe_cambiar_password` y `email`
-nullable. **La base de trabajo no las tiene hasta rearmarla** con
-`php artisan migrate:fresh --seed`, y mientras tanto el botón «Dar acceso al
-portal» responde con `column "beneficiario_id" does not exist`. Verificado sobre
-una SQLite descartable. Ver [modulos/PORTAL.md](modulos/PORTAL.md).
-
 ## 🟠 Portal del beneficiario: lo que quedó afuera a propósito — 28/09/2026
 
 - **Imprime desde casa lo vigente** (autorización, faena y guía; el carnet no, se repone en ventanilla). La copia
@@ -99,18 +113,14 @@ una SQLite descartable. Ver [modulos/PORTAL.md](modulos/PORTAL.md).
   El borrador `GuardarUsuarioRequest` se quitó el 28/09/2026 por no tener ruta
   ni controlador; está en el historial de git (commit `8511537`).
 
-## 🔴 Nada vence solo
+## ✅ Nada vence solo, y no hace falta — 03/10/2026
 
-No hay comando programado que pase a `vencido` ni tarea en el scheduler. Lo que
-eso deja mal:
-
-- **Una faena pendiente abandonada reserva sus kilos para siempre**, hasta que
-  alguien la elimine a mano. En modo estricto eso traba al pescador.
-- Los carnets, autorizaciones, faenas y guías fuera de fecha siguen diciendo
-  `aprobado` en la base y en el **filtro por estado** de los listados.
-
-Lo que sí está bien: la vigencia (`estaVigente()`, scopes `vigentes()` y
-`enCurso()`) compara además contra la fecha, así que ninguna regla se equivoca.
+Ya no hay estado `vencido` ni comando diario: la **vigencia** se lee de las fechas
+(`estaVigente()`, scopes `vigentes()` y `enCurso()`) y un aprobado queda
+`aprobado` —en el filtro «Aprobado» de los listados aparecen también los que
+pasaron su fecha, y es a propósito—. El plazo de **pago** sí cambia el estado:
+`no_pagado` al verificar, y eso libera los kilos de una faena abandonada sin
+pagar y el lugar de una autorización.
 
 ## 🟠 Datos de desarrollo con 4 horas de corrimiento
 
@@ -119,21 +129,12 @@ CLAUDE.md). Lo cargado antes quedó con `created_at` en hora UTC y ahora se lee 
 horas más tarde: un cobro de las 21:00 aparece a la 01:00 del día siguiente. Se
 resuelve rearmando la base de desarrollo (`migrate:fresh --seed`).
 
-## 🟠 Quedan notas viejas en NOTAS-CODIGO.md
+## 🟡 NOTAS-CODIGO.md: puede quedar alguna mención suelta — 03/10/2026
 
-El 27/09/2026 se unieron las secciones repetidas, se sacaron las de archivos
-borrados y las que contradecían el circuito actual. **Siguen quedando notas
-escritas contra el modelo anterior** —hablan de trámites, rubros o
-`codigo_carnet`—, sobre todo en `ConceptoRecibo`, `CarnetImpresionController`,
-`VerificacionController`, `carnet-pescador.blade.php` y las rutas. Se dejaron
-porque tienen partes que siguen valiendo y separarlas pide leerlas una por una.
-Ante una contradicción, mandan REGLAS-NEGOCIO.md y MER.md.
-
-## 🟠 RECIBOS.md conserva historia del modelo anterior
-
-`PAGOS.md` se reescribió el 02/10/2026. `RECIBOS.md` tiene arriba el estado de
-hoy y debajo historia (`tramite_id`, `ReciboTramiteService`…); la maquetación del
-PDF sigue valiendo. Ante una duda, mandan MER.md y ARQUITECTURA.md.
+Se sacaron las secciones de archivos borrados y las notas del circuito viejo, y
+se reescribieron las de los estados. Puede quedar alguna palabra del modelo
+anterior (trámite, rubro) dentro de una nota que vale en lo demás. Ante una
+contradicción, mandan REGLAS-NEGOCIO.md y MER.md.
 
 ## 🟠 No hay pruebas automáticas
 
@@ -154,7 +155,7 @@ Recaudaciones, que es donde está el pago— qué pasa con la plata en ese caso.
 ## ✅ Módulo del pescador — cerrado el 27/09/2026
 
 Autorización de Pesca para Aprovechamiento Pesquero, carnet de pescador y
-permiso de faena: circuito completo, cobro y control de boletas, impresión de
+permiso de faena: circuito completo, cobro en SIREB, impresión de
 los tres papeles, reserva de kilos y revocación (sin cascada: deja «sin efecto»
 a carnets y faenas, ver REGLAS-NEGOCIO, Regla 5). La especificación está en
 [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md) y el diagrama en
@@ -359,8 +360,8 @@ tener:
   guías (ver «Falta el reporte por especie y por período», arriba).
 
 Por dónde empezar: copiar el patrón de `BeneficiarioController::index()`
-—filtros + `Paginacion` + `through()`— y exportar con `maatwebsite/excel`, que
-ya está instalado. El libro de recibos ya existe (`/panel/recibos`).
+—filtros + `Paginacion` + `through()`— y exportar a Excel con un paquete a elegir
+(`maatwebsite/excel` se retiró el 03/10/2026: nadie lo usaba). El libro de recibos ya existe (`/panel/recibos`).
 
 ### Configuración
 
@@ -377,12 +378,12 @@ falta la pantalla para editarla agrupada por `grupo`, subir el logo y el escudo
 
 ## Orden sugerido
 
-1. Probar el pago en SIREB de punta a punta y dejar el cron de Laravel en el
-   servidor.
+1. Rearmar la base, probar el pago en SIREB de punta a punta y dejar el cron de
+   Laravel en el servidor.
 2. Separación de funciones: rol de ventanilla y pantalla mínima de usuarios —
    antes de poner el sistema en manos de varias personas.
-3. El comando diario de vencimiento — libera los kilos reservados por faenas
-   abandonadas.
+3. Definir con Recaudaciones lo de la vencida con pago, la imagen del comprobante
+   y mostrar el plazo de pago en la ficha.
 4. Confirmar los catálogos contra la resolución (los precios ya son plata).
 5. Reportes.
 6. Configuración.

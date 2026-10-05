@@ -7,6 +7,7 @@ use App\Enums\TipoActor;
 use App\Exceptions\CarnetInvalidoException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
+use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EditarCarnetRequest;
 use App\Http\Requests\Panel\EliminarCarnetRequest;
 use App\Http\Requests\Panel\EmitirCarnetRequest;
@@ -18,10 +19,11 @@ use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
-use App\Models\Recibo;
 use App\Models\TipoCarnet;
+use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirCarnetService;
+use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
@@ -282,7 +284,7 @@ class CarnetController extends Controller
 
             // Las salidas emitidas con ESTE carnet. Al revocarlo siguen valiendo.
             'faenas' => $carnet->faenas()
-                ->latest('numero_faena')
+                ->latest('permisos_faena.nro')
                 ->get()
                 ->each(fn (PermisoFaena $f) => $f->setRelation('carnet', $carnet))
                 ->map(fn (PermisoFaena $f): array => [
@@ -302,7 +304,7 @@ class CarnetController extends Controller
 
             // Los traslados emitidos con ESTE carnet. Al revocarlo siguen valiendo.
             'guias' => $carnet->guias()
-                ->latest('numero_guia')
+                ->latest('guias_movimiento.nro')
                 ->get()
                 ->map(fn (GuiaMovimiento $g): array => [
                     'id' => $g->id,
@@ -471,7 +473,7 @@ class CarnetController extends Controller
     /**
      * Eliminar — DELETE /panel/carnets/{carnet}
      */
-    public function destroy(EliminarCarnetRequest $request, Carnet $carnet): RedirectResponse
+    public function destroy(EliminarCarnetRequest $request, Carnet $carnet, ConfirmarPagoService $pagos): RedirectResponse
     {
         $codigo = $carnet->codigo_legible;
 
@@ -479,6 +481,14 @@ class CarnetController extends Controller
             $this->servicio->eliminar($carnet, $request->validated()['motivo']);
         } catch (CarnetInvalidoException $e) {
             return back()->withErrors(['motivo' => $e->getMessage()]);
+        } catch (SirebException $e) {
+            if (! $e->frenaPorPago()) {
+                throw $e;
+            }
+
+            $resultado = $pagos->alNoPoderEliminar($carnet);
+
+            return redirect()->route('carnets.show', $carnet)->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
         }
 
         return redirect()
@@ -496,6 +506,19 @@ class CarnetController extends Controller
         $resultado = $pagos->verificar($carnet);
 
         return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /**
+     * Cargar pago — POST /panel/carnets/{carnet}/cargar-pago
+     *
+     * Lo carga en SIREB, que lo valida allá.
+     */
+    public function cargarPago(CargarPagoRequest $request, Carnet $carnet, CargarPagoService $carga): RedirectResponse
+    {
+        $datos = $request->validated();
+        $resultado = $carga->cargar($carnet, $datos['numero_transaccion'], $datos['banco']);
+
+        return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     //  Auxiliares
@@ -518,7 +541,7 @@ class CarnetController extends Controller
             // contra el plástico y lo que se dicta por teléfono.
             'codigo' => $carnet->codigo_legible,
 
-            // El número del libro, «00001». Vacío hasta que lo firman: se
+            // El número del libro, «000001». Vacío hasta que lo firman: se
             // asigna al aprobar, para no gastar uno en un carnet que se rechaza.
             'registro' => $carnet->registro_legible,
             'gestion' => $carnet->gestion,
@@ -574,6 +597,7 @@ class CarnetController extends Controller
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $carnet->resumenSireb(),
             'puede_verificar_pago' => $carnet->estado->estaAbierto(),
+            'puede_cargar_pago' => $carnet->puedeCargarPago(),
             'ya_fue_aprobado' => $carnet->yaFueAprobado(),
 
             // Los dos respaldos de la emisión, listos para abrir.

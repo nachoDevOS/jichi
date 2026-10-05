@@ -19,12 +19,16 @@ enum EstadoGuia: string
     /** Dada de baja con motivo. No vuelve atrás: si hace falta, se emite otra. */
     case Anulada = 'anulada';
 
+    /** Venció el plazo de pago en SIREB sin ningún pago: no sigue su curso. NO es la vigencia, que la dicen las fechas. */
+    case NoPagada = 'no_pagado';
+
     public function etiqueta(): string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::Aprobada => 'Aprobada',
             self::Anulada => 'Anulada',
+            self::NoPagada => 'No pagada',
         };
     }
 
@@ -34,6 +38,7 @@ enum EstadoGuia: string
             self::Pendiente => 'sky',
             self::Aprobada => 'emerald',
             self::Anulada => 'rose',
+            self::NoPagada => 'slate',
         };
     }
 

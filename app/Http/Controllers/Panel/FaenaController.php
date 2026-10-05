@@ -7,6 +7,7 @@ use App\Enums\EstadoFaena;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\ActualizarFaenaRequest;
+use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EliminarFaenaRequest;
 use App\Http\Requests\Panel\EmitirFaenaRequest;
 use App\Models\AprovechamientoPesq;
@@ -14,9 +15,10 @@ use App\Models\ArancelSireb;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
-use App\Models\Recibo;
+use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirFaenaService;
+use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -49,7 +51,7 @@ class FaenaController extends Controller
             ->with([
                 'codigo',
                 // Con `aprovechamiento_id`: «sin efecto» mira la autorización del carnet.
-                'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision,estado,fecha_vencimiento',
+                'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro,fecha_emision,estado,fecha_vencimiento',
                 'carnet.aprovechamiento:id,estado',
                 'carnet.codigo',
                 'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
@@ -59,7 +61,7 @@ class FaenaController extends Controller
                     ->whereHas('carnet.beneficiario', fn ($b) => $b->buscar($termino))
                     // Sin los ceros del talonario: la columna es un ENTERO, y
                     // «000042» tecleado tal cual no encuentra al 42.
-                    ->orWhere('numero_faena', 'like', '%'.ltrim(preg_replace('/\D/', '', $termino), '0').'%'),
+                    ->orWhere('permisos_faena.nro', 'like', '%'.ltrim(preg_replace('/\D/', '', $termino), '0').'%'),
             ))
             ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
             ->when($filtros['estado'], fn ($q, $estado) => $q->where('permisos_faena.estado', $estado))
@@ -183,7 +185,7 @@ class FaenaController extends Controller
         }
 
         $faena->load([
-            'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro_registro,fecha_emision,estado,fecha_vencimiento',
+            'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro,fecha_emision,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.aprovechamiento' => fn ($a) => $a->withSum('faenasQueConsumen', 'kilos_extraidos')
@@ -202,7 +204,7 @@ class FaenaController extends Controller
                 'documento' => $faena->carnet?->beneficiario?->documento_identidad,
                 'foto_url' => $faena->carnet?->beneficiario?->foto_url,
                 'carnet_codigo' => $faena->carnet?->codigo_legible,
-                /* El número del libro: «00001». Ver resumir(). */
+                /* El número del libro: «000001». Ver resumir(). */
                 'carnet_registro' => $faena->carnet?->registro_legible,
 
                 // Los kilos propios se suman SOLO si descontaban: la pendiente ya
@@ -258,7 +260,7 @@ class FaenaController extends Controller
     /**
      * Eliminar — DELETE /panel/faenas/{faena}
      */
-    public function destroy(EliminarFaenaRequest $request, PermisoFaena $faena): RedirectResponse
+    public function destroy(EliminarFaenaRequest $request, PermisoFaena $faena, ConfirmarPagoService $pagos): RedirectResponse
     {
         $numero = $faena->numero_legible;
 
@@ -266,6 +268,14 @@ class FaenaController extends Controller
             $this->servicio->eliminar($faena, $request->validated()['motivo']);
         } catch (PermisoOperativoException $e) {
             return back()->withErrors(['motivo' => $e->getMessage()]);
+        } catch (SirebException $e) {
+            if (! $e->frenaPorPago()) {
+                throw $e;
+            }
+
+            $resultado = $pagos->alNoPoderEliminar($faena);
+
+            return redirect()->route('faenas.show', $faena)->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
         }
 
         return redirect()
@@ -281,7 +291,7 @@ class FaenaController extends Controller
     {
         $faena->load([
             'codigo',
-            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,aprovechamiento_id,nro_registro,fecha_emision,estado,fecha_vencimiento',
+            'carnet:id,beneficiario_id,tipo_actor,asociacion_id,aprovechamiento_id,nro,fecha_emision,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.asociacion:id,nombre,sigla',
@@ -338,6 +348,19 @@ class FaenaController extends Controller
         return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
+    /**
+     * Cargar pago — POST /panel/faenas/{faena}/cargar-pago
+     *
+     * Lo carga en SIREB, que lo valida allá.
+     */
+    public function cargarPago(CargarPagoRequest $request, PermisoFaena $faena, CargarPagoService $carga): RedirectResponse
+    {
+        $datos = $request->validated();
+        $resultado = $carga->cargar($faena, $datos['numero_transaccion'], $datos['banco']);
+
+        return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
     private function tarifaDeReferencia(): ?float
     {
         $tarifa = ArancelSireb::de(ConceptoArancel::Faena)?->tarifa_sireb;
@@ -356,7 +379,7 @@ class FaenaController extends Controller
 
         return [
             'id' => $faena->id,
-            'numero_faena' => $faena->numero_faena,
+            'nro' => $faena->nro,
             // Con los seis ceros del talonario: «002190».
             'numero_legible' => $faena->numero_legible,
             'etiqueta' => $faena->etiqueta,
@@ -365,7 +388,7 @@ class FaenaController extends Controller
 
             'carnet_id' => $faena->carnet_id,
             'carnet_codigo' => $faena->carnet?->codigo_legible,
-            // El número de registro: «00001», que es como se nombra un carnet en
+            // El número de registro: «000001», que es como se nombra un carnet en
             // el mostrador. El código de 16 sirve para verificar, no para nombrar.
             'carnet_registro' => $faena->carnet?->registro_legible,
             'beneficiario_id' => $faena->carnet?->beneficiario_id,
@@ -403,6 +426,7 @@ class FaenaController extends Controller
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $faena->resumenSireb(),
             'puede_verificar_pago' => $faena->estado->estaAbierto(),
+            'puede_cargar_pago' => $faena->puedeCargarPago(),
 
             // El arancel de la salida y cómo va cobrado.
             'monto' => $faena->montoACobrar(),

@@ -9,8 +9,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Los trámites abiertos: pendientes (borrador en ventanilla) y en revisión (la
- * Unidad controla el depósito). Cada uno dice qué le falta, ya resuelto acá.
+ * Los trámites abiertos: pendientes de pago en SIREB. Cada uno dice qué le
+ * falta y su código de pago, ya resuelto acá.
  */
 class EnCursoController extends Controller
 {

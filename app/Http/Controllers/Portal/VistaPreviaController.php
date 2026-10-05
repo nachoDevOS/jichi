@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * Vista previa de un trámite ABIERTO (pendiente o en revisión): el mismo PDF
+ * Vista previa de un trámite ABIERTO (pendiente de pago): el mismo PDF
  * del panel con «NO VÁLIDO» encima de cada hoja. Lo aprobado se descarga
  * limpio; esto es para que la persona vea cómo va a quedar su papel.
  *

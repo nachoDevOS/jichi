@@ -1,256 +1,202 @@
-> # ⚠️ DESACTUALIZADO desde el 18/09/2026
->
-> El núcleo de datos se rehízo desde cero: ya no existen `rubros`,
-> `tramites`, `faenas`, `guias` ni `guia_detalles`, y `beneficiarios`,
-> `carnets` y `pagos` cambiaron de columnas. Lo de abajo describe el modelo
-> ANTERIOR: sirve para entender el código del panel, que todavía está escrito
-> contra él, NO para entender el esquema.
->
-> El esquema vigente está en las migraciones `database/migrations/2026_09_18_*`
-> y explicado en [docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md).
-
----
-
 # Mapa de archivos
 
 Qué hace cada archivo y **qué tiene de no obvio**. Pensado para no tener que
 abrirlos: si la fila no dice nada raro, el archivo hace lo que su nombre indica.
 
 Leer junto con [ARQUITECTURA.md](ARQUITECTURA.md), que explica el porqué de las
-decisiones que acá solo se nombran.
+decisiones que acá solo se nombran, y [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md),
+que es la especificación.
 
-> La columna «líneas» sirve para calibrar: un archivo de 50 líneas se abre sin
-> pensar; uno de 1.000 conviene entenderlo desde acá primero.
+> Reescrito el 03/10/2026 contra el código: el mapa anterior describía el modelo
+> de `rubros` y `tramites`, que ya no existe. La columna «Ln» calibra: un archivo
+> de 50 líneas se abre sin pensar; uno de 800 conviene entenderlo desde acá.
+
+---
+
+## El recorrido de un documento, archivo por archivo
+
+```
+Panel ─▶ Controller ─▶ Emitir*Service / OtorgarCupoService   (crea PENDIENTE + liquidación)
+                          └─ LiquidarSirebService ─▶ SirebService ─▶ SIREB (POST /liquidaciones)
+Ficha ─▶ «Cargar pago»    ─▶ CargarPagoService   ─▶ SIREB (POST /pago-manual)   — solo carga
+Ficha ─▶ «Verificar pago» ─▶ ConfirmarPagoService ─▶ SIREB (GET /liquidaciones/{id})
+jichi:verificar-pagos ─────┘   ├─ pagada    ─▶ Revisar*Service::aprobar() + Recibo  ─▶ APROBADO
+                               └─ vencida   ─▶ NO PAGADO (sin pago)
+Eliminar ─▶ Servicio::eliminar() ─▶ LiquidarSirebService::anular() (consulta antes: con pago no borra)
+```
 
 ---
 
 ## `app/Enums/` — los valores fijos del negocio
 
-| Archivo | Ln | Qué es | No obvio |
+Las transiciones viven acá (`permite*()`, `estaAbierto()`, `habilita()`): el
+servicio pregunta y el controlador manda la respuesta en los `puede_*`.
+
+| Archivo | Ln | Valores | No obvio |
 | --- | --- | --- | --- |
-| `EstadoTramite.php` | 261 | `pendiente → en_revision → aprobado \| rechazado` | **Única fuente de verdad de las transiciones.** `siguientes()` decide qué salto vale. Se puede aprobar directo desde pendiente. `abiertos()` agrupa pendiente + en revisión |
-| `EstadoCarnet.php` | 137 | `vigente \| suspendido \| vencido \| anulado` | Absorbió al enum `EstadoHabilitacion`: con un carnet por rubro, suspender la actividad es suspender el carnet. `vencido` lo escribiría un comando programado que **no existe todavía** |
-| `EstadoRubro.php` | 48 | `activo \| inactivo` | Un rubro nunca se borra |
-| `TipoTramite.php` | 92 | `emision_inicial \| actualizacion` | **Lo decide el sistema, no el operador**. «Adición de rubro» ya no existe: pedir otro rubro emite otro carnet |
-| `RolSistema.php` | 124 | Roles y **todos** sus permisos | Un solo rol hoy (`administrador`). Los permisos ya están en cuatro bloques para poder agregar el segundo en una línea |
-| `EstadoPermiso.php` | 106 | `emitido \| anulado` | **Lo comparten faenas y guías**, porque su ciclo de vida es idéntico. Solo dos valores: no hay circuito — el permiso se llena, se cobra y se entrega en el acto. Se **anula**, nunca se borra: el número ya se gastó del talonario |
-| `TipoTransporte.php` | 79 | `fluvial \| aerea \| terrestre` | Dice **quién controla y dónde**: la naval en el río, un retén en la carretera. Por eso la columna es obligatoria mientras el resto del transporte es opcional. `rotuloIdentificacion()` cambia «Placa» por «Matrícula» |
-| `CondicionProducto.php` | 70 | `fresco \| congelado \| seco \| salado` | Lista **cerrada**, al revés de la especie vecina: son cuatro, las usa el formulario de papel y no aparecen nuevas |
-| `ConceptoRecibo.php` | 110 | Las seis casillas de DESCRIPCIÓN del recibo | Puente rubro→casilla **por nombre**, con caída a `Otros`: el catálogo y el talonario evolucionan por separado |
+| `EstadoAprovechamiento.php` | 98 | `pendiente`, `aprobado`, `agotado`, `revocado`, `no_pagado` | `estaAbierto()` = esperando pago. **No hay `vencido`**: la vigencia la dicen las fechas. `no_pagado` = venció el plazo de pago en SIREB sin pago |
+| `EstadoCarnet.php` | 116 | `pendiente`, `aprobado`, `revocado`, `no_pagado` | Solo `aprobado` habilita; si vale HOY lo dice `Carnet::estaVigente()` con la fecha |
+| `EstadoFaena.php` | 122 | `pendiente`, `aprobado`, `completado`, `revocado`, `no_pagado` | `consumeCupo()` (aprobado/completado) y `reservaCupo()` (pendiente): de acá sale el saldo de kilos. `revocado` es histórico |
+| `EstadoGuia.php` | 101 | `pendiente`, `aprobado` (`Aprobada`), `anulada`, `no_pagado` (`NoPagada`) | Los casos van en femenino; los valores, iguales a los otros tres |
+| `EstadoLiquidacionSireb.php` | 36 | `por_enviar`, `registrada`, `anulada` | Dónde está la liquidación respecto de SIREB, no si se pagó: eso se pregunta |
+| `TipoActor.php` | 60 | `pescador`, `comercializador` | **Qué emite cada carnet**: `emiteFaenas()`, `emiteGuias()`, `requiereAprovechamiento()`. Nunca por el nombre del tipo de carnet |
+| `ModalidadAprovechamiento.php` | 62 | `escala_general`, `especie_especial` | Se copia al otorgar: reclasificar el tramo no cambia lo otorgado |
+| `ConceptoArancel.php` | 28 | `faena` | Cobros sin catálogo: una fila de `aranceles_sireb` por caso |
+| `ConceptoRecibo.php` | 50 | Las seis casillas del recibo | `desdeDocumento()` elige la casilla por el tipo de documento pagado |
+| `CondicionProducto.php` | 75 | Las diez columnas del cuadro D | Un solo enum: el talonario no cruza estado × presentación |
+| `MedioTransporte.php` / `TipoTransporte.php` | 33 / 37 | Por dónde / en qué viaja la guía | Separados porque el papel los pregunta por separado |
+| `EstadoAsociacion.php` | 51 | `activo`, `inactivo` | Una asociación no se borra: se inactiva |
+| `RolSistema.php` | 123 | `administrador` y **todos** los permisos | Un solo rol hoy. Tocarlo exige `db:seed --class=RolPermisoSeeder` |
 
 ## `app/Services/` — acá viven las reglas
 
 | Archivo | Ln | Qué hace | No obvio |
 | --- | --- | --- | --- |
-| `CodigoService.php` | 93 | Genera el código de 16, reintenta diez veces y falla ruidoso. `asignar()` es **idempotente**: un reenvío no puede gastar un código nuevo, porque el anterior ya salió impreso |
-| `SolicitudCarnetService.php` | 1053 | **El caso de uso central.** Reglas A, B y C + todo el circuito | El archivo más importante del sistema. Ver el desglose abajo |
-| `PagoTramiteService.php` | 223 | Pagos parciales, 1 a N | Los métodos vienen **de a pares**: uno recibe `UploadedFile`, el otro `...ConRuta`. No es duplicación — ver §2.4 de ARQUITECTURA |
-| `ValidacionPagoService.php` | 127 | Validar u observar un depósito | Aparte de `PagoTramiteService` porque son actos de PERSONAS distintas: uno es de ventanilla, este de supervisión. Y vale para los tres, porque `pagos` es polimórfica |
-| `FaenaService.php` | 155 | Emitir y anular faenas | Tres comprobaciones y el ORDEN importa: el rubro primero, porque elegir el carnet equivocado es el error más probable. El número se comprueba ANTES del INSERT, porque en PostgreSQL un INSERT fallido aborta la transacción |
-| `EmitirGuiaService.php` | 330 | Emitir, corregir, eliminar y anular guías | Cabecera y detalle en la MISMA transacción. El detalle se **reemplaza entero** al corregir: casarlo fila por fila sin un id estable del papel inventa una identidad que el talonario no tiene. `eliminar()` baja el detalle A MANO —la FK es CASCADE, y eso no se dispara con una baja lógica—. El arancel se copia DESPUÉS del `create()`: el factor de piscicultura lo calcula el modelo leyendo su propia columna |
-| `RevisarGuiaService.php` | 118 | El circuito de la guía: enviar, aprobar, rechazar | Espejo de `RevisarFaenaService`. **Las dos fechas de vigencia las escribe `aprobar()`**: los 5 días corren desde la firma, no desde que se cargó el borrador. Aprobar exige las tres cosas: estado, arancel cubierto y ninguna boleta sin validar |
-| `ArchivoTramiteService.php` | 107 | Subir/descartar adjuntos alrededor de una transacción | `descartar()` **no propaga errores**: se llama desde un `catch` y taparía la excepción original |
-| `ReciboTramiteService.php` | 200 | **Arma** el RECIBO OFICIAL, no lo guarda | `armar()` lo reconstruye desde el trámite. No hay tabla `recibos` |
-| `CorrelativoService.php` | 78 | Dos usos distintos: `siguienteContinuo()` para lo que se IMPRIME —recibos y permisos de faena, seis dígitos y sin reinicio, guardados bajo el **año 0**— y `siguienteNumero()` con gestión para lo que sí cuenta por año, como el registro del carnet |
+| `OtorgarCupoService.php` | 231 | Otorgar, corregir y eliminar la autorización | Una autorización en curso por persona (`enCurso()`). El precio sale de SIREB (`verificarPrecio()`). **Corregir cambia solo la embarcación**: el tramo no se toca nunca. El N° (`nro`) es correlativo continuo |
+| `EmitirCarnetService.php` | 383 | Emitir, corregir, eliminar, revocar y reponer el carnet | Un carnet vigente por actividad. Pescador exige autorización; comercializador la prohíbe. Adjuntos SUBIDOS antes de la transacción |
+| `EmitirFaenaService.php` | 295 | Emitir, corregir y eliminar la faena | Reserva kilos al registrarse; en modo estricto no deja pasar lo libre. Ver `PermisoFaena::cupo` |
+| `EmitirGuiaService.php` | 356 | Emitir, corregir, eliminar y anular la guía | Cabecera y detalle en la misma transacción. `eliminar()` baja el detalle a mano: CASCADE no corre con baja lógica |
+| `Revisar*Service.php` (Cupo, Carnet, Faena, Guia) | 41–76 | `aprobar()` de cada documento | **Los llama solo `ConfirmarPagoService`.** Conservan las reglas propias (autorización revocada, kilos libres, fechas, número de registro). `RevisarCupoService` además revoca |
+| `LiquidarSirebService.php` | 145 | La liquidación de un documento en SIREB | Dos tiempos: `preparar()` guarda la `Idempotency-Key` DENTRO de la transacción, `enviar()` llama DESPUÉS. `anular()` **consulta antes**: con pago cargado o validado frena (`SirebException::pagoEnRevision()` / `liquidacionPagada()`); vencida sin pago no pide anular |
+| `ConfirmarPagoService.php` | 206 | Pregunta a SIREB y actúa | `pagada` + pago `confirmado` → aprueba y emite el recibo; `vencida` sin pago → `no_pagado`. Guarda el pago informado en `sireb_envio.pago` (solo si cambió: el comando corre cada 10 min y audita). `alNoPoderEliminar()`: al eliminar algo con pago, verifica y arma el aviso |
+| `CargarPagoService.php` | 77 | Carga en SIREB el pago de un trámite | **Solo carga.** Antes consulta: liquidación `pendiente` y sin pago, o no carga y corre `verificar()` para poner la ficha al día |
+| `CorrelativoService.php` | 78 | Números correlativos con la fila bloqueada | `siguienteContinuo()` (año 0, no reinicia) para lo impreso: recibo, autorización, faena, guía. `siguienteNumero()` por gestión: el registro del carnet. `rellenar()` → seis dígitos |
+| `CodigoService.php` | 88 | El código de verificación de 16 caracteres | `asignar()` es idempotente: un reenvío no gasta otro código |
+| `CuentaPortalService.php` | 97 | Cuentas del portal | Clave temporal, obligatoria de cambiar. Esas cuentas nunca llevan roles |
 
-### Desglose de `SolicitudCarnetService`
+## `app/Sireb/` — cliente de Recaudaciones
 
-| Método | Qué hace | Ojo con |
+| Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `registrar()` | Alta completa, todo o nada | 4 pasos; el orden archivos/transacción es la parte importante |
-| `tomarParaRevision()` | `pendiente → en_revision` | **Acá nace el recibo**, dentro de la misma transacción |
-| `aprobar()` | `→ aprobado` + consolida el carnet | No aprueba sin cobrar. Copia cupo y asociación al carnet; lo que viene en blanco NO pisa lo que ya había |
-| `rechazar()` | `→ rechazado` | Motivo obligatorio. El carnet recién creado **no se borra** |
-| `eliminar()` | Borra de verdad (sin `deleted_at`) | Orden **inverso** al de registrar. Borra el carnet si quedó vacío |
-| `generar()` / `entregar()` | Escriben las fechas de impreso/entregado | No son estados |
-| `actualizarAdjuntos()` | Reemplaza papeles ilegibles | Guarda las rutas viejas ANTES del update |
-| `bloquear()` | Relee con la fila bloqueada | **Devuelve otra instancia.** Se escribe sobre la copia, se devuelve la original refrescada |
-| `verificarTransicion()` | La guarda | Se llama **dos veces** por operación: fuera y dentro de la transacción |
-| `traducir()` | SQLSTATE 23505 → castellano | Sin esto el operador ve el error crudo de la base |
+| `SirebService.php` | 277 | Token de Ibare (client_credentials) en caché. `servicios()` en caché `SIREB_CACHE_MINUTOS`; `tarifa()` sin caché. Liquidaciones: `registrarLiquidacion()`, `liquidacion()`, `registrarPagoManual()`, `anularLiquidacion()`. Las escrituras reintentan ante red o 5xx, nunca ante 4xx |
+| `PrecioSireb.php` | 60 | El precio al emitir, para congelarlo. Tarifa y servicio `activo` o no se emite (`liquidable` para la autorización) |
+| `VistaSireb.php` | 162 | Lo que las pantallas de catálogo necesitan ya armado: select, precios, historial. Abre con SIREB caído |
+| `SirebException.php` | 75 | Códigos propios de Jichi `LIQUIDACION_PAGADA` y `PAGO_EN_REVISION` (`frenaPorPago()`). `paraVentanilla()` es lo que muestra el manejador de `bootstrap/app.php` |
+| `SinPrecioException.php` | 15 | SIREB no dio un precio cobrable |
 
 ## `app/Models/`
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `FaenaController.php` | 400 | Listado, alta, ficha, cobro y circuito de revisión, más **corregir y eliminar el BORRADOR** (21/09/2026): solo en PENDIENTE y sin un peso cargado, porque el número lo pone el sistema y el papel sale recién al aprobar. El número NO viene del formulario —lo genera el correlativo continuo— y el alta guarda además los siete renglones del talonario. `edit()` manda el saldo del cupo **con los kilos de esta faena sumados de vuelta**, o el formulario diría que no entra lo que ya entró; y `libre_kg`, lo libre más lo que ella misma reservaba (27/09/2026) |
-| `GuiaController.php` | 745 | Listado, alta, ficha, corrección del borrador, cobro y circuito de revisión, más anular. `resumir()` usa el `withSum` del listado para no calcular el saldo por fila, y `reciboDe()` lo resuelve desde los pagos ya precargados. El buscador OMITE la condición del número cuando el término no trae dígitos: un `like '%%'` traería la tabla entera |
-| `ProductoHidrobiologicoController.php` | 80 | Catálogo de productos hidrobiológicos: listado, alta y corrección, sin baja. `catalogosDelFormulario()` de `GuiaController` le pasa a la guía los activos más los que la guía ya usa |
-| `Beneficiario.php` | 319 | `nombreCompleto` **NO** va en `#[Appends]` (camelCase). `SQL_NOMBRE` entrecomilla por el camelCase. `carnetDeGestion()` usa `relationLoaded()` para no caer en N+1. `deudaTotal()` **sí cae en N+1** — el comentario dice lo contrario. Suma faenas y guías con el mismo corte que Caja (`admitePagos()`); antes olvidaba las faenas |
-| `Carnet.php` | 405 | Sin columna `codigo`. `registro()` = id con ceros (público), `firma_validacion` = la llave (secreta). `estaVigente()` mira estado **y** fecha. `vencimientoDeGestion()` = 31/12 siempre. `puedeImprimirse()` exige un rubro habilitado, no solo que el carnet exista |
-| `Tramite.php` | 310 | Cuelga del **carnet**. `montoPagado()` reusa `pagos_sum_monto` si el listado hizo `withSum`. Las 5 fechas van en `#[Fillable]` aunque ningún formulario las mande — `update()` las descartaría |
-| `CarnetRubro.php` | 71 | Pivote **con modelo propio**, porque `attach()` no dispara eventos y `Auditable` no registraría nada |
-| `Faena.php` | 288 | Cuelga del **carnet**, no del beneficiario. `$attributes` declara `estado` por defecto **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `diasAutorizados()` suma uno — salir y desembarcar el mismo día es un día, no cero. `estaVigente()` mira TRES cosas, y la que se olvida es el carnet |
-| `GuiaMovimiento.php` | 350 | Cuelga del **carnet**, no del beneficiario; la carga está en `GuiaDetalle`. **`montoACobrar()` lee la COLUMNA**, no `config()`: el arancel se congela al emitir. `factorArancel()` es el único lugar donde vive el 50% de piscicultura. `$attributes` declara `estado`, `monto` y `peso_total_kg` **en memoria**: el default de la base no llega al objeto que devuelve `create()`. `beneficiarioId` es un accesor —no una columna— para que `CobrarService` le hable igual que al carnet |
-| `GuiaDetalle.php` | 70 | Un renglón del cuadro D. `condicion` es UN enum de diez casos y no dos columnas: partirlo en estado × presentación dejaría combinaciones que el talonario no tiene. Desde el 27/09/2026 apunta a `producto_id` y guarda **copias** de nombre y precio: el papel no cambia si el catálogo cambia. `precio_kg` es lo pagado en origen, no el arancel |
-| `ProductoHidrobiologico.php` | 45 | El catálogo del cuadro D: nombre, tasa por kilo (mínimo 0,20) y estado; la guía cobra la suma de su cuadro D. `vigentes()` es lo que se elige en una guía nueva. Sin baja: uno usado se pone inactivo |
-| `Rubro.php` | 70 | `Auditable` pero **sin** `SoftDeletes`: no se borra, se inactiva |
-| `Configuracion.php` | 63 | Cache `rememberForever`, invalidada en `saved`/`deleted` |
-| `Correlativo.php` | 18 | Solo la tabla del contador |
-| `Auditoria.php`, `Acceso.php`, `User.php` | 50/21/72 | Infraestructura |
+| `AprovechamientoPesq.php` | 451 | La bolsa madre. **Sin columnas de saldo**: `kilosConsumidos()`, `kilosReservados()`, `saldoKg()`, `libreKg()` se calculan sobre las faenas, reusando el `withSum` si vino (por CLAVE, no por null). `sincronizarEstadoPorSaldo()` solo mueve entre aprobado y agotado. `numeroLegible()` lee `nro` |
+| `Carnet.php` | 425 | `estaVigente()`, `sinEfecto()` y `etiquetaEstado()` **miran a su autorización**: la consulta tiene que precargarla. `amparaSusPapeles()`: faenas y guías valen si el titular tiene carnet vigente de la actividad. `registro_legible` = `nro` con seis dígitos |
+| `PermisoFaena.php` | 305 | Vigencia de 30 días (`fecha_desembarque`). Vale si su carnet y su autorización valen. `$attributes` lleva los defaults que lee el código |
+| `GuiaMovimiento.php` | 330 | Vigencia de 5 días. `factorArancel()`: piscicultura al 50%. `numero_legible` lee `nro` |
+| `GuiaDetalle.php` | 67 | Un renglón del cuadro D; copia el precio por kilo |
+| `Beneficiario.php` | 273 | **camelCase** de `primerNombre` en adelante: en SQL a mano va entrecomillado (`SQL_NOMBRE`). `documento_identidad` lee `ci`, `complemento` y `departamento_id`: los tres van en el select |
+| `Recibo.php` | 65 | Copia congelada: monto, concepto, N° de transacción, banco y fecha de pago de SIREB. `recibible` es polimórfica: se precarga con `morphWith` |
+| `Codigo.php` | 31 | El código de verificación de los cinco documentos, en una tabla aparte. Ver trait `Codificable` |
+| `CategoriaAprovechamiento.php`, `TipoCarnet.php`, `ProductoHidrobiologico.php`, `ArancelSireb.php` | 39–90 | Catálogos con `servicio_sireb` + `tarifa_sireb` (uuid). El precio lo da SIREB |
+| `Asociacion.php`, `Departamento.php` | 150 / 83 | Departamento es catálogo cerrado, sembrado en su migración |
+| `User.php` | 75 | Con `beneficiario_id` = cuenta del portal, nunca entra al panel. `scopeFuncionarios()` para el módulo Usuarios |
+| `Auditoria.php`, `Acceso.php`, `Configuracion.php`, `Correlativo.php` | 18–63 | Soporte |
+
+## `app/Traits/`
+
+| Archivo | No obvio |
+| --- | --- |
+| `LiquidableSireb.php` | Columnas `sireb_*`, relación `recibo`, `resumenSireb()` (estado, código de pago, `pago`, `pago_consultado`) y `puedeCargarPago()`. Lo usan los cuatro documentos |
+| `Codificable.php` | `codigo_legible` y `asignarCodigo()`. Toda consulta que muestre el código necesita `with('codigo')` |
+| `Auditable.php` | Audita `created`/`updated`/`deleted`. El motivo viaja por `$modelo->motivoAuditoria`: no escribir la auditoría a mano |
+| `HistorialSireb.php` | Al cambiar la tarifa de un catálogo, guarda el par anterior en `sireb_historial` |
 
 ## `app/Http/Controllers/`
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `StorageController.php` | 163 | **El único que escribe en disco.** Devuelve ruta (local) o URL completa (s3) |
-| `Panel/BeneficiarioController.php` | 418 | **La plantilla del sistema**, comentada paso a paso. `buscar()` devuelve JSON, no Inertia |
-| `Panel/TramiteController.php` | 645 | **No decide nada.** `resumir()` arma lo que comparten tabla y ficha |
-| `Panel/CarnetController.php` | 243 | **Sin `create()` ni `store()`**: un carnet nace en el servicio. La dirección del QR ya no se arma acá: la da `Carnet::urlVerificacion()` |
-| `Panel/CarnetImpresionController.php` | 263 | El PDF del plástico. **No marca impreso** —eso sigue siendo `PATCH /tramites/{tramite}/generar`— ni guarda nada en disco. CR80: 243×153 pt |
-| `Panel/RubroController.php` | 97 | **Sin `destroy()`** |
-| `Panel/ReciboController.php` | 199 | Solo dibuja el PDF. Media carta apaisada. Imágenes embebidas |
-| `Panel/PermisoFaenaImpresionController.php` | 130 | El «Permiso por Faena» en PDF. Carta vertical. Sale recién con la faena **aprobada**. El monto es la copia congelada de la fila, no la tarifa de hoy; la fecha del pie sale de `fecha_emision` para que una reimpresión diga lo mismo |
-| `Panel/GuiaImpresionController.php` | 190 | La «Guía Única de Transporte» en PDF. Carta vertical. Sale recién con la guía **aprobada**. **Rellena el cuadro D hasta cinco renglones** aunque la guía traiga menos: la hoja impresa tiene que medir siempre lo mismo que la preimpresa del archivo. Un cero entra como celda VACÍA, no como «0,00» |
-| `Panel/AutorizacionPescaController.php` | 187 | La autorización de pesca en PDF. Carta vertical. Sale recién con el cupo **aprobado**; la tabla de tamaños mínimos y las reglas de redes van como constantes —son texto del reglamento, no de la base— |
-| `Panel/DashboardController.php` | 223 | Trabajo pendiente (borradores y por firmar, con URL filtradas), cuatro números, recaudación de 12 meses, avisos y últimos carnets. Cada bloque en `fn()` para las visitas parciales |
-| `Publico/VerificacionController.php` | 265 | Atiende los CINCO documentos, no solo el carnet: una consulta a `codigos` y `morphTo`. Devuelve **renglones ya resueltos**, así que sumar un tipo no toca React. Cédula enmascarada, sin ids internos |
-| `Panel/CuentaPortalController.php` | 80 | Dar acceso al portal, resetear y desactivar, desde la ficha. La clave temporal vuelve por flash y se ve UNA vez |
-| `Portal/*` | — | El portal `/mi-cuenta`: `AccesoController`, `InicioController`, `PapelesController`, `PagosController` y `PerfilController`. **Ninguno recibe un id**: todo sale de `$request->user()->beneficiario`. Ver `docs/modulos/PORTAL.md` |
-| `Publico/InicioController.php` | 52 | La portada institucional. **No consulta el dominio**: todo sale de `configuraciones`, con valor por defecto para que se dibuje en una base sin seeder. Manda la prop como `portada` y no `institucion` porque esa clave ya la ocupa una prop compartida, y una de página con el mismo nombre la tapa sin avisar |
+| `Panel/BeneficiarioController.php` | 481 | **El patrón a copiar**, comentado paso a paso |
+| `Panel/AprovechamientoController.php` | 534 | `edit()` manda los datos fijos: solo se corrige la embarcación |
+| `Panel/CarnetController.php` | 615 | Revocar y reponer, además del CRUD |
+| `Panel/FaenaController.php`, `Panel/GuiaController.php` | 447 / 513 | `excede` y `bloquea` separados: el modo flexible tiene que llegar a la pantalla |
+| Los cuatro anteriores | — | `verificarPago()`, `cargarPago()` y `destroy()` con la captura de `frenaPorPago()`: si al eliminar hay pago, vuelven a la ficha con el aviso |
+| `Panel/*ImpresionController.php`, `Panel/AutorizacionPescaController.php` | 160–516 | Devuelven bytes (DomPDF), no pantallas. `documento()` lo reusa el portal con la marca «NO VÁLIDO». `CarnetImpresionController::texto()` achica lo que no entra |
+| `Panel/ReciboController.php` | 203 | Libro de recibos; `recibible` con `morphWith` |
+| `Panel/DashboardController.php` | 202 | El tablero |
+| Catálogos: `Asociacion`, `CategoriaAprovechamiento`, `TipoCarnet`, `ProductoHidrobiologico`, `ArancelSireb` | 85–198 | Eligen la tarifa de SIREB con `VistaSireb` |
+| `Panel/CuentaPortalController.php` | 68 | La clave temporal vuelve por flash una sola vez |
+| `Portal/*` | 25–80 | Solo lectura; nada recibe un id: todo sale de la cuenta con sesión. `VistaPreviaController` dibuja «NO VÁLIDO» sobre lo abierto |
+| `Publico/VerificacionController.php` | 335 | La única pantalla sin sesión. `datosPublicos()` decide qué se muestra: nada de datos personales completos |
+| `StorageController.php` | 75 | **El único que escribe archivos**: 3 MB, nombre aleatorio, disco |
 
-## `app/Http/Requests/Panel/`
+## `app/Http/Requests/` y `app/Exceptions/`
 
-| Archivo | Ln | No obvio |
-| --- | --- | --- |
-| `RegistrarSolicitudRequest.php` | 224 | `pagosIniciales()` arma la lista que espera el servicio |
-| `GuardarBeneficiarioRequest.php` | 186 | Índice único parcial ⇒ la regla `unique` ignora los dados de baja |
-| `RegistrarPagoRequest.php` | 103 | |
-| `CorregirPagoRequest.php` | 118 | Corregir una boleta ya cargada. La boleta es OPCIONAL y el `unique` del número **ignora la propia fila**, o guardar sin tocar el número se acusaría a sí mismo |
-| `GuardarRubroRequest.php` | 78 | |
+Un Request por formulario (`Emitir*`, `Editar*`/`Actualizar*`, `Eliminar*`,
+`Revocar*`, `CargarPagoRequest`, `EditarCupoRequest`…). `validated()` devuelve
+**solo lo que vino**: un `nullable` ausente va con `?? null`.
 
-## `app/AuthIbare/` — login con Ibare, módulo cerrado
+Las excepciones de negocio (`CupoInvalidoException`, `CarnetInvalidoException`,
+`PermisoOperativoException`, `CuentaPortalException`) traen el mensaje que ve el
+funcionario; el controlador lo pone en el campo o en el aviso.
 
-Todo lo del login con Ibare vive en esta carpeta. Fuera de ella solo quedan la config
-(`jichi.ibare`, porque `env()` va en `config/`), la columna `users.mamore_id`, la
-restricción del login por correo en `LoginRequest` y el botón de `pages/auth/login.tsx`.
+## `app/Support/`
 
-| Archivo | Qué hace |
+| Archivo | No obvio |
 | --- | --- |
-| `AuthIbareServiceProvider.php` | Carga `rutas.php` con `web` + `guest` y registra el comando. Sacarlo de `bootstrap/providers.php` desconecta el módulo |
-| `rutas.php` | `/auth/ibare` y `/auth/ibare/callback` (404 con `IBARE_ACTIVO=false`) |
-| `IbareController.php` | Redirige a Ibare y recibe la vuelta; registra en `accesos` |
-| `IbareService.php` | URL con PKCE, canje del código, validación del JWT contra el JWKS. Devuelve un `User` o lanza `IbareException` |
-| `IbareException.php` | Los mensajes que ve el funcionario |
-| `VincularIbareCommand.php` | `jichi:vincular-ibare` — carga `users.mamore_id` mientras no haya módulo de Usuarios |
+| `ExpedienteBeneficiario.php` | Las consultas del expediente compartidas por la ficha y el portal: los `with()` se escriben una vez |
+| `ResumenPortal.php` | Lo que el portal muestra de cada documento. `situacion`: vigente / vencido (por fecha) / revocado (incluye anulado, sin efecto y no pagado) |
+| `TramitesDisponibles.php` | «Puede tramitar» del portal: pregunta a los mismos métodos del modelo |
+| `DocumentoDelPortal.php` | Busca por código público, solo lo propio: lo ajeno da 404 igual que lo inexistente |
+| `QrVerificacion.php`, `CodigoQr.php` | URL **relativa + `APP_URL`** (nunca el host de la petición); QR pintado con `gd` |
+| `ReciboImpreso.php`, `TextoVertical.php`, `MarcaAgua.php` | Piezas de los PDF: lo que DomPDF no sabe hacer va horneado en PNG |
+| `Archivos.php`, `Paginacion.php`, `Sql.php` | `Sql` tiene lo que cambia entre PostgreSQL y SQLite |
 
-Ver [modulos/IBARE.md](modulos/IBARE.md).
+## `app/AuthIbare/` — login con Ibare
 
-## `app/Sireb/` — precios de Recaudaciones (SIREB)
+Módulo cerrado: provider, controlador, servicio, rutas y el comando
+`jichi:vincular-ibare`. Sacar el provider de `bootstrap/providers.php` lo
+desconecta entero. Ver [modulos/IBARE.md](modulos/IBARE.md).
 
-| Archivo | Qué hace |
+## `app/Console/Commands/`
+
+| Archivo | No obvio |
 | --- | --- |
-| `SirebService.php` | Pide a Ibare el token de máquina (`client_credentials`) y lee el catálogo del SEDAG: `catalogoCrudo()` una página con `tarifas=todas` (llegan también las inactivas), `servicios()` todas juntas en caché 10 min, `serviciosSiResponde()` null si SIREB cae, `servicio($id)` uno con sus tarifas, sin caché; `tarifa($servicio, $tarifa)` una tarifa con su servicio adentro, sin caché (la que usa la emisión); `registrarLiquidacion()` el POST de la deuda con `Idempotency-Key`. GET y POST pasan por `enviar()` (token + reintento ante 401). Un 404 de SIREB vuelve como null, no como error |
-| `SirebException.php` | Los mensajes que ve el funcionario |
-| `PrecioSireb.php` | El precio de una tarifa al EMITIR, para congelarlo: pide `tarifa()` y exige tarifa y servicio `activo` (y `liquidable` si se pasa `exigirLiquidable`, hoy solo la autorización); si no, `SinPrecioException` con el motivo. Flujo en [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir). Lo usan `OtorgarCupoService`, `EmitirCarnetService`, `EmitirFaenaService` y `EmitirGuiaService` |
-| `../Services/LiquidarSirebService.php` | La liquidación de cada documento en SIREB, sobre sus columnas `sireb_*` (trait `LiquidableSireb`): `preparar()` guarda la `Idempotency-Key` dentro de la transacción; `enviar()` y `anular()` llaman a SIREB después del commit. `sireb_envio` guarda lo enviado y la respuesta |
-| `../Services/ConfirmarPagoService.php` | Pregunta a SIREB (`GET /liquidaciones/{id}`); con `pagada` aprueba el documento (vía `Revisar*Service::aprobar()`) y emite su recibo con la boleta, en una transacción. Lo usan el botón «Verificar pago» y `jichi:verificar-pagos` (cada 10 min, `routes/console.php`) |
-| `VistaSireb.php` | Lo que las pantallas de catálogo necesitan de SIREB, ya armado: `serviciosParaSelect()` (solo tarifas liquidables de servicios activos; null si SIREB cae), `tarifasPorId()` (precio + `estado` + `liquidable` de cada tarifa), `preciosPorTarifa()` (solo liquidables), `describir()` e `historial($modelo)` (actual + anteriores, con qué es hoy cada tarifa y quién la cambió). Lo usan los cuatro catálogos y los formularios de autorización, carnet, faena y guía |
-
-Hoy lo usa solo la autorización (`OtorgarCupoService`, la escala y los formularios
-de otorgar y corregir). Ver [modulos/SIREB.md](modulos/SIREB.md).
-
-## `app/Support/` y `app/Traits/`
-
-| Archivo | Ln | No obvio |
-| --- | --- | --- |
-| `Sql.php` | 53 | `ILIKE` vs `LIKE` y truncado a mes (`periodoMes`). Lo que cambia entre motores |
-| `Archivos.php` | 142 | `url()` mira qué recibió antes de decidir. **`borrar()` no puede borrar** lo guardado como URL completa. `contenido()` devuelve los bytes, para embeber en un PDF |
-| `QrVerificacion.php` | 57 | El bloque de verificación de los CUATRO PDF: QR + código + URL. **Fuerza `APP_URL`**, porque `route()` absoluta usa el host de la petición y el QR queda impreso |
-| `CodigoQr.php` | 134 | El QR en sí. BaconQrCode + `gd`, porque el PNG de simple-qrcode exige `imagick` y acá no está |
-| `Codificable.php` | 66 | El código de 16 de los CINCO documentos que se entregan. `$doc->codigo_legible` para mostrar, `$doc->asignarCodigo()` para emitir. **Toda consulta que lo muestre necesita `with('codigo')`** o hace N+1 en silencio |
-| `SituacionCarnet.php` | 149 | Lo comparten el autocompletado y el formulario. Es **para la pantalla**, no la regla |
-| `Paginacion.php` | 62 | Lista blanca de tamaños: el número llega por la URL |
-| `ExpedienteBeneficiario.php` | 85 | Las consultas del expediente de una persona, con sus `with()`. Las comparten la ficha del panel y el portal: arreglar un N+1 acá lo arregla en los dos |
-| `ResumenPortal.php` | 130 | Lo que el portal muestra de cada documento: sin ids ni banderas de funcionario. `clase` dice qué documento es |
-| `Auditable.php` | 83 | Bitácora automática. **No se entera de `attach()` ni de los DELETE en cascada** |
-
-## `resources/views/documentos/`
-
-| Archivo | Qué es | No obvio |
-| --- | --- | --- |
-| `permiso-faena.blade.php` | Calco del talonario «PERMISO POR FAENA» | Texto que FLUYE dentro de un MARCO redondeado —`border-radius`, que la 3.1.6 de DomPDF dibuja bien—. El «Kg.» lleva la línea de ancho fijo, o se sale del marco. Carta vertical, 612×792 pt |
-| `guia-transporte.blade.php` | Calco del talonario «Guía Única de Transporte» | Al revés que la faena, NO es texto que fluye: es una grilla de cuadros con anchos declarados. **El relleno de cada celda suma al ancho y acá se paga por columna** — el cuadro D tiene quince, así que sus 2 pt de cada lado son 60 que hay que descontar de los 544 de la hoja. Los rótulos rotados del papel se apilan **una letra por renglón**: DomPDF no tiene `transform` ni `writing-mode`. El sello de agua va ABAJO, detrás de observaciones y las firmas, no detrás del cuadro de productos |
-| `autorizacion-pesca.blade.php` | Calco de la autorización de pesca | Texto que FLUYE, al revés que el carnet y el recibo: el papel son párrafos, no coordenadas fijas. Carta vertical, 612×792 pt |
-| `recibo-oficial.blade.php` | Calco del talonario del SEDAG | Todo en `position: absolute` sobre una grilla de 592×376 pt. Ver [modulos/RECIBOS.md](modulos/RECIBOS.md) |
-| `carnet-pescador.blade.php` | La credencial impresa | Calco de la cédula de papel, una carilla de 243×153 pt (CR80). **Es el espejo de `vista-previa-carnet.tsx`**: si se toca una, se toca la otra. Ver [modulos/CARNETS.md](modulos/CARNETS.md) |
-| `partes/texto-perfilado.blade.php` | Un texto con contorno | Lo dibuja **cinco veces** —cuatro copias corridas más la cara— porque DomPDF no tiene `-webkit-text-stroke` ni `text-shadow`. Lo usan el título de la cédula y los rótulos. El color, el cuerpo y el corrimiento los pone quien la incluye |
+| `VerificarPagosCommand.php` | `jichi:verificar-pagos`, cada 10 min (`routes/console.php`). Revisa lo `pendiente` con liquidación `registrada`. **En producción necesita el cron de Laravel** |
+| `ProbarSirebCommand.php` | `jichi:sireb`: prueba token y catálogo. Diagnóstico |
 
 ## `routes/`
 
-| Archivo | Qué expone |
+| Archivo | No obvio |
 | --- | --- |
-| `web.php` | **Solo incluye** a los otros tres. Laravel carga este. La raíz se mudó a `publico.php` el 22/09/2026 |
-| `panel.php` | `/panel/...` — con sesión y con `permiso:` en cada ruta |
-| `publico.php` | `/` (portada) y `/verificar/{codigo?}` — sin sesión, con `throttle` |
-| `auth.php` | `/login`, `/logout`. Las rutas de Ibare NO están acá: ver `app/AuthIbare/rutas.php` |
-| `portal.php` | `/mi-cuenta/...` — el portal del beneficiario, con `auth` + `beneficiario`. Ninguna ruta recibe un id |
-
-> **El orden importa:** `/beneficiarios/crear` y `/beneficiarios/buscar` van
-> ANTES de `/beneficiarios/{beneficiario}`, o esas palabras se toman como id.
+| `panel.php` | Prefijo `/panel`, middleware `funcionario` en el grupo y `permiso:` en cada ruta. Cada documento tiene `verificar-pago` y `cargar-pago` con el permiso `crear`. Las rutas literales (`crear`, `buscar`) van antes de `{id}` |
+| `portal.php` | `/mi-cuenta`, middleware `beneficiario` |
+| `publico.php` | Portada y verificación por código |
+| `console.php` | El scheduler: `jichi:verificar-pagos` |
 
 ## `resources/js/` — frontend
 
-| Carpeta | Qué hay | No obvio |
-| --- | --- | --- |
-| `pages/panel/` | Una pantalla = un archivo | Reciben los props de `Inertia::render()` |
-| `pages/publico/` | `inicio.tsx` (portada) · `verificar.tsx` (acta) | Dos pantallas con marcos distintos: la portada es ancha y azul, el acta es angosta, verde y **se imprime** |
-| `components/ui/` | Genéricas | **Única excepción a «todo en español»** |
-| `ui/button.tsx` | La escala de botones | Las variantes `ver`, `editar` y `eliminar` son el estilo ÚNICO de esas tres acciones en todo el sistema —celeste mira, ámbar cambia, rojo saca—. `eliminar` cubre también dar de baja, anular, revocar y rechazar. Una pantalla nueva las usa; **no** escribe las clases de color a mano |
-| `components/panel/` | Por módulo | `crear.tsx` de trámites: cuidado con los `key` de los botones. `tramites/vista-previa-carnet.tsx` es **el molde del carnet impreso**: si se toca, se toca también el Blade |
-| `components/panel/tramites/depositos.tsx` | Resumen, lista y los dos formularios | Un solo archivo para las DOS pantallas, que son dos MOMENTOS y no dos lugares para lo mismo: «Editar trámite» es el borrador y la FICHA es el expediente presentado —lo único que cambia es que ahí se CONTROLA—. `conCorreccion` va en las dos y enciende corregir Y quitar: un depósito observado tiene que poder arreglarse en la ficha, porque observar solo pasa en revisión. `FilaDeposito` es componente propio y no un `<li>` dentro del `map` porque tiene estado, y un hook no va en un `map`. «Quitar» pide además el permiso `pagos.eliminar`, que es de administración |
-| `components/panel/beneficiarios/` | Ficha en pestañas: `pestana-pescador.tsx`, `pestana-comercializador.tsx`, `pestana-pagos.tsx` y `partes-ficha.tsx` | La pestaña va a la URL (`?pestana=`). Pescador se agrupa por **período** = autorización → cédulas (`aprovechamiento_id`) → faenas (`carnet_id`), en `armarPeriodos()`; Comercializador, por cédula → guías. Sin eso, al renovar la autorización se mezclaban las faenas de dos años. Los botones de emitir salen de las banderas del servidor —`puede_emitir`—, no de reglas propias. `CredencialMini` **no** es la vista previa del plástico: esa es `vista-previa-carnet.tsx` |
-| `components/panel/carnets/` | `dialogo-imprimir-carnet.tsx` | La vista previa antes de imprimir. Muestra el PDF DE VERDAD en un `iframe`, no una maqueta |
-| `components/panel/layout/` | Barra lateral, encabezado, menú | El ancho de la barra está escrito **dos veces** —`w-16`/`w-64` en la barra y `lg:pl-16`/`lg:pl-64` en el layout— y los dos se mueven juntos. `moduloActual()` de `navegacion.ts` es lo ÚNICO que decide qué módulo está abierto: lo usan el menú y las migas |
-| `components/panel/dashboard/` | Gráfico de recaudación, avisos y últimos carnets | El gráfico se carga con `lazy()`. Los avisos solo listan lo que tiene algo, y enlazan al listado filtrado |
-| `components/publico/` | Hoja oficial, ficha, buscador | `buscador-codigo.tsx` vive en TRES sitios —el acta, su fondo verde y la portada— y por eso no lleva margen propio |
-| `pages/portal/`, `components/portal/`, `layouts/layout-portal.tsx` | El portal del beneficiario | Claro siempre, como la portada: `piezas.tsx` tiene sus propios chips e inputs porque `Badge` e `Input` cambian en modo oscuro. `fila-papel.tsx` es la fila de un papel aprobado, en el inicio y en «Mis papeles» |
-| `components/publico/institucional/` | Las seis secciones de la portada, su cabecera y su pie | Los textos de servicios, pasos y preguntas salen de `docs/REGLAS-NEGOCIO.md`: si la regla cambia, cambian con ella. `seccion.tsx` lleva `scroll-mt` porque la cabecera es sticky y sin eso el ancla deja el título tapado |
-| `hooks/use-permisos.ts` | `puede('x.y')` | **Comodidad, no seguridad** |
-| `ui/confirmar-accion.tsx` · `ui/confirmar-con-motivo.tsx` | Las ventanas de confirmación | La prop `confirmacion` agrega una CASILLA que hay que marcar, y apaga el botón hasta entonces. Se usa solo en lo irreversible y en lo que es una declaración: marcada sin leer no protege nada. Se limpia al cerrar |
-| `lib/utils.ts` | `bs()`, `fecha()`, `fechaInput()`, `hora()`, `fechaHora()`, `hace()`, `cn()` | `aFechaLocal()` resuelve el bug de UTC-4. `fechaInput()` es su inversa —AAAA-MM-DD para un `<input type="date">`— y **no es `slice(0,10)`**: cortar un instante UTC da el día siguiente en Bolivia. `hace()` usa DOS `RelativeTimeFormat`: `auto` hasta días —para que salga «ayer»— y `always` de meses para arriba, o 40 días dirían «el mes pasado». **Sin pruebas** |
-| `lib/rueda-numerica.ts` | `bloquearRuedaEnNumericos()` | Se llama una vez en `app.tsx`. Quita el foco al `<input type="number">` cuando le giran la rueda encima: sin foco el navegador no cambia el valor y la página se desplaza igual |
-| `types/` | La forma de lo que manda Laravel | Hay que actualizarlos al cambiar un controlador |
+| Carpeta / archivo | No obvio |
+| --- | --- |
+| `pages/panel/<modulo>/{index,crear,ver,editar}.tsx` | Una carpeta por módulo. Las fichas (`ver.tsx`) reciben los `puede_*` resueltos |
+| `pages/panel/catalogos/*` | Cada catálogo con su formulario e historial de tarifas de SIREB |
+| `components/panel/pagos/tarjeta-recaudaciones.tsx` | **La tarjeta de pago de las cuatro fichas**: estado de la liquidación, código de pago copiable, «Pago informado» / «Pago cargado: No», formulario «Cargar pago», «Verificar pago» y recibo |
+| `components/comunes/texto-copiable.tsx` | Copiar con un clic; respaldo con `execCommand` fuera de HTTPS |
+| `components/panel/beneficiarios/*` | La ficha del beneficiario por pestañas: pescador, comercializador, pagos |
+| `components/portal/*`, `pages/portal/*` | El portal: colores claros fijos, sin `dark:` |
+| `components/publico/*`, `pages/publico/*` | Portada institucional y verificación |
+| `components/ui/*` | Los únicos con vocabulario en inglés (`Button`, `Card`…). Un color nuevo va también a `badge.tsx` |
+| `lib/utils.ts` | `bs()`, `fecha()`, `fechaInput()`, `fechaHora()`, `hace()`. **Nunca `new Date(cadena)` directo**: una fecha suelta se corre un día en UTC-4 |
+| `types/*.ts` | Espejo de lo que manda cada controlador. `index.d.ts` tiene los estados de los enums |
+
+## `resources/views/documentos/` — los PDF
+
+`autorizacion-pesca`, `carnet-pescador`, `permiso-faena`, `guia-transporte` y
+`recibo-oficial`, más `partes/` (QR, marca «NO VÁLIDO», texto perfilado).
+Maquetados con tablas y coordenadas: DomPDF no tiene flexbox, grid, `transform`
+ni `object-fit`. Las trampas están en `CLAUDE.md`.
 
 ## `database/`
 
-| Carpeta | Qué hay | No obvio |
-| --- | --- | --- |
-| `migrations/` | 23 archivos: los de Laravel (`0001_*`) y el núcleo del dominio (`2026_09_18_*`) | Cortos a propósito: el porqué de cada columna e índice está en [MER.md](MER.md) |
-| `seeders/RolPermisoSeeder` | Lee los permisos de `RolSistema` | Correrlo a mano al sumar un permiso |
-| `seeders/ConfiguracionSeeder` | Datos de la institución | Usa `updateOrCreate`: pisa lo ajustado a mano |
-| `seeders/UsuarioSeeder` | El administrador inicial | |
-| `seeders/CatalogoSeeder` | Asociaciones, escala, tipos de carnet y productos | Valores de **plantilla**; solo fuera de producción. Ver PENDIENTES |
-| `seeders/BeneficiarioSeeder` | Padrón de prueba | Solo el padrón: el circuito se carga desde la pantalla |
-| `factories/` | `BeneficiarioFactory` | |
-
-## `public/image/`
-
-| Archivo | Para qué |
+| Archivo | No obvio |
 | --- | --- |
-| `icon.png` | Escudo del GAD Beni, para el panel (1,7 MB) |
-| `sedag.png` | Sello del SEDAG, para el panel (1 MB) |
-| `recibo-escudo.png` | El mismo escudo a 220 px, para el PDF (36 KB) |
-| `recibo-sello.png` | El sello a 360 px **y ya atenuado**, para el PDF (23 KB) |
-| `carnet-fondo.png` | El verde del carnet **con el sello ya atenuado adentro**, 674×425 px. Degradado `#719327` → `#518411`. **Su gemelo es el `linear-gradient` de `vista-previa-carnet.tsx`**: el verde se toca en los dos o se separan |
-| `carnet-escudo.png` | El escudo del encabezado, recortado de `recibo-escudo.png` (27 KB) |
-
-> Las copias `recibo-*` existen porque embeber los originales hacía un PDF de
-> 5,4 MB por recibo.
->
-> `carnet-fondo.png` trae el degradado Y el sello horneados en el archivo porque
-> DomPDF no entiende `linear-gradient` y su `opacity` es poco confiable. Es la
-> misma decisión que el sello del recibo, llevada al fondo entero. El degradado
-> es el MISMO que declara `vista-previa-carnet.tsx`, resuelto con la fórmula de
-> CSS para que el verde impreso sea el de la pantalla.
-
----
+| `migrations/2026_09_18_*` | **El núcleo**, una migración por tabla. Columna nueva va DENTRO de su migración (regla 12): al cambiar una, se rearma la base. Explicadas en [MER.md](MER.md) |
+| `migrations/2026_09_01_*` | Soporte: campos del usuario, correlativos, configuración, auditoría, accesos, permisos |
+| `seeders/CatalogoSeeder.php` | Los catálogos con sus tarifas de SIREB |
+| `seeders/BeneficiarioSeeder.php` + `factories/BeneficiarioFactory.php` | Datos de prueba: los únicos del sistema |
+| `seeders/RolPermisoSeeder.php`, `UsuarioSeeder.php`, `ConfiguracionSeeder.php` | Correrlos a mano al tocar `RolSistema` o la configuración |
 
 ## Lo que NO hay que buscar porque no existe
 
-- API REST, `fetch()`, `axios` — todo pasa por Inertia
-- Columnas `monto_pagado`, `saldo`, `edad`, `codigo` del carnet, `created_by`
-- Tipos ENUM nativos de PostgreSQL
-- Módulos de Reportes y Configuración
-- Comando de vencimiento de carnets
-- PDF del carnet (el del **recibo** sí existe)
-- Pruebas automáticas (se retiraron el 27/09/2026; están en el commit `7dc0ac6`)
+`rubros`, `tramites`, `faenas` (la tabla vieja), `guias`, tabla `pagos`, Caja,
+`en_revision`, firma de supervisión, depósitos cargados en Jichi, el estado
+`vencido`, `maatwebsite/excel`, `simple-qrcode` y las pruebas automáticas. Todo
+está en el historial de git.

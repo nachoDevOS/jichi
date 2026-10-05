@@ -44,13 +44,13 @@ class RevisarCarnetService
             // El número se asigna ACÁ: un carnet que nunca se firma no puede
             // gastar uno del libro. `siguienteNumero()` bloquea la fila del
             // contador, y solo se pide si NO tiene.
-            $registro = $bloqueado->nro_registro
+            $registro = $bloqueado->nro
                 ?? $this->correlativos->siguienteNumero(self::SERIE_REGISTRO, $gestion);
 
             $bloqueado->motivoAuditoria = 'Pago confirmado en SIREB: la credencial queda habilitada.';
             $bloqueado->update([
                 'estado' => EstadoCarnet::Aprobado,
-                'nro_registro' => $registro,
+                'nro' => $registro,
                 'fecha_emision' => $emision->toDateString(),
                 'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
             ]);

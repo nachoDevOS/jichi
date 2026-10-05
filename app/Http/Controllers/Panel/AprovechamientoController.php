@@ -6,6 +6,8 @@ use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Exceptions\CupoInvalidoException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Panel\CargarPagoRequest;
+use App\Http\Requests\Panel\EditarCupoRequest;
 use App\Http\Requests\Panel\EliminarCupoRequest;
 use App\Http\Requests\Panel\OtorgarCupoRequest;
 use App\Http\Requests\Panel\RevocarCupoRequest;
@@ -14,10 +16,11 @@ use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\CategoriaAprovechamiento;
 use App\Models\PermisoFaena;
-use App\Models\Recibo;
+use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\OtorgarCupoService;
 use App\Services\RevisarCupoService;
+use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
@@ -173,6 +176,19 @@ class AprovechamientoController extends Controller
     }
 
     /**
+     * Cargar pago — POST /panel/aprovechamientos/{aprovechamiento}/cargar-pago
+     *
+     * Lo carga en SIREB, que lo valida allá.
+     */
+    public function cargarPago(CargarPagoRequest $request, AprovechamientoPesq $aprovechamiento, CargarPagoService $carga): RedirectResponse
+    {
+        $datos = $request->validated();
+        $resultado = $carga->cargar($aprovechamiento, $datos['numero_transaccion'], $datos['banco']);
+
+        return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /**
      * FICHA — GET /panel/aprovechamientos/{aprovechamiento}
      */
     public function show(AprovechamientoPesq $aprovechamiento): Response
@@ -261,16 +277,16 @@ class AprovechamientoController extends Controller
             // Las faenas de este cupo: es el detalle que explica el saldo. Sin
             // él, «le quedan 20 kg» es un número que hay que creer.
             'faenas' => $aprovechamiento->faenas()
-                // Con `nro_registro` y `fecha_emision`: de esas dos columnas
+                // Con `nro` y `fecha_emision`: de esas dos columnas
                 // salen los accesores del número del carnet, y sin ellas
                 // devuelven null sin ningún error.
-                ->with(['carnet:id,nro_registro,fecha_emision,beneficiario_id,tipo_actor,aprovechamiento_id,estado,fecha_vencimiento', 'carnet.codigo'])
-                ->orderByDesc('numero_faena')
+                ->with(['carnet:id,nro,fecha_emision,beneficiario_id,tipo_actor,aprovechamiento_id,estado,fecha_vencimiento', 'carnet.codigo'])
+                ->orderByDesc('permisos_faena.nro')
                 ->get()
                 ->each(fn (PermisoFaena $f) => $f->carnet?->setRelation('aprovechamiento', $aprovechamiento))
                 ->map(fn (PermisoFaena $f): array => [
                     'id' => $f->id,
-                    'numero_faena' => $f->numero_faena,
+                    'nro' => $f->nro,
                     // Con los seis ceros del talonario: lo arma el modelo, no
                     // la pantalla, o cada tabla elige su propio relleno.
                     'numero_legible' => $f->numero_legible,
@@ -312,53 +328,33 @@ class AprovechamientoController extends Controller
             'categoria',
         ]);
 
+        // Titular, tramo, kilos, monto y fechas llegan FIJOS: solo se corrige la embarcación.
         return Inertia::render('panel/aprovechamientos/editar', [
-            // La persona llega FIJA: cambiar de titular no es corregir un cupo,
-            // es otorgar otro.
             'cupo' => [
                 'id' => $aprovechamiento->id,
-                'beneficiario_id' => $aprovechamiento->beneficiario_id,
                 'beneficiario' => $aprovechamiento->beneficiario?->nombreCompleto,
                 'documento' => $aprovechamiento->beneficiario?->documento_identidad,
                 'foto_url' => $aprovechamiento->beneficiario?->foto_url,
-                'categoria_aprov_id' => $aprovechamiento->categoria_aprov_id,
+                'tramo' => $aprovechamiento->categoria?->descripcion_kg,
+                'volumen_total_kg' => (float) $aprovechamiento->volumen_total_kg,
+                'modalidad_etiqueta' => $aprovechamiento->modalidad?->etiqueta(),
                 'monto' => $aprovechamiento->montoACobrar(),
                 'tipo_embarcacion' => $aprovechamiento->tipo_embarcacion,
                 'fecha_solicitud' => $aprovechamiento->fecha_solicitud?->toDateString(),
+                'fecha_vencimiento' => $aprovechamiento->fecha_vencimiento?->toDateString(),
             ],
-
-            'escala' => $this->tramosElegibles(),
         ]);
     }
 
     /**
      * Guardar la corrección — PUT /panel/aprovechamientos/{id}
      */
-    public function update(OtorgarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
+    public function update(EditarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
     {
-        $datos = $request->validated();
-
         try {
-            $corregido = $this->servicio->editar(
-                $aprovechamiento,
-                CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
-                $datos['tipo_embarcacion'],
-                now()->parse($datos['fecha_solicitud']),
-            );
+            $this->servicio->editar($aprovechamiento, $request->validated()['tipo_embarcacion']);
         } catch (CupoInvalidoException $e) {
-            if ($e->avisoGeneral) {
-                return $this->avisoDeError($e, 'No se corrigió la autorización. ');
-            }
-
-            // Al corregir el titular no se toca: el único campo con el que el
-            // operador puede reaccionar es la escala.
-            return back()->withInput()
-                ->withErrors(['categoria_aprov_id' => $e->getMessage()])
-                ->with('error', 'No se registró el aprovechamiento. Revise el motivo en el formulario.');
-        }
-
-        if (! $corregido->registradoEnSireb()) {
-            return redirect()->route('aprovechamientos.show', $aprovechamiento)->with('aviso', self::AVISO_SIN_SIREB);
+            return $this->avisoDeError($e, 'No se corrigió la autorización. ');
         }
 
         return redirect()
@@ -369,7 +365,7 @@ class AprovechamientoController extends Controller
     /**
      * Eliminar — DELETE /panel/aprovechamientos/{id}
      */
-    public function destroy(EliminarCupoRequest $request, AprovechamientoPesq $aprovechamiento): RedirectResponse
+    public function destroy(EliminarCupoRequest $request, AprovechamientoPesq $aprovechamiento, ConfirmarPagoService $pagos): RedirectResponse
     {
         $persona = $aprovechamiento->beneficiario?->nombreCompleto ?? 'el pescador';
 
@@ -377,6 +373,14 @@ class AprovechamientoController extends Controller
             $this->servicio->eliminar($aprovechamiento, $request->validated()['motivo']);
         } catch (CupoInvalidoException $e) {
             return back()->withErrors(['motivo' => $e->getMessage()]);
+        } catch (SirebException $e) {
+            if (! $e->frenaPorPago()) {
+                throw $e;
+            }
+
+            $resultado = $pagos->alNoPoderEliminar($aprovechamiento);
+
+            return redirect()->route('aprovechamientos.show', $aprovechamiento)->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
         }
 
         return redirect()
@@ -506,6 +510,7 @@ class AprovechamientoController extends Controller
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $cupo->resumenSireb(),
             'puede_verificar_pago' => $cupo->estado->estaAbierto(),
+            'puede_cargar_pago' => $cupo->puedeCargarPago(),
             // La autorización en papel sale recién con el cupo aprobado.
             'ya_fue_aprobado' => $cupo->yaFueAprobado(),
             // Revocada: firmada, pero sin papel y sin poder revocarse de nuevo.

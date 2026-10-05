@@ -80,7 +80,7 @@ export interface RenglonesGuia {
 /** Una guía, tal como la pintan el listado y la ficha. */
 export interface GuiaFila extends RenglonesGuia {
     id: number;
-    numero_guia: number;
+    nro: number;
     /** Con los seis ceros del talonario: «000308». */
     numero_legible: string;
     /** «Guía N° 000308», armado por el servidor. */
@@ -127,6 +127,8 @@ export interface GuiaFila extends RenglonesGuia {
     /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
     sireb: VentaSireb | null;
     puede_verificar_pago: boolean;
+    /** Pendiente, con la liquidación registrada y sin pago cargado. SIREB lo confirma al cargar. */
+    puede_cargar_pago: boolean;
 
     /** Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
@@ -142,6 +144,8 @@ export interface GuiaFila extends RenglonesGuia {
 
 /** La guía con el detalle que solo pinta la ficha. */
 export interface GuiaFicha extends GuiaFila {
+    /** El de verificación, 16 caracteres. */
+    codigo: string | null;
     asociacion_nombre: string | null;
     detalles: DetalleGuia[];
 

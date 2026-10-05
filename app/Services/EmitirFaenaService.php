@@ -101,7 +101,7 @@ class EmitirFaenaService
                 'carnet_id' => $carnet->id,
                 // El número lo pone el sistema, no el operador: correlativo
                 // global y continuo, como el talonario de papel.
-                'numero_faena' => $this->correlativos->siguienteContinuo(PermisoFaena::SERIE),
+                'nro' => $this->correlativos->siguienteContinuo(PermisoFaena::SERIE),
                 // Copia congelada del precio de SIREB: ver PermisoFaena::montoACobrar().
                 'monto' => $precio['monto'],
                 'sireb_tarifa_id' => $precio['tarifa_id'],

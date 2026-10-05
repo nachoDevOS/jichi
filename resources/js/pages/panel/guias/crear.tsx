@@ -17,8 +17,8 @@ import type { CatalogosGuia, FormularioGuia } from '@/types/guias';
 /**
  *  Registrar una guía de movimiento — paso 4, rama comercializador
  *
- * Nace pendiente: acá se arma el papel y nada más. Los depósitos se cargan
- * desde la ficha, y recién con la firma la guía ampara el traslado.
+ * Nace pendiente: acá se arma el papel y nada más. Se paga en SIREB, y recién
+ * aprobada la guía ampara el traslado.
  */
 export default function CrearGuia({
     beneficiario,

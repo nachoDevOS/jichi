@@ -25,7 +25,7 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'carnet_id',
     'asociacion_id',
-    'numero_guia',
+    'nro',
     'monto',
     'origen',
     'origen_departamento',
@@ -151,7 +151,7 @@ class GuiaMovimiento extends Model
     protected function numeroLegible(): Attribute
     {
         return Attribute::get(
-            fn (): string => CorrelativoService::rellenar($this->numero_guia),
+            fn (): string => CorrelativoService::rellenar($this->nro),
         );
     }
 

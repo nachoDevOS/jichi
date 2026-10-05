@@ -44,7 +44,7 @@ class ExpedienteBeneficiario
     {
         return $beneficiario->faenas()
             ->with('carnet.aprovechamiento:id,estado')
-            ->orderByDesc('permisos_faena.numero_faena')
+            ->orderByDesc('permisos_faena.nro')
             ->get();
     }
 
@@ -52,7 +52,7 @@ class ExpedienteBeneficiario
     public static function guias(Beneficiario $beneficiario): Collection
     {
         return $beneficiario->guias()
-            ->orderByDesc('guias_movimiento.numero_guia')
+            ->orderByDesc('guias_movimiento.nro')
             ->get();
     }
 

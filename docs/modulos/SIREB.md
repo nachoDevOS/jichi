@@ -127,7 +127,7 @@ vale igual para la escala, tipos de carnet, productos y aranceles.
 
 | Caso | Qué hace el select |
 | --- | --- |
-| Tarifa que ya usa otra escala | Deshabilitada, con «(escala N)» (prop `tarifasUsadas`) |
+| Tarifa que ya usa otro tramo | Deshabilitada, con «(ya la usa: 201 Kg Hasta 300 Kg)» —la capacidad, nunca el número de escala— (prop `tarifasUsadas`) |
 | Servicio dado de baja o tarifa no liquidable | No aparece (lo descarta `serviciosParaSelect()`) |
 | Tarifa guardada que ya no llega o dejó de ser liquidable | Opción «Tarifa actual (no está en SIREB)»: editar otro campo no la borra |
 | SIREB no responde | Select deshabilitado con aviso; al editar se conservan los ids actuales |
@@ -166,7 +166,7 @@ historial, edición en `tipos-carnet-formulario.tsx` y vista de historial en
 `precio_bs`. `EmitirCarnetService::precioDe()` pide `servicio($servicio_sireb)`
 —**fuera** de la transacción— y congela el monto en `carnets.monto` junto con
 `sireb_tarifa_id`, al emitir y al corregir el borrador. `Carnet::montoACobrar()`
-lee esa columna, así que Caja, el tablero y las fichas no llaman a SIREB.
+lee esa columna, así que los listados, el tablero y las fichas no llaman a SIREB.
 
 | Situación | Qué pasa al emitir |
 | --- | --- |
@@ -223,13 +223,14 @@ con sus fechas.
 
 ## Al otorgar
 
-`OtorgarCupoService::otorgar()` y `editar()` piden el precio del tramo con
+`OtorgarCupoService::otorgar()` pide el precio del tramo con
 `PrecioSireb::de($servicio_sireb, $tarifa_sireb, exigirLiquidable: true)`
 —directo a SIREB, sin caché— y lo **congelan** en `aprovechamientos_pesq.monto`,
 junto con `sireb_tarifa_id`. La verificación completa está en
 [Validación de la tarifa al emitir](#validación-de-la-tarifa-al-emitir).
-`montoACobrar()` lee esa columna, así que los listados, la Caja y el tablero no
-llaman a SIREB.
+`montoACobrar()` lee esa columna, así que los listados y el tablero no
+llaman a SIREB. `editar()` no lo pide: desde el 03/10/2026 solo corrige la
+embarcación, y el tramo y el monto quedan como se otorgaron.
 
 | Situación | Qué pasa |
 | --- | --- |
@@ -250,7 +251,7 @@ exacto va a `storage/logs` («SIREB rechazó el precio del tramo»). Lo distingu
 `SinPrecioException::$sinRespuesta`.
 
 El error nombra el tramo por su texto («601 Kg Hasta 800 Kg»), nunca por su
-número. Los selects de crear/editar muestran «texto del tramo — precio» con el
+número. El select de crear muestra «texto del tramo — precio» con el
 precio de referencia de `tarifasPorId()` (caché 10 min); el que vale es el que
 pide el servicio al guardar.
 
@@ -258,8 +259,7 @@ pide el servicio al guardar.
 con su precio, pero **deshabilitado** y con «(tarifa no disponible)»: el texto
 es para ventanilla, no nombra a SIREB. Lo decide el campo `liquidable` de
 `AprovechamientoController::tramosElegibles()` (`null` si SIREB no respondió:
-ahí no se deshabilita nada). Al editar una autorización cuyo tramo quedó así, se
-ve seleccionado; guardar falla al pedir el precio.
+ahí no se deshabilita nada). Editar no muestra el select: el tramo es fijo.
 
 ## Validación de la tarifa al emitir
 
@@ -295,7 +295,7 @@ caché: lo que se congela en el documento es el precio y el estado de ese moment
 
 ```
 Funcionario aprieta «Registrar»
-  └─ Controller ─▶ OtorgarCupoService::otorgar() / editar()
+  └─ Controller ─▶ OtorgarCupoService::otorgar()
                      (o EmitirCarnetService, EmitirFaenaService, EmitirGuiaService)
        └─ DB::transaction
             ├─ bloquea al beneficiario, revisa reglas propias (una bolsa por persona…)
@@ -353,8 +353,9 @@ otros tres es cambiar el `false` por defecto en su llamada a `de()`.
 
 *(02/10/2026)* **El pago se hace en SIREB.** Autorización, carnet, faena y guía
 registran su liquidación al crearse y se aprueban solos cuando SIREB la da por
-pagada. Jichi no carga ni controla boletas; no hay tabla `pagos`, Caja ni
-`en_revision`.
+pagada. Jichi no valida pagos —puede cargarlos, ver abajo—; no hay tabla
+`pagos`, Caja ni `en_revision`. Si la liquidación vence sin pago, el documento
+queda «No pagado» (03/10/2026).
 
 ### Registrar la liquidación
 
@@ -404,6 +405,42 @@ Idempotency-Key: 9f3c2a1e-7b4d-4e8a-b1c2-5d6e7f8a9b0c
   llegado aunque no volvió respuesta. Si SIREB contesta 422, con esa clave nunca
   la creó: se marca anulada sin llamar a anular.
 
+### Cargar el pago desde Jichi
+
+*(03/10/2026)* La ficha de los cuatro documentos ofrece **«Cargar pago»**
+(`POST /panel/{documento}/{id}/cargar-pago`, permiso `{documento}.crear`).
+`CargarPagoService::cargar()` **solo carga**: valida un encargado de SIREB y
+aprueba `ConfirmarPagoService`, como siempre.
+
+1. Consulta `GET /liquidaciones/{id}`. Se carga **solo** si está `pendiente` —ni
+   vencida, ni pagada, ni anulada— **y sin ningún pago**. Si no, no carga y corre
+   `verificar()` para poner la ficha al día (muestra el pago, aprueba, o «No pagado»).
+2. `POST /liquidaciones/{id}/pago-manual` con `numero_boleta` (el «N° de
+   transacción», 50) y `entidad_bancaria` (100): lo único que acepta SIREB; monto
+   y fecha los pone él, y no recibe imagen. Sin `Idempotency-Key`: reintentar es
+   seguro porque un segundo pago da `422 PAGO_YA_EXISTE`.
+3. 201 → guarda el pago en `sireb_envio.pago` y la ficha lo muestra «Por validar».
+   422 o sin respuesta → no carga y vuelve a consultar.
+
+`puede_cargar_pago` (`LiquidableSireb::puedeCargarPago()`) mira la última consulta
+guardada; la que manda es la del paso 1.
+
+### Antes de anular: ¿ya está pagada?
+
+*(03/10/2026)* `LiquidarSirebService::anular()` —el paso por el que pasan eliminar y
+corregir de los cuatro documentos— consulta `GET /liquidaciones/{id}` antes de
+pedir la anulación. Con `estado = pagada` o `pago.estado = confirmado` lanza
+`SirebException::liquidacionPagada()` (código `LIQUIDACION_PAGADA`, propio de
+Jichi); con cualquier otro pago cargado —en revisión—, `pagoEnRevision()`
+(`PAGO_EN_REVISION`). No toca nada; el manejador de `bootstrap/app.php` lo muestra en rojo con
+`paraVentanilla()`. Una `vencida` sin pago no frena: no se le pide la anulación a
+SIREB —responde 422: ya no cobra nada— y se elimina. Al **eliminar**, los cuatro `destroy()` capturan esos códigos (`frenaPorPago()`) y
+llaman a `ConfirmarPagoService::alNoPoderEliminar()`: corre la verificación
+—aprueba y emite el recibo— y vuelven a la ficha con «No se eliminó: el pago ya
+fue validado… quedó aprobado y se emitió la autorización» (o el carnet, el permiso de faena, la guía). Con el pago en revisión, la ficha queda mostrándolo
+como «Por validar» y el aviso dice que todavía está en revisión. Si SIREB no
+responde, también frena.
+
 ### Confirmar el pago
 
 `ConfirmarPagoService::verificar()` pide `GET /liquidaciones/{id}`:
@@ -412,8 +449,20 @@ Idempotency-Key: 9f3c2a1e-7b4d-4e8a-b1c2-5d6e7f8a9b0c
 | --- | --- |
 | `pendiente`, sin pago | Sigue pendiente: «todavía no se registró ningún pago» (con el código) |
 | `pendiente`, pago `pendiente` | Sigue pendiente: «falta que lo validen en Recaudaciones» |
-| `anulada` / `vencida` | Sigue pendiente: «corrija el trámite para generar uno nuevo, o elimínelo» |
-| `pagada`, pago `confirmado` | **Aprueba** (`Revisar*Service::aprobar()`, con sus reglas) **y emite el recibo** con la boleta, en una transacción |
+| `vencida`, sin pago | **Pasa a `no_pagado`** (03/10/2026): no sigue su curso, libera el lugar y los kilos, el comando deja de consultarlo |
+| `vencida`, con pago en revisión | Sigue pendiente: «consulte con Recaudaciones» |
+| `anulada` | Sigue pendiente: «corrija el trámite para generar uno nuevo, o elimínelo» |
+| `pagada`, pago `confirmado` | **Aprueba** (`Revisar*Service::aprobar()`, con sus reglas) **y emite el recibo** con el pago (N° de transacción, banco, fecha), en una transacción |
+
+Cada consulta guarda el `pago` que manda SIREB en `sireb_envio.pago` —solo si
+cambió: el comando corre cada 10 min y cada escritura audita— y la tarjeta lo
+muestra como «Pago informado» (n° de transacción, banco, fecha, monto, «Por validar» /
+«Validado») hasta que sale el recibo (03/10/2026). Sin pago, la tarjeta dice «Pago cargado: No» si ya se
+preguntó (`pago_consultado`: la clave `pago` existe en `sireb_envio`) o «Sin
+verificar» si nunca; con recibo suma «Validado el». **La imagen del comprobante
+NO se puede mostrar:** el contrato de SIREB (`/docs/api/openapi.yaml`) no la
+expone; el `Pago` trae solo `tipo_pago`, `monto_pagado`, `estado`, `fecha_pago`,
+`numero_boleta`, `entidad_bancaria` y `fecha_validacion`.
 
 Si una regla de Jichi lo frena al aprobar (autorización revocada, kilos), queda
 pendiente con ese motivo. Lo disparan el botón **«Verificar pago»** de la ficha
@@ -439,6 +488,15 @@ test.sireb. **Falta pagar una de punta a punta en test.sireb.**
 
 ## Lo que falta
 
-- Probar de punta a punta contra test.sireb (pagar, validar, ver la aprobación).
+- Probar de punta a punta contra test.sireb: cargar el pago desde Jichi, validarlo
+  allá, ver la aprobación; y dejar vencer una liquidación sin pago.
+- Confirmar con Recaudaciones qué pasa si la liquidación vence con un pago en
+  revisión: ¿sigue `pendiente` o pasa a `vencida`? Hoy Jichi la deja pendiente.
+- Una liquidación anulada **desde SIREB** deja el documento pendiente sin
+  salida automática: se corrige o se elimina a mano.
+- El plazo de pago (`fecha_vencimiento` de la liquidación) no se muestra en la
+  ficha: está en `sireb_envio.respuesta`.
 - El cron de Laravel en el servidor, o nada se aprueba solo.
 - La guía de piscicultura: su 50% no viaja a SIREB.
+- Ver la imagen del comprobante: SIREB tiene que exponerla (un `comprobante_url`
+  en el `Pago` o un endpoint de descarga). Pedirlo al equipo de Recaudaciones.

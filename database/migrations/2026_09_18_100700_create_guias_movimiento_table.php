@@ -26,7 +26,7 @@ return new class extends Migration
 
             // Correlativo global y continuo, lo genera el sistema. Único y no
             // parcial: la hoja del talonario se gastó.
-            $table->unsignedInteger('numero_guia')->unique()->comment('Del talonario: 000308');
+            $table->unsignedInteger('nro')->unique()->comment('Del talonario: 000308');
 
             $table->decimal('monto', 10, 2)->default(0)->comment('Copia congelada del arancel');
 

@@ -1,493 +1,182 @@
-# El recibo hoy — 02/10/2026
-
-> **Esto manda sobre todo lo de abajo.** El recibo es la tabla `recibos`, **uno
-> por documento pagado** (`recibible_type` + `recibible_id`). Lo emite
-> `ConfirmarPagoService` cuando SIREB da la liquidación por `pagada`, y congela
-> el monto, el concepto y la boleta tal como la validó SIREB (`numero_boleta`,
-> `entidad_bancaria`, `fecha_pago`). Correlativo continuo `000001` (serie `REC`).
-> Ya no hay tabla `pagos`, ni Caja, ni recibo armado al vuelo. El PDF sigue siendo
-> `recibo-oficial.blade.php`, con `App\Support\ReciboImpreso` (un renglón: el
-> documento pagado; en «N°», la boleta y el banco). Ver [PAGOS.md](PAGOS.md).
->
-> Lo de abajo es historia, salvo la maquetación del PDF, que sigue valiendo.
-
-> # ⚠️ DESACTUALIZADO desde el 18/09/2026
->
-> El núcleo de datos se rehízo desde cero: ya no existen `rubros`,
-> `tramites`, `faenas`, `guias` ni `guia_detalles`, y `beneficiarios`,
-> `carnets` y `pagos` cambiaron de columnas. Lo de abajo describe el modelo
-> ANTERIOR: sirve para entender el código del panel, que todavía está escrito
-> contra él, NO para entender el esquema.
->
-> El esquema vigente está en las migraciones `database/migrations/2026_09_18_*`
-> y explicado en [docs/sesiones/09-2026/2026-09-18.md](../sesiones/09-2026/2026-09-18.md).
-
----
-
 # Módulo Recibos — el RECIBO OFICIAL del SEDAG
 
-Reemplaza al talonario verde de tres copias que la unidad venía llenando a mano.
-Es el papel que el pescador se lleva del mostrador cuando entrega sus documentos
-y paga.
+Reemplaza al talonario verde que la unidad venía llenando a mano. Es el
+comprobante de que un documento se pagó: **uno por documento pagado**
+(autorización, carnet, faena o guía).
 
-> ## ⚠️ NO HAY TABLA `recibos`
->
-> La hubo, y buena parte de este documento fue escrita cuando existía. Se retiró
-> a pedido del responsable: toda la información del comprobante ya vive en
-> `beneficiarios`, `carnets`, `rubros`, `tramites` y `pagos`, así que duplicarla
-> era mantener el mismo dato en dos lugares.
->
-> **Hoy el recibo se ARMA al vuelo**, cada vez que alguien lo imprime, en
-> `ReciboTramiteService::armar()`. El objeto que devuelve es
-> `App\Support\ReciboArmado`, de solo lectura.
->
-> | Dato | De dónde sale ahora |
-> | --- | --- |
-> | Número | El **id del trámite**, con ceros: `0016` |
-> | Fecha | `tramites.fecha_revision` — el día en que se cobró de verdad |
-> | Nombre y CI | `beneficiarios`, en vivo |
-> | Concepto | `rubros.nombre` + la gestión del carnet |
-> | Monto | Suma de `pagos`, o `tramites.monto_requerido` si no hay ninguno |
-> | Casilla DESCRIPCIÓN | `ConceptoRecibo::desdeTramite()` |
->
-> **LO QUE SE PERDIÓ, que hay que saber antes de tocar el módulo:**
->
-> 1. **El recibo ya no es inmutable.** Corregir una tilde del apellido o un
->    dígito de la cédula cambia los comprobantes ya entregados.
-> 2. **Borrar el trámite se lleva el recibo.** Antes quedaba huérfano pero
->    legible, con `ON DELETE SET NULL`.
-> 3. **La serie tiene huecos.** No todo trámite emite recibo —nace al pasar a EN
->    REVISIÓN— así que el talonario va 0012, 0015, 0016, 0019.
->
-> Si algún día Contabilidad exige una serie sin saltos, hay que volver a guardar
-> el número: `CorrelativoService` quedó escrito y sin usar justamente para eso.
->
-> Lo que sigue abajo describe el diseño del papel, que **no cambió**.
+> Reescrito el 03/10/2026 contra el código. El recibo del modelo viejo —armado al
+> vuelo desde `tramites` y `pagos`, con depósitos cargados en Jichi y «enviar a
+> revisión»— ya no existe; está en el historial de git. El cobro está explicado
+> en [SIREB.md](SIREB.md).
 
 ---
 
-## 1. Cuándo nace, y por qué ahí
+## 1. Cuándo nace
 
 ```
-PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
-                   ▲
-                   │
-             acá nace el recibo
+PENDIENTE ──(SIREB: liquidación «pagada», pago «confirmado»)──▶ APROBADO
+                                                      └── en la MISMA transacción sale el RECIBO
 ```
 
-**Al pasar a EN REVISIÓN. Ni antes ni después.**
+**Al aprobarse el documento, y solo ahí.** Lo emite
+`ConfirmarPagoService::emitirRecibo()`, dentro de la transacción que aprueba
+(«Verificar pago», el comando `jichi:verificar-pagos`, o al intentar eliminar un
+trámite que ya estaba pagado). Un documento sin aprobar no tiene recibo; uno «No
+pagado» tampoco, nunca.
 
-El motivo es de mostrador, no de código: ese es el momento en que el pescador ya
-entregó los papeles y la plata, y se tiene que ir con un comprobante en la mano
-mientras la unidad revisa. Antes no hay nada que respaldar; después ya se fue.
-
-Sin tabla, «nacer» significa otra cosa: el recibo EXISTE desde que el trámite
-tiene `fecha_revision`. Lo decide `ReciboTramiteService::corresponde()`, que mira
-esa fecha y no el estado — un trámite rechazado conserva su comprobante, porque
-la plata entró igual.
-
-Lo dispara `SolicitudCarnetService::tomarParaRevision()`, **dentro de su misma
-transacción**. Si la toma para revisión se deshace, el recibo tampoco queda y el
-número vuelve al contador —`CorrelativoService` participa de esa transacción—.
-Un recibo numerado colgando de un trámite que quedó pendiente sería un papel
-entregado que el sistema no puede explicar.
+Es una fila de la tabla **`recibos`**, polimórfica: `recibible_type` +
+`recibible_id` apuntan al documento pagado, con **único** sobre el par —dos
+recibos no pueden respaldar el mismo documento—.
 
 ---
 
 ## 2. El número
 
-Sale de `CorrelativoService` y es **continuo**: `000001`, seis dígitos, sin
-prefijo ni gestión, y **no reinicia en enero**.
+`numero_recibo`: correlativo **continuo** de seis dígitos —`000001`, `000002`…—
+de la serie `REC` bajo el año 0 (`CorrelativoService::siguienteContinuo()`). No
+reinicia en enero: el talonario de papel tampoco. **Contabilidad audita sus
+huecos**, y por eso es aparte del código de verificación, que es al azar.
 
-```php
-CorrelativoService::rellenar($this->correlativos->siguienteContinuo(CobrarService::SERIE));
-```
+Lo guardado **es** lo que va impreso (`ReciboImpreso::numeroImpreso()`): no hay
+prefijo que recortar.
 
-**Era `REC-2026-0016` y reiniciaba cada año —cambiado el 21/09/2026—.** Dos
-problemas: el papel del talonario no dice el año por ningún lado, así que el
-recibo 0016 de 2026 y el de 2027 quedaban indistinguibles en el archivo; y el
-prefijo no lo lee nadie, porque `ReciboImpreso::numeroImpreso()` lo recortaba
-con una regex antes de imprimirlo. Lo guardado ahora ES lo que va impreso.
-
-`CobrarService::SERIE` sigue valiendo `'REC'`: es la CLAVE del contador en la
-tabla `correlativos`, no lo que sale en el papel.
-
-El contador se bloquea con `SELECT ... FOR UPDATE`, así dos ventanillas cobrando
-en el mismo segundo nunca reciben el mismo número. Como el bloqueo vive dentro
-de la transacción del cobro, la fila del contador queda tomada hasta el commit
-— es breve y es lo que se quiere.
-
-**Continuo se implementa con el año 0.** La tabla `correlativos` lleva
-`(serie, anio)`; pasarle el año de verdad es lo que lo hacía reiniciar. El 0 no
-lo ocupa ninguna gestión real. Ver `CorrelativoService::SIN_GESTION`.
-
-> `CorrelativoService` existía desde el principio y estaba **sin usar**:
-> `PENDIENTES.md` lo había conservado con el argumento de que «el día que haga
-> falta un número correlativo —de recibo, de resolución— ya está escrito y
-> probado contra concurrencia». Este es ese día.
-
-### Reimprimir da el MISMO número
-
-`ReciboTramiteService::emitir()` es **idempotente**: si el trámite ya tiene
-recibo, devuelve el que tiene y no consume otro.
-
-Hace falta porque el papel ya se entregó. Un segundo recibo con otro número por
-el mismo pago dejaría a Contabilidad con dos comprobantes que no puede cuadrar, y
-al pescador con dos papeles por una sola plata.
-
-La garantía de fondo es el `unique` sobre `recibos.tramite_id`.
+**Reimprimir da el MISMO número.** Imprimir no escribe nada: el PDF se arma cada
+vez desde la fila.
 
 ---
 
 ## 3. Todo lo que dice está congelado
 
-La tabla `recibos` guarda una **copia** del nombre, la cédula, el concepto, el
-monto, la forma de pago y el lugar — datos que se podrían leer siguiendo
-`tramite_id`.
+| Columna | Qué guarda |
+| --- | --- |
+| `monto_total` | Lo pagado en SIREB (`monto_pagado`, o el monto de la liquidación) |
+| `concepto` | Cómo se nombra el documento, tal como se imprime: «Cédula de Pescador - 300 Kg», «Autorización de Pesca para Aprovechamiento Pesquero - 101 Kg Hasta 200 Kg», «Faena N° 000003 - 120 kg», «Guía N° 000308» |
+| `numero_boleta` | El **N° de transacción** del pago, tal como lo validó SIREB |
+| `entidad_bancaria` | El banco |
+| `fecha_pago` | El DÍA del pago (`toDateString()`: es un día, no un instante) |
 
-Se copian igual, y es la decisión central del módulo:
+Copiado y no leído por relación: el catálogo cambia por resolución y lo ya
+entregado no puede cambiar retroactivamente.
 
-> Un recibo es un papel **numerado que ya se entregó**. Si mañana alguien corrige
-> un apellido mal tipeado en la ficha, o la unidad sube la tarifa del rubro por
-> ordenanza, el original que el pescador tiene en el bolsillo no cambia — y la
-> reimpresión tampoco puede cambiar, o dejaría de coincidir con lo que se entregó
-> y con lo que Contabilidad archivó.
-
-Es el mismo criterio de `tramites.monto_requerido`, llevado hasta el final: acá
-se congela el documento entero.
-
----
-
-## 4. El recibo sobrevive al borrado del trámite
-
-`tramite_id` es `nullable` y va con `nullOnDelete()`: si el trámite desaparece,
-la fila del recibo **queda**, con su número y su copia de los datos. Borrarlo en
-cascada abriría un hueco en la serie numerada sin que nadie pueda explicar
-después qué fue el 0016.
-
-> **Hoy ese borrado no debería ocurrir.** El recibo nace al enviar a revisión, y
-> desde EN REVISIÓN el expediente ya no se elimina: solo se aprueba o se rechaza
-> (`EstadoTramite::permiteEliminacion()` responde solo por PENDIENTE). Cuando se
-> diseñó esta tabla sí se podía borrar en revisión, y de ahí viene la columna
-> nullable.
->
-> Se deja así a propósito: el talonario se rinde ante la contraloría, y un hueco
-> en la serie no se explica diciendo que cambió una regla del sistema. Que el
-> recibo no dependa de que el trámite exista es más barato que confiar en que esa
-> regla no se afloje nunca.
-
-La copia congelada de §3 es lo que hace que esa fila huérfana siga siendo legible
-sola.
-
-> **El `unique` sobre una columna nullable es intencional.** En SQL
-> `NULL != NULL`, así que los nulos no chocan entre sí: muchos recibos pueden
-> quedar huérfanos, pero dos recibos no pueden apuntar al mismo trámite. Es el
-> caso **inverso** al de `beneficiarios_ci_unico`, donde esa misma regla del SQL
-> obligaba a usar un índice parcial.
+> **Lo que NO está congelado:** el nombre y la C.I. del titular se leen del padrón
+> al imprimir (`ReciboImpreso::__get()`). Corregir un apellido mal tipeado cambia
+> la reimpresión, a propósito: hay un solo lugar donde se corrige.
 
 ---
 
-## 5. Qué se imprime en cada campo
+## 4. Qué se imprime en cada campo
 
 | Campo del papel | De dónde sale |
 | --- | --- |
-| `N°` (rojo, arriba) | `Recibo::numeroImpreso()` — el correlativo con ceros: `0016` |
-| Lugar y Fecha | `recibos.lugar` (de Configuración) + `fecha_emision` |
-| DIA \| MES \| AÑO | `Recibo::fechaEnCasilleros()` |
-| Nombre y Apellido | Copia de `Beneficiario::nombreCompleto` |
-| La suma de … -00/100 | `Recibo::montoEnLetras()` |
-| Concepto | `«{rubro} — Carnet gestión {año}»` |
-| Depósito Bancario \| Efectivo | `FormaPago` |
-| N° (del depósito) | Los `nro_transaccion` de los pagos, separados por coma |
-| DESCRIPCIÓN (6 casillas) | `ConceptoRecibo` — se imprimen **las seis**, se marca **Cédulas** |
-| IMPORTE A PAGAR Bs. | `Recibo::lineas()` + `ReciboController::importeFormateado()` |
-| C.I. | Copia de `Beneficiario::documento_identidad` |
+| `N°` (rojo, arriba) | `numero_recibo` |
+| Lugar | `configuraciones` → `documentos.lugar_emision` («Trinidad - Beni») |
+| DIA \| MES \| AÑO | `ReciboImpreso::fechaEnCasilleros()` — el día en que se emitió |
+| Nombre y Apellido, C.I. | Del padrón, al imprimir |
+| La suma de … 00/100 | `ReciboImpreso::montoEnLetras()` |
+| Concepto | `recibos.concepto` |
+| N° (del depósito) | `numero_boleta (entidad_bancaria)` |
+| DESCRIPCIÓN (6 casillas) | `ConceptoRecibo::desdeDocumento()` — se imprimen las seis y se marca la del documento pagado |
+| IMPORTE A PAGAR Bs. | Un renglón —el documento— y el TOTAL |
+| QR + código | `QrVerificacion::de($recibo)`: el recibo también se verifica en `/verificar` |
 
 ### El monto en letras
 
-`Number::spell($entero, locale: 'es')` de Laravel, que usa la extensión `intl`.
-
-```
-80.00  →  «OCHENTA 00/100 BOLIVIANOS»
-```
-
-El `-00/100` del papel es la forma clásica de cerrar un importe escrito a mano
-para que nadie le agregue centavos después. Se reproduce con los centavos reales.
-
-> Escribir a mano un conversor de número a palabras en castellano son doscientas
-> líneas de casos especiales —«veintiuno», «quinientos», «un millón»— que ya
-> están resueltas y probadas en `intl`.
-
-### El monto: lo cobrado, no lo que costaba
-
-Un recibo respalda **plata recibida**. Si el pescador pagó en cuotas y todavía
-debe, el recibo dice lo que entregó —no el total del trámite— porque si no
-estaría firmando que pagó algo que no pagó.
-
-Cuando no hay ningún pago cargado se cae en `monto_requerido`: es el caso de la
-plata puesta en el mostrador, que llega a revisión sin boleta y que este mismo
-recibo respalda. Ahí se marca **Efectivo**.
+`Number::spell($entero, locale: 'es')` de Laravel, que usa la extensión `intl`:
+`80.00 → «OCHENTA 00/100 BOLIVIANOS»`. El `00/100` es la forma clásica de cerrar
+un importe escrito para que nadie le agregue centavos.
 
 ### Las seis casillas de DESCRIPCIÓN
 
 ```
-( ) Permiso por Faena
+( ) Permiso por Faena                                      ← faena
 ( ) Solicitud de Importe de Alevines
-( ) Autorización de Pesca para Aprovechamiento Pesquero
-( ) Guía única de Transporte
-( ) Cédulas
+( ) Autorización de Pesca para Aprovechamiento Pesquero     ← autorización
+( ) Guía única de Transporte                               ← guía
+( ) Cédulas                                                ← carnet
 ( ) Otros
 ```
 
-**Se imprimen siempre las seis**, aunque el sistema solo cobre una. El recibo
-tiene que salir igual al papel: quien lo recibe está acostumbrado a esa lista, y
-una versión recortada se lee como si fuera otro documento.
-
-### Siempre se marca «Cédulas»
-
-Las seis casillas son los **servicios que cobra el SEDAG**, cada uno con su
-propio trámite:
-
-| Casilla | Qué servicio es |
-| --- | --- |
-| Permiso por Faena | un permiso puntual de pesca |
-| Solicitud de Importe de Alevines | la solicitud de alevines |
-| Autorización de Pesca para Aprovechamiento Pesquero | el aprovechamiento pesquero |
-| Guía única de Transporte | la guía que acompaña un cargamento |
-| **Cédulas** | **la credencial ← esto es lo que emite Jichi** |
-| Otros | el resto |
-
-Este sistema emite **carnets**, que en el mostrador se llaman «cédula de
-pescador». Cobre lo que cobre —emisión inicial o adición de rubro, Pescador o
-Comercializador— lo que el pescador se lleva es su cédula.
-
-Lo resuelve `ConceptoRecibo::desdeTramite()`, que hoy devuelve `Cedulas` fijo.
-Recibe el trámite igual —y no ningún parámetro— para que el día que el sistema
-maneje otro servicio la firma ya esté lista y solo haya que cambiar el cuerpo.
-
-> ### El error que esto corrigió
->
-> La primera versión miraba el **rubro** y marcaba:
->
-> ```
-> Pescador         ──▶ Permiso por Faena
-> Comercializador  ──▶ Guía única de Transporte
-> ```
->
-> Era confundir **la actividad que el carnet autoriza** con **el papel que se
-> está cobrando**. El pescador pagaba su carnet y el recibo declaraba que había
-> pagado una guía de transporte — un documento distinto, con otro trámite y otra
-> tarifa.
->
-> Qué rubro se habilitó sí se lee en el recibo, pero donde corresponde: en el
-> renglón **Concepto**, que dice «Comercializador — Carnet gestión 2026».
+**Se imprimen siempre las seis**, aunque el sistema no cobre alevines: el recibo
+tiene que salir igual al papel. La cruz la decide **el documento pagado**
+(`ConceptoRecibo::desdeDocumento()`), no la actividad de la persona: un pescador
+que paga su carnet lleva la cruz en «Cédulas», no en «Permiso por Faena».
 
 ---
 
-## 6. El PDF
+## 5. El PDF
 
 ### No se guarda en disco
 
-Se arma al vuelo cada vez que alguien imprime, desde la fila de `recibos`.
-Guardarlo no agregaría nada —los datos están congelados, el PDF de mañana sale
-idéntico al de hoy— y sí traería el problema de siempre: un archivo más que
-limpiar cuando el expediente se borra, y que con el disco en s3 no se puede
-borrar.
-
-Por eso `ReciboController` **no pasa por `StorageController`**: no escribe nada.
+Se arma al vuelo cada vez que alguien imprime, desde la fila de `recibos`: los
+datos están congelados y el PDF de mañana sale idéntico al de hoy. Por eso
+`ReciboController` no pasa por `StorageController`: no escribe nada.
 
 ### La maqueta
 
 `resources/views/documentos/recibo-oficial.blade.php`, un calco del talonario.
-
-**Media carta apaisada: 612 × 396 puntos** (8,5" × 5,5"), fijado en
-`ReciboController` y no en la plantilla — es una decisión de impresión, no de
-diseño. El marco vive a 10 pt de cada borde, o sea **592 × 376 útiles**, y todas
-las coordenadas del Blade son puntos dentro de ese marco.
-
-> Si se cambia el tamaño del papel en el controlador, hay que revisar las
-> coordenadas: están calculadas para estos 592 × 376.
-
-**Todo va en `position: absolute`**, y por dos razones:
-
-1. Esto no es una página web que se acomoda al ancho del que mira: es un papel de
-   medida fija que tiene que salir **siempre igual**. Con el flujo normal del
-   documento, un nombre más largo que otro corre todo lo que viene abajo y dos
-   recibos salen distintos.
-2. Lo dibuja DomPDF, que no es un navegador.
+**Media carta apaisada: 612 × 396 puntos**, fijado en `ReciboController`. El
+marco vive a 10 pt de cada borde —**592 × 376 útiles**— y todo va en
+`position: absolute`: es un papel de medida fija que tiene que salir siempre
+igual, y lo dibuja DomPDF, que no es un navegador.
 
 ### Trampas de DomPDF que ya costaron tiempo
 
 | Trampa | Solución aplicada |
 | --- | --- |
 | No entiende flexbox, grid ni variables CSS | Tablas y `position: absolute` |
-| No ejecuta JavaScript | Todo llega resuelto desde PHP |
-| `opacity` es poco confiable — según la versión lo ignora y el sello sale a pleno color tapando el texto | La atenuación va **horneada** en `recibo-sello.png` |
-| Una ruta `/image/...` se resuelve contra el disco con las restricciones de `chroot`, y en producción termina en un recuadro vacío | Imágenes **embebidas en base64** |
-| Embeber los PNG del panel (2,8 MB) daba un PDF de **5,4 MB por recibo** | Copias a medida: `recibo-escudo.png` (36 KB) y `recibo-sello.png` (23 KB) |
-| Solo DejaVu Sans trae acentos y «ñ» completos; con Helvetica «PISCÍCOLA» sale partida | `font-family: 'DejaVu Sans'` |
-| Blade escapa las entidades HTML de su interpolación: un `&nbsp;` saldría impreso como texto literal `(&nbsp;)` | Un `<span class="hueco">` de ancho fijo |
+| `opacity` es poco confiable | La atenuación va **horneada** en `recibo-sello.png` |
+| Una ruta `/image/...` termina en un recuadro vacío en producción | Imágenes **embebidas en base64** |
+| Los PNG del panel daban un PDF de **5,4 MB por recibo** | Copias a medida: `recibo-escudo.png` y `recibo-sello.png` |
+| Las fuentes completas pesaban 734 KB por PDF | `enable_font_subsetting` |
+| Solo DejaVu Sans trae acentos y «ñ» completos | `font-family: 'DejaVu Sans'` |
+| Blade escapa `&nbsp;` y sale impreso como texto | Un `<span class="hueco">` de ancho fijo |
 
 ### La cuadrícula de importes
 
-**Un solo cuadro, con un renglón por cobro y el TOTAL al pie.** Con más de un
-depósito el cuadro crece hacia abajo; con uno solo se completa con renglones en
-blanco para conservar el alto del talonario
-(`ReciboController::RENGLONES_MINIMOS`, hoy 3).
+Un cuadro con **un renglón** —el documento pagado— y el TOTAL al pie, completado
+con renglones en blanco hasta `ReciboController::RENGLONES_MINIMOS` para
+conservar el alto del talonario. El monto va alineado a la derecha, con punto
+para los miles y coma para los decimales (`1.250,50`).
 
-**Dos columnas**: la descripción del cobro y el monto. La fila del pie repite esa
-misma división — TOTAL a la izquierda, la cifra a la derecha.
+**La cifra no se parte.** Se probó un dígito por casillero —se leía `12000`— y
+bolivianos | centavos —obligaba a juntar dos cifras—: va en una sola celda. Es
+un comprobante, y lo único que importa es que el número se lea de una.
 
-```
-        UN COBRO                           DOS COBROS
-┌────────────────────────────┐    ┌────────────────────────────┐
-│     IMPORTE A PAGAR Bs.    │    │     IMPORTE A PAGAR Bs.    │
-├──────────────────┬─────────┤    ├──────────────────┬─────────┤
-│ Dep. 6CF39608…   │  120,00 │    │ Dep. 6CF39608…   │   80,00 │
-├──────────────────┼─────────┤    ├──────────────────┼─────────┤
-│                  │         │    │ Dep. 77120044…   │   40,50 │
-├──────────────────┼─────────┤    ├──────────────────┼─────────┤
-│                  │         │    │                  │         │
-├──────────────────┼─────────┤    ├──────────────────┼─────────┤
-│         TOTAL    │  120,00 │    │         TOTAL    │  120,50 │
-└──────────────────┴─────────┘    └──────────────────┴─────────┘
-```
+---
 
-El monto va alineado a la **derecha**: las unidades quedan una debajo de otra y
-la columna se puede sumar de un vistazo. Centrado, cada renglón arranca en un
-lugar distinto y deja de leerse como columna.
+## 6. Las rutas y la pantalla
 
-Punto para los miles y coma para los decimales, como se escribe acá:
-`1.250,50`.
-
-Cada renglón lleva el **número de boleta**: es lo que permite cruzarlo contra el
-extracto del banco. Sin él, dos depósitos del mismo monto en el mismo día son
-indistinguibles.
-
-### La cifra no se parte — se probaron dos formas y fallaron
-
-| Intento | Cómo se veía | Por qué falló |
+| Ruta | Permiso | Qué hace |
 | --- | --- | --- |
-| Un dígito por casillero | `[1][2][0][00]` | Se leía **12000**: el espacio entre celdas rompe el número y la coma decimal desaparece |
-| Bolivianos \| centavos | `120 │ 00` | Se leía mejor, pero seguía obligando al ojo a juntar dos cifras para entender una |
-| **Una sola celda** | `120,00` | ✅ No hay nada que juntar |
+| `GET /panel/recibos` | `recibos.ver` | El libro de recibos, con búsqueda y rango de fechas |
+| `GET /panel/recibos/{recibo}` | `recibos.ver` | La ficha: documento pagado, pago de SIREB, enlace al documento |
+| `GET /panel/recibos/{recibo}/imprimir` | `recibos.imprimir` | El PDF. GET porque no escribe nada |
 
-La idea de partirla venía de mirar el formulario **en blanco**: como trae la
-columna dividida, parecía que había que repartir el número. Al llenarlo con un
-monto de verdad se rompía.
-
-> **Es un comprobante: la única propiedad que importa es que el número se lea de
-> una y sin ambigüedad.** Ningún test puede verificar eso — hay que renderizar y
-> mirar.
-
-### Los renglones NO quedan congelados — y es la parte que más hay que tener presente
-
-> Este apartado decía lo contrario, porque se escribió cuando existía la tabla
-> `recibos` y los renglones se copiaban a una columna `detalle` (JSON). Esa
-> tabla se retiró —ver el aviso del principio— y con ella la copia.
-
-Hoy `ReciboTramiteService::detalle()` **lee `pagos` en el momento de imprimir**,
-así que el detalle del comprobante refleja los depósitos que hay HOY, no los que
-había cuando el pescador se llevó el papel. Lo que se conserva es el **número**
-—el id del trámite— y la **fecha** —`tramites.fecha_revision`, que se escribe una
-sola vez y no se pisa ni al reenviar un expediente reabierto—.
-
-En la práctica, el detalle cambia cuando:
-
-- se **corrige** el monto de un depósito (110,00 → 30,00);
-- se **quita** un depósito del expediente;
-- se **agrega** uno mientras el trámite sigue en revisión.
-
-Las tres se pueden hacer desde la ficha, y las tres son necesarias: son la única
-forma de arreglar una boleta mal cargada. Ver
-[PAGOS.md](PAGOS.md#5-bis-corregir-un-depósito).
-
-Lo que ya NO puede pasar es que el detalle se mueva después de aprobar: desde
-que `EstadoTramite::permitePagos()` deja de aceptar depósitos en APROBADO, el
-expediente queda quieto cuando se firma. Antes se podían cargar depósitos sobre
-un trámite aprobado, y eso cambiaba el recibo de un carnet ya impreso.
-
-**Es el costo conocido de no tener tabla `recibos`.** Si algún día molesta, la
-solución no es volver a la tabla entera: alcanza con congelar el detalle en una
-columna del trámite al momento de enviar a revisión.
-
-El monto va alineado a la **derecha** contra la línea de los centavos, que es
-como se lee una cifra de dinero: centrado, el ojo no encuentra dónde termina. El
-separador de miles es el punto, como se escribe acá: `1.250`.
-
-Lo arma `ReciboController::importePartido()`.
-
-> **Antes iba un dígito por casillero, y estuvo mal.** La idea venía de que el
-> formulario en blanco trae la columna dividida — pero al llenarlo se leía
-> pésimo: `[1][2][0][00]` parece **12000**, no 120,00. El espacio entre celdas
-> parte el número y la coma decimal desaparece. Peor todavía, la fila TOTAL
-> arrancaba desde otra celda y mostraba `[2][0][00]`.
->
-> Lo detectó el usuario mirando el recibo impreso, no una prueba — y no había
-> prueba que pudiera detectarlo: el código era correcto y los números eran los
-> correctos; lo que estaba mal era lo que el papel comunicaba.
->
-> **Todo cambio en la plantilla se verifica renderizando y mirando el resultado,
-> con un monto de tres cifras y con uno de miles.**
+Además, la tarjeta «Pago en Recaudaciones» de las cuatro fichas muestra el recibo
+—N°, N° de transacción, banco, fecha y «Validado el»— con su botón «Imprimir
+recibo». El portal del beneficiario lo descarga en «Mis pagos»
+(`DescargarReciboController`).
 
 ---
 
-## 7. La ruta
-
-```php
-Route::get('/tramites/{tramite}/recibo', [ReciboController::class, 'imprimir'])
-    ->middleware('permiso:recibos.imprimir')
-    ->name('tramites.recibo');
-```
-
-**Es la única ruta del circuito que es GET**, y no es una excepción a la regla de
-que los pasos van por PATCH: esta no escribe nada. El recibo ya se emitió solo,
-dentro de la transacción que pasó el expediente a EN REVISIÓN. Que el navegador
-precargue el enlace no cambia ningún dato ni consume ningún número de la serie.
-
-El permiso `recibos.imprimir` vive en el bloque `$operacion` de `RolSistema`: es
-de ventanilla y no de supervisión —lo imprime quien atiende, no quien aprueba—,
-mismo criterio que `carnets.generar`.
-
-### En la pantalla
-
-`TramiteController::show()` manda la prop `recibo` (o `null`). La ficha dibuja el
-botón **«Recibo N° 0016»** solo cuando existe, y va como `<a target="_blank">` y
-no como `router.visit()`: abre el PDF en otra pestaña, y una navegación de
-Inertia no sabe qué hacer con un archivo.
-
-El botón **no se esconde** después de la primera impresión: perder el recibo es
-justamente el caso en el que hay que volver a sacarlo.
-
----
-
-## 8. Archivos del módulo
+## 7. Archivos del módulo
 
 | Archivo | Qué es |
 | --- | --- |
-| `app/Enums/FormaPago.php` | `deposito \| efectivo` — las dos casillas |
-| `app/Enums/ConceptoRecibo.php` | Las seis casillas de DESCRIPCIÓN + el puente con los rubros |
-| `app/Models/Recibo.php` | La copia congelada + los métodos de presentación |
-| `app/Services/ReciboTramiteService.php` | Emisión idempotente |
-| `app/Http/Controllers/Panel/ReciboController.php` | Arma el PDF |
-| `resources/views/documentos/recibo-oficial.blade.php` | El calco del talonario |
-| `database/migrations/2026_09_14_100000_create_recibos_table.php` | El esquema, muy comentado |
-| `public/image/recibo-escudo.png`, `recibo-sello.png` | Assets de impresión |
-
-Tocados: `CorrelativoService` (se le extrajo `siguienteNumero()`),
-`SolicitudCarnetService::tomarParaRevision()`, `TramiteController::show()`,
-`RolSistema`, `routes/panel.php`, `ConfiguracionSeeder`,
-`resources/js/pages/panel/tramites/ver.tsx`, `resources/js/types/tramites.ts`.
+| `app/Models/Recibo.php` | La fila; `recibible` polimórfica (precargar con `morphWith`) |
+| `app/Services/ConfirmarPagoService.php` | `emitirRecibo()` y `concepto()` |
+| `app/Enums/ConceptoRecibo.php` | Las seis casillas y `desdeDocumento()` |
+| `app/Support/ReciboImpreso.php` | El recibo como lo lee la plantilla |
+| `app/Http/Controllers/Panel/ReciboController.php` | Libro, ficha y PDF |
+| `resources/views/documentos/recibo-oficial.blade.php` | La maqueta |
+| `resources/js/pages/panel/recibos/{index,ver}.tsx` | El libro y la ficha |
+| `public/image/recibo-escudo.png`, `recibo-sello.png` | Copias a medida |
 
 ---
 
-## 9. Lo que quedó afuera
+## 8. Lo que quedó afuera
 
-- **Un listado de recibos** (el «libro de recibos»). La tabla tiene el índice
-  `['gestion', 'fecha_emision']` preparado para eso.
-- **Anular un recibo.** Hoy no se puede. En el talonario de papel se anulaba
-  escribiendo «ANULADO» sobre las tres copias y archivándolas; la versión
-  digital necesitaría el equivalente y todavía no está definido con la unidad.
-- **Emitir recibos para expedientes viejos**, los que se aprobaron directo desde
-  PENDIENTE. La ruta avisa en vez de inventar uno: un recibo con fecha de hoy por
-  una plata cobrada hace meses diría algo que no ocurrió.
+- **Anular un recibo.** Hoy un recibo emitido no se anula: el documento que
+  respalda se pagó en SIREB y quedó aprobado.
+- **Varios documentos en un recibo.** Uno por documento, porque en SIREB cada
+  documento es una liquidación aparte.

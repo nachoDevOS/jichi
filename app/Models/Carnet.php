@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
+use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
 use App\Traits\LiquidableSireb;
@@ -31,7 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'tipo_actor',
     'monto',
     'sireb_tarifa_id',
-    'nro_registro',
+    'nro',
     'estado',
     'fecha_solicitud',
     'fecha_emision',
@@ -114,16 +115,16 @@ class Carnet extends Model
     }
 
     /**
-     * El número de registro como va impreso: cinco dígitos, «00001».
+     * El número de registro como va impreso: seis dígitos, «000001».
      *
      * Vacío mientras el carnet no esté aprobado: el número se asigna al
      * firmarlo, así que antes no hay nada que imprimir.
      */
     protected function registroLegible(): Attribute
     {
-        return Attribute::get(fn (): ?string => $this->nro_registro === null
+        return Attribute::get(fn (): ?string => $this->nro === null
             ? null
-            : str_pad((string) $this->nro_registro, 5, '0', STR_PAD_LEFT));
+            : CorrelativoService::rellenar($this->nro));
     }
 
     //  Reglas de negocio
@@ -184,8 +185,8 @@ class Carnet extends Model
     /**
      * ¿Pasó alguna vez por la firma?
      *
-     * A revocado y vencido se llega desde APROBADO, así que los tres se
-     * pagaron; pendiente no. Es lo que habilita la impresión: el
+     * A revocado se llega desde APROBADO, así que los dos se pagaron;
+     * pendiente y no pagado no. Es lo que habilita la impresión: el
      * plástico no sale de un carnet que nadie aprobó.
      */
     public function yaFueAprobado(): bool
@@ -193,7 +194,6 @@ class Carnet extends Model
         return in_array($this->estado, [
             EstadoCarnet::Aprobado,
             EstadoCarnet::Revocado,
-            EstadoCarnet::Vencido,
         ], true);
     }
 

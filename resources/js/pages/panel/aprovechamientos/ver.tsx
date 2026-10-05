@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Ban, Banknote, BadgeCheck, ExternalLink, Eye, Pencil, Plus, Printer, Receipt, RefreshCw, Ship, Trash2, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
+import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
@@ -142,13 +143,6 @@ export default function VerCupo({
                         </Button>
                     )}
 
-                    {/*
-                        NO HAY BOTÓN «COBRAR» ACÁ, y es deliberado: los depósitos
-                        se cargan más abajo, en la tarjeta de Pagos, con una
-                        sección por boleta. Mandar al operador a Caja lo sacaba de
-                        la ficha para hacer lo mismo que puede hacer sin moverse,
-                        y perdiendo de vista el saldo.
-                    */}
                 </div>
             }
         >
@@ -264,9 +258,9 @@ export default function VerCupo({
                             <p className="flex items-start gap-2 rounded-md bg-sky-50 p-3 text-sm text-sky-900 dark:bg-sky-500/10 dark:text-sky-200">
                                 <Banknote className="mt-0.5 size-4 shrink-0" />
                                 <span>
-                                    <strong>Pendiente.</strong> Todavía no autoriza a pescar. Cargue
-                                    los depósitos hasta cubrir el monto y recién ahí se puede enviar
-                                    a revisión. Mientras tanto se puede corregir o eliminar.
+                                    <strong>Pendiente.</strong> Todavía no autoriza a pescar: falta
+                                    que se pague y se valide en Recaudaciones. Mientras tanto se puede
+                                    corregir o eliminar.
                                 </span>
                             </p>
                         )}
@@ -300,9 +294,9 @@ export default function VerCupo({
                         </div>
 
                         {/* La llave del QR de la autorización impresa. */}
-                        <div className="flex justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3">
                             <span className="text-muted-foreground">Código</span>
-                            <span className="text-right font-mono font-medium">{cupo.codigo ?? '—'}</span>
+                            {cupo.codigo ? <TextoCopiable texto={cupo.codigo} className="-mr-1.5" /> : <span>—</span>}
                         </div>
 
 
@@ -357,6 +351,8 @@ export default function VerCupo({
                     recibo={recibo}
                     puedeVerificar={cupo.puede_verificar_pago}
                     rutaVerificar={route('aprovechamientos.verificar-pago', cupo.id)}
+                    puedeCargar={cupo.puede_cargar_pago}
+                    rutaCargar={route('aprovechamientos.cargar-pago', cupo.id)}
                     permiso="aprovechamientos.crear"
                 />
 
@@ -605,7 +601,7 @@ export default function VerCupo({
                                                         </span>
                                                         {!f.consume_cupo && (
                                                             <span className="ml-2 text-xs text-muted-foreground">
-                                                                {f.estado === 'vencido' || f.estado === 'revocado'
+                                                                {f.estado === 'no_pagado' || f.estado === 'revocado'
                                                                     ? 'liberados'
                                                                     : 'sin descontar'}
                                                             </span>
@@ -783,8 +779,11 @@ export default function VerCupo({
                 onConfirmar={() =>
                     borrado.delete(route('aprovechamientos.destroy', cupo.id), {
                         preserveScroll: true,
-                        // Sin onSuccess: al borrarse, el servidor redirige al
-                        // listado y esta pantalla deja de existir.
+                        // Borrado va al listado; con el pago ya validado vuelve acá aprobado.
+                        onSuccess: () => {
+                            setEliminando(false);
+                            borrado.reset();
+                        },
                         onError: () => setEliminando(true),
                     })
                 }

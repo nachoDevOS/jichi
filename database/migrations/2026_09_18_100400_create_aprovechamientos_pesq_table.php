@@ -21,6 +21,8 @@ return new class extends Migration
             $table->foreignId('beneficiario_id')->constrained('beneficiarios')->restrictOnDelete();
             $table->foreignId('categoria_aprov_id')->constrained('categorias_aprovechamiento')->restrictOnDelete();
 
+            $table->unsignedInteger('nro')->unique()->comment('Del talonario: 000001');
+
             // Los dos son COPIA CONGELADA del tramo: editar el catálogo en
             // agosto no puede mover un cupo otorgado en marzo.
             $table->string('modalidad', 30)
@@ -48,7 +50,7 @@ return new class extends Migration
             // El día que se pidió y el día que se firmó son distintos.
             $table->date('fecha_solicitud');
             $table->date('fecha_emision')->nullable()->comment('Se llena al aprobar');
-            $table->date('fecha_vencimiento')->index()->comment('Índice: lo lee el comando diario');
+            $table->date('fecha_vencimiento')->index()->comment('Índice: lo filtra el scope vigentes()');
 
             // «¿Esta persona tiene bolsa?» es la consulta caliente.
             $table->index(['beneficiario_id', 'estado']);

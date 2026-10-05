@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * Dónde está una venta respecto de SIREB. No es el pago: el cobro sigue en Jichi.
+ * Dónde está una liquidación respecto de SIREB. No dice si se pagó: eso se pregunta.
  */
 enum EstadoLiquidacionSireb: string
 {

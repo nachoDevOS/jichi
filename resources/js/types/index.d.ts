@@ -110,7 +110,7 @@ export type EstadoCarnet =
     | 'pendiente'
     | 'aprobado'
     | 'revocado'
-    | 'vencido';
+    | 'no_pagado';
 
 /**
  * Espejo de App\Enums\TipoActor.
@@ -123,9 +123,9 @@ export type TipoActor = 'pescador' | 'comercializador';
 export type EstadoAprovechamiento =
     | 'pendiente'
     | 'aprobado'
-    | 'vencido'
     | 'agotado'
-    | 'revocado';
+    | 'revocado'
+    | 'no_pagado';
 
 /**
  * Espejo de App\Enums\ModalidadAprovechamiento.
@@ -133,10 +133,10 @@ export type EstadoAprovechamiento =
 export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 
 /** Espejo de App\Enums\EstadoFaena. */
-export type EstadoFaena = 'pendiente' | 'aprobado' | 'completado' | 'vencido' | 'revocado';
+export type EstadoFaena = 'pendiente' | 'aprobado' | 'completado' | 'revocado' | 'no_pagado';
 
 /** Espejo de App\Enums\EstadoGuia. */
-export type EstadoGuia = 'pendiente' | 'aprobado' | 'anulada';
+export type EstadoGuia = 'pendiente' | 'aprobado' | 'anulada' | 'no_pagado';
 
 /**
  * Espejo de App\Enums\EstadoAsociacion.

@@ -5,10 +5,12 @@
 >
 > **Si una nota contradice a [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md) o a
 > [MER.md](MER.md), mandan ellos** y la nota está vieja: borrala o corregila.
-> El 27/09/2026 se unieron los archivos que figuraban dos veces, se sacaron los
-> de archivos borrados y las notas que contradecían el circuito actual. **Todavía
-> quedan notas escritas contra el modelo anterior** (trámites, rubros,
-> `codigo_carnet`): ver PENDIENTES.md. Lo sacado está en el historial de git.
+> Revisado el 03/10/2026: se sacaron las secciones de archivos que ya no
+> existen (Caja, `pagos`, `CobrarService`…) y las notas del circuito viejo
+> —depósitos en Jichi, enviar a revisión, firma, el estado `vencido`—, y se
+> reescribieron las de los estados y la corrección de la autorización. Puede
+> quedar alguna mención suelta del modelo anterior dentro de una nota que sigue
+> valiendo en lo demás. Lo sacado está en el historial de git.
 
 ---
 
@@ -65,61 +67,26 @@
 
 ### En qué situación está la BOLSA MADRE de un pescador.
 
-   NACE PENDIENTE, Y ESO ES LO QUE LO HACE CORREGIBLE
-   PENDIENTE ──[enviar, con el monto cubierto]──▶ EN REVISIÓN
-   (borrador)                                         │
-   ▲                              ┌──────────────┴──────────────┐
-   └──────────[rechazar]──────────┤                             │
-   [aprobar]                          │
-   │                             │
-   ACTIVO ──▶ AGOTADO | VENCIDO ────┘
-   ENVIAR NO ES APROBAR, y son dos personas distintas. Ventanilla carga los
-   depósitos y declara que el expediente está completo; quien firma mira las
-   boletas contra el extracto y recién ahí el cupo queda habilitado.
-   COBRAR YA NO ACTIVA SOLO. Antes, cubrir el monto pasaba el cupo a ACTIVO en el
-   acto: la plata entraba y el pescador salía a pescar sin que nadie mirara las
-   boletas. Hoy el cobro solo baja el saldo; el salto lo da una persona.
-   Un cupo recién otorgado es un BORRADOR: el operador lo acaba de cargar contra
-   el talonario y el pescador todavía está enfrente. Mientras nadie pagó nada,
-   equivocarse de tramo o de embarcación se arregla corrigiendo la fila, y un
-   cupo cargado por error se ELIMINA con el motivo escrito.
-   En cuanto entra el primer boliviano eso deja de valer: hay un recibo numerado
-   con el detalle impreso, y cambiar lo que dice ese papel por detrás no es una
-   corrección sino otra cosa. Por eso editar y eliminar viven SOLO en pendiente,
-   y de ahí en adelante el cupo no se toca más: si hacen falta más kilos,
-   eso es un trámite nuevo.
-   Y por eso un cupo pendiente TAMPOCO emite faenas: lo que autoriza a pescar es
-   la concesión pagada, no el papel a medio llenar.
-   TIENE DOS FORMAS DE MORIR, Y HAY QUE PODER DISTINGUIRLAS
-   Un aprovechamiento es un cupo de kilos con fecha. Deja de servir por dos
-   motivos distintos y la diferencia importa en ventanilla:
-   - `Vencido`  — se le acabó el TIEMPO. Puede quedarle volumen sin usar, y
-   ese volumen se pierde: no se arrastra a la gestión siguiente.
-   - `Agotado`  — se le acabaron los KILOS. La fecha todavía no llegó, pero
-   las faenas emitidas ya consumieron el volumen otorgado.
-   Al pescador se le dice cosas distintas en cada caso: en uno renueva, en el
-   otro tramita un cupo nuevo. Un solo estado «inactivo» obligaría a deducirlo
-   comparando fechas y sumando faenas cada vez.
-   IGUAL QUE EN CARNETS, ESTA COLUMNA PUEDE ESTAR DESFASADA
-   `Agotado` lo escribe quien emite la última faena y `Vencido` un comando
-   diario. Para decidir si hoy se puede emitir una faena se usa
-   `AprovechamientoPesq::puedeEmitirFaena()`, que mira además la fecha y el
-   saldo real en kilos.
+   NACE PENDIENTE, Y DE AHÍ SALE POR LO QUE DIGA SIREB
+   PENDIENTE ──(SIREB: pagada)──▶ APROBADO ──▶ AGOTADO (se usaron los kilos)
+   (borrador)  │                      └──[revocar]──▶ REVOCADO
+               └──(SIREB: vencida, sin pago)──▶ NO_PAGADO
+   No hay revisión ni firma en Jichi (02/10/2026): pagado en SIREB es aprobado.
+   Un cupo PENDIENTE no emite faenas: lo que autoriza a pescar es la concesión
+   pagada, no el papel a medio llenar.
+   NO HAY `vencido` (03/10/2026). La vigencia —hasta el 31/12 de su gestión— la
+   dicen las fechas, no el estado: un aprobado fuera de fecha sigue `aprobado`, y
+   para decidir si hoy emite faenas se usa `puedeEmitirFaena()`, que mira además
+   la fecha y el saldo real. `no_pagado` es otra cosa: venció el PLAZO DE PAGO
+   en SIREB sin ningún pago, y libera el lugar de la persona.
+   AGOTADO Y FUERA DE FECHA SON DISTINTOS a propósito: se le acabaron los kilos
+   o se le acabó el tiempo, y al pescador se le explica distinto.
 
 ### ¿Se pueden corregir sus datos?
 
-   Solo el borrador. Con un pago encima existe un recibo numerado que dice
-   qué se cobró y por qué: cambiar el tramo por detrás haría que el papel
-   entregado dejara de coincidir con la fila, sin que nada lo delate.
-   EN REVISIÓN tampoco: quien firma mira los papeles que se le presentaron, y
-   moverlos mientras los está mirando es cambiarle el expediente de abajo.
-   Lo que no sirve se RECHAZA, y el rechazo lo devuelve a pendiente.
-
-### Los depósitos están cargados y cubren el monto; falta que alguien firme.
-
-   NO autoriza a pescar todavía, y esa es la razón de que el estado exista:
-   entre «la plata entró» y «la unidad lo aprobó» hay un control, y sin un
-   estado propio ese control no tendría dónde ocurrir.
+   Solo el borrador, y desde el 03/10/2026 SOLO LA EMBARCACIÓN: el tramo, los
+   kilos, el monto y las fechas no se tocan nunca. Si el tramo se eligió mal, se
+   elimina y se otorga de nuevo, con el motivo escrito.
 
 ### ¿Según el estado, todavía se le pueden colgar faenas?
 
@@ -128,24 +95,10 @@
    llenar, y emitir faenas contra él dejaría al pescador trabajando sobre
    una autorización que la unidad todavía no entregó.
 
-### ¿Se pueden CARGAR depósitos contra él?
-
-   En pendiente sí: es justamente lo que hay que hacer. En revisión no —el
-   monto ya está cubierto y el expediente presentado— y después tampoco:
-   un cupo aprobado está pagado por definición, y la plata que entre de más
-   no es de este trámite.
-
-### ¿Se puede mandar a que alguien lo firme?
-
-   El estado es solo una de las dos condiciones. La otra —que los depósitos
-   cubran el monto— la mira el servicio, porque depende de la suma de los
-   pagos y no del estado. Ver AprovechamientoPesq::puedeEnviarseARevision().
-
 ### ¿Se puede borrar la fila entera?
 
-   Mismo criterio que la edición, y con más razón: un cupo con plata encima
-   no se elimina —se arregla por caja—, porque borrarlo dejaría pagos
-   colgando de algo que ya no existe.
+   Solo pendiente. Y además el servicio consulta SIREB antes: con un pago
+   cargado no se borra, y con el pago validado se aprueba en su lugar.
 
 ## `app/Enums/EstadoAsociacion.php`
 
@@ -161,17 +114,13 @@
 
 ### En qué situación está una credencial.
 
-   ESTA COLUMNA PUEDE MENTIR, Y ESTÁ BIEN QUE PUEDA
-   `Vencido` no se escribe solo el día que corresponde: lo pone un comando
-   programado que corre una vez por día. Entre corrida y corrida, un carnet que
-   venció ayer sigue diciendo «activo» en la base.
-   Por eso NINGUNA decisión se toma leyendo esta columna sola: para saber si un
-   carnet vale HOY se mira además `fecha_vencimiento`, que no puede quedar
-   desfasada. Ver Carnet::estaVigente().
-   ¿Y entonces para qué está la columna? Para dos cosas que la fecha no puede
-   dar: distinguir «venció» de «se revocó» —un carnet revocado en marzo tiene la
-   fecha de vencimiento de diciembre y la fecha no lo delata— y filtrar o
-   agrupar en los listados sin calcular una comparación por fila.
+   EL ESTADO GUARDA EL ÚLTIMO HECHO; LA VIGENCIA LA DICE LA FECHA
+   pendiente → (SIREB: pagada) → aprobado → revocado
+   pendiente → (SIREB: vencida, sin pago) → no_pagado
+   No hay `vencido` (03/10/2026): un carnet aprobado sigue `aprobado` después
+   del 31/12, y si vale HOY lo dice Carnet::estaVigente(), que mira además
+   `fecha_vencimiento` y la autorización. La columna sirve para lo que la fecha
+   no puede dar: distinguir «se revocó» o «nunca se pagó» de «se aprobó».
 
 ### Dado de baja por decisión de la unidad, antes de su vencimiento.
 
@@ -192,16 +141,6 @@
    `Cerrada` es la que llegó a destino y se descargó; `Anulada` es la que se dio
    de baja con motivo. La diferencia importa en un control de ruta: una guía
    cerrada amparó un traslado real, una anulada nunca amparó nada.
-
-## `app/Enums/EstadoValidacionPago.php`
-
-### El estado del CONTROL de un depósito, que no es el estado del pago.
-
-   PENDIENTE ──▶ VALIDADO    cuadra con el extracto del banco
-   ▲     └─▶ OBSERVADO   no cuadra, con el motivo escrito
-   └──[corregir]──┘
-   Un OBSERVADO sigue sumando en `montoPagado()`: la plata está, lo que se duda
-   es si la boleta respalda lo que dice. Ver docs/MER.md.
 
 ## `app/Enums/ModalidadAprovechamiento.php`
 
@@ -276,16 +215,6 @@
    ya está autorizado — el carnet vigente ES la autorización.
    ANULARLOS sí es de supervisión: ver el bloque de abajo.
 
-### CORREGIR UN DEPÓSITO ES DE VENTANILLA, y tiene que serlo.
-
-   Es arreglar lo que se tipeó —un monto, un número de boleta, la
-   foto equivocada— y además es la ÚNICA salida de una observación:
-   un depósito observado no se valida, se corrige. Con este permiso
-   en supervisión, el revisor tendría que arreglar él mismo lo que
-   acaba de objetar, y el reparo no tendría a quién volver.
-   No alcanza con tenerlo: el trámite tiene que estar abierto. Ver
-   `AprovechamientoPesq::admiteCorreccionDePagos()`.
-
 ### ANULAR UNA GUÍA quema un número del talonario para siempre —no se
 
    NO HAY `faenas.anular`, y no es un olvido: `EstadoFaena` no tiene
@@ -301,24 +230,6 @@
    recibo ya entregado, y lo único que queda es la línea de
    `auditorias`. Quien atiende el mostrador corrige lo que tipeó;
    esto es otra cosa.
-
-### APROBAR Y RECHAZAR un aprovechamiento presentado.
-
-   Es el control del circuito: quien firma mira las boletas contra el
-   extracto del banco y recién ahí el cupo autoriza a pescar. Con el
-   mismo permiso que enviar, la misma persona cargaría la plata y se
-   la aprobaría, y el control no existiría.
-   Uno solo para las dos acciones, como `carnets.revocar`: quien
-   puede aprobar puede rechazar.
-
-### CONTROLAR LAS BOLETAS —validar u observar— es del mismo lado que
-
-   Es el trabajo de quien firma: comparar cada depósito contra el
-   extracto del banco antes de habilitar a nadie. Dado a ventanilla,
-   la misma persona cargaría la boleta y la daría por buena, y el
-   control no existiría — sería un botón que solo cambia un color.
-   Uno solo para las dos acciones, como `aprovechamientos.aprobar`:
-   quien puede dar por buena una boleta puede objetarla.
 
 ### ELIMINAR UN CUPO ES DE SUPERVISIÓN, aunque solo se pueda sobre un
 
@@ -401,40 +312,6 @@
    vuelve a estar en regla, lo que corresponde es emitirle un carnet nuevo,
    con su propio código — el plástico viejo puede estar circulando.
 
-## `app/Exceptions/CobroInvalidoException.php`
-
-### Una regla de caja dijo que no.
-
-   Mismo criterio que las otras: es una excepción y no un `return false` porque
-   el cobro entero —el recibo y todos sus abonos— corre dentro de una
-   transacción. Con la excepción, `DB::transaction()` deshace todo solo; con un
-   booleano quedaría un recibo emitido sin la mitad de sus pagos, y su número ya
-   gastado.
-
-### NO SE COBRA MÁS DE LO QUE SE DEBE
-
-   Y es una regla, no una comodidad. `Pagable::saldoPendiente()` se corta en
-   cero: pagar de más NO genera saldo a favor, así que el excedente
-   DESAPARECE — queda escrito en `pagos`, suma en la recaudación del día, y
-   no se le acredita a nadie.
-   Si entró dinero de más, no es un abono de este trámite y se resuelve por
-   caja. Por eso acá se rechaza en vez de aceptarlo callado.
-
-### El TRÁMITE no está en un estado que acepte depósitos.
-
-   Separada de `noAdmitePagos()` porque el motivo es otro y el mensaje tiene
-   que decir cuál: ahí el papel está anulado, acá el expediente se presentó o
-   ya se aprobó. Con un solo texto, cargar un depósito sobre un cupo EN
-   REVISIÓN contestaba «el papel está anulado», que manda a buscar una
-   anulación que nunca existió.
-
-### No se puede validar ni observar este depósito.
-
-   Son dos motivos distintos y el mensaje los separa, porque lo que hay que
-   hacer después no es lo mismo: si el trámite no está en revisión hay que
-   presentarlo o dejar de discutir una firma puesta; si el depósito ya está
-   observado, lo que sigue es CORREGIRLO.
-
 ## `app/Exceptions/CupoInvalidoException.php`
 
 ### Una regla del otorgamiento de cupo dijo que no.
@@ -467,18 +344,6 @@
    Puede pasar entre que el operador abre el formulario y aprieta guardar:
    la lista se armó con los tramos de ese momento y en el medio alguien
    derogó uno desde el catálogo.
-
-### Se quiso presentar o aprobar un cupo con saldo sin cubrir.
-
-   Dice CUÁNTO falta y no solo «falta plata», porque es el número con el que
-   el operador decide qué hacer: cargar otro depósito, o revisar si el que
-   cargó salió por menos.
-
-### Se quiso firmar con boletas sin controlar.
-
-   Dice CUÁNTAS quedan, que es lo que el revisor necesita para saber si le
-   falta mirar una o diez. El detalle —cuál y por qué— está en la tarjeta de
-   pagos de la ficha, que es donde se resuelve.
 
 ### No se amplía un cupo que ya no corre.
 
@@ -524,12 +389,6 @@
    carnet: `tipos_carnet` es un catálogo que edita la unidad y el mismo
    documento figura como «Carnet de Pescador» o «Pescador Artesanal» según
    quién lo cargó.
-
-### El cupo está presentado y esperando una firma.
-
-   Mensaje propio y no el de «pendiente de pago»: acá la plata YA entró, y
-   decirle al operador que cobre lo mandaría a buscar un depósito que no
-   existe. Lo que falta es una firma, y eso no se resuelve en la ventanilla.
 
 ### La faena pedida no entra en lo que queda del cupo.
 
@@ -579,24 +438,6 @@
    Es lo que permite que una carga masiva por consola aplique exactamente las
    mismas reglas sin copiar una línea.
 
-### OTORGAR TERMINA EN LA FICHA DEL CUPO
-
-   Que es donde se cargan los depósitos: la tarjeta de Pagos tiene una
-   sección por boleta y el saldo a la vista. Mandarlo a Caja —como hacía
-   antes— lo sacaba de la ficha para hacer lo mismo desde otra pantalla, y
-   perdiendo de vista cuánto falta.
-   Caja sigue existiendo para lo suyo: cobrar varios trámites de una misma
-   persona bajo un solo recibo.
-
-### LOS DEPÓSITOS QUE PAGARON ESTE CUPO, CON SU BOLETA
-
-   Un cupo de 412,50 Bs puede haberse pagado con DOS depósitos
-   bancarios de 200 y 212,50, cada uno con su boleta. Sin esta lista,
-   la ficha solo dice «debe 212,50» o «pagado» y no hay forma de ver
-   de dónde salió esa plata sin ir a buscar recibo por recibo.
-   Van de la más nueva a la más vieja, que es el orden en que se
-   pregunta: «¿entró el último depósito?».
-
 ### FORMULARIO DE CORRECCIÓN — GET /panel/aprovechamientos/{id}/editar
 
    SE CORTA ACÁ SI EL CUPO YA NO ES BORRADOR
@@ -611,42 +452,6 @@
    La fila se borra de verdad, así que el redirect va al LISTADO. Y el
    motivo, que es lo único que sobrevive, ya quedó en `auditorias` — lo
    escribe el servicio antes de borrar, cuando el modelo todavía tiene id.
-
-### CARGAR LOS DEPÓSITOS — POST /panel/aprovechamientos/{id}/pagos
-
-   Acepta VARIOS de una vez, porque la pantalla es repetible: el operador
-   agrega una sección por cada depósito que trajo la persona y los manda
-   todos juntos.
-   ACÁ NO SE EMITE NINGÚN RECIBO: `registrarDepositos()` escribe los pagos con
-   `recibo_id` en NULL y el papel —uno solo, con el total— lo emite
-   `RevisarCupoService::enviar()`. Emitiéndolo acá salían dos recibos por un
-   mismo cupo.
-   LOS ARCHIVOS SE SUBEN ANTES DE ABRIR NINGUNA TRANSACCIÓN
-   Una transacción de base NO deshace escrituras en disco. Subiendo adentro,
-   un cobro que falle —saldo movido por otra ventanilla, boleta repetida—
-   dejaría archivos huérfanos para siempre. Se suben todos acá, y si algo
-   falla el `catch` los borra TODOS, incluidos los de las líneas que sí
-   habían pasado.
-
-### REGISTRAR Y ENVIAR SON UN SOLO ACTO CUANDO EL MONTO QUEDA CUBIERTO
-
-   El botón lo dice: «Registrar depósitos y enviar a revisión». Partirlo
-   en dos clics obligaba al operador a apretar otro botón para declarar
-   algo que la pantalla ya le había mostrado —que la suma alcanza—.
-   PERO SE VUELVE A MIRAR EL SALDO, y no se confía en la intención: entre
-   que se abrió el formulario y se guardó, otra ventanilla pudo dar de
-   baja un pago. Si no quedó cubierto, los depósitos se registran igual
-   —ya entraron— y el envío simplemente no ocurre. Nunca falla por esto:
-   el operador ve cuánto falta y sigue.
-
-### ENVIAR A REVISIÓN — POST /panel/aprovechamientos/{id}/enviar
-
-   Ventanilla declara que el expediente está completo. Las dos condiciones
-   —estado y monto cubierto— las vuelve a mirar el servicio con la fila
-   bloqueada.
-   Y ES ACÁ DONDE SALE EL RECIBO: uno solo, con el total de los depósitos.
-   Por este camino va a nombre del beneficiario, porque no hay formulario que
-   pregunte otra cosa; el de los depósitos sí lo pregunta y lo manda.
 
 ### Los tramos que el operador puede elegir, con sus consecuencias.
 
@@ -686,13 +491,6 @@
    Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
    buscador ya resuelto: quien viene de ahí ya eligió a quién, y volver a
    pedírselo es hacerle repetir un paso que acaba de dar.
-
-### LAS TRES DEL CIRCUITO DE REVISIÓN, resueltas en el servidor.
-
-   `puede_enviarse` no es «el estado es pendiente»: es eso Y que los
-   depósitos cubran el monto. Deducirlo en React sería una segunda
-   copia de la regla, y encima con el saldo que la pantalla conoce,
-   que puede estar viejo.
 
 ## `app/Http/Controllers/Panel/AsociacionController.php`
 
@@ -867,62 +665,6 @@
    único que decide en qué disco se escribe. Para que la imagen sea visible
    desde el navegador tiene que existir el enlace simbólico que crea
    `php artisan storage:link`.
-
-## `app/Http/Controllers/Panel/CajaController.php`
-
-### CAJA — el circuito del dinero
-
-   carnet | cupo | guía  ──▶  pagos (abonos)  ──▶  recibo numerado
-   Es el tercer circuito del sistema y ATRAVIESA a los otros dos: no es un paso
-   del flujo sino algo que puede pasar en cualquiera de ellos y varias veces.
-   ESTA PANTALLA MUESTRA ABONOS, NO RECIBOS
-   Son dos vistas distintas del mismo hecho y las dos hacen falta:
-   - CAJA lista PAGOS: cada entrega de dinero, con su método y su trámite. Es
-   lo que se mira para cuadrar los depósitos del día contra lo que hay en el
-   cajón.
-   - RECIBOS lista los PAPELES entregados, con su número correlativo. Es lo
-   que audita Contabilidad.
-   Un recibo agrupa varios pagos, así que las dos listas nunca tienen la misma
-   cantidad de filas y ninguna reemplaza a la otra.
-
-### LA BOLETA SE SUBE ANTES DE ABRIR LA TRANSACCIÓN
-
-   Una transacción de base NO deshace escrituras en disco. Subiendo
-   adentro, un cobro que falle —saldo movido por otra ventanilla, número
-   de boleta repetido— dejaría el archivo huérfano para siempre, sin
-   ninguna fila que lo nombre.
-   Por eso se sube acá y el `catch` lo borra. Ver la misma maniobra en
-   ArchivoTramiteService.
-
-### Todo lo que esta persona debe hoy, listo para cobrar.
-
-   SE JUNTAN LOS TRES TIPOS EN UNA SOLA LISTA
-   Porque así es como llega la persona al mostrador: con lo que debe, no con
-   «los carnets por un lado y los cupos por otro». Y porque un mismo recibo
-   puede cubrir los tres, que es justamente lo que el polimorfismo permite.
-   Los `withSum` evitan una consulta agregada por fila al calcular cada
-   saldo, y los `with` de los catálogos hacen falta porque `montoACobrar()`
-   lee el precio del tipo de carnet y el valor de la escala.
-
-### YA NO SE REPARTE POR MÉTODO: todo pago es un depósito bancario, así
-
-   - `created_at`      lo CARGADO hoy: cuadra el trabajo del día.
-   - `fecha_deposito`  lo DEPOSITADO hoy: se cruza contra el extracto.
-   Un depósito del viernes cargado el lunes entra en el primero y no en
-   el segundo, y esa diferencia es justamente la que hay que ver.
-
-### UNA RELACIÓN POLIMÓRFICA NO SE PRECARGA CON `with('pagable.x')`.
-
-   Eloquent no sabe qué es `pagable` hasta que lee la fila, así que
-   lo escrito así se IGNORA en silencio y el N+1 sigue ahí. Va con
-   morphWith, declarando qué traer para cada tipo.
-
-### EL ARQUEO DEL DÍA, siempre del día de HOY y no del rango filtrado.
-
-   Es lo que se cuadra contra el extracto del banco antes de cerrar,
-   y esa pregunta no cambia porque alguien esté mirando marzo. Un
-   total que siguiera al filtro invitaría a cuadrar la caja contra el
-   número equivocado.
 
 ## `app/Http/Controllers/Panel/CarnetController.php`
 
@@ -1358,14 +1100,12 @@
    avisos y últimos carnets. Se sacaron los minigráficos de 14 días, el gráfico
    de carnets por tipo (repetía «por actividad») y «por cobrar», que cargaba
    TODOS los carnets, autorizaciones y guías en PHP para restar.
-   TRABAJO PENDIENTE es lo accionable: por documento, cuántos borradores
-   esperan que ventanilla cobre y envíe (`pendiente`) y cuántos esperan firma
-   (`en_revision`). Una consulta agrupada por tabla. Las URL van armadas con
+   TRABAJO PENDIENTE es lo accionable: por documento, cuántos esperan el pago en
+   SIREB (`pendiente`). Una consulta agrupada por tabla. Las URL van armadas con
    los enums, con el filtro `?estado=` que ya aceptan los listados.
    AVISOS solo lista lo que pide una acción. Las faenas vencidas no están: la
    faena no registra la vuelta y sus kilos quedan consumidos, así que vencer
-   no deja nada pendiente. La guía sí: vencida y sin cerrar, falta registrar
-   la llegada.
+   no deja nada pendiente. La guía tampoco registra la llegada (28/09/2026).
    CADA BLOQUE VA EN UN fn(): Inertia evalúa la closure solo si la prop se
    envía, así una visita parcial no corre las demás consultas.
 
@@ -1437,21 +1177,6 @@
    Los cinco días se cuentan desde la HORA de emisión —una guía de
    las 18:00 del lunes vence a las 18:00 del sábado— así que mandarlas
    como día perdería justamente el dato que decide la vigencia.
-
-## `app/Http/Controllers/Panel/PagoController.php`
-
-### El control de las boletas: validar, observar y corregir un depósito.
-
-   Las tres viven en la FICHA del trámite, así que devuelven `back()`: el revisor
-   está mirando la tarjeta de pagos y no hay por qué sacarlo de ahí.
-   El controlador no decide nada: las reglas están en `Pago::admiteControl()` y
-   en `ControlarPagoService`. Acá solo se sube el archivo y se traduce el error.
-
-### CORREGIR — POST /panel/pagos/{pago}/corregir
-
-   POST y no PATCH porque puede traer un ARCHIVO: un multipart no viaja en un
-   PATCH. Y se sube ANTES de la transacción, que no deshace escrituras en
-   disco; el `catch` lo borra. La boleta vieja la borra el servicio.
 
 ## `app/Http/Controllers/Panel/ReciboController.php`
 
@@ -1694,28 +1419,6 @@
    garantiza que el motivo sirva, pero sí que alguien haya tenido que escribir
    una frase.
 
-## `app/Http/Requests/Panel/CobrarRequest.php`
-
-### Reglas para emitir un cobro.
-
-   ACÁ SOLO SE VALIDA LA FORMA. LOS SALDOS SE COMPRUEBAN EN EL SERVICIO
-   Que el monto no exceda lo que se debe NO se comprueba acá, y no es un olvido:
-   el saldo puede moverlo otra ventanilla en el mismo segundo, así que esa
-   comparación tiene que correr DENTRO de la transacción y con la fila del
-   trámite bloqueada. Ver CobrarService::resolver().
-
-### LA BOLETA ES SIEMPRE OBLIGATORIA
-
-   En esta unidad no se cobra en efectivo ni por QR: todo pago es un
-   depósito bancario, y sin la boleta lo único que respalda el cobro
-   es que alguien lo tipeó — eso no se puede cruzar contra el
-   extracto del banco.
-
-### ÚNICO entre los pagos VIVOS. Es lo que impide cargar la misma
-
-   El índice de la base lo vuelve a exigir: dos ventanillas
-   simultáneas pasarían esta comprobación las dos.
-
 ## `app/Http/Requests/Panel/EliminarCupoRequest.php`
 
 ### Reglas para ELIMINAR un aprovechamiento cargado por error.
@@ -1900,15 +1603,6 @@
    Esta tabla NO tiene borrado lógico, así que el unique va simple
    —sin el whereNull de las asociaciones—.
 
-## `app/Http/Requests/Panel/ObservarPagoRequest.php`
-
-### Reglas para OBSERVAR un depósito.
-
-   El motivo es obligatorio: quien corrige es otra persona, y sin el texto
-   «observado» es una marca que nadie sabe cómo levantar.
-   El mínimo de 10 coincide con el de la ventana del panel, como en
-   `RechazarCupoRequest`: si fuera menor, el botón se habilitaría de más.
-
 ## `app/Http/Requests/Panel/OtorgarCupoRequest.php`
 
 ### Reglas para otorgar una bolsa madre.
@@ -1937,20 +1631,6 @@
    Sí se acepta una fecha pasada: se carga en el sistema lo que se
    autorizó en papel la semana anterior, que es lo normal al poner
    al día una unidad.
-
-## `app/Http/Requests/Panel/RechazarCupoRequest.php`
-
-### Reglas para RECHAZAR un aprovechamiento presentado a revisión.
-
-   EL MOTIVO ES LO ÚNICO QUE EXPLICA LA DEVOLUCIÓN
-   Rechazar es devolverle el expediente a ventanilla, y lo que sigue es que lo
-   corrijan. Sin el texto escrito, quien lo recibe no sabe QUÉ corregir y el
-   expediente rebota: se vuelve a presentar igual y se vuelve a rechazar.
-   El estado no recuerda el rechazo —vuelve a PENDIENTE, a secas— así que la
-   línea de `auditorias` es todo el rastro que queda.
-   El mínimo de 10 caracteres coincide con el de la ventana de confirmación del
-   panel: si acá fuera menor, el botón se habilitaría antes de que el servidor
-   acepte el texto.
 
 ## `app/Http/Requests/Panel/RevocarCarnetRequest.php`
 
@@ -2023,17 +1703,6 @@
    ya emitido detrás, y editarlo cambiaría lo que ese papel dice.
    Preguntar las dos cosas cuesta una consulta y cierra el agujero.
 
-### ¿SE PUEDE MANDAR A QUE ALGUIEN LO FIRME?
-
-   DOS condiciones, y la segunda es la que pidió la unidad: el estado tiene
-   que ser PENDIENTE y los depósitos tienen que CUBRIR el monto.
-   No alcanza con el estado porque un cupo a medio pagar sigue siendo
-   pendiente, y presentarlo así obligaría a quien firma a devolverlo — que es
-   trabajo de ida y vuelta por algo que la pantalla puede ver antes.
-   Se compara con `>= 0` sobre el saldo y no con una igualdad: pagar de más
-   no deja saldo negativo —`saldoPendiente()` se corta en cero— así que lo
-   que se pregunta es si quedó algo sin cubrir.
-
 ### ¿ESTÁ DENTRO DE SU PERÍODO? — sin mirar el estado
 
    Es la mitad «calendario» de `estaVigente()`, y existe separada porque
@@ -2077,17 +1746,11 @@
    llena antes de cobrar— y borrarlo dejaría esas salidas sin la bolsa madre
    que las respalda.
 
-### ¿Se le pueden cargar depósitos hoy?
-
-   Solo en pendiente: en revisión el monto ya está cubierto y el expediente
-   presentado, y después de aprobado la plata que entre de más no es de este
-   trámite.
-
 ### ¿Vale HOY?
 
-   Mira el estado Y la fecha. El estado solo no alcanza: `vencido` lo
-   escribe un comando que corre una vez al día, así que entre corrida y
-   corrida un cupo que venció ayer sigue diciendo «activo» en la base.
+   Mira el estado Y la fecha. Un aprobado no cambia de estado al pasar su
+   fecha —no hay `vencido`: la vigencia es la fecha—, así que el estado solo
+   no alcanza para decir si hoy autoriza.
 
 ## `app/Models/Asociacion.php`
 
@@ -2224,10 +1887,10 @@
 
 ### ¿Vale HOY?
 
-   EL ESTADO GUARDADO PUEDE MENTIR, Y POR ESO SE MIRA TAMBIÉN LA FECHA
-   `vencido` lo escribe un comando programado que corre una vez al día.
-   Entre corrida y corrida, un carnet que venció ayer sigue diciendo
-   «activo» en la base. Ninguna decisión se toma leyendo la columna sola.
+   ESTADO, FECHA Y AUTORIZACIÓN
+   Un carnet del año pasado sigue `aprobado` (la vigencia no es un estado), y
+   uno cuya autorización se revocó también. Ninguna decisión se toma leyendo
+   la columna sola: se mira además `fecha_vencimiento` y el padre.
 
 ### El cupo que se imprime en el plástico, o null si no corresponde.
 
@@ -2330,61 +1993,6 @@
    destino o por volumen, esto pasa a leer una tabla y el resto del circuito
    de cobro no se entera.
 
-## `app/Models/Pago.php`
-
-### Un abono: una entrega de dinero, contra un trámite y bajo un recibo.
-
-   ES POLIMÓRFICA PORQUE EL NÚMERO DE RECIBO ES ÚNICO GLOBAL
-   Se cobran tres cosas —la credencial, el cupo de pesca y la guía de traslado—
-   y las tres se pagan igual. Una tabla de pagos por cada una obligaría a
-   repetir el circuito de caja tres veces, y peor: el mismo papel podría amparar
-   un carnet y una guía sin que nada lo impida.
-   EL COSTO, Y HAY QUE TENERLO PRESENTE: SE PIERDE LA CLAVE FORÁNEA. El motor no
-   puede exigir que `pagable_id` exista, porque no sabe en qué tabla buscarlo.
-   La integridad la sostienen los RESTRICT de las otras tablas y la aplicación.
-   `monto_parcial` SE LLAMA ASÍ PORQUE LA REGLA ES QUE PUEDE SER PARCIAL
-   Un carnet de 80 Bs admite dos filas de 40, cada una con su recibo y su fecha.
-   Lo que se DEBE no se guarda en ninguna columna: es el precio menos la suma de
-   estas filas, y lo calcula el trait Pagable al leer. Guardado, quedaría
-   desfasado en cuanto alguien corrija un abono.
-
-### El trámite que este abono paga: un Carnet, un AprovechamientoPesq o una
-
-   NO SE PRECARGA CON `with('pagable.beneficiario')`. Eloquent no sabe qué
-   es `pagable` hasta que lee la fila, así que no puede resolver lo que
-   cuelga de él: lo escrito así se IGNORA y el N+1 sigue ahí, sin ningún
-   error. Va con morphWith, declarando qué traer para cada tipo:
-   Pago::with(['pagable' => fn ($m) => $m->morphWith([
-   Carnet::class              => ['beneficiario', 'tipoCarnet'],
-   AprovechamientoPesq::class => ['beneficiario', 'categoria'],
-   GuiaMovimiento::class      => ['comercializador'],
-   ])])
-
-### La dirección completa de la boleta, o null si no hay.
-
-   La columna guarda una RUTA; quién la convierte en dirección depende del
-   disco activo, y eso lo sabe App\Support\Archivos —el mismo que la escribe
-   y la borra—. Armada acá a mano, escribir y leer podrían mirar discos
-   distintos.
-
-### Cómo se nombra el trámite pagado en el detalle del recibo.
-
-   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`, que
-   es el mismo dato pero sin que el analizador pueda avisar cuando se agrega
-   un tipo nuevo y este método se olvida.
-
-### Los abonos de un trámite concreto.
-
-   Recibe el modelo y no el par (tipo, id) a mano: escrito a mano, el tipo
-   se copia como texto y el día que una clase se renombre o se mueva de
-   namespace la consulta deja de encontrar nada, en silencio.
-
-### Los depósitos hechos en una fecha, según lo que dice la BOLETA.
-
-   Es otra pregunta que `delDia()`, que mira `created_at`: un depósito del
-   viernes cargado el lunes entra en uno y no en el otro. El primero cuadra
-   el trabajo del día; este se cruza contra el extracto del banco.
-
 ## `app/Models/PermisoFaena.php`
 
 ### La autorización de UNA salida de pesca.
@@ -2421,30 +2029,15 @@
 
 ## `app/Models/Recibo.php`
 
-### La CABECERA del comprobante oficial de caja.
+### El comprobante de UN documento pagado en SIREB.
 
-   UN RECIBO, VARIOS PAGOS, POSIBLEMENTE DE TRÁMITES DISTINTOS
-   recibo 0016 (180 Bs)  ──< pago 80 Bs  → carnet
-   ──< pago 100 Bs → aprovechamiento
-   Esa es la unidad del comprobante: la persona entrega la plata UNA vez y se
-   lleva UN papel, aunque adentro esté pagando dos cosas. Por eso el detalle es
-   polimórfico y la cabecera no sabe a qué trámite pertenece — no pertenece a
-   ninguno en particular.
-   EL MONTO SE COPIA; EL TITULAR VA POR ID (cambiado el 20/09/2026, a pedido)
-   `monto_total` y `concepto` se congelan al emitir: corregir un abono después no
-   puede cambiar el papel que la persona se llevó.
-   El nombre y la cédula NO: se guarda `beneficiario_id` y se leen del padrón al
-   imprimir, para que un apellido mal tipeado se corrija en un solo lugar. El
-   precio son las dos cosas que las columnas copiadas sostenían — el encabezado
-   dejó de ser inmutable, y ya no se puede emitir a nombre de un TERCERO.
-
-### El detalle: los abonos que este papel ampara.
-
-   OJO AL RECORRERLO PARA IMPRIMIR: `pagable` es una relación POLIMÓRFICA y
-   NO se puede precargar con `with('pagos.pagable.beneficiario')`. Eloquent
-   no sabe qué es `pagable` hasta que lee la fila, así que lo escrito así se
-   ignora en silencio y el N+1 sigue ahí. Va con `morphWith`, declarando qué
-   traer para cada tipo. Ver Pago::pagable().
+   UNO POR DOCUMENTO: `recibible` es polimórfica y el par es único. Lo emite
+   ConfirmarPagoService al aprobar (02/10/2026; antes un recibo agrupaba varios
+   pagos cargados en Jichi).
+   EL MONTO SE COPIA; EL TITULAR VA POR ID (20/09/2026, a pedido)
+   `monto_total`, `concepto` y el pago de SIREB se congelan al emitir. El nombre y
+   la cédula se leen del padrón al imprimir, para que un apellido mal tipeado se
+   corrija en un solo lugar.
 
 ### La suma de lo que HOY cuelga de este recibo.
 
@@ -2469,12 +2062,6 @@
    «Carnet de Pescador» o como «Pescador Artesanal» según quién lo cargó, y un
    match sobre el texto rompería en silencio el día que alguien lo edite.
 
-### El precio de HOY, para armar un cobro nuevo.
-
-   No sirve para leer lo que salió un carnet ya emitido: si el arancel
-   cambió, esta columna ya dice otra cosa. Lo cobrado de verdad está en
-   `pagos`, que no se recalcula nunca.
-
 ## `app/Models/User.php`
 
 ### NO LLEVA HasFactory, y su UserFactory se borró.
@@ -2485,134 +2072,6 @@
    era el juego de pruebas, que se eliminó el 14/09/2026.
    `Beneficiario` sí conserva la suya: DemoSeeder la usa para poblar el
    padrón de prueba.
-
-### Los depósitos que esta persona cargó en ventanilla.
-
-   OJO: apuntaba a `user_id`, UNA COLUMNA QUE NUNCA EXISTIÓ en `pagos`. La
-   relación estaba rota desde el primer día y no se notaba porque nadie la
-   llamaba —Eloquent no valida el nombre de la columna hasta que se ejecuta
-   la consulta—. Se arregló al agregar `registrado_por`.
-
-## `app/Services/CobrarService.php`
-
-### CAJA — cobrar uno o varios trámites bajo UN recibo
-
-   recibo REC-2026-0016 (180 Bs)  ──< pago  80 Bs  → carnet
-   ──< pago 100 Bs  → aprovechamiento
-   Es el tercer circuito del sistema, y atraviesa a los otros dos: se cobran la
-   credencial, el cupo de pesca y la guía de traslado, y los tres se pagan
-   igual.
-   DOS REGLAS QUE SE VEN EN CADA LÍNEA DEL FORMULARIO
-   1. SE PUEDE PAGAR EN CUOTAS. Un carnet de 80 Bs admite dos abonos de 40,
-   cada uno con su recibo y su fecha. Lo que se debe no está en ninguna
-   columna: es el precio menos la suma de los abonos, calculada al leer.
-   2. NO SE COBRA MÁS DE LO QUE SE DEBE. `saldoPendiente()` se corta en cero,
-   así que un excedente no se acredita a nadie: queda escrito, suma en la
-   recaudación del día y desaparece. Por eso se rechaza.
-   UN RECIBO, VARIOS TRÁMITES — Y POR ESO LOS PAGOS SON POLIMÓRFICOS
-   La persona entrega la plata UNA vez y se lleva UN papel, aunque adentro esté
-   pagando el carnet y el cupo. Una tabla de pagos por cada cosa cobrable
-   obligaría a repetir este circuito tres veces, y peor: el número de recibo
-   dejaría de ser único global, así que el mismo papel podría amparar un carnet
-   y una guía sin que nada lo impida.
-
-### Qué se puede cobrar, y cómo lo nombra el formulario.
-
-   ES UNA LISTA BLANCA, Y ESO NO ES DECORACIÓN
-   `pagos.pagable_type` guarda un nombre de clase. Si el formulario lo
-   mandara directo, cualquiera podría escribir otro en el navegador y el
-   sistema crearía filas apuntando a tablas que no tienen nada que ver.
-   Con esta tabla el formulario manda una palabra corta —`carnet`, `cupo`,
-   `guia`— y el servidor decide a qué clase corresponde.
-
-### EL NÚMERO SE RESERVA DENTRO DE LA MISMA TRANSACCIÓN.
-
-   `CorrelativoService` bloquea la fila del contador con
-   SELECT ... FOR UPDATE, así que dos ventanillas cobrando al mismo
-   tiempo nunca reciben el mismo número. Y si el cobro falla más
-   abajo, el rollback devuelve también el contador — sin eso, cada
-   intento fallido quemaría un número y la serie saldría con huecos
-   que nadie puede explicar.
-
-### LA BOLETA SE REPITE EN CADA LÍNEA DEL MISMO COBRO, y es
-
-   EL NÚMERO SE DESAMBIGUA CON UN SUFIJO cuando el mismo
-   depósito cubre varias líneas. Es único global —el índice
-   lo exige— y la columna ya no admite NULL, así que repetirlo
-   tal cual chocaría.
-   Queda «0012345678» para el caso normal de una sola línea, y
-   «0012345678-2», «-3»… cuando un depósito paga el carnet y
-   el cupo a la vez. Se sigue leyendo cuál es la boleta.
-
-### Carga depósitos SIN emitir recibo — el circuito del aprovechamiento.
-
-   PENDIENTE ──< depósito 330,00 ──< depósito 82,50   (sin recibo)
-   │
-   [enviar a revisión] ──▶ UN recibo de 412,50 con los dos adentro
-   El papel lo emite `emitirRecibo()` desde `RevisarCupoService`. El saldo se
-   descuenta entre depósitos: si no, tres boletas por el total pasarían las
-   tres —ninguna está escrita cuando se valida la siguiente—.
-
-### Convierte una línea del formulario en un trámite real, comprobado.
-
-   LA FILA SE BLOQUEA, Y NO ES DE MÁS
-   El saldo se calcula sumando los abonos que ya tiene. Dos ventanillas
-   cobrando el mismo carnet a la vez leerían las dos el mismo saldo
-   —ninguna ve el abono de la otra, que todavía no está escrito— y las dos
-   pasarían el control de «no cobrar de más». La persona terminaría pagando
-   el doble, con dos recibos válidos y sin nada que lo delate.
-
-### COBRAR YA NO ACTIVA NADA, Y ES DELIBERADO
-
-   Este servicio tuvo un `activarSiQuedoPagado()` que pasaba el cupo a ACTIVO
-   en cuanto el saldo llegaba a cero. Se retiró el 19/09/2026 al aparecer el
-   estado EN REVISIÓN: con él, la plata entraba y el pescador quedaba
-   habilitado en el acto, sin que nadie mirara las boletas contra el extracto.
-   Hoy el cobro solo baja el saldo. El salto PENDIENTE → EN REVISIÓN lo da
-   una persona desde la ficha, y solo con el monto cubierto; y de ahí a
-   ACTIVO lo da otra, la que firma. Ver RevisarCupoService.
-
-### El texto que se imprime cuando el operador no escribe uno.
-
-   Se arma con los nombres de los trámites cobrados, que es exactamente lo
-   que el papel tiene que decir. Dejarlo vacío haría un comprobante que no
-   explica por qué entró esa plata — y el recibo es justamente el respaldo
-   de eso.
-
-### La serie del correlativo de caja.
-
-   Vive acá y no escrita en cada llamada porque `CorrelativoService` entrega
-   números POR SERIE: dos cadenas distintas son dos contadores distintos, y
-   un error de tipeo abriría una serie paralela que nadie pidió, con su
-   propio 0001.
-
-### El total se CONGELA acá, con los abonos que acaban de entrar.
-
-   Recalcularlo al leer haría que el papel entregado cambiara si
-   después se corrige un abono, y lo que se imprimió es lo que la
-   persona pagó. Ver Recibo::cuadra(), que compara lo impreso con lo
-   que hay hoy en vez de taparlo.
-
-### Cómo se nombra un trámite en el recibo y en los mensajes de error.
-
-   El `match` va sobre la CLASE y no sobre el texto de `pagable_type`: es el
-   mismo dato, pero así el analizador avisa cuando se agrega un cobrable y
-   este método se olvida.
-
-## `app/Services/ControlarPagoService.php`
-
-### El control de las boletas: validar, observar y corregir.
-
-   PENDIENTE ──▶ VALIDADO    cuadra con el extracto del banco
-   ▲     └─▶ OBSERVADO   no cuadra, con el motivo escrito
-   └──[corregir]──┘
-   Un observado NO se valida: se corrige. Validarlo sin tocar el dato sería dar
-   por bueno lo que se marcó como malo. Ver docs/MER.md.
-
-### Corregir el depósito: única salida de una observación.
-
-   Vuelve SIEMPRE a PENDIENTE, aunque no se cambie nada: el dato se volvió a
-   declarar y nadie lo miró desde entonces.
 
 ## `app/Services/CorrelativoService.php`
 
@@ -2779,7 +2238,7 @@
    mirar antes de seguir, no autocorregir en silencio.
    Lo único que el sistema garantiza es que no se repita dentro del mismo
    cupo, y eso lo sostiene el índice único `(aprovechamiento_id,
-   numero_faena)` además de esta comprobación.
+   nro)` además de esta comprobación.
 
 ### SE PREGUNTA POR LA FECHA, NO POR `estaVigente()`.
 
@@ -2830,12 +2289,6 @@
    balanza. Corregir hacia ARRIBA vuelve a comprobar el saldo —si no entra,
    se rechaza— porque de lo contrario cerrar una faena sería la forma de
    saltear el cupo.
-
-### Y EL OTRO ESTADO QUE NO HABILITA: presentado y sin firmar.
-
-   Va aparte del anterior porque lo que falta es distinto —ahí plata,
-   acá una firma— y mandar al operador a cobrar un cupo ya cubierto
-   lo haría buscar un depósito que no existe.
 
 ### EL TOPE SOLO SE HACE CUMPLIR EN MODO ESTRICTO.
 
@@ -2954,14 +2407,10 @@
 
 ### CORREGIR UN CUPO QUE TODAVÍA ES BORRADOR
 
-   Acá no se le está dando más volumen a nadie: se está arreglando una carga
-   equivocada antes de que exista ningún papel. El volumen y el monto se
-   vuelven a copiar del tramo nuevo, igual que al otorgar.
-   Solo corre en PENDIENTE y sin pagos. Con un abono encima hay un recibo
-   numerado que dice qué se cobró: cambiar el tramo por detrás haría que el
-   papel entregado dejara de coincidir con la fila, y nadie lo notaría.
-   NO se toca `fecha_vencimiento` recalculándola desde cero por las dudas:
-   se recalcula solo si cambió la fecha de emisión, que es de donde sale.
+   SOLO LA EMBARCACIÓN (03/10/2026). El tramo no se cambia en ningún estado: ni
+   los kilos, ni el monto, ni las fechas, así que corregir no toca la
+   liquidación de SIREB ni pide precio. Se comprueba con la fila bloqueada, por
+   si entre abrir y guardar el cupo se aprobó.
 
 ### ELIMINAR UN CUPO CARGADO POR ERROR
 
@@ -3028,47 +2477,14 @@
 
 ## `app/Services/RevisarCupoService.php`
 
-### EL CIRCUITO DE REVISIÓN DE UN APROVECHAMIENTO
+### APROBAR Y REVOCAR UN APROVECHAMIENTO
 
-   PENDIENTE ──[enviar, con el monto cubierto]──▶ EN REVISIÓN
-   (borrador)                                         │
-   ▲                              ┌──────────────┴──────────────┐
-   └──────────[rechazar]──────────┤                             │
-   [aprobar]                          │
-   │                             │
-   ACTIVO ──▶ recién acá emite faenas
-   ENVIAR NO ES APROBAR, Y SON DOS PERSONAS DISTINTAS
-   Ventanilla carga los depósitos y declara que el expediente está completo;
-   quien firma mira las boletas contra el extracto del banco y recién ahí el cupo
-   queda habilitado. Sin el paso del medio, la plata entraba y el pescador salía
-   a pescar sin que nadie hubiera mirado nada — que es exactamente lo que este
-   circuito viene a impedir.
-   Por eso son PERMISOS distintos: `aprovechamientos.enviar` es de ventanilla y
-   `aprovechamientos.aprobar` es de supervisión.
-   RECHAZADO NO ES EL FINAL: VUELVE A PENDIENTE
-   Rechazar es devolverle el expediente a ventanilla con el motivo escrito, y lo
-   que sigue es que lo corrijan y lo vuelvan a presentar. Devolverlo a PENDIENTE
-   es lo que permite eso: los pagos ya cargados SIGUEN AHÍ —cuelgan del cupo, no
-   del envío— así que nadie tiene que volver a cargarlos.
-   El rechazo queda en `auditorias` con su motivo; el estado no lo recuerda, y no
-   hace falta que lo recuerde.
-
-### PENDIENTE ──▶ EN REVISIÓN.
-
-   Las dos condiciones se comprueban con la fila BLOQUEADA: entre que el
-   operador ve el botón encendido y lo aprieta, otra ventanilla pudo anular
-   un pago y dejar el cupo sin cubrir.
-   ACÁ SE EMITE EL RECIBO DEL TRÁMITE, uno solo con el total. Va dentro de la
-   misma transacción que el cambio de estado: o el cupo se presenta CON su
-   papel o no se presenta.
-   El NIT y el nombre son opcionales: el comprobante puede ir a nombre de un
-   tercero. Sin ellos sale a nombre del beneficiario.
-
-### SE VUELVE A MIRAR EL MONTO, aunque el envío ya lo había mirado.
-
-   No es redundancia: entre el envío y la firma pueden pasar días, y
-   en el medio alguien pudo dar de baja un pago. Aprobar un cupo que
-   dejó de estar cubierto lo habilitaría para pescar sin la plata.
+   PENDIENTE ──(SIREB: pagada)──▶ APROBADO ──▶ recién acá emite faenas
+   No hay revisión ni firma en Jichi (02/10/2026): aprobar lo dispara
+   ConfirmarPagoService cuando SIREB da la liquidación por pagada, y este
+   servicio solo conserva las reglas propias —estado, fila bloqueada— y escribe
+   las fechas de emisión. Revocar es la sanción, con motivo, y no se revierte:
+   deja sin efecto a carnets y faenas sin reescribirlos (REGLAS-NEGOCIO, Regla 5).
 
 ## `app/Support/Archivos.php`
 
@@ -3140,7 +2556,7 @@
 
    Devuelve un PNG en base64 listo para meter en un `<img>` de una plantilla que
    va a dibujar DomPDF.
-   POR QUÉ NO SE USA simple-qrcode, QUE ESTÁ INSTALADO
+   POR QUÉ NO SE USA simple-qrcode (RETIRADO EL 03/10/2026)
    Porque su salida PNG necesita la extensión **imagick**, y este servidor no la
    tiene (`php -m` lista gd, no imagick). Con eso, `QrCode::format('png')` lanza
    «Extension 'Imagick' is required» y el carnet no sale.
@@ -3253,11 +2669,6 @@
    —eso se ignora en silencio— y acá cada renglón necesita saber qué trámite
    pagó.
 
-### Todas las boletas del recibo. El papel es UNO por trámite, así que tiene
-
-   Se corta en seis porque el renglón va de 198 a 226 pt —ahí empieza
-   DESCRIPCIÓN— y DomPDF no recorta, desborda.
-
 ### El número que va en el recuadro N° del papel: 0016.
 
    Se imprime SOLO LA PARTE NUMÉRICA de `REC-2026-0016`, porque el recuadro
@@ -3321,64 +2732,6 @@
    comparar, y se puede tipear con guion, con espacio o sin nada.
    Guion y no espacio: al copiar y pegar, un espacio se colapsa o se pierde
    por el camino; el guion viaja entero.
-
-## `app/Traits/Pagable.php`
-
-### Lo que sabe hacer un trámite que se cobra: carnet, aprovechamiento o guía.
-
-   POR QUÉ ES UN TRAIT Y NO TRES COPIAS DEL MISMO CÓDIGO
-   Las tres cosas que se cobran se pagan exactamente igual: en abonos, contra
-   un recibo, y el saldo es el precio menos lo entregado. Escrita tres veces,
-   esa resta se desincroniza sola —alguien corrige el corte en cero de un lado
-   y los otros dos siguen devolviendo saldos negativos—.
-   Lo único que cambia entre los tres es DE DÓNDE SALE EL PRECIO, y eso es
-   justamente lo que el trait deja abierto en `montoACobrar()`.
-   EL SALDO NO SE GUARDA EN NINGUNA COLUMNA, A PROPÓSITO
-   Una columna `saldo` hay que actualizarla en cada alta, cada baja y cada
-   corrección de un abono. Se olvida una y el número queda mintiendo para
-   siempre, sin ningún error que lo delate. Calculado al leer no puede
-   desfasarse: es siempre la resta de lo que hay hoy.
-
-### Lo entregado hasta hoy.
-
-   LA PRIMERA RAMA ES LO QUE EVITA UNA CONSULTA POR FILA
-   `$this->pagos()->sum(...)` consulta SIEMPRE, aunque quien llamó haya
-   hecho `withSum('pagos', 'monto_parcial')` justamente para evitarlo. En un
-   listado de treinta carnets eso son treinta consultas agregadas, con el
-   `withSum` escrito, viéndose correcto y sin ningún error.
-   Cuando el atributo agregado vino en la consulta se usa ese; cuando la
-   relación ya está cargada se suma en memoria; recién si no hay ninguno de
-   los dos se consulta. Quien llama no tiene que saber en cuál de los tres
-   casos está.
-   OJO CON LA COMPROBACIÓN: se pregunta si la CLAVE EXISTE, no si el valor
-   es distinto de null. `withSum` NO devuelve 0 cuando no hay filas: devuelve
-   NULL, porque eso es lo que contesta `sum()` en SQL sobre un conjunto
-   vacío. Comparando contra null, justamente el trámite SIN abonos —el que
-   más aparece en un listado— se caía a la consulta suelta, y el withSum
-   quedaba escrito, viéndose correcto, sin ahorrar nada.
-
-### Los recibos bajo los que se cobró este trámite.
-
-   Son VARIOS y no uno: pagar en dos cuotas son dos papeles distintos, cada
-   uno con su número de caja. Por eso la relación no puede ser un belongsTo
-   colgado del trámite.
-
-### Cuánto cuesta este trámite. Lo define cada modelo:
-
-   - Carnet              → el precio de su tipo de carnet
-   - AprovechamientoPesq → el valor de la escala con la que se otorgó
-   - GuiaMovimiento      → el arancel, con el 50% de descuento si es piscicultura
-
-### Cuánto falta para cubrirlo.
-
-   Se corta en cero: pagar de más NO genera saldo a favor. Si entró dinero
-   de más, no es un abono de este trámite y se resuelve por caja — dejarlo
-   en negativo lo mostraría como un crédito que el sistema no sabe aplicar.
-
-### ¿Se pueden CONTROLAR sus depósitos? Solo donde hay circuito de revisión;
-
-   `false` acá y no un `method_exists` en quien pregunta: ese truco deja el
-   control apagado en silencio si alguien nombra el método distinto.
 
 ## `database/migrations/0001_01_01_000000_create_users_table.php`
 
@@ -3475,82 +2828,13 @@
    usa este índice —envuelve la columna en una función—. Se arregla
    comparando contra instantes en vez de días; queda anotado.
 
-### Recibos — la CABECERA del comprobante oficial de caja.
+### Recibos — el comprobante de un documento pagado en SIREB.
 
-   El papel numerado que la persona se lleva. Agrupa uno o varios `pagos`, que
-   pueden ser de trámites distintos:
-   recibo 0016 (180 Bs)  ──< pago  80 Bs → carnet
-   ──< pago 100 Bs → aprovechamiento
-   Es una tabla y no se arma al vuelo porque `numero_recibo` es un CORRELATIVO DE
-   CAJA —el dato que no se puede derivar de otras tablas— y porque el comprobante
-   tiene que ser INMUTABLE: por eso el nombre, el NIT y el total se COPIAN acá al
-   emitir.
+   Uno por documento (único sobre `recibible_type` + `recibible_id`). Es una
+   tabla y no se arma al vuelo porque `numero_recibo` es un CORRELATIVO —el dato
+   que no se puede derivar de otras tablas— y porque el comprobante tiene que ser
+   INMUTABLE: monto, concepto y el pago de SIREB se COPIAN al emitir.
    Ver docs/MER.md.
-
-## `database/migrations/2026_09_18_100900_create_pagos_table.php`
-
-### NO HAY COLUMNA `metodo_pago`, Y NO ES UN OLVIDO
-
-   En esta unidad NO se cobra en efectivo ni por QR: TODO pago es un
-   depósito bancario. Una columna con un solo valor posible no informa
-   nada —y peor, invita a suponer que algún día hubo otra cosa—.
-   Por eso las tres columnas de abajo son OBLIGATORIAS: todo pago
-   tiene su número de boleta, su fecha y su papel. Cuando existían el
-   efectivo y el QR eran nullable, porque esos dos no traían boleta.
-
-### LA FECHA QUE DICE LA BOLETA, que NO es cuándo se cargó.
-
-   Un depósito hecho el viernes puede registrarse el lunes, y el
-   arqueo tiene que poder mirar las dos cosas: `created_at` para
-   cuadrar el trabajo del día, y esta para cruzar contra el extracto
-   del banco.
-   Es un DÍA y no un instante: va `date`, y a React con toDateString().
-
-### LA FOTO O EL PDF DE LA BOLETA. Es una RUTA, no una dirección
-
-   UNA POR PAGO y no por recibo: si la persona hizo dos depósitos,
-   son dos boletas distintas y cada una respalda su monto. Guardada
-   en el recibo, la segunda pisaría a la primera.
-   La sube StorageController::file() —regla 11— que es el único que
-   aplica el tope de 3 MB y el nombre al azar.
-
-### LA MISMA BOLETA NO SE CARGA DOS VECES.
-
-   Es la forma más fácil de que un trámite figure pagado sin que haya
-   entrado la plata: cargar el mismo depósito contra dos cupos, o dos
-   veces contra el mismo. El índice lo impide en la base, que es donde
-   tiene que estar — dos ventanillas simultáneas pasarían cualquier
-   comprobación de la aplicación.
-   Va PARCIAL para dejar fuera las filas dadas de baja: un cobro anulado
-   libera su boleta y se la puede volver a cargar bien. Ya no hace falta
-   excluir los NULL —como antes, por el efectivo— porque la columna es
-   obligatoria.
-
-### Pagos — el DETALLE de lo que se cobró, depósito por depósito.
-
-   TODO pago es un DEPÓSITO BANCARIO: no hay efectivo ni QR en esta unidad. Por
-   eso cada fila lleva sí o sí su número de boleta, su fecha y su archivo.
-   Es POLIMÓRFICA porque se cobran tres cosas —carnet, cupo y guía— y las tres se
-   pagan igual. Partida en tres tablas, `numero_recibo` dejaría de ser único
-   global.
-   EL COSTO: se pierde la clave foránea. El motor no puede exigir que
-   `pagable_id` exista, porque no sabe en qué tabla buscarlo. La integridad la
-   sostienen los RESTRICT de las otras tablas y la aplicación.
-   Y no se precarga con `with('pagable.beneficiario')`: eso se IGNORA en silencio
-   y el N+1 sigue ahí. Va con `morphWith`.
-   Ver docs/MER.md.
-
-### NULLABLE: el depósito nace antes que el recibo. En el
-
-   CASCADE y no RESTRICT: un pago sin recibo no se imprime ni entra
-   en ningún arqueo.
-
-### EL NÚMERO DEL DEPÓSITO, ÚNICO GLOBAL.
-
-   Es lo que impide cargar la misma boleta dos veces —contra el mismo
-   trámite o contra otro—, que es la forma más fácil de que un cupo
-   figure pagado sin que haya entrado la plata. Único global y no por
-   trámite: la boleta es una sola en el banco.
 
 ## `database/seeders/BeneficiarioSeeder.php`
 
@@ -3620,22 +2904,6 @@
    volúmenes que caen adentro y el formulario no ofrece ninguna escala, sin
    ningún error que lo explique.
 
-## `database/seeders/ConfiguracionSeeder.php`
-
-### ¿QUIEN CARGA UN DEPÓSITO PUEDE VALIDARLO ÉL MISMO?
-
-   La separación de funciones —«quien dice que entraron 150 Bs no
-   puede además declarar que lo comprobó»— es lo correcto cuando hay
-   dos personas. En una oficina de UNA sola deja el circuito trabado:
-   el mismo usuario carga y por lo tanto no puede validar, y el
-   trámite nunca se aprueba.
-   Por eso es una configuración y no una regla escrita en el código:
-   la unidad la enciende el día que haya un segundo usuario, sin que
-   nadie tenga que tocar nada.
-   ARRANCA APAGADA porque hoy hay un solo usuario. Lo que NO se
-   pierde con eso es el registro: quién cargó, quién validó y cuándo
-   se guarda igual, que es el dato que pidió la unidad.
-
 ## `database/seeders/DatabaseSeeder.php`
 
 ### El orden importa: RolPermisoSeeder tiene que correr antes que UsuarioSeeder
@@ -3673,34 +2941,10 @@
 
 ## `routes/panel.php`
 
-### EL CIRCUITO DE REVISIÓN
-
-   PENDIENTE ──[enviar]──▶ EN REVISIÓN ──[aprobar]──▶ ACTIVO
-   ▲                       │
-   └──────[rechazar]───────┘
-   ENVIAR es de VENTANILLA: quien carga los depósitos declara que el
-   expediente está completo. APROBAR y RECHAZAR son de SUPERVISIÓN: quien
-   firma mira las boletas contra el extracto del banco.
-   Son dos permisos distintos a propósito. Con uno solo, la misma persona
-   cargaría la plata y se la aprobaría, y el control del medio no existiría.
-
 ### EL PLÁSTICO. Va ANTES de '{carnet}' aunque la URL sea más larga: el
 
    Es GET y devuelve bytes, no una pantalla de Inertia: el navegador lo abre
    en su visor de PDF, que es desde donde el operador aprieta imprimir.
-
-### EL CONTROL DE LAS BOLETAS — la segunda mitad de la revisión.
-
-   PENDIENTE ──▶ VALIDADO    cuadra con el extracto del banco
-   ▲     └─▶ OBSERVADO   no cuadra, con el motivo escrito
-   └──[corregir]──┘
-   SON DOS PERMISOS DISTINTOS Y ESE ES EL PUNTO. Controlar es de supervisión
-   —quien firma mira las boletas— y corregir es de ventanilla —quien las
-   cargó arregla lo que tipeó—. Con uno solo, la misma persona objetaría y
-   resolvería su propia objeción, y el circuito sería un adorno.
-   Las tres cuelgan de /pagos/{pago} y no del trámite: el depósito es
-   polimórfico y mañana se controla igual el de un carnet o el de una guía.
-   Las pantallas las llaman desde la ficha del trámite y vuelven ahí.
 
 ### Panel de administración — requiere sesión iniciada
 
@@ -3728,7 +2972,8 @@
    2. Aprovechamientos   la bolsa madre: el cupo en kilos
    3. Carnets            la credencial anual, y su impresión
    4. Faenas / Guías     los permisos operativos que cuelgan del carnet
-   5. Caja               recibos y pagos
+   5. Recibos            el libro de comprobantes (el pago vive en SIREB)
+   6. Catálogos          asociaciones, escala, tipos de carnet, productos, aranceles
    Los módulos que todavía no existen NO tienen rutas declaradas, y eso es
    deliberado: una ruta declarada convierte el renglón del menú en un enlace
    pinchable (ver barra-lateral.tsx, que pregunta por la ruta antes de enlazar).
@@ -3772,12 +3017,6 @@
    Mismo cuidado con el orden que en beneficiarios: 'crear' va ANTES de
    '{aprovechamiento}' o Laravel toma esa palabra como si fuera el id.
 
-### CARGAR LOS DEPÓSITOS DESDE LA FICHA DEL CUPO.
-
-   El permiso es el de CAJA y no uno de aprovechamientos, porque esto es un
-   cobro: sale con recibo numerado y entra al arqueo del día. Que la pantalla
-   sea otra no cambia quién puede hacerlo.
-
 ### 3. Carnets — la credencial anual
 
    La LLAVE del año. De ella cuelgan los permisos operativos: faenas si es de
@@ -3813,24 +3052,6 @@
    Igual que las faenas, NO hay `edit` ni `destroy`: el código sale de un
    talonario de papel que viaja dentro del camión.
 
-### 5. Caja — el circuito del dinero
-
-   Atraviesa a todos los anteriores: se cobran la credencial, el cupo y la
-   guía, y los tres se pagan igual. NO es un paso del flujo —es algo que
-   puede pasar en cualquiera de ellos y varias veces— y por eso va aparte y
-   no intercalado.
-   DOS LISTADOS QUE NO SE REEMPLAZAN:
-   /caja     los ABONOS, uno por entrega de dinero. Es lo que se cuadra
-   contra el efectivo del cajón al cerrar el día.
-   /recibos  los PAPELES entregados, con su correlativo. Es lo que audita
-   Contabilidad.
-   Un recibo agrupa varios abonos, así que las dos listas nunca tienen la
-   misma cantidad de filas.
-   LOS RECIBOS NO TIENEN `store`: nacen del cobro, en la misma transacción.
-   Un endpoint para crear uno suelto permitiría un comprobante numerado sin
-   ningún pago detrás — un papel oficial que dice que entró plata que no
-   entró.
-
 ### IMPRIMIR va ANTES de '/recibos/{recibo}'… no: van los dos con parámetro,
 
    Entregar el papel numerado es un acto distinto de consultarlo: quien
@@ -3859,13 +3080,10 @@
 
 ### Módulos por construir
 
-   Aprovechamientos, Carnets, Faenas, Guías, Caja, Reportes y Configuración.
-   Todos aparecen en el menú lateral en gris, porque barra-lateral.tsx
-   comprueba si la ruta está declarada antes de convertir el renglón en
-   enlace.
+   Reportes (en gris en el menú) y Configuración. barra-lateral.tsx comprueba si
+   la ruta está declarada antes de convertir el renglón en enlace.
    Para construir cualquiera: copiar el patrón de Beneficiarios —controlador,
-   Request, tipos de TypeScript y pantallas—, que es la plantilla del sistema
-   y está comentado paso a paso a propósito.
+   Request, tipos de TypeScript y pantallas—, que es la plantilla del sistema.
 
 ## `routes/publico.php`
 
@@ -4298,15 +3516,6 @@
    Vive acá y no en cada componente porque lo usan los dos, y escrito dos veces
    alcanzaría con tocar uno para que la miga y el globito dijeran cosas
    distintas.
-
-## `resources/js/components/panel/pagos/dialogo-corregir-pago.tsx`
-
-### Corregir un depósito: lo único que levanta una observación.
-
-   Vive en la ficha y no en «editar», que en revisión no abre — y observar solo
-   pasa en revisión. Guardar sin cambiar nada también sirve: vuelve a quedar sin
-   validar y queda en la auditoría quién lo hizo.
-   La boleta es OPCIONAL: sin elegir otra se conserva la que está.
 
 ## `resources/js/components/publico/buscador-codigo.tsx`
 
@@ -4799,23 +4008,13 @@
 
 ## `resources/js/pages/panel/aprovechamientos/editar.tsx`
 
-### CORREGIR UN APROVECHAMIENTO QUE TODAVÍA ES BORRADOR
+### CORREGIR UN APROVECHAMIENTO: SOLO LA EMBARCACIÓN
 
-   Solo se llega acá con el cupo PENDIENTE DE PAGO y sin ningún abono encima. El
-   servidor lo comprueba dos veces —al abrir la pantalla y al guardar, esta
-   última con la fila bloqueada— porque entre una cosa y la otra otra ventanilla
-   puede cobrarlo.
-   EL TITULAR NO SE CAMBIA, Y NO ES UN OLVIDO
-   Corregir es arreglar una carga equivocada; mover la autorización de una
-   persona a otra es otra cosa, y dejarlo hacer desde acá la volvería invisible:
-   la fila quedaría igual, con otro nombre, sin nada que lo delate. Si el cupo se
-   cargó a quien no era, se elimina —con el motivo escrito— y se otorga de nuevo.
-   Por eso la persona se muestra fija arriba, no en el buscador.
-   ES EL MISMO FORMULARIO QUE EL ALTA MENOS ESE CAMPO
-   Se mantiene como pantalla aparte —y no como un modo de `crear.tsx`— porque lo
-   que cambia no es un campo sino el significado: el alta elige a quién y esta
-   no, el alta manda a la caja y esta vuelve a la ficha. Un solo componente con
-   dos modos tendría un `if` en cada una de esas decisiones.
+   Solo se llega acá con el cupo PENDIENTE; el servidor lo comprueba al abrir y
+   al guardar, esta última con la fila bloqueada. Un único campo editable —la
+   embarcación, que va impresa—; el titular, el tramo, los kilos, el monto y las
+   fechas se muestran fijos en «Lo que no cambia». Cambiar de titular o de tramo
+   no es corregir: se elimina con el motivo escrito y se otorga de nuevo.
 
 ## `resources/js/pages/panel/aprovechamientos/index.tsx`
 
@@ -4881,26 +4080,6 @@
    suma de la lista no cuadra con el saldo de arriba y parece un error del
    sistema. Por eso van tachadas y con la aclaración al lado.
 
-### EL FORMULARIO ES UNA LISTA DE SECCIONES, NO UN PAGO
-
-   Cada clic en «Agregar pago» suma una sección, y cada una es un depósito
-   completo: monto, número de boleta, fecha y archivo. Se mandan todas
-   juntas y quedan cargadas SIN recibo: el papel es uno para todo el trámite
-   y sale al enviarlo a revisión, con el total de los depósitos.
-   Por qué una lista y no un pago por vez: la persona llega al mostrador con
-   las dos boletas en la mano. Cargarlas de a una obligaba a guardar, esperar
-   la recarga y volver a abrir el formulario.
-
-### NO HAY BOTÓN «COBRAR» ACÁ, y es deliberado: los depósitos
-
-   Caja sigue existiendo para lo suyo: cobrar varios trámites
-   de una persona en un mismo recibo.
-
-### SE COBRA DESDE ACÁ Y NO SOLO DESDE CAJA, porque el
-
-   Es el mismo cobro —sale con su recibo numerado y entra
-   al arqueo—, así que pide el permiso de caja.
-
 ### ELIMINAR PIDE MOTIVO **Y** CASILLA DE CONSENTIMIENTO
 
    Las dos cosas, y cada una tapa algo distinto:
@@ -4914,13 +4093,6 @@
    El mínimo de 10 caracteres es el mismo que exige
    EliminarCupoRequest: si acá fuera menor, el botón se habilitaría
    y el servidor rechazaría igual.
-
-### LA INTENCIÓN DE ENVIAR, que viaja con los depósitos.
-
-   Se llena al enviar con lo que el botón estaba diciendo, para que el
-   servidor haga exactamente lo que el operador leyó. Es una intención y
-   no un permiso: si al guardar el saldo no quedó en cero, el servidor
-   registra igual y no envía.
 
 ### ¿CON ESTO ALCANZA? Es lo que decide qué dice el botón y qué hace.
 
@@ -5008,55 +4180,6 @@
    Y nombra la ACTIVIDAD y no el tipo de carnet, porque es lo que decide qué
    puede emitir: un pescador saca faenas, un comercializador saca guías. Quien
    hace las dos cosas tiene dos carnets, y acá se ven los dos.
-
-## `resources/js/pages/panel/caja/cobrar.tsx`
-
-### COBRAR — el formulario de caja
-
-   UN RECIBO PUEDE CUBRIR VARIOS TRÁMITES, Y POR ESO SON CASILLAS
-   La persona llega con lo que debe —el carnet, el cupo, una guía— y entrega la
-   plata UNA vez. Un formulario que cobrara de a un trámite obligaría a emitir
-   tres papeles por una sola entrega, y a la persona a guardar tres.
-   Por eso las deudas vienen juntas en una lista con casillas: se tilda lo que
-   se cobra y sale un solo comprobante numerado.
-   CADA LÍNEA ARRANCA CON EL SALDO COMPLETO, PERO ES EDITABLE
-   Lo normal es pagar todo, así que ese es el valor por defecto. Bajarlo es lo
-   que hace un pago en cuotas: 40 hoy y 40 la semana que viene, cada uno con su
-   recibo.
-   Lo que NO se puede es subirlo por encima del saldo. El servidor lo rechaza, y
-   la pantalla lo avisa antes: pagar de más no genera saldo a favor —el saldo se
-   corta en cero— así que el excedente se perdería.
-
-### LA BOLETA DEL DEPÓSITO, SIEMPRE
-
-   No hay efectivo ni QR: todo pago es un depósito
-   bancario. Sin la boleta, lo único que respalda
-   el cobro es que alguien lo tipeó, y eso no se
-   puede cruzar contra el extracto del banco.
-
-## `resources/js/pages/panel/caja/index.tsx`
-
-### CAJA — el listado de ABONOS
-
-   ESTA PANTALLA MUESTRA ABONOS, NO RECIBOS, Y NO ES LO MISMO
-   Un recibo agrupa varios abonos, así que las dos listas nunca tienen la misma
-   cantidad de filas. Acá se mira el DINERO —cada depósito, con su boleta— que es
-   lo que se cuadra contra el cajón. En «Recibos» se miran los PAPELES, con su
-   correlativo, que es lo que audita Contabilidad.
-   EL ARQUEO ES SIEMPRE DE HOY, AUNQUE SE ESTÉ FILTRANDO OTRO MES
-   Es deliberado. Lo que se cuadra contra el extracto del banco antes de cerrar
-   es lo de hoy, y esa pregunta no cambia porque alguien esté mirando marzo. Un
-   total que siguiera al filtro invitaría a cuadrar la caja contra el número
-   equivocado.
-
-### LAS DOS FECHAS NO SON LA MISMA PREGUNTA, y por eso
-
-   - CARGADO HOY  cuadra el trabajo del día.
-   - DEPOSITADO   se cruza contra el extracto.
-   Un depósito del viernes registrado el lunes entra
-   en el primero y no en el segundo. Antes acá iba el
-   reparto por método de pago, que desapareció: todo
-   pago es un depósito bancario.
 
 ## `resources/js/pages/panel/carnets/crear.tsx`
 
@@ -5448,31 +4571,6 @@
    para eliminar, además, que no tenga faenas emitidas—. Llegan resueltas
    del servidor porque deducirlas acá sería una segunda copia de tres reglas.
 
-### Las tres del circuito de revisión, resueltas en el servidor.
-
-   `puede_enviarse` NO es «el estado es pendiente»: es eso Y que los
-   depósitos cubran el monto entero. Deducirlo acá sería una segunda copia
-   de la regla, y con un saldo que la pantalla puede tener viejo.
-
-### Cuántas boletas quedan sin dar por buenas —sin validar u observadas—.
-
-   Es lo que frena la aprobación: `puede_aprobarse` NO es «el estado es en
-   revisión», es eso Y que este número esté en cero. Sin esa condición,
-   validar sería decorativo.
-
-### Un depósito que pagó este cupo, en la ficha.
-
-   Son VARIOS a propósito: un cupo se puede pagar en cuotas, y cada depósito
-   bancario llega con su propia boleta. No hay efectivo ni QR, así que las tres
-   columnas de la boleta están siempre.
-
-### EL RECIBO DEL TRÁMITE: uno solo, con todos los depósitos adentro.
-
-   No va por depósito, y ese es el punto: el aprovechamiento es un trámite, la
-   persona entrega sus boletas —una o cinco— y se lleva UN papel con el total.
-   Se emite al enviar a revisión, así que mientras el cupo está pendiente esto
-   llega en `null`.
-
 ### Si sus kilos pesan contra el saldo.
 
    Una faena VENCIDA libera su volumen —la salida no ocurrió— así que la
@@ -5556,46 +4654,6 @@
    operador tiene en la mano, y si no coincide hay algo que conviene mirar
    antes de seguir, no autocorregir en silencio.
 
-## `resources/js/types/caja.ts`
-
-### Tipos del módulo Caja y Recibos — el circuito del dinero.
-
-   Describen lo que arman `CajaController` y `ReciboController`.
-   DOS VISTAS DEL MISMO HECHO, Y NINGUNA REEMPLAZA A LA OTRA
-   - `PagoFila` es un ABONO: cada entrega de dinero, con su método y su
-   trámite. Es lo que se cuadra contra el efectivo del cajón al cerrar.
-   - `ReciboFila` es el PAPEL entregado, con su correlativo. Es lo que audita
-   Contabilidad.
-   Un recibo agrupa varios abonos, así que las dos listas nunca tienen la misma
-   cantidad de filas.
-
-### Lo cobrado hoy, repartido por método.
-
-   Es SIEMPRE del día de hoy, no del rango filtrado: es lo que se compara contra
-   el efectivo del cajón antes de cerrar, y esa pregunta no cambia porque
-   alguien esté mirando marzo.
-   El reparto por método tampoco es decorativo: lo que hay que cuadrar contra el
-   cajón es el EFECTIVO, y una transferencia no está ahí adentro.
-
-### NULL mientras el depósito no tiene papel.
-
-   Pasa con el aprovechamiento: sus depósitos se cargan mientras el trámite
-   está pendiente y el recibo —uno solo, con el total— se emite recién al
-   enviarlo a revisión. La plata ya entró, así que la fila está y suma en el
-   arqueo; lo que falta es el comprobante.
-
-### La boleta del banco. Nunca faltan: TODO pago es un depósito bancario —no
-
-   Cuando un mismo depósito cubre varias líneas, la segunda en adelante
-   llevan el número con un sufijo («0012345678-2»), porque es único global.
-
-### Una deuda de la persona, lista para cobrar.
-
-   `tipo` es una palabra corta —`carnet`, `cupo`, `guia`— y no un nombre de
-   clase: el servidor la traduce con una lista blanca. Mandando la clase
-   directo, cualquiera podría escribir otra en el navegador y el sistema crearía
-   pagos apuntando a cualquier tabla.
-
 ## `resources/js/types/carnets.ts`
 
 ### Tipos del módulo Carnets — la credencial anual.
@@ -5657,13 +4715,6 @@
    Se guarda aparte de los kilos porque no siempre es su lectura: el tramo
    más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese «PAICHE» no está en
    ningún número.
-
-### El arancel de HOY, para armar un cobro nuevo.
-
-   NO sirve para leer lo que salió un carnet ya emitido: lo cobrado de
-   verdad está en `pagos` y no se recalcula. Lo que SÍ cambia al subir este
-   número es el saldo pendiente de los carnets que todavía no están
-   cubiertos.
 
 ## `resources/js/types/dashboard.ts`
 
@@ -5735,18 +4786,12 @@
 
 ### TIPOS COMPARTIDOS POR TODO EL SISTEMA
 
-   Acá va SOLO lo que usan varias pantallas a la vez. Lo que pertenece a un
-   módulo concreto vive en su propio archivo:
-   types/index.d.ts        <- este archivo: lo común
-   types/dashboard.ts      <- tipos del panel principal
-   types/beneficiarios.ts  <- tipos del módulo Beneficiarios
-   types/tramites.ts       <- tipos del módulo Trámites
-   types/carnets.ts        <- tipos del módulo Carnets
-   types/rubros.ts         <- tipos del catálogo de rubros
-   types/pagos.ts          <- tipos del libro de caja
-   ¿Para qué sirven los tipos? Describen la forma exacta de los datos que
-   manda Laravel. Si en PHP se renombra una clave y acá no, el editor lo marca
-   en rojo al instante, en vez de descubrirlo con una pantalla en blanco.
+   Acá va SOLO lo que usan varias pantallas a la vez —los estados de los enums,
+   el paginado, lo que comparte HandleInertiaRequests—. Lo de un módulo vive en
+   su propio archivo de `types/` (aprovechamientos, carnets, faenas, guias,
+   beneficiarios, catalogos, recibos, dashboard, portal, publico).
+   Describen la forma exacta de lo que manda Laravel: si en PHP se renombra una
+   clave y acá no, el editor lo marca en rojo al instante.
 
 ### Lo que devuelve ->paginate() de Laravel, ya convertido a JSON.
 
@@ -5758,20 +4803,9 @@
 
 ### Espejo de App\Enums\EstadoAprovechamiento.
 
-   PENDIENTE ──[enviar, con el monto cubierto]──▶ EN REVISIÓN
-   (borrador)                                         │
-   ▲                              ┌──────────────┴──────────────┐
-   └──────────[rechazar]──────────┤                             │
-   [aprobar]                          │
-   │                             │
-   ACTIVO ──▶ AGOTADO | VENCIDO ────┘
-   `pendiente` es el BORRADOR: otorgado y sin cobrar del todo. Es el único estado
-   en que el cupo se edita, se elimina y admite depósitos.
-   `en_revision` es el expediente PRESENTADO: la plata está y falta que alguien
-   firme. Tampoco autoriza a pescar — recién lo hace al aprobarse.
-   `vencido` y `agotado` son distintos a propósito: se le acabó el tiempo o se
-   le acabaron los kilos, y al pescador se le explica distinto aunque los dos
-   terminen en un trámite nuevo.
+   `pendiente` es el BORRADOR, esperando el pago en SIREB. `aprobado` autoriza;
+   `agotado` y `revocado` dejan de hacerlo; `no_pagado` venció su plazo de pago
+   sin pago. No hay `vencido`: fuera de fecha se calcula con las fechas.
 
 ### Espejo de App\Enums\ModalidadAprovechamiento.
 
@@ -5804,10 +4838,9 @@
 
 ### Espejo de App\Enums\EstadoCarnet.
 
-   `vencido` lo escribe un comando que corre una vez al día, así que esta
-   columna puede estar desfasada: para saber si un carnet vale HOY, el servidor
-   mira además `fecha_vencimiento`. La pantalla recibe la respuesta ya
-   calculada y no la vuelve a deducir.
+   Si un carnet vale HOY no lo dice el estado —un aprobado del año pasado sigue
+   `aprobado`—: el servidor manda la respuesta ya calculada con la fecha y la
+   autorización, y la pantalla no la vuelve a deducir.
 
 ### Espejo de App\Enums\TipoActor.
 
@@ -6095,9 +5128,8 @@
    un cupo de cinco dígitos y separador de miles.
    OJO CON EL RELLENO: `.campo .valor` lleva `padding: 1pt 2pt`, y en
    CSS eso SUMA al ancho declarado. Los anchos ÚTILES que salen de acá
-   —24-4, 20-4 y 37,5-4— son los que el controlador tiene escritos en
-   ANCHO_TRIPLE_*. Si se toca una medida hay que tocar la otra, o el
-   cálculo de encogido mide contra una caja que no existe.
+   —24-4, 20-4 y 37,5-4—. Las constantes ANCHO_TRIPLE_* del controlador
+   se retiraron el 03/10/2026: ningún cálculo las leía.
 
 ### El recuadro va SIEMPRE, con foto o sin ella. Es lo que hacía la unidad
 
@@ -6325,14 +5357,6 @@
    toca. El PDF sale de a una, pero la leyenda se conserva: es lo que
    Contabilidad y Archivo buscan cuando reciben su copia impresa.
 
-## `app/Http/Requests/Panel/CorregirPagoRequest.php`
-
-### Reglas para CORREGIR un depósito, con dos diferencias contra la carga:
-
-   1. La boleta se compara contra la tabla IGNORÁNDOSE a sí misma, o guardar
-   sin tocar el número chocaría contra su propia fila.
-   2. El archivo es OPCIONAL: ya hay una boleta guardada.
-
 ## `database/factories/BeneficiarioFactory.php`
 
 ### La cédula se arma con unique() y no con un número al azar.
@@ -6451,15 +5475,12 @@
 
 ### Comandos de consola
 
-   Acá se declaran los comandos de Artisan propios del sistema. Hoy no hay
-   ninguno: el archivo existe porque `bootstrap/app.php` lo declara en
-   `withRouting(commands: ...)` y borrarlo rompería el arranque.
-   EL PRIMERO QUE VA A VIVIR ACÁ es el que marca los carnets como vencidos.
-   `EstadoCarnet::Vencido` no lo escribe nadie todavía, y por eso el filtro por
-   estado del listado muestra como «vigentes» carnets de gestiones cerradas. Ver
-   el problema 2 de docs/PENDIENTES.md.
-   Mientras tanto el sistema no miente, porque `Carnet::estaVigente()` compara
-   además contra `fecha_vencimiento`.
+   El scheduler: `jichi:verificar-pagos` cada 10 minutos, sin solaparse. SIREB
+   no avisa (no tiene webhooks), así que esto pregunta por cada documento
+   pendiente con su liquidación registrada: aprueba lo pagado y marca «No
+   pagado» lo vencido sin pago. En producción necesita el cron de Laravel
+   (`schedule:run` cada minuto). No hay comando de vencimiento: la vigencia se
+   lee de las fechas.
 
 ## `routes/web.php`
 

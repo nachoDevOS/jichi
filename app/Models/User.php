@@ -67,11 +67,6 @@ class User extends Authenticatable
         return $this->hasRole(RolSistema::Administrador->value);
     }
 
-    public function scopeActivos(Builder $query): Builder
-    {
-        return $query->where('activo', true);
-    }
-
     /** El personal del SEDAG: toda lista de usuarios del panel parte de acá. */
     public function scopeFuncionarios(Builder $query): Builder
     {

@@ -99,7 +99,7 @@ a React. Clave por clave, con el mismo nombre.
 return Inertia::render('panel/beneficiarios/index', [
     'beneficiarios' => $beneficiarios,
     'filtros'      => $filtros,
-    'tipos'        => EstadoRubro::opciones(),
+    'opcionesPorPagina' => Paginacion::OPCIONES,
 ]);
 ```
 
@@ -398,10 +398,12 @@ Entonces NO van en el controlador, ni siquiera «por ahora». Van en un servicio
 de `app/Services/`, y el controlador se limita a traducir la petición, llamarlo
 y convertir el resultado en un `redirect()`.
 
-El ejemplo completo es `SolicitudCarnetService`: decide el tipo de trámite,
-crea el carnet si hace falta, registra el expediente y sus pagos, todo dentro de
-una transacción. El controlador que lo usa —`TramiteController::store()`— tiene
-quince líneas, y esa es la señal de que está bien repartido.
+El ejemplo a copiar es `EmitirFaenaService` + `PermisoOperativoException`:
+controla el carnet, los kilos libres de la autorización y el precio de SIREB,
+crea la faena con su número y su código, prepara la liquidación —todo dentro de
+una transacción con la autorización bloqueada— y la manda a SIREB después del
+commit. `FaenaController::store()` solo traduce la petición y convierte la
+excepción en un mensaje, y esa es la señal de que está bien repartido.
 
 El motivo es concreto: el mismo caso de uso lo necesitan el formulario del
 panel y un comando de consola. Escrito adentro del controlador, el otro tiene
@@ -429,18 +431,13 @@ El ítem "Reportes" del menú lateral **se enciende solo**. Ya está declarado e
 `components/panel/layout/navegacion.ts` y se muestra en gris únicamente porque
 la ruta todavía no existe. En cuanto se declare, pasa a ser un enlace.
 
-### Lo específico de Trámites
+### Los estados y sus transiciones
 
-Además del CRUD, ese módulo tiene una máquina de estados que ya está escrita en
-`app/Enums/EstadoTramite.php` pero que todavía nadie usa:
-
-```php
-if (! $tramite->estado->puedePasarA($nuevoEstado)) {
-    abort(422, 'Transición de estado no permitida.');
-}
-```
-
-Hay que llamarla antes de cambiar el estado de cualquier trámite.
+Si el módulo tiene un circuito, sus estados van en un enum de `app/Enums/` con
+las preguntas que deciden cada paso —`permiteEdicion()`, `permiteEliminacion()`,
+`estaAbierto()`…—, como `EstadoFaena`. El servicio pregunta antes de cambiar el
+estado (también sobre la fila bloqueada), el controlador manda la respuesta a
+React en los campos `puede_*`, y la pantalla solo los lee.
 
 ---
 

@@ -114,7 +114,21 @@ class LiquidarSirebService
             $this->enviar($documento);
 
             if ($documento->registradoEnSireb()) {
-                $this->sireb->anularLiquidacion($documento->sireb_liquidacion_id, $motivo);
+                // Se pregunta ANTES: con un pago cargado —en revisión o validado— no se elimina ni se corrige.
+                $liquidacion = $this->sireb->liquidacion($documento->sireb_liquidacion_id);
+
+                if (($liquidacion['estado'] ?? null) === 'pagada' || ($liquidacion['pago']['estado'] ?? null) === 'confirmado') {
+                    throw SirebException::liquidacionPagada();
+                }
+
+                if (($liquidacion['pago'] ?? null) !== null) {
+                    throw SirebException::pagoEnRevision();
+                }
+
+                // Vencida y sin pago ya no cobra nada, y SIREB no la anula (422): se sigue sin pedirlo.
+                if (($liquidacion['estado'] ?? null) !== 'vencida') {
+                    $this->sireb->anularLiquidacion($documento->sireb_liquidacion_id, $motivo);
+                }
             }
         } catch (SirebException $e) {
             // Un «no» de SIREB al ENVIAR (422) dice que con esta clave nunca la creó: no hay nada que anular.

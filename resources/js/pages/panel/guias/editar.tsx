@@ -16,8 +16,8 @@ import type { CatalogosGuia, FilaDetalle, FormularioGuia, GuiaEditable } from '@
  *  Corregir el borrador de una guía
  *
  * La persona y el carnet llegan FIJOS, para mostrar: cambiar de titular no es
- * corregir un traslado, es emitir otro. Solo se abre en PENDIENTE y sin un
- * depósito cargado — lo comprueba el servidor con la fila bloqueada.
+ * corregir un traslado, es emitir otro. Solo se abre en PENDIENTE —lo comprueba
+ * el servidor con la fila bloqueada—; con un pago cargado en SIREB no se guarda.
  */
 export default function EditarGuia({
     guia,

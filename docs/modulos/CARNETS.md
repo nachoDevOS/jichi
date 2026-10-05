@@ -1,24 +1,13 @@
-> # ⚠️ DESACTUALIZADO desde el 18/09/2026
->
-> El núcleo de datos se rehízo desde cero: ya no existen `rubros`,
-> `tramites`, `faenas`, `guias` ni `guia_detalles`, y `beneficiarios`,
-> `carnets` y `pagos` cambiaron de columnas. Lo de abajo describe el modelo
-> ANTERIOR: sirve para entender el código del panel, que todavía está escrito
-> contra él, NO para entender el esquema.
->
-> El esquema vigente está en las migraciones `database/migrations/2026_09_18_*`
-> y explicado en [docs/sesiones/09-2026/2026-09-18.md](../sesiones/09-2026/2026-09-18.md).
-
----
-
 # Módulo Carnets — la impresión de la credencial
 
-El plástico que la persona se lleva al final del circuito. Reemplaza a la
-credencial que la unidad venía mandando a imprimir por fuera, una por una.
+El plástico que la persona se lleva cuando su carnet queda aprobado. Reemplaza a
+la credencial que la unidad venía mandando a imprimir por fuera, una por una.
 
-> Este documento cubre **la impresión**. Cómo NACE un carnet —la Regla A, el
-> índice único por persona y gestión— está en
-> [ARQUITECTURA.md](../ARQUITECTURA.md) y en `SolicitudCarnetService`.
+> Este documento cubre **la impresión**. Cómo NACE un carnet —un carnet vigente
+> por actividad, el pescador con su autorización, el pago en SIREB— está en
+> [REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md) (paso 3), en
+> [ARQUITECTURA.md](../ARQUITECTURA.md) y en `EmitirCarnetService`.
+> Revisado contra el código el 03/10/2026.
 
 ---
 
@@ -34,13 +23,13 @@ sus tiras blancas.
 │ [escudo] GOBERNACIÓN        │ SECRETARÍA DPTAL. DE …          │
 │          GOB. AUT. DEPT. DEL│ RECURSOS NATURALES Y …          │
 │          BENI               │      SEDAG - BENI               │
-│                     C É D U L A                                │
+│               C É D U L A   D E   P E S C A D O R              │
 │ ┌────────┐  NOMBRE     : ▓ Jesús Acosta Cervantes ▓            │
 │ │        │  ASOCIACIÓN : ▓ Pacusito                ▓            │
 │ │  FOTO  │  CIUDAD     : ▓ Riberalta               ▓            │
 │ │        │  PROVINCIA  : ▓ Yacuma                  ▓            │
 │ └────────┘  DIRECCIÓN  : ▓ Puerto Almacén          ▓            │
-│ ▓C.I. 3277571▓ REGISTRO: ▓ 000002 ▓ GESTIÓN : ▓ 2026 ▓         │
+│ ▓C.I. 3277571▓ REGISTRO: ▓ 000002 ▓ CUPO : ▓ 800 KG ▓          │
 └───────────────────────────────────────────────────────────────┘
 
    ▓ = tira BLANCA con la letra negra fina; los rótulos, blancos
@@ -53,89 +42,57 @@ sus tiras blancas.
 > inspector que la revisa en el río la reconoce de lejos por su forma: una
 > tarjeta rediseñada se lee como si fuera otro documento.
 
-### Espejo de la vista previa del panel
+### En pantalla no hay maqueta
 
-`resources/js/components/panel/tramites/vista-previa-carnet.tsx` dibuja este
-mismo molde en pantalla, en el recuadro «ASÍ VA A SALIR EL CARNET» que el
-operador mira mientras carga el trámite.
-
-**Si se toca una, se toca la otra.** Si se separan, la vista previa pasa a ser
-una promesa que el PDF no cumple, y el operador se entera con el pescador ya en
-la ventanilla — que es justo el problema que ese recuadro viene a evitar.
-
-Lo que está fijado de a pares:
-
-| | En el PDF | En la vista previa |
-| --- | --- | --- |
-| Fondo | `carnet-fondo.png` | `linear-gradient(180deg, #719327, #5c8b18 55%, #518411)` |
-| Sello de agua | horneado en ese PNG, al 30% | `sedag.png` al 46% de ancho y `opacity-30` |
-| Encabezado | `carnet-escudo.png` + los tres bloques | `icon.png` + los mismos |
-| Título | cinco copias del texto, a 9,5 pt | una a `0.82rem`, con `text-shadow` en cuatro direcciones |
-| Renglones | Nombre, Asociación, Ciudad, Provincia, Dirección, Registro | los mismos |
-
-> Los colores van escritos fijos y no salen de los tokens del tema: esto no es
-> una pantalla que cambia con el modo claro y oscuro, es la representación de una
-> tarjeta IMPRESA, y el verde institucional tiene que verse igual siempre porque
-> el operador la compara contra la credencial que tiene en la mano.
+La vista previa dibujada en React («ASÍ VA A SALIR EL CARNET») se retiró con el
+modelo viejo. Hoy la ficha del carnet tiene el botón **«Imprimir carnet»**, que
+abre **el PDF de verdad** en una pestaña aparte, y la ficha del beneficiario
+muestra una credencial en miniatura (`CredencialMini`) con los datos que se dictan
+en el mostrador —no es una réplica del plástico—. Lo que se mira antes de
+imprimir es el archivo que va a salir, no una promesa de cómo va a salir.
 
 ---
 
 ## 2. Cuándo se puede imprimir
 
 ```
-PENDIENTE ──▶ EN REVISIÓN ──▶ APROBADO ──▶ (impreso) ──▶ (entregado)
-   │                              │
-   │                              └── el carnet habilita ──▶ ACÁ se puede imprimir
+PENDIENTE ──(SIREB: pagada)──▶ APROBADO ──▶ ACÁ se puede imprimir
+   │                              └── revocado: ya no se imprime
    └── el carnet YA EXISTE, pero no autoriza a nada
+PENDIENTE ──(SIREB: vencida, sin pago)──▶ NO PAGADO: nunca se imprime
 ```
 
-**El carnet existe desde PENDIENTE y no se puede imprimir hasta APROBADO.** La
-fila de `carnets` nace junto con el expediente —la crea
-`SolicitudCarnetService::registrar()` cuando la persona no tenía uno de ese rubro
-en esta gestión— pero no habilita hasta que alguien firma. Entre uno y otro
-momento el plástico saldría con todos sus datos y sin autorizar nada, y encima
-puede no estar pagado todavía.
+**El carnet existe desde PENDIENTE y no se puede imprimir hasta APROBADO.** No
+habilita hasta que se paga en SIREB: impreso antes, el plástico saldría con
+todos sus datos y sin autorizar nada.
 
-Lo dice `Carnet::puedeImprimirse()`, con dos condiciones:
+Lo dice `Carnet::puedeImprimirse()`:
 
 | Condición | Por qué |
 | --- | --- |
-| Al menos un trámite APROBADO | Sin eso el carnet no autoriza a nada. Antes se contaban las filas de `carnet_rubro`; al desaparecer el pivote, la pregunta equivalente es si algún expediente del carnet llegó a aprobarse |
-| El carnet no está anulado | Anular es una sanción: reimprimirlo devolvería a la calle un documento que el sistema ya desconoció |
+| `yaFueAprobado()` | Pasó por la aprobación (aprobado o revocado). Pendiente y no pagado no |
+| No está `revocado` | Revocar es una baja: reimprimirlo devolvería a la calle un documento que el sistema ya desconoció |
+| Su autorización no está revocada | Sin efecto (Regla 5 de REGLAS-NEGOCIO): no se imprime |
 
-**Un carnet VENCIDO sí se imprime.** Es la reimpresión de un documento que
-existió: el plástico dice su gestión, y la ficha del panel dice si sigue
-valiendo. Negarla obligaría a explicar a mano por qué el sistema no puede
-mostrar lo que emitió el año pasado.
+**Un carnet fuera de fecha sí se imprime.** Sigue `aprobado` —la vigencia la dicen
+las fechas, no el estado— y es la reimpresión de un documento que existió.
 
 **Reimprimir no consume nada ni cambia nada.** El registro es el mismo y el PDF
-sale idéntico. Es lo contrario del recibo, donde la idempotencia hubo que
-construirla: acá no hay número que gastar. Por eso el botón no se esconde
-después de la primera impresión — el carnet se pierde, se moja y se rompe, y esa
-es justamente la vez que hace falta.
+sale idéntico. Por eso el botón no se esconde después de la primera impresión:
+el carnet se pierde, se moja y se rompe, y esa es justamente la vez que hace falta.
 
 ---
 
-## 3. Imprimir NO es marcar impreso
+## 3. Imprimir no escribe nada
 
-Son dos actos y dos rutas:
+`GET /panel/carnets/{carnet}/imprimir`, permiso `carnets.imprimir`, dibuja el
+documento y **no escribe nada**: por eso puede ser GET, igual que el recibo y a
+diferencia del resto del circuito. Ya no existe «marcar impreso» ni la columna
+`fecha_generacion`: se retiraron con el modelo viejo.
 
-| | Ruta | Qué hace |
-| --- | --- | --- |
-| Ver el PDF | `GET /panel/carnets/{carnet}/imprimir` | Dibuja el documento. **No escribe nada** |
-| Declararlo impreso | `PATCH /panel/tramites/{tramite}/generar` | Escribe `tramites.fecha_generacion` |
-
-Abrir la vista previa no es haber sacado el plástico en la impresora de
-credenciales. Si la primera ruta marcara, alcanzaría con que alguien mirara el
-documento —o con que el navegador precargara el enlace— para que el expediente
-quedara declarando un carnet que nunca existió.
-
-Es por eso que la de impresión **puede ser GET**, igual que la del recibo y a
-diferencia del resto del circuito: no cambia ningún dato.
-
-El permiso es `carnets.generar` —el de ventanilla, el mismo que marca impreso— y
-no `carnets.ver`: consultar un carnet en pantalla y sacar el documento con
-validez no son la misma atribución.
+El portal del beneficiario **no** descarga el carnet: perdido, se revoca y se
+repone en ventanilla (ver «Reposición» en REGLAS-NEGOCIO). Sí muestra la vista
+previa «NO VÁLIDO» mientras está pendiente.
 
 ---
 
@@ -144,59 +101,32 @@ validez no son la misma atribución.
 | Elemento | De dónde sale |
 | --- | --- |
 | Encabezado | Escudo + «GOBERNACIÓN / GOBIERNO AUTÓNOMO DEPARTAMENTAL DEL / BENI», filete, y el bloque de la Secretaría con «SEDAG - BENI» |
-| Título | «CÉDULA», fijo |
+| Título | «CÉDULA DE PESCADOR» / «CÉDULA DE COMERCIALIZADOR»: `carnets.tipo_actor`, nunca el nombre del tipo de carnet |
 | C.I. (debajo de la foto, en su propia tira) | `Beneficiario::documento_identidad` |
-| Foto | `beneficiarios.foto`, cuadrada, embebida en base64 |
+| Foto | `beneficiarios.foto`, recortada y reducida, embebida en base64 |
 | NOMBRE | `Beneficiario::nombreCompleto` |
-| CUPO | `Carnet::capacidadLegible()`. **Tercer valor del último renglón, SIN rótulo**, y solo si la actividad lo lleva |
-| ASOCIACIÓN | `carnets.asociacion` — la copia que se congeló al emitir |
+| ASOCIACIÓN | `carnets.asociacion_id` → nombre de la asociación |
 | CIUDAD | La ficha del beneficiario, en su propio renglón |
 | PROVINCIA | Ídem. Entera, ya no abreviada |
 | DIRECCIÓN | La ficha del beneficiario |
-| REGISTRO | `Carnet::registro()` — el id con ceros: `000013` |
-| GESTIÓN | `carnets.gestion` — comparte renglón con el registro |
+| REGISTRO | `Carnet::registro_legible` — la columna `nro` con seis dígitos: `000013`. Por gestión, asignado al aprobar |
+| CUPO | `Carnet::cupoImpreso()` = `volumen_total_kg` de su autorización. **Segundo par del último renglón**, y solo si la actividad lo lleva (`TipoActor::requiereAprovechamiento()`) |
 
-**Son SEIS renglones, siempre, para cualquier actividad.** Uno solo comparte un
-segundo par: `REGISTRO + GESTIÓN`, partido por la mitad —38 pt útiles cada uno—,
-que es lo que necesitan seis dígitos y un año. El salto entre renglones es fijo:
-14 pt desde los 66.
+**Son SEIS renglones, siempre, para cualquier actividad.** El último es
+`REGISTRO`, solo para el comercializador y partido en `REGISTRO + CUPO` para el
+pescador —38 pt útiles cada valor—. El salto entre renglones es fijo: 14 pt
+desde los 66.
 
-> **LLEGAR A SEIS COSTÓ SACAR DOS DATOS DE LA COLUMNA.** Los dos estaban de más
-> ahí, y conviene saber adónde fueron:
->
-> | Dato | Dónde está ahora | Por qué salió |
-> | --- | --- | --- |
-> | RUBRO | En el **título** | Con «CÉDULA DE COMERCIALIZADOR» arriba, el renglón imprimía dos veces la misma palabra |
-> | CUPO | En la **columna de la foto**, bajo el C.I. | Como renglón, un pescador llegaba a SIETE y había que apretar el salto de 14 a 12 pt |
->
-> Sacarlos liberó el lugar que permitió darle a CIUDAD y a PROVINCIA una tira
-> entera cada una —compartían una— y, de paso, **«PROVINCIA» volvió entera**: se
-> abreviaba a «PROV.» porque el rótulo de un segundo par tiene una caja de 32 pt
-> y la palabra mide 33,2 a 6,1 pt bold. El rótulo de un renglón entero tiene 44.
+> **La gestión ya no se imprime.** Compartía el último renglón con el registro;
+> hoy ese lugar es del cupo. La gestión la dice la verificación pública del QR,
+> junto con la vigencia de hoy.
 
-> **EL ÚLTIMO RENGLÓN LLEVA DOS O TRES DATOS.** `REGISTRO + GESTIÓN` siempre, y
-> el `CUPO` cuando la actividad se autoriza por volumen. Con cupo el renglón usa
-> el reparto `triple`:
->
-> | | Rótulo | Valor |
-> | --- | --- | --- |
-> | REGISTRO | 0 → 44 | 47,5 → 75,5 |
-> | GESTIÓN | 78 → 108 | 111,5 → 134,5 |
-> | CUPO | *(sin rótulo)* | 137 → 176,5 |
->
-> **El cupo va SIN rótulo**, a pedido: «800 KG» se lee solo, la unidad hace de
-> etiqueta. Y es lo único que cabe — los 176 pt ya están repartidos entre dos
-> rótulos y tres valores. Se queda con la tira más ancha porque es el único que
-> puede crecer, con un cupo de cinco dígitos y separador de miles.
->
-> **SOLO SALE SI LA ACTIVIDAD LO LLEVA.** Sin cupo el renglón vuelve al reparto
-> de dos, con las tiras anchas de siempre. Lo decide `rubros.requiere_capacidad`,
-> no una lista de nombres. Ver `CarnetImpresionController::renglonRegistro()`.
->
-> Antes probó dos lugares más: un renglón propio —que llevaba la tarjeta a siete
-> y obligaba a apretar el salto— y una tira suelta bajo la cédula, que lo dejaba
-> lejos del resto de los datos. Acá vuelve a la columna donde lo traía la cédula
-> de papel, sin costar una línea.
+> **LLEGAR A SEIS COSTÓ SACAR DATOS DE LA COLUMNA:** la actividad se fue al
+> **título** —con «CÉDULA DE COMERCIALIZADOR» arriba, un renglón imprimía dos
+> veces la misma palabra— y eso liberó el lugar para darle a CIUDAD y a
+> PROVINCIA una tira entera cada una. **«PROVINCIA» volvió entera**: se abreviaba
+> a «PROV.» porque el rótulo de un segundo par tiene una caja de 32 pt y la
+> palabra mide 33,2 a 6,1 pt bold. El rótulo de un renglón entero tiene 44.
 
 > **OJO CON LOS RÓTULOS DE UN SEGUNDO PAR.** El cálculo de encogido de `texto()`
 > protege a los VALORES: si un nombre no entra, se achica. Los rótulos son
@@ -204,24 +134,19 @@ que es lo que necesitan seis dígitos y un año. El salto entre renglones es fij
 > lo que tenga al lado. Pasó con «PROVINCIA» cuando compartía renglón: a 6,1 pt
 > bold mide 33,2 en una caja de 32, y en el PDF salía «PROVINCIACercado» pegado.
 >
-> Volvió a pasar con «GESTIÓN» al partir el renglón en tres: con una caja de
-> 27 pt salía «GESTIÓN2026» pegado, y hubo que abrirla a 30.
+> Volvió a pasar con «GESTIÓN», cuando todavía se imprimía: con una caja de
+> 27 pt salía «GESTIÓN2026» pegado. Hoy el segundo rótulo es «CUPO», que entra.
 >
 > Antes de poner un rótulo en un renglón partido, medirlo:
 > **caracteres × 0,605 × cuerpo**, y dejarle un par de puntos de margen.
 
-### El registro y la gestión comparten renglón
+### El registro es un número para dictar, no la llave
 
-Es el único de los seis que lleva dos pares, y van juntos porque **el número solo
-no alcanza**: el registro es el id del carnet y los carnets son por año, así que
-se reinicia con cada gestión. El `000002` de 2026 y el `000002` de 2027 son dos
-credenciales distintas con el mismo número impreso, y quien lee el plástico en un
-control necesita los dos datos a la vez para saber de cuál está hablando.
-
-Comparten renglón y no ocupan uno propio porque en una CR80 no entran siete
-líneas sueltas sin apretar todo lo demás; el registro son seis dígitos fijos y le
-sobra media tira. El corte va a la mitad: 46 pt para cada valor, con el rótulo
-«GESTIÓN» en el medio. En la vista previa lo mismo se pide con dos `flex-1`.
+«REGISTRO» lleva el número del libro —`000013`—, no el código de 16: en el
+plástico entra un número que se dicta por teléfono y se busca en el libro. Como
+cuenta **por gestión**, el `000002` de 2026 y el de 2027 son dos credenciales
+distintas: quien necesita saber cuál es, escanea el QR. El código sigue
+existiendo, en el dorso, y es el que abre la verificación pública.
 
 ### Los rótulos van en blanco grueso Y perfilado
 
@@ -281,45 +206,6 @@ más allá de donde la cuenta decía.
 | --- | ---: | ---: |
 | Tira entera | 126 | 122 |
 | Mitad del renglón partido | 42 | 38 |
-
-### El registro y la gestión comparten renglón
-
-Es el único de los seis que lleva dos pares, y van juntos porque **el número solo
-no alcanza**: el registro es el id del carnet y los carnets son por año, así que
-se reinicia con cada gestión. El `000002` de 2026 y el `000002` de 2027 son dos
-credenciales distintas con el mismo número impreso, y quien lee el plástico en un
-control necesita los dos datos a la vez para saber de cuál está hablando.
-
-Comparten renglón y no ocupan uno propio porque en una CR80 no entran siete
-líneas sueltas sin apretar todo lo demás; el registro son seis dígitos fijos y le
-sobra media tira. El corte va a la mitad: 46 pt para cada valor, con el rótulo
-«GESTIÓN» en el medio. En la vista previa lo mismo se pide con dos `flex-1`.
-
-### Los rótulos van en blanco perfilado, y los valores en verde oscuro
-
-El blanco es lo que separa el andamio del dato. «NOMBRE» no es información: es el
-cartelito que dice qué se está leyendo. En el verde oscuro del valor pesaba lo
-mismo que el nombre de la persona y el ojo tenía que descartarlo en cada renglón.
-
-**Pero el blanco solo no alcanza sobre este fondo.** El verde del plástico es
-claro, y no es liso: abajo corre el sello de agua del SEDAG, que le cambia el
-tono al rótulo según por dónde pase. A 4,6 pt, el blanco puro se desdibuja en los
-tramos claros del sello y desaparece del todo en un carnet impreso con poco
-tóner. Así que van **perfilados en verde oscuro** —el `:` también, que es andamio
-igual que el rótulo—, y se leen recortados en cualquier tramo del fondo.
-
-El contorno es el mismo truco del título, y vive en una sola parte:
-[`documentos/partes/texto-perfilado.blade.php`](../../resources/views/documentos/partes/texto-perfilado.blade.php).
-DomPDF no tiene `-webkit-text-stroke` ni `text-shadow`, así que el texto se
-dibuja **cinco veces**: cuatro copias del color del borde corridas hacia cada
-esquina y la cara encima. En pantalla alcanza con `text-shadow` en cuatro
-direcciones.
-
-> **El corrimiento se elige contra el cuerpo, no contra el gusto.** El título va
-> corrido 0,5 pt a 11 pt; los rótulos, 0,3 pt a 4,6 — más o menos un 6% del
-> cuerpo en los dos casos. Medio punto sobre 4,6 pt no perfila: engorda la letra
-> hasta cerrarle los huecos —la «O» se llena, la «E» se vuelve una mancha— y el
-> rótulo deja de leerse, que es lo contrario de lo que el contorno viene a hacer.
 
 ### El encabezado va en DOS PISOS, no en dos columnas
 
@@ -449,17 +335,17 @@ pesar más que el encabezado.
 > sobre una letra más chica la engorda, que es la trampa que ya había aparecido
 > con los rótulos.
 
-### El título dice «CÉDULA DE <RUBRO>»
+### El título dice «CÉDULA DE <ACTIVIDAD>»
 
-**Ya no.** Hoy dice «CÉDULA DE PESCADOR», con el rubro adentro, igual que el
-plástico de papel.
+Hoy dice «CÉDULA DE PESCADOR» o «CÉDULA DE COMERCIALIZADOR», igual que el
+plástico de papel. Sale de `carnets.tipo_actor` (`TipoActor::etiqueta()`), nunca
+del nombre del tipo de carnet, que es un catálogo que edita la unidad.
 
 Decía «CÉDULA» a secas mientras el carnet era UNO para todas las actividades de
-una persona: nombrar una habría dicho algo que el documento no era. Con un carnet
-por rubro, el título es lo que se lee de lejos —antes que cualquier renglón— y
-puede decirlo.
+una persona. Con un carnet por actividad, el título es lo que se lee de lejos
+—antes que cualquier renglón— y puede decirlo.
 
-**El largo lo decide el catálogo**, así que el título se achica si no entra, igual
+**El largo está acotado por el enum**, y aun así el título se achica si no entra, igual
 que los renglones. A 9,5 pt con 0,8 de interletrado cada carácter ocupa ~6,55 pt
 y en los 230 pt útiles entran unos 35:
 
@@ -474,50 +360,33 @@ y en los 230 pt útiles entran unos 35:
 > sobre un cuerpo de 7,6: pasa de ser un 6% a un 9% y engorda la letra hasta
 > cerrarle los huecos, que es justo lo que el perfilado viene a evitar.
 
-Lo arma `CarnetImpresionController::titulo()`, y `vista-previa-carnet.tsx` repite
-el mismo umbral. Los dos tienen que moverse juntos.
+Lo arma `CarnetImpresionController::titulo()` (`CARACTERES_TITULO`).
 
-### El rubro y el cupo SÍ van; el vencimiento no
+### La actividad y el cupo SÍ van; el estado y el vencimiento no
 
-Esta sección decía lo contrario, y vale la pena leer por qué cambió: **el motivo
-viejo era bueno, y lo que cambió no fue la opinión sino el sistema.**
+**Lo que se imprime tiene que ser lo que NO cambia** después de que el plástico
+sale de la impresora.
 
-Con el modelo anterior —un carnet por persona, con los rubros colgados en
-`carnet_rubro`— el plástico no llevaba ni la lista de rubros ni el cupo:
+Con el modelo anterior —un carnet por persona, con las actividades colgadas— el
+plástico no llevaba ni las actividades ni el cupo: una adición posterior dejaba
+vieja la lista impresa, y el documento pasaba a decir MENOS de lo que la persona
+podía hacer.
 
-- quien era pescador podía sumar comercializador en octubre con una adición, y el
-  plástico **no cambiaba**: mismo carnet, mismo registro. Impresa, la lista
-  quedaba vieja ese mismo día y el documento pasaba a decir MENOS de lo que la
-  persona estaba autorizada a hacer — peor que no decir nada;
-- el cupo era un tope POR ACTIVIDAD, así que con dos rubros había dos cupos y un
-  único renglón donde ponerlos.
-
-Hoy el carnet es de **un** rubro, y ese rubro es parte de la llave que lo
-identifica: no cambia nunca. No queda nada que pueda dejar vieja la impresión, y
-el cupo es uno solo.
-
-**Y es más que una posibilidad: es necesario.** Dos carnets de la misma persona
-en la misma gestión son dos plásticos con el mismo nombre, la misma foto y el
-mismo domicilio. Sin el rubro impreso, nada los distingue a simple vista — y el
-número de registro no ayuda, porque nadie compara seis dígitos en un control.
+Hoy el carnet es de **una** actividad, que no cambia nunca, y su cupo es el de
+**una** autorización. Las dos van impresas, y hacen falta: dos carnets de la
+misma persona son plásticos con el mismo nombre, la misma foto y el mismo
+domicilio, y sin la actividad nada los distingue a simple vista.
 
 Lo que sigue sin imprimirse:
 
-- **El ESTADO.** Un carnet se suspende o se anula DESPUÉS de impreso y la tarjeta
-  no se entera. Es el mismo criterio de siempre —en un documento impreso va lo
-  que no cambia— aplicado a lo que de verdad cambia.
-- **La fecha de vencimiento.** Todos los carnets de una gestión vencen el
-  mismo día —el 31 de diciembre, ver `Carnet::vencimientoDeGestion()`— así que
-  **con la gestión impresa la fecha no agrega nada**: 2026 ya dice 31/12/2026.
-  Y si la pregunta es si HOY vale, la fecha impresa nunca fue la respuesta: un
-  carnet puede estar anulado con su fecha intacta.
+- **El ESTADO.** Un carnet se revoca o queda sin efecto DESPUÉS de impreso y la
+  tarjeta no se entera.
+- **El vencimiento.** Todos los carnets vencen el 31/12 de su gestión, y si la
+  pregunta es si HOY vale, la fecha impresa nunca fue la respuesta: un carnet
+  puede estar revocado con su fecha intacta.
 
-  > Antes de que la gestión se imprimiera, esta ausencia se justificaba diciendo
-  > que «el año del registro ya lo dice». **No lo decía**: el registro es
-  > `000013`, seis dígitos sin año. El dato faltaba de verdad, y el renglón
-  > compartido es lo que lo tapó.
-
-El estado y la fecha se consultan en la ficha del carnet, en el panel.
+El estado, la gestión y la vigencia se consultan escaneando el QR del dorso, o en
+la ficha del carnet en el panel.
 
 ### Las tiras van blancas y la letra negra fina, como una cédula de identidad
 
@@ -568,8 +437,8 @@ sistema; el molde le dice al operador exactamente dónde ir a completarlo.
 
 ### Un valor largo se achica, no se corta
 
-La vista previa corta con `truncate`, y en pantalla está bien: es una maqueta y
-el dato completo está en la ficha. **En el plástico no.** «María Esperanza del
+En una pantalla se corta con `truncate`, y está bien: el dato completo está en
+la ficha. **En el plástico no.** «María Esperanza del
 Carmen Justiniano Vaca Guzmán de Suárez Vilinga» cortado en «María Esperanza del
 Carmen» pierde los apellidos, que son justamente lo que identifica a la persona
 en un control.
@@ -705,17 +574,11 @@ se bajó hasta el del plástico.
 > —`V × 0,82 · S × 1,14`, y después `V × 0,86 · S × 1,06`— que baja el brillo sin mover el tono y deja el sello con el mismo
 > contraste relativo contra el fondo. Multiplicar el RGB a secas, que es lo
 > primero que uno prueba, apaga el verde hacia el oliva: el plástico es un verde
-> **vivo**, no un verde sucio. Son los mismos números que llevan los tres topes
-> del degradado de la vista previa, así que para volver a moverlo alcanza con
-> aplicar el mismo ajuste a las dos mitades.
+> **vivo**, no un verde sucio. Para volver a moverlo se aplica el mismo ajuste
+> al PNG entero.
 
-> ⚠️ **El fondo se toca en DOS lugares.** El PNG es solo la mitad del PDF: la
-> vista previa dibuja su verde con un `linear-gradient` de CSS, porque en
-> pantalla sí existe. Cambiar uno y no el otro es exactamente lo que el recuadro
-> «así va a salir el carnet» viene a evitar.
-
-El generador reproduce la fórmula de CSS para que el verde del papel sea
-exactamente el de la pantalla.
+> El fondo vive en un solo lugar desde que se retiró la vista previa en React,
+> que dibujaba su propio verde con un `linear-gradient`.
 
 ### El contorno dorado del título son cinco copias
 
@@ -725,8 +588,7 @@ mismo texto se dibuja **cinco veces** —cuatro en dorado, corridas 0,7 pt hacia
 cada esquina, y la quinta en rojo encima—.
 
 Parece un truco y lo es, pero es el único que sale igual en todas las versiones
-de DomPDF. En la vista previa, que sí corre en un navegador, alcanza con
-`text-shadow` en cuatro direcciones.
+de DomPDF. En un navegador alcanzaría con `text-shadow` en cuatro direcciones.
 
 ### El peso
 
@@ -898,11 +760,10 @@ archivo se guardó con un nombre al azar (ver `StorageController`) y la extensi�
 que mandó el navegador no es prueba de nada.
 
 **Sin foto el carnet sale igual, con el recuadro vacío.** Es lo mismo que hacía
-la unidad con la cédula de papel cuando la persona traía la foto después, y la
-vista previa lo avisa antes de llegar a la impresora: «La ficha no tiene
-fotografía». Un error 500 acá dejaría a ventanilla sin poder imprimir nada.
+la unidad con la cédula de papel cuando la persona traía la foto después,  y la
+ficha lo avisa antes de imprimir. Un error 500 acá dejaría a ventanilla sin poder imprimir nada.
 
-La foto **no se carga en el formulario del trámite**: es un dato del padrón, se
+La foto **no se carga en el formulario del carnet**: es un dato del padrón, se
 carga en la ficha del beneficiario.
 
 ---
@@ -912,7 +773,8 @@ carga en la ficha del beneficiario.
 Estuvo escrita y sin llamar desde que el QR se sacó hasta que volvió, el
 22/09/2026. Lo que resuelve:
 
-**`simplesoftwareio/simple-qrcode` no sirve en este servidor.** Su salida PNG
+**`simplesoftwareio/simple-qrcode` no servía en este servidor** —se desinstaló el
+03/10/2026 y hoy se requiere `bacon/bacon-qr-code` directo—. Su salida PNG
 necesita la extensión `imagick`, que no está instalada (`php -m` lista `gd`), y
 revienta con «Extension 'Imagick' is required». La otra salida que ofrece es
 SVG, y DomPDF trae `php-svg-lib` para dibujarlo — pero un QR es justamente el
@@ -955,41 +817,16 @@ más de lado, así que el margen contra el piso de 69 px es de unas tres veces.
 
 ## 9. En la pantalla
 
-El botón **«Carnet»** aparece en dos lugares:
-
-- la ficha del trámite (`pages/panel/tramites/ver.tsx`), junto a los del
-  circuito;
-- la ficha del carnet (`pages/panel/carnets/ver.tsx`), al lado de «Anular».
-
-En los dos casos lo gobierna la prop `puede_imprimirse`, que **calcula el
-servidor**.
-
-### El botón NO abre el PDF: abre la vista previa
-
-`DialogoImprimirCarnet` muestra el carnet en pantalla y recién después se manda
-a la impresora. Lo que se imprime es un plástico que se troquela y se lamina: no
-se corrige, así que conviene mirarlo antes — sobre todo para descubrir la ficha
-sin foto.
-
-**Lo que muestra es el PDF DE VERDAD, no una maqueta.** El `iframe` apunta a la
-misma dirección que imprime, así que lo que se ve es exactamente el archivo que
-va a salir. Podría haberse dibujado con `VistaPreviaCarnet` y habría sido más
-rápido, pero una maqueta es una PROMESA de cómo va a salir algo, y para decidir
-si mandar a imprimir hace falta ver la cosa. Si algún día la maqueta y el PDF se
-separan, este diálogo es donde se tiene que notar.
-
-El PDF se pide **recién al abrir**: el `iframe` se monta con el diálogo. Montado
-siempre, cada visita a una ficha pediría un PDF que nadie va a mirar.
+El botón **«Imprimir carnet»** está en la ficha del carnet
+(`pages/panel/carnets/ver.tsx`). Lo gobiernan el permiso `carnets.imprimir`
+(`usePermisos()`) y la prop `puede_imprimirse`, **que calcula el servidor**. Es un
+`<a target="_blank">` al PDF: una navegación de Inertia no sabe qué hacer con un
+archivo.
 
 > **No hay un botón que llame a `print()`.** Con un PDF el visor del navegador lo
-> ignora o lo bloquea según la versión, y un botón que a veces no hace nada es
-> peor que no tenerlo. Se imprime desde la barra del propio visor o desde la
-> pestaña aparte, que es lo que ofrece «Abrir en pestaña nueva» — y ese sí va
-> como `<a target="_blank">`, porque una navegación de Inertia no sabe qué hacer
-> con un archivo.
->
-> Por lo mismo, el «Generando el carnet…» **no puede depender de `onLoad`**:
-> medido, con un PDF ese evento no llega nunca en algunos navegadores.
+> ignora o lo bloquea según la versión. Se imprime desde la barra del visor, en
+> la pestaña que se abrió. Y un «generando…» no puede depender de `iframe.onLoad`:
+> con un PDF ese evento no llega nunca en algunos navegadores.
 
 ---
 
@@ -997,29 +834,20 @@ siempre, cada visita a una ficha pediría un PDF que nadie va a mirar.
 
 | Archivo | Qué es |
 | --- | --- |
-| `app/Http/Controllers/Panel/CarnetImpresionController.php` | Arma el PDF y resuelve los renglones |
+| `app/Http/Controllers/Panel/CarnetImpresionController.php` | Arma el PDF y resuelve los renglones: `texto()` achica lo que no entra; `documento()` lo reusa el portal con la marca «NO VÁLIDO» |
+| `resources/views/documentos/carnet-pescador.blade.php` | La maqueta impresa, anverso y dorso |
 | `resources/views/documentos/partes/texto-perfilado.blade.php` | Las cinco copias del texto con contorno, para el título y los rótulos |
-| `resources/views/documentos/carnet-pescador.blade.php` | La maqueta impresa |
-| `resources/js/components/panel/carnets/dialogo-imprimir-carnet.tsx` | La vista previa antes de imprimir |
-| `public/image/carnet-fondo.png` | El verde con el sello horneado |
-| `public/image/carnet-escudo.png` | El escudo del encabezado, recortado de `recibo-escudo.png` |
-| `app/Support/CodigoQr.php` | El QR del dorso: BaconQrCode + `gd`, sin `imagick` — ver §8 |
-
-Tocados: `Carnet` (`puedeImprimirse()`, `urlVerificacion()`), `Archivos`
-(`contenido()`), `CarnetController` (se le quitó `urlVerificacion()`),
-`TramiteController::show()`, `routes/panel.php`,
-`resources/js/pages/panel/{carnets,tramites}/ver.tsx`,
-`resources/js/types/{carnets,tramites}.ts`.
+| `resources/views/documentos/partes/qr-verificacion.blade.php` | El QR y el código escrito |
+| `app/Support/CodigoQr.php`, `app/Support/QrVerificacion.php` | El QR del dorso: BaconQrCode + `gd` (ver §8), con la URL relativa + `APP_URL` |
+| `public/image/carnet-fondo.png`, `carnet-escudo.png` | El verde con el sello horneado y el escudo del encabezado |
+| `app/Models/Carnet.php` | `puedeImprimirse()`, `registro_legible`, `cupoImpreso()` |
 
 ---
 
 ## 11. Lo que quedó afuera
 
-- **El QR.** Se sacó a pedido; ver §5 y §8 por lo que eso implica y por lo que
-  quedó listo para cuando vuelva.
 - **Impresión por lotes.** Sacar de una todos los carnets aprobados y sin
   imprimir de una gestión. `PENDIENTES.md` ya pedía el padrón para eso.
-- **Marcar impreso automáticamente** al abrir el PDF. Se decidió que no: ver §3.
-- **Una silueta en el recuadro de la foto vacío**, como la que dibuja la vista
-  previa. En pantalla explica que falta cargarla; impresa en un plástico que se
+- **Marcar impreso.** Se retiró con el modelo viejo: imprimir no escribe nada (§3).
+- **Una silueta en el recuadro de la foto vacío.** En pantalla explica que falta cargarla; impresa en un plástico que se
   entrega, sería un dibujo raro en el lugar de la cara.
