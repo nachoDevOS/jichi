@@ -347,6 +347,13 @@ export default function VerCupo({
                 <TarjetaRecaudaciones
                     className="lg:col-span-3"
                     monto={cupo.monto}
+                    pago={{
+                        concepto: 'Autorización de Pesca para Aprovechamiento Pesquero',
+                        numero: cupo.numero,
+                        titular: cupo.beneficiario,
+                        documento: cupo.documento,
+                        detalle: `${cupo.volumen_total_kg} kg`,
+                    }}
                     sireb={cupo.sireb}
                     recibo={recibo}
                     puedeVerificar={cupo.puede_verificar_pago}

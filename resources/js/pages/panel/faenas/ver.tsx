@@ -284,7 +284,15 @@ export default function VerFaena({
 
                 {/* El cobro: se paga en SIREB, igual que los otros tres documentos. */}
                 <TarjetaRecaudaciones
+                    className="lg:col-span-3"
                     monto={faena.monto}
+                    pago={{
+                        concepto: 'Permiso de faena',
+                        numero: faena.numero_legible,
+                        titular: faena.beneficiario,
+                        documento: faena.documento,
+                        detalle: `${faena.kilos_extraidos} kg`,
+                    }}
                     sireb={faena.sireb}
                     recibo={recibo}
                     puedeVerificar={faena.puede_verificar_pago}

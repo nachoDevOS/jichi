@@ -4232,25 +4232,11 @@
 
 ### CATÁLOGO DE ASOCIACIONES — y el patrón de las tres pantallas de catálogo
 
-   LA TABLA OCUPA EL ANCHO ENTERO Y EL FORMULARIO SE ABRE ARRIBA
-   El formulario sigue en la MISMA pantalla que la lista —navegar a un alta y
-   volver hace perder de vista aquello contra lo que se compara mientras se
-   carga: «¿ya está ASOPESCA?», «¿este tramo se pisa con el anterior?»— pero va
-   ARRIBA y no en una columna al costado.
-   Dos motivos. Uno: la tabla necesita el ancho, igual que la del padrón — con
-   un tercio de la pantalla robado, las columnas se aprietan y la de «en uso» se
-   corta. Dos: a lo ancho los campos entran en UNA fila en vez de apilarse en
-   una columna angosta, así que el formulario ocupa menos alto del que ocupaba
-   al costado.
-   Es lo contrario de Beneficiarios, que sí tiene pantallas aparte: ahí el
-   formulario tiene veinte campos y una foto, y no entra en una fila.
-   UN SOLO ESTADO DECIDE TODO: `editando`
-   null      -> el formulario está cerrado
-   'nueva'   -> alta
-   <fila>    -> edición de esa fila
-   Con tres booleanos sueltos —`abierto`, `esAlta`, `filaActual`— se pueden
-   combinar en estados imposibles: abierto sin fila y sin ser alta. Un único
-   valor no lo permite.
+   EL FORMULARIO TIENE PANTALLA PROPIA (05/10/2026)
+   Hasta esa fecha se abría arriba de la tabla, con un estado `editando`. A
+   pedido del responsable pasó a `asociaciones-formulario.tsx`, con rutas
+   `asociaciones.create` y `asociaciones.edit`, igual que productos, escala,
+   aranceles y tipos de carnet.
    NO HAY BOTÓN DE BORRAR, Y ES LA REGLA
    Los carnets y las guías emitidas apuntan acá. Una asociación que se deja de
    usar se pone INACTIVA: desaparece de los desplegables de alta y los
@@ -4258,7 +4244,7 @@
    La columna «En uso» está para que eso se entienda solo: con 12 carnets
    colgando, que no haya papelera deja de parecer un descuido.
 
-### El formulario de alta y edición.
+### `asociaciones-formulario.tsx` — alta y edición
 
    Es el MISMO para los dos casos, igual que el Request del servidor comparte
    las reglas: escrito dos veces, alcanza con tocar uno para que crear y editar

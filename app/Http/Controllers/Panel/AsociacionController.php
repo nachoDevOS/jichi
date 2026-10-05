@@ -19,7 +19,7 @@ use Inertia\Response;
 class AsociacionController extends Controller
 {
     /**
-     * Listado y formulario — GET /panel/catalogos/asociaciones
+     * Listado — GET /panel/catalogos/asociaciones
      */
     public function index(Request $request): Response
     {
@@ -75,11 +75,6 @@ class AsociacionController extends Controller
             // en los dos lados, agregar un estado en la pantalla y olvidarse del
             // servidor dejaría al operador eligiendo un valor que se rechaza.
             'estados' => EstadoAsociacion::opciones(),
-
-            // Los rótulos salen del modelo: agregar un dato a la ficha es
-            // sumar una línea en `Asociacion::CAMPOS`, sin tocar la pantalla
-            // ni migrar.
-            'camposFicha' => Asociacion::CAMPOS,
         ]);
     }
 
@@ -91,6 +86,22 @@ class AsociacionController extends Controller
         $escapado = trim((string) json_encode($termino), '"');
 
         return '%'.str_replace(['%', '_'], ['\%', '\_'], $escapado).'%';
+    }
+
+    /**
+     * Formulario de alta — GET /panel/catalogos/asociaciones/crear
+     */
+    public function create(): Response
+    {
+        return $this->formulario(null);
+    }
+
+    /**
+     * Formulario de edición — GET /panel/catalogos/asociaciones/{asociacion}/editar
+     */
+    public function edit(Asociacion $asociacion): Response
+    {
+        return $this->formulario($asociacion);
     }
 
     /**
@@ -115,5 +126,22 @@ class AsociacionController extends Controller
         return redirect()
             ->route('asociaciones.index')
             ->with('exito', "Asociación «{$asociacion->nombre}» actualizada.");
+    }
+
+    /** La misma pantalla para alta (sin asociación) y edición. */
+    private function formulario(?Asociacion $asociacion): Response
+    {
+        return Inertia::render('panel/catalogos/asociaciones-formulario', [
+            'asociacion' => $asociacion === null ? null : [
+                'id' => $asociacion->id,
+                'nombre' => $asociacion->nombre,
+                'sigla' => $asociacion->sigla,
+                'datos' => $asociacion->fichaCompleta(),
+                'estado' => $asociacion->estado->value,
+            ],
+            'estados' => EstadoAsociacion::opciones(),
+            // Los rótulos salen del modelo: un dato nuevo de la ficha es una línea en `Asociacion::CAMPOS`.
+            'camposFicha' => Asociacion::CAMPOS,
+        ]);
     }
 }

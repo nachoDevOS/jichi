@@ -278,6 +278,13 @@ export default function VerGuia({
                     {/* El cobro: se paga en SIREB, igual que los otros tres documentos. */}
                     <TarjetaRecaudaciones
                         monto={guia.monto}
+                        pago={{
+                            concepto: 'Guía única de transporte',
+                            numero: guia.numero_legible,
+                            titular: guia.comercializador,
+                            documento: guia.documento,
+                            detalle: `${guia.peso_total_kg} kg · ${guia.ruta}`,
+                        }}
                         sireb={guia.sireb}
                         recibo={recibo}
                         puedeVerificar={guia.puede_verificar_pago}

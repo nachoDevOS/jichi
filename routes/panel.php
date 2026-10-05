@@ -329,6 +329,14 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:catalogos.ver')
             ->name('asociaciones.index');
 
+        Route::get('/asociaciones/crear', [AsociacionController::class, 'create'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('asociaciones.create');
+
+        Route::get('/asociaciones/{asociacion}/editar', [AsociacionController::class, 'edit'])
+            ->middleware('permiso:catalogos.gestionar')
+            ->name('asociaciones.edit');
+
         Route::middleware('permiso:catalogos.gestionar')->group(function () {
             Route::post('/asociaciones', [AsociacionController::class, 'store'])
                 ->name('asociaciones.store');

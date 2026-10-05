@@ -1,9 +1,8 @@
-import { Head, router, useForm } from '@inertiajs/react';
-import { Building2, Pencil, Plus, Search, X } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Building2, Pencil, Plus, Search } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Campo } from '@/components/ui/campo';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
@@ -11,6 +10,7 @@ import { Paginacion } from '@/components/ui/paginacion';
 import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
+import { cn } from '@/lib/utils';
 import type { OpcionEnum, Paginado } from '@/types';
 import type { AsociacionFila } from '@/types/catalogos';
 
@@ -21,19 +21,15 @@ export default function CatalogoAsociaciones({
     asociaciones,
     filtros,
     estados,
-    camposFicha,
     opcionesPorPagina,
 }: {
     asociaciones: Paginado<AsociacionFila>;
     filtros: { buscar: string | null; estado: string | null; por_pagina: number };
     estados: OpcionEnum[];
     opcionesPorPagina: number[];
-    /** Clave → rótulo de la ficha. Sale de `Asociacion::CAMPOS`. */
-    camposFicha: Record<string, string>;
 }) {
     const { puede } = usePermisos();
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
-    const [editando, setEditando] = useState<AsociacionFila | 'nueva' | null>(null);
 
     function filtrar(valores: Record<string, string | number | null> = {}) {
         router.get(route('asociaciones.index'), { buscar, estado: filtros.estado, ...valores }, {
@@ -52,32 +48,16 @@ export default function CatalogoAsociaciones({
             descripcion="Los gremios que certifican al beneficiario. Se imprimen en el carnet y en las guías."
             acciones={
                 puede('catalogos.gestionar') && (
-                    <Button onClick={() => setEditando('nueva')}>
+                    <Link href={route('asociaciones.create')} className={cn(buttonVariants())}>
                         <Plus className="size-4" />
                         Nueva asociación
-                    </Button>
+                    </Link>
                 )
             }
         >
             <Head title="Asociaciones" />
 
             <div className="space-y-6">
-                {/* --------------------------------------------------- Formulario */}
-                {editando !== null && puede('catalogos.gestionar') && (
-                    <FormularioAsociacionCard
-                        // La `key` fuerza a React a rehacer el componente al
-                        // cambiar de fila. Sin ella reutilizaría el mismo, y el
-                        // useForm de adentro conservaría los valores de la fila
-                        // anterior: se abriría «editar ASOPESCA» con los datos
-                        // de APREMA cargados.
-                        key={editando === 'nueva' ? 'nueva' : editando.id}
-                        asociacion={editando === 'nueva' ? null : editando}
-                        estados={estados}
-                        camposFicha={camposFicha}
-                        onCerrar={() => setEditando(null)}
-                    />
-                )}
-
                 {/* ------------------------------------------------------ Tabla */}
                 {/*
                     `min-w-0` NO ES DECORACIÓN. Un elemento de grilla arranca con
@@ -220,14 +200,13 @@ export default function CatalogoAsociaciones({
 
                                                     <td className="px-5 py-2.5 text-right">
                                                         {puede('catalogos.gestionar') && (
-                                                            <Button
-                                                                variant="editar"
-                                                                size="sm"
+                                                            <Link
+                                                                href={route('asociaciones.edit', a.id)}
                                                                 title="Editar"
-                                                                onClick={() => setEditando(a)}
+                                                                className={cn(buttonVariants({ variant: 'editar', size: 'sm' }))}
                                                             >
                                                                 <Pencil className="size-4" />
-                                                            </Button>
+                                                            </Link>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -244,183 +223,5 @@ export default function CatalogoAsociaciones({
 
             </div>
         </LayoutPanel>
-    );
-}
-
-/**
- * El formulario de alta y edición.
- */
-function FormularioAsociacionCard({
-    asociacion,
-    estados,
-    camposFicha,
-    onCerrar,
-}: {
-    asociacion: AsociacionFila | null;
-    estados: OpcionEnum[];
-    camposFicha: Record<string, string>;
-    onCerrar: () => void;
-}) {
-    const esAlta = asociacion === null;
-
-    /*
-     * La ficha arranca con todas las claves, en cadena vacía: un `undefined`
-     * en `useForm` hace que el input pase de no-controlado a controlado al
-     * escribir, y React avisa en consola y pierde el primer carácter.
-     */
-    const fichaInicial = Object.fromEntries(
-        Object.keys(camposFicha).map((clave) => [clave, asociacion?.datos?.[clave] ?? '']),
-    );
-
-    const form = useForm({
-        nombre: asociacion?.nombre ?? '',
-        sigla: asociacion?.sigla ?? '',
-        datos: fichaInicial,
-        estado: asociacion?.estado ?? 'activo',
-    });
-
-    function enviar(e: FormEvent) {
-        e.preventDefault();
-
-        const opciones = {
-            preserveScroll: true,
-            // Al guardar bien, el panel se cierra solo: dejarlo abierto con los
-            // datos ya guardados invita a apretar otra vez y crear un duplicado.
-            onSuccess: () => onCerrar(),
-        };
-
-        if (esAlta) {
-            form.post(route('asociaciones.store'), opciones);
-        } else {
-            form.put(route('asociaciones.update', asociacion.id), opciones);
-        }
-    }
-
-    return (
-        <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                <CardTitle>{esAlta ? 'Nueva asociación' : 'Editar asociación'}</CardTitle>
-
-                <Button variant="ghost" size="sm" onClick={onCerrar} aria-label="Cerrar">
-                    <X className="size-4" />
-                </Button>
-            </CardHeader>
-
-            <CardContent>
-                <form onSubmit={enviar} className="space-y-4">
-                    {/* A lo ancho los tres campos entran en una fila. */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Campo etiqueta="Nombre" htmlFor="nombre" error={form.errors.nombre} obligatorio>
-                        <Input
-                            id="nombre"
-                            value={form.data.nombre}
-                            onChange={(e) => form.setData('nombre', e.target.value)}
-                            aria-invalid={Boolean(form.errors.nombre)}
-                            placeholder="Asociación de Pescadores de Trinidad"
-                        />
-                    </Campo>
-
-                    <Campo
-                        etiqueta="Sigla"
-                        htmlFor="sigla"
-                        error={form.errors.sigla}
-                        ayuda="Es lo que entra en el renglón angosto del carnet. El servidor la guarda en mayúsculas."
-                    >
-                        <Input
-                            id="sigla"
-                            value={form.data.sigla}
-                            onChange={(e) => form.setData('sigla', e.target.value.toUpperCase())}
-                            aria-invalid={Boolean(form.errors.sigla)}
-                            placeholder="ASOPESTRI"
-                            className="font-mono"
-                        />
-                    </Campo>
-
-                    <Campo
-                        etiqueta="Estado"
-                        htmlFor="estado"
-                        error={form.errors.estado}
-                        ayuda="Una asociación inactiva no aparece al emitir, pero los documentos ya emitidos la siguen mostrando."
-                        obligatorio
-                    >
-                        <Select
-                            id="estado"
-                            value={form.data.estado}
-                            onChange={(e) => form.setData('estado', e.target.value as typeof form.data.estado)}
-                            aria-invalid={Boolean(form.errors.estado)}
-                        >
-                            {estados.map((o) => (
-                                <option key={o.value} value={o.value}>
-                                    {o.label}
-                                </option>
-                            ))}
-                        </Select>
-                    </Campo>
-                    </div>
-
-                    {/*
-                        LA FICHA DEL GREMIO. Los campos se dibujan a partir de
-                        los rótulos que manda el servidor —`Asociacion::CAMPOS`—
-                        así que sumar un dato es una línea en el modelo: acá no
-                        se toca nada, y tampoco hace falta migrar.
-                    */}
-                    <div className="space-y-4 border-t border-border pt-4">
-                        <div>
-                            <p className="text-sm font-medium">Ficha de la asociación</p>
-                            <p className="text-xs text-muted-foreground">
-                                Todo opcional. Son datos de respaldo y de contacto: no deciden nada
-                                en el sistema, se guardan y se muestran.
-                            </p>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {Object.entries(camposFicha).map(([clave, rotulo]) => (
-                                <Campo
-                                    key={clave}
-                                    etiqueta={rotulo}
-                                    htmlFor={`ficha-${clave}`}
-                                    error={form.errors[`datos.${clave}` as keyof typeof form.errors]}
-                                >
-                                    <Input
-                                        id={`ficha-${clave}`}
-                                        // El tipo sale de la clave y no de una
-                                        // lista aparte: un campo nuevo con
-                                        // «fecha» o «correo» en el nombre ya
-                                        // entra con el control correcto.
-                                        type={
-                                            clave === 'fundacion'
-                                                ? 'date'
-                                                : clave === 'correo'
-                                                  ? 'email'
-                                                  : 'text'
-                                        }
-                                        value={form.data.datos[clave] ?? ''}
-                                        onChange={(e) =>
-                                            form.setData('datos', {
-                                                ...form.data.datos,
-                                                [clave]: e.target.value,
-                                            })
-                                        }
-                                        aria-invalid={Boolean(
-                                            form.errors[`datos.${clave}` as keyof typeof form.errors],
-                                        )}
-                                    />
-                                </Campo>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                        <Button type="submit" disabled={form.processing}>
-                            {esAlta ? 'Registrar' : 'Guardar cambios'}
-                        </Button>
-
-                        <Button type="button" variant="outline" onClick={onCerrar}>
-                            Cancelar
-                        </Button>
-                    </div>
-                </form>
-            </CardContent>
-        </Card>
     );
 }

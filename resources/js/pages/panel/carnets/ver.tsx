@@ -395,6 +395,13 @@ export default function VerCarnet({
             <div className="mt-6">
                 <TarjetaRecaudaciones
                     monto={carnet.monto}
+                    pago={{
+                        concepto: `Carnet de ${carnet.tipo_actor_etiqueta.toLowerCase()} · gestión ${carnet.gestion}`,
+                        numero: carnet.registro,
+                        titular: carnet.beneficiario,
+                        documento: carnet.documento,
+                        detalle: carnet.tipo,
+                    }}
                     sireb={carnet.sireb}
                     recibo={recibo}
                     puedeVerificar={carnet.puede_verificar_pago}

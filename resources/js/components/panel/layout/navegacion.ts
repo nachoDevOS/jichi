@@ -39,8 +39,10 @@ export const NAVEGACION: ItemNavegacion[] = [
     // --- Lo pagado en Recaudaciones (SIREB): un recibo por documento.
     { titulo: 'Recibos', ruta: 'recibos.index', icono: ReceiptText, permiso: 'recibos.ver', grupo: 'Pagos' },
 
+    // --- Las asociaciones de pescadores, aparte de los catálogos.
+    { titulo: 'Asociaciones', ruta: 'asociaciones.index', icono: Building2, permiso: 'catalogos.ver', grupo: 'Parámetros' },
+
     // --- Lo que sale de una resolución y casi no se toca.
-    { titulo: 'Asociaciones', ruta: 'asociaciones.index', icono: Building2, permiso: 'catalogos.ver', grupo: 'Catálogos' },
     { titulo: 'Tipos de carnet', ruta: 'tipos-carnet.index', icono: Tags, permiso: 'catalogos.ver', grupo: 'Catálogos' },
     { titulo: 'Productos', tituloCompleto: 'Productos hidrobiológicos', ruta: 'productos.index', icono: Fish, permiso: 'catalogos.ver', grupo: 'Catálogos' },
     { titulo: 'Escala', tituloCompleto: 'Escala de aprovechamiento', ruta: 'categorias-aprovechamiento.index', icono: Ruler, permiso: 'catalogos.ver', grupo: 'Catálogos' },

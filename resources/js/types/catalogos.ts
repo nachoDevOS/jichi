@@ -155,4 +155,6 @@ export interface ArancelFila extends ReferenciaSireb {
 }
 
 /** Lo que la pantalla de alta/edición necesita de un producto. */
+export type AsociacionFormulario = Pick<AsociacionFila, 'id' | 'nombre' | 'sigla' | 'datos' | 'estado'>;
+
 export type ProductoFormulario = Pick<ProductoFila, 'id' | 'nombre' | 'servicio_sireb' | 'tarifa_sireb' | 'estado'>;
