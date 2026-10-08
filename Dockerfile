@@ -36,6 +36,10 @@ RUN npm run build
 # --- Imagen final ---
 FROM base AS final
 
+# nginx escucha en el 8000 (la imagen trae 8080): es el puerto que se expone en Coolify.
+ENV NGINX_HTTP_PORT=8000
+EXPOSE 8000
+
 COPY --chown=www-data:www-data --from=vendor /var/www/html/vendor ./vendor
 COPY --chown=www-data:www-data . .
 COPY --chown=www-data:www-data --from=assets /app/public/build ./public/build

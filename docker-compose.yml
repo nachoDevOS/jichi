@@ -7,8 +7,8 @@ services:
     build: .
     image: jichi:local
     ports:
-      # 8080 suele estar ocupado en el equipo; DOCKER_APP_PORT lo cambia
-      - "${DOCKER_APP_PORT:-8090}:8080"
+      # El contenedor escucha en el 8000 (Dockerfile); afuera, 8090 o DOCKER_APP_PORT
+      - "${DOCKER_APP_PORT:-8090}:8000"
     environment:
       APP_NAME: Jichi
       # production: el seeder no vacía el dominio ni pide Faker (no está instalado)

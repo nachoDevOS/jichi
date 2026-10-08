@@ -37,7 +37,9 @@ Queda en **http://localhost:8090**, con `admin@admin.com` y la contraseña de
 
 - **Imagen `serversideup/php:8.3-fpm-nginx`.** Trae nginx, php-fpm, `pdo_pgsql`,
   `zip` y opcache. Con `AUTORUN_ENABLED` corre al arrancar `storage:link`,
-  `migrate --force` y `optimize`. Escucha en el **8080** del contenedor, sin root.
+  `migrate --force` y `optimize`. Escucha en el **8000** del contenedor, sin root
+  (la imagen trae 8080; el Dockerfile fija `NGINX_HTTP_PORT=8000`, 08/10/2026). En
+  Coolify, «Exposed ports»: **8000**.
 - **Se suman `gd`, `intl` y `bcmath`.** gd sale con freetype, jpeg y webp: sin
   freetype revienta el texto girado de la guía (`TextoVertical`), y sin webp se
   rechazan las fotos webp. Imagick no hace falta (ver CLAUDE.md).
