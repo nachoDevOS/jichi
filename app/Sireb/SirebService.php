@@ -236,6 +236,15 @@ class SirebService
         return $respuesta;
     }
 
+    /** Se anota cuando SIREB no contesta: lo automático (comando, portal) no insiste mientras dure. */
+    private const CACHE_SIN_RESPUESTA = 'sireb:sin-respuesta';
+
+    /** ¿SIREB dejó de contestar hace menos de 2 minutos? El botón manual igual prueba. */
+    public static function sinRespuestaReciente(): bool
+    {
+        return Cache::has(self::CACHE_SIN_RESPUESTA);
+    }
+
     /** `$reintentos`: veces de más ante red, timeout o 5xx, con 1 s de pausa. Un 4xx no cambia por insistir. */
     private function pedir(string $metodo, string $ruta, array $datos, array $cabeceras, int $reintentos, string $token): Response
     {
@@ -243,6 +252,7 @@ class SirebService
             return Http::acceptJson()
                 ->withToken($token)
                 ->withHeaders($cabeceras)
+                ->connectTimeout(5)
                 ->timeout(config('jichi.sireb.timeout'))
                 ->retry(
                     $reintentos + 1,
@@ -253,6 +263,8 @@ class SirebService
                 )
                 ->{$metodo}(config('jichi.sireb.url').$ruta, $datos);
         } catch (ConnectionException) {
+            Cache::put(self::CACHE_SIN_RESPUESTA, true, now()->addMinutes(2));
+
             throw SirebException::noResponde();
         }
     }

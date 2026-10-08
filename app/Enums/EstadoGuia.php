@@ -16,19 +16,15 @@ enum EstadoGuia: string
     /** Pagada y vigente: la carga está en camino. */
     case Aprobada = 'aprobado';
 
-    /** Dada de baja con motivo. No vuelve atrás: si hace falta, se emite otra. */
-    case Anulada = 'anulada';
-
-    /** Venció el plazo de pago en SIREB sin ningún pago: no sigue su curso. NO es la vigencia, que la dicen las fechas. */
-    case NoPagada = 'no_pagado';
+    /** Dada de baja con motivo, igual que el carnet y la autorización. No vuelve atrás: si hace falta, se emite otra. */
+    case Revocada = 'revocado';
 
     public function etiqueta(): string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::Aprobada => 'Aprobada',
-            self::Anulada => 'Anulada',
-            self::NoPagada => 'No pagada',
+            self::Revocada => 'Revocada',
         };
     }
 
@@ -37,8 +33,7 @@ enum EstadoGuia: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::Aprobada => 'emerald',
-            self::Anulada => 'rose',
-            self::NoPagada => 'slate',
+            self::Revocada => 'rose',
         };
     }
 
@@ -73,10 +68,10 @@ enum EstadoGuia: string
     }
 
     /**
-     * ¿Se anula? Solo la APROBADA, cuyo papel está en la calle: el borrador se
+     * ¿Se revoca? Solo la APROBADA, cuyo papel está en la calle: el borrador se
      * elimina.
      */
-    public function permiteAnulacion(): bool
+    public function permiteRevocacion(): bool
     {
         return $this === self::Aprobada;
     }

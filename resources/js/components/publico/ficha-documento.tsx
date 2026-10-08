@@ -146,7 +146,7 @@ function Codigo({ codigo }: { codigo: string | null }) {
 
 function Vigencia({ vigencia, vigente }: { vigencia: VigenciaPublica; vigente: boolean }) {
     const dias = vigencia.dias_restantes;
-    // Sin vigencia —en revisión, anulado— contar días que «quedan» engañaría.
+    // Sin vigencia —en revisión, revocado— contar días que «quedan» engañaría.
     const leyenda = !vigente && dias >= 0
         ? 'No habilitado'
         : dias > 1

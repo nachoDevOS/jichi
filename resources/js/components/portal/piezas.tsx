@@ -43,7 +43,7 @@ export function ConMontoResaltado({ texto }: { texto: string }) {
         <>
             {texto.split(/(\d{1,3}(?:\.\d{3})*,\d{2} Bs)/).map((parte, i) =>
                 i % 2 === 1 ? (
-                    <strong key={i} className="text-sm font-extrabold whitespace-nowrap text-rio-profundo">
+                    <strong key={i} className="text-lg font-extrabold whitespace-nowrap text-rio-profundo">
                         {parte}
                     </strong>
                 ) : (

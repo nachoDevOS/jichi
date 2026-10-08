@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { LogoJichi } from '@/components/comunes/logo-jichi';
 import { ToggleApariencia } from '@/components/comunes/toggle-apariencia';
 import { moduloActual, nombreDe } from '@/components/panel/layout/navegacion';
+import { usePermisos } from '@/hooks/use-permisos';
 import { iniciales } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
@@ -130,6 +131,7 @@ export function BarraSuperior({
  */
 function Migas({ titulo }: { titulo: string }) {
     const { ziggy } = usePage<PageProps>().props;
+    const { puede } = usePermisos();
 
     const modulo = moduloActual(ziggy?.location);
     const enElTablero = modulo?.ruta === 'dashboard';
@@ -137,13 +139,20 @@ function Migas({ titulo }: { titulo: string }) {
     // Ziggy solo conoce las rutas ya declaradas: un módulo todavía sin rutas se
     // muestra como texto y no como enlace, en vez de romper el render.
     const enlazable =
-        modulo && Boolean((ziggy?.routes as Record<string, unknown>)?.[modulo.ruta]);
+        modulo &&
+        Boolean((ziggy?.routes as Record<string, unknown>)?.[modulo.ruta]) &&
+        (!modulo.permiso || puede(modulo.permiso));
 
     return (
         <nav aria-label="Ruta de navegación" className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Link href={route('dashboard')} className="hover:text-foreground hover:underline">
-                Inicio
-            </Link>
+            {/* Sin el permiso del tablero, «Inicio» es texto: el enlace terminaría en 403. */}
+            {puede('dashboard.ver') ? (
+                <Link href={route('dashboard')} className="hover:text-foreground hover:underline">
+                    Inicio
+                </Link>
+            ) : (
+                <span>Inicio</span>
+            )}
 
             {modulo && !enElTablero && nombreDe(modulo) !== titulo && (
                 <>

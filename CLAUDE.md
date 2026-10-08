@@ -72,11 +72,12 @@ para no equivocarse:
   ```
                 ┌─(SIREB: «pagada»)──▶ APROBADO ──▶ revocado / agotado
   PENDIENTE ────┤                          └── al aprobar sale el RECIBO
-  (borrador)    └─(SIREB: «vencida», sin pago)──▶ NO PAGADO (no sigue su curso)
+  (borrador)    └─(SIREB: «vencida»)──▶ sigue PENDIENTE (08/10/2026)
   ```
 
   **Dos plazos que no se mezclan** (03/10/2026): el de PAGO lo pone SIREB
-  (`plazo_pago_dias`, 5 días) y si vence sin pago el trámite queda `no_pagado`;
+  (`plazo_pago_dias`, 5 días) y si vence el trámite **sigue `pendiente`** (08/10/2026:
+  el estado `no_pagado` se quitó de los enums);
   la VIGENCIA del trámite (31/12, 30 días, 5 días) NO es un estado: un aprobado
   sigue `aprobado` y si vale hoy lo dicen sus fechas (`estaVigente()`).
 
@@ -147,10 +148,17 @@ controlador ni en React.**
 
 5. **Los permisos se declaran en las rutas.** El middleware `permiso:` es la
    seguridad real. Esconder un botón en React (`usePermisos()`) es solo
-   comodidad: siempre van los dos. Hoy el único rol es `administrador` y los
-   tiene todos, pero el middleware va igual en cada ruta.
+   comodidad: siempre van los dos.
 
-6. **Los enums mandan.** Estados, tipos, roles y permisos viven en `app/Enums/`.
+   **Los PERMISOS son código; los ROLES, datos** (05/10/2026). El catálogo de
+   permisos vive en `RolSistema` —un permiso sin ruta no hace nada—. Los roles
+   los arma la unidad en Seguridad › Roles, salvo `administrador`, que siembra
+   `RolPermisoSeeder` con todos y el panel no toca. Un permiso nuevo va a
+   `RolSistema::CATALOGO` (módulo → nombre, sección, acciones) y a su ruta; una
+   acción nueva, además, a `::ACCIONES`. Uno por acción real: nada de `gestionar`.
+
+6. **Los enums mandan.** Estados, tipos y permisos viven en `app/Enums/` (los
+   roles, salvo `administrador`, en la base: ver la regla 5).
    No escribir esos valores como texto suelto en el código.
 
    Eso incluye las TRANSICIONES: qué salto de estado vale desde dónde lo dice
@@ -356,8 +364,8 @@ Los tres tienen que pasar.
   pasar su fecha —es a propósito: el estado guarda el último hecho, la vigencia
   la dicen las fechas—, así que un carnet del año pasado sigue `aprobado`. Para
   saber si vale HOY: `estaVigente()` y el scope `vigentes()`. **No hay estado
-  `vencido`**: el que existía se rehízo como `no_pagado` (03/10/2026), que es el
-  plazo de PAGO, no la vigencia.
+  `vencido`** ni `no_pagado`: el plazo de PAGO lo lleva la liquidación de SIREB y
+  no toca el estado del trámite (08/10/2026).
 - **EL CÓDIGO DE UN DOCUMENTO NO ES UNA COLUMNA SUYA: vive en `codigos`.**
   Desde el 22/09/2026 los cinco documentos que se entregan —carnet,
   aprovechamiento, faena, guía y recibo— comparten una tabla polimórfica con un
@@ -670,6 +678,13 @@ Los tres tienen que pasar.
   boleta de SIREB, en una transacción. SIREB no avisa: lo disparan el botón de la
   ficha y `jichi:verificar-pagos` cada 10 minutos, que **en producción necesita
   el cron de Laravel** (`schedule:run`); sin él, nada se aprueba solo.
+  **Y en desarrollo `composer run dev` NO traía el programador** (`artisan dev`
+  levanta serve, queue y vite): había que apretar «Verificar pago» siempre, y
+  parecía un bug de SIREB. Desde el 08/10/2026 lo registra `AppServiceProvider`
+  con `DevCommands::artisan('schedule:work')`. Ver `php artisan dev:list`. **En
+  Coolify** (un solo contenedor) el cron es una «Scheduled Task» con
+  `php artisan schedule:run` cada minuto; no hay trabajador de cola: el
+  `VerificarPagoJob` del portal corre con `dispatchAfterResponse()`.
 - **Un `LIKE` sobre una columna JSON no encuentra nada con tildes.** Laravel
   guarda el JSON con `json_encode` por defecto, que escapa los acentos a
   `\uXXXX` y las barras a `\/`: buscar «Pérez» no encuentra `P\u00e9rez`, y
@@ -690,6 +705,13 @@ Los tres tienen que pasar.
   el REPL**, esperando entrada, con lo que el archivo dejó abierto —una
   transacción, sus bloqueos—. Para un script va
   `php artisan tinker --execute="require 'archivo.php';" < /dev/null`.
+  **Y ahí las variables del archivo NO son globales**: una función que diga
+  `global $x` lee null. Se comparten por `$GLOBALS['x']`.
+- **Un enlace a OTRO módulo necesita el permiso de ESE módulo** (05/10/2026). Con
+  un solo rol con todo nadie lo nota; con roles a medida, la ficha del carnet ofrecía
+  «Beneficiario», «Autorización» y las faenas a quien no podía verlos, y cada clic
+  terminaba en 403. Va `EnlacePermitido` o `puede('x.ver') &&`. Lo mismo para
+  redirigir: el login manda a `User::rutaInicio()`, nunca a `dashboard` a secas.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **NADA AVISA SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Una tabla, un

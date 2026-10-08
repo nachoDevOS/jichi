@@ -1,10 +1,10 @@
-import { Link } from '@inertiajs/react';
 import { History, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { bs, cn, fecha } from '@/lib/utils';
 import type { TipoActor } from '@/types';
 import type { CarnetResumen } from '@/types/beneficiarios';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 
 /** Los colores de cada actividad, escritos enteros: Tailwind no ve clases armadas. */
 const TONOS: Record<TipoActor, { tarjeta: string; suave: string; texto: string; punto: string }> = {
@@ -30,7 +30,8 @@ export function CredencialMini({ carnet, moneda }: { carnet: CarnetResumen; mone
     const dias = carnet.dias_para_vencer;
 
     return (
-        <Link
+        <EnlacePermitido
+            permiso="carnets.ver"
             href={route('carnets.show', carnet.id)}
             className={cn(
                 'group relative block overflow-hidden rounded-xl p-5 text-white shadow-md transition-transform hover:-translate-y-0.5',
@@ -83,7 +84,7 @@ export function CredencialMini({ carnet, moneda }: { carnet: CarnetResumen; mone
                     {dias === 0 ? 'Vence hoy' : `Quedan ${dias} ${dias === 1 ? 'día' : 'días'} de vigencia`}
                 </p>
             )}
-        </Link>
+        </EnlacePermitido>
     );
 }
 
@@ -121,12 +122,13 @@ export function HistorialCarnets({ carnets, moneda }: { carnets: CarnetResumen[]
         <ul className="divide-y divide-border rounded-lg border border-border">
             {carnets.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
-                    <Link
+                    <EnlacePermitido
+                        permiso="carnets.ver"
                         href={route('carnets.show', c.id)}
                         className="font-mono font-medium tabular-nums text-primary hover:underline"
                     >
                         {c.registro ? `N° ${c.registro}` : c.codigo}
-                    </Link>
+                    </EnlacePermitido>
                     <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
                     <span className="text-muted-foreground">
                         {c.asociacion ?? '—'} · vence {fecha(c.fecha_vencimiento)}

@@ -1,5 +1,5 @@
-import { Check, ExternalLink, Eye } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, Check, CheckCircle2, ExternalLink, Eye, Hourglass, Search } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { detalleDocumento, ICONO_DOCUMENTO } from '@/components/portal/documento';
 import { ConMontoResaltado, EstadoChip } from '@/components/portal/piezas';
 import { VisorVistaPrevia } from '@/components/portal/visor-vista-previa';
@@ -10,6 +10,14 @@ const PASOS = ['Solicitado', 'Pago en Recaudaciones', 'Aprobado'];
 
 /** Qué paso está en marcha: sale de la `etapa` que calcula el servidor. */
 const PASO_ACTUAL: Record<NonNullable<PapelPortal['etapa']>, number> = { pago: 1 };
+
+/** Cómo se dice el estado del pago, de un vistazo. Clases completas: Tailwind solo ve lo escrito. */
+const ESTADO_PAGO: Record<NonNullable<PapelPortal['pago']>, { texto: string; clase: string; icono: ReactNode }> = {
+    sin_pago: { texto: 'Esperando su pago', clase: 'bg-amber-50 text-amber-900 ring-amber-200', icono: <Hourglass className="size-5" /> },
+    revision: { texto: 'Pago cargado: lo están revisando', clase: 'bg-sky-50 text-sky-900 ring-sky-200', icono: <Search className="size-5" /> },
+    validado: { texto: 'Pago validado', clase: 'bg-emerald-50 text-emerald-900 ring-emerald-200', icono: <CheckCircle2 className="size-5" /> },
+    caida: { texto: 'Hace falta un nuevo código de pago', clase: 'bg-rose-50 text-rose-900 ring-rose-200', icono: <AlertTriangle className="size-5" /> },
+};
 
 /**
  * Un trámite abierto, compacto: qué es, la línea de pasos del circuito, qué le
@@ -27,8 +35,8 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
                     <Icono className="size-4.5" />
                 </span>
                 <div className="min-w-0 flex-1 leading-tight">
-                    <p className="truncate text-sm font-bold text-rio-profundo">{tramite.tipo}</p>
-                    <p className="truncate text-xs text-slate-500">{detalleDocumento(tramite)}</p>
+                    <p className="text-base leading-snug font-bold text-rio-profundo">{tramite.tipo}</p>
+                    <p className="truncate text-sm text-slate-500">{detalleDocumento(tramite)}</p>
                 </div>
                 <EstadoChip color={tramite.estado_color}>{tramite.estado_etiqueta}</EstadoChip>
             </div>
@@ -76,10 +84,19 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
                 })}
             </ol>
 
-            {tramite.siguiente_paso && (
-                <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                    <ConMontoResaltado texto={tramite.siguiente_paso} />
-                </p>
+            {/* En qué está el pago: lo primero que busca quien ya pagó. */}
+            {tramite.pago && (
+                <div className={cn('mt-3 rounded-xl px-3 py-2.5 ring-1', ESTADO_PAGO[tramite.pago].clase)}>
+                    <p className="flex items-center gap-2 font-bold">
+                        {ESTADO_PAGO[tramite.pago].icono}
+                        {ESTADO_PAGO[tramite.pago].texto}
+                    </p>
+                    {tramite.siguiente_paso && (
+                        <p className="mt-1 text-sm leading-relaxed">
+                            <ConMontoResaltado texto={tramite.siguiente_paso} />
+                        </p>
+                    )}
+                </div>
             )}
 
             <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -112,7 +129,7 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
 
                 {/* Con este código se paga en Recaudaciones. */}
                 {tramite.codigo_pago && (
-                    <p className="shrink-0 rounded-full bg-rio-espuma px-3 py-1.5 text-xs text-rio-profundo">
+                    <p className="shrink-0 rounded-full bg-rio-espuma px-3.5 py-2 text-sm text-rio-profundo">
                         Código de pago <strong className="font-mono tracking-wider">{tramite.codigo_pago}</strong>
                     </p>
                 )}

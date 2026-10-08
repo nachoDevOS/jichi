@@ -18,6 +18,12 @@ class RolPermisoSeeder extends Seeder
             Permission::findOrCreate($permiso, 'web');
         }
 
+        // Un permiso que salió del enum ya no tiene ruta: se borra, y con él su
+        // asignación en los roles armados desde el panel.
+        Permission::where('guard_name', 'web')
+            ->whereNotIn('name', RolSistema::todosLosPermisos())
+            ->delete();
+
         // syncPermissions resuelve los nombres contra el cache del registrar,
         // que quedó armado antes de insertar los permisos de arriba.
         app(PermissionRegistrar::class)->forgetCachedPermissions();

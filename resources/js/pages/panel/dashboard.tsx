@@ -149,9 +149,17 @@ function TrabajoPendiente({ pendientes }: { pendientes: Pendiente[] }) {
 }
 
 /** Un cero se ve apagado y no es enlace: solo llama la atención lo que tiene trabajo. */
-function Cantidad({ valor, href }: { valor: number; href: string }) {
+function Cantidad({ valor, href }: { valor: number; href: string | null }) {
     if (valor === 0) {
         return <span className="text-muted-foreground/60 tabular-nums">0</span>;
+    }
+
+    if (href === null) {
+        return (
+            <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-800 tabular-nums dark:bg-amber-500/15 dark:text-amber-300">
+                {valor}
+            </span>
+        );
     }
 
     return (

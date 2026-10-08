@@ -53,7 +53,7 @@ export default function CatalogoEscala({
             titulo="Escala de aprovechamiento"
             descripcion="Los tramos oficiales en kilos. El precio de cada uno lo pone Recaudaciones (SIREB)."
             acciones={
-                puede('catalogos.gestionar') && (
+                puede('catalogos.crear') && (
                     <Link href={route('categorias-aprovechamiento.create')} className={cn(buttonVariants())}>
                         <Plus className="size-4" />
                         Nuevo tramo
@@ -235,7 +235,7 @@ export default function CatalogoEscala({
                                                                     <History className="size-4" />
                                                                 </Link>
 
-                                                                {puede('catalogos.gestionar') && (
+                                                                {puede('catalogos.editar') && (
                                                                     <Link
                                                                         href={route('categorias-aprovechamiento.edit', t.id)}
                                                                         className={cn(buttonVariants({ variant: 'editar', size: 'sm' }))}

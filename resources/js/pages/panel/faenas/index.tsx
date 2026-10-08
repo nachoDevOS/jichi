@@ -227,7 +227,7 @@ export default function IndiceFaenas({
                                                 </td>
 
                                                 {/* El arancel; mientras está pendiente, falta pagarlo en SIREB. */}
-                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                <td className="px-5 py-2.5 text-right text-base tabular-nums">
                                                     {bs(f.monto, institucion.moneda)}
                                                     {f.puede_verificar_pago && (
                                                         <p className="text-xs text-amber-700 dark:text-amber-300">por pagar</p>

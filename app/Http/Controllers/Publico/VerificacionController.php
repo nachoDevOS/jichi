@@ -87,7 +87,7 @@ class VerificacionController extends Controller
         $fila = Codigo::query()
             /*
              * `codigable` va con `withTrashed()` —ver App\Models\Codigo—: un
-             * documento anulado tiene que contestar «fue anulado», no
+             * documento revocado tiene que contestar «fue revocado», no
              * «no existe».
              */
             ->with('codigable')

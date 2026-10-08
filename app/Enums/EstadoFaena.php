@@ -13,26 +13,15 @@ enum EstadoFaena: string
     /** Pagada y en curso: el pescador está afuera. */
     case Aprobado = 'aprobado';
 
-    /** Volvió y descargó. Los kilos quedaron firmes contra el cupo. */
-    case Completado = 'completado';
-
-    /**
-     * Cortada por la unidad al revocar su Autorización de Pesca para Aprovechamiento
-     * Pesquero, estando aprobada y en fecha. Ya no autoriza la salida.
-     */
+    /** Dada de baja por la unidad estando aprobada, con motivo. Ya no autoriza la salida, pero sus kilos siguen descontados. */
     case Revocado = 'revocado';
-
-    /** Venció el plazo de pago en SIREB sin ningún pago: no sigue su curso y libera los kilos reservados. NO es la vigencia, que la dicen las fechas. */
-    case NoPagado = 'no_pagado';
 
     public function etiqueta(): string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::Aprobado => 'Aprobado',
-            self::Completado => 'Completado',
             self::Revocado => 'Revocado',
-            self::NoPagado => 'No pagado',
         };
     }
 
@@ -41,9 +30,7 @@ enum EstadoFaena: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::Aprobado => 'emerald',
-            self::Completado => 'teal',
             self::Revocado => 'rose',
-            self::NoPagado => 'slate',
         };
     }
 
@@ -57,10 +44,13 @@ enum EstadoFaena: string
      * En modo estricto la solicitud no descuenta pero RESERVA —ver `reservaCupo()`—,
      * así que el cupo no se sobrecompromete. `RevisarFaenaService::aprobar()`
      * vuelve a medir igual, por si la faena nació en modo flexible.
+     *
+     * La REVOCADA sigue descontando (05/10/2026): puede ser una sanción, y devolverle
+     * los kilos le regalaría cupo al infractor.
      */
     public function consumeCupo(): bool
     {
-        return $this === self::Aprobado || $this === self::Completado;
+        return $this === self::Aprobado || $this === self::Revocado;
     }
 
     /**
@@ -100,6 +90,12 @@ enum EstadoFaena: string
     public function permiteEliminacion(): bool
     {
         return $this === self::Pendiente;
+    }
+
+    /** ¿Se revoca? Solo la APROBADA: el borrador se elimina y la completada ya cerró su salida. */
+    public function permiteRevocacion(): bool
+    {
+        return $this === self::Aprobado;
     }
 
     /** Esperando el pago en SIREB. No es permiso de trabajo: para eso, `habilita()`. */

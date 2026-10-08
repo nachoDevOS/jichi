@@ -36,13 +36,21 @@ class IbareController extends Controller
             return redirect()->route('login')->withErrors(['ibare' => $e->getMessage()]);
         }
 
+        if ($usuario->rutaInicio() === null) {
+            $this->registrarAcceso($request, 'fallido', $usuario->id, $usuario->email);
+
+            return redirect()->route('login')->withErrors([
+                'ibare' => 'Su cuenta no tiene permisos en el sistema. Pida a un administrador que le asigne un rol.',
+            ]);
+        }
+
         Auth::login($usuario);
         $request->session()->regenerate();
 
         $usuario->forceFill(['ultimo_acceso_at' => now()])->saveQuietly();
         $this->registrarAcceso($request, 'login', $usuario->id, $usuario->email);
 
-        return redirect()->intended(route('dashboard'))
+        return redirect()->intended(route($usuario->rutaInicio()))
             ->with('exito', 'Bienvenido a Jichi, '.$usuario->name.'.');
     }
 

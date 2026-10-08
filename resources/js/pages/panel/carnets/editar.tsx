@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha } from '@/lib/utils';
+import { bs, fecha, fechaInput } from '@/lib/utils';
 import type { PageProps, TipoActor } from '@/types';
 import type { AsociacionElegible, CarnetEnCorreccion, CupoVigente, TipoElegible } from '@/types/carnets';
 
@@ -37,7 +37,7 @@ export default function EditarCarnet({
         asociacion_id: String(carnet.asociacion_id),
         tipo_carnet_id: String(carnet.tipo_carnet_id),
         aprovechamiento_id: carnet.aprovechamiento_id,
-        fecha_solicitud: carnet.fecha_solicitud ?? new Date().toISOString().slice(0, 10),
+        fecha_solicitud: carnet.fecha_solicitud ?? fechaInput(new Date()),
 
         // Opcionales: lo normal es NO volver a subir lo que ya está cargado.
         archivo_ci: null as File | null,
@@ -302,7 +302,7 @@ export default function EditarCarnet({
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                     A cobrar
                                 </p>
-                                <p className="text-2xl font-semibold tabular-nums">
+                                <p className="text-3xl font-semibold tabular-nums">
                                     {tipo.precio !== null ? bs(tipo.precio, institucion.moneda) : '—'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">

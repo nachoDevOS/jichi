@@ -9,10 +9,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\StorageController;
 use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EditarCarnetRequest;
-use App\Http\Requests\Panel\EliminarCarnetRequest;
 use App\Http\Requests\Panel\EmitirCarnetRequest;
-use App\Http\Requests\Panel\ReponerCarnetRequest;
-use App\Http\Requests\Panel\RevocarCarnetRequest;
+use App\Http\Requests\Panel\MotivoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
@@ -23,6 +21,7 @@ use App\Models\TipoCarnet;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirCarnetService;
+use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Archivos;
@@ -247,6 +246,8 @@ class CarnetController extends Controller
         $recibo = $carnet->recibo;
 
         return Inertia::render('panel/carnets/ver', [
+            // Solo al abrir «Generar nueva liquidación» (partial reload): consulta a SIREB.
+            'cotizacion_renovacion' => Inertia::optional(fn () => app(RenovarLiquidacionService::class)->cotizar($carnet)),
             'carnet' => [
                 ...$this->resumir($carnet),
 
@@ -338,7 +339,7 @@ class CarnetController extends Controller
     /**
      * Revocar — PATCH /panel/carnets/{carnet}/revocar
      */
-    public function revocar(RevocarCarnetRequest $request, Carnet $carnet): RedirectResponse
+    public function revocar(MotivoRequest $request, Carnet $carnet): RedirectResponse
     {
         try {
             $this->servicio->revocar($carnet, $request->validated()['motivo']);
@@ -356,7 +357,7 @@ class CarnetController extends Controller
      *
      * Revoca el actual y abre el formulario con los datos del anterior.
      */
-    public function reponer(ReponerCarnetRequest $request, Carnet $carnet): RedirectResponse
+    public function reponer(MotivoRequest $request, Carnet $carnet): RedirectResponse
     {
         try {
             $this->servicio->reponer($carnet, $request->validated()['motivo']);
@@ -473,7 +474,7 @@ class CarnetController extends Controller
     /**
      * Eliminar — DELETE /panel/carnets/{carnet}
      */
-    public function destroy(EliminarCarnetRequest $request, Carnet $carnet, ConfirmarPagoService $pagos): RedirectResponse
+    public function destroy(MotivoRequest $request, Carnet $carnet, ConfirmarPagoService $pagos): RedirectResponse
     {
         $codigo = $carnet->codigo_legible;
 
@@ -506,6 +507,18 @@ class CarnetController extends Controller
         $resultado = $pagos->verificar($carnet);
 
         return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /**
+     * Generar nueva liquidación — POST /panel/carnets/{carnet}/renovar-liquidacion
+     *
+     * La vencida sin pago pasa al historial y se pide otra con la tarifa vigente.
+     */
+    public function renovarLiquidacion(Carnet $carnet, RenovarLiquidacionService $renovacion): RedirectResponse
+    {
+        $resultado = $renovacion->renovar($carnet);
+
+        return back()->with($resultado['renovada'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     /**
@@ -589,14 +602,14 @@ class CarnetController extends Controller
 
             // Corregir y eliminar llegan RESUELTAS, y no se deducen del estado en React.
             'puede_editarse' => $carnet->puedeEditarse(),
-            'puede_eliminarse' => $carnet->puedeEliminarse(),
+            'puede_eliminarse' => $carnet->puedeEliminarse() && $carnet->sinPagoInformado(),
             'puede_revocarse' => $carnet->estado->permiteRevocacion(),
 
             'monto' => $carnet->montoACobrar(),
 
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $carnet->resumenSireb(),
-            'puede_verificar_pago' => $carnet->estado->estaAbierto(),
+            'puede_verificar_pago' => $carnet->puedeVerificarPago(),
             'puede_cargar_pago' => $carnet->puedeCargarPago(),
             'ya_fue_aprobado' => $carnet->yaFueAprobado(),
 

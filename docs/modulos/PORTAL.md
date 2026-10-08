@@ -66,6 +66,10 @@ ventanilla ──[Resetear]──▶ clave temporal nueva (también reactiva)
   a mano desde un papel.
 - **No hay «olvidé mi contraseña»**: muchos pescadores no tienen correo, así que
   se resetea en ventanilla con la cédula.
+- **La clave propia: 8 o más, solo letras y números, con los dos** (08/10/2026,
+  `CambiarClaveRequest`): sin signos ni espacios, para que se escriba fácil en
+  cualquier celular. La ñ y las tildes cuentan como letras. La pantalla
+  (`portal/clave.tsx`) tilda las reglas mientras se escribe; el servidor decide.
 
 ## Seguridad del ingreso
 
@@ -82,8 +86,8 @@ ventanilla ──[Resetear]──▶ clave temporal nueva (también reactiva)
 
 | Pantalla | Controlador | Qué |
 | --- | --- | --- |
-| Inicio | `InicioController` | Lo vigente hoy, qué puede tramitar (`App\Support\TramitesDisponibles`), si debe algo y cuántos trámites tiene en curso |
-| En curso | `EnCursoController` | Lista de trámites abiertos —todos esperan el pago en SIREB— y, en cada fila (`fila-tramite.tsx`), la línea de avance Solicitado → Pago en Recaudaciones → Aprobado y el **código de pago** de SIREB. El paso lo da `etapa` y el texto `siguiente_paso`, los dos de `ResumenPortal` a partir del enum: React no decide |
+| Inicio | `InicioController` | Lo vigente hoy, la vitrina de trámites con requisitos (marca lo que puede pedir con `App\Support\TramitesDisponibles`), si debe algo y cuántos trámites tiene en curso |
+| En curso | `EnCursoController` | Lista de trámites abiertos —todos esperan el pago en SIREB— y, en cada fila (`fila-tramite.tsx`), la línea de avance Solicitado → Pago en Recaudaciones → Aprobado y el **código de pago** de SIREB. El paso lo da `etapa` y el texto `siguiente_paso`, los dos de `ResumenPortal` a partir del enum: React no decide. **Muestra en qué está el pago** (`pago`: sin pago / en revisión / validado / caída, de `ResumenPortal::estadoPago()`; con la liquidación vencida o anulada oculta el código de pago y manda a ventanilla por uno nuevo). **Se refresca sola cada minuto** (`usePoll`, solo la prop `tramites`, pausado con la pestaña oculta; 08/10/2026). No es «tiempo real»: el estado lo mueve la verificación con SIREB, cada 10 min |
 | Mis papeles | `PapelesController` | Todo lo que se aprobó alguna vez, con filtros **Vigentes** (abre acá) / **Vencidos** (incluye la autorización agotada) / **Revocados** (dados de baja: incluye anulado, «sin efecto» y **no pagado** —venció el plazo de pago en SIREB, con su motivo—) / Todos. **Vencidos** es por fecha: un aprobado fuera de vigencia sigue `aprobado`. `situacion`, `dias_restantes` y `motivo_baja` los calcula `ResumenPortal` desde el enum y `estaVigente()`; «vence pronto» a 30 días. Lo abierto va en «En curso» |
 | Mis pagos | `PagosController` | Por **gestión** (`?gestion=`, informe de aportes del **Art. 13**): sus **recibos**, cada uno con el pago tal como lo validó SIREB (N° de transacción, banco, fecha). Cada recibo se **descarga** (`/mi-cuenta/recibos/{codigo}/descargar`, `DescargarReciboController`, el mismo PDF del panel como `attachment`); lo ajeno da 404. El pago se hace en SIREB (02/10/2026) |
 | Mis datos | `PerfilController` | Sus datos, **solo para leer**: se corrigen en ventanilla |
@@ -150,13 +154,25 @@ descarga limpio.
 - **Límite honesto:** nada impide una captura de pantalla. Lo que protege es la
   marca, horneada en el PDF: capturado o guardado, el papel dice «NO VÁLIDO».
 
+## La lista de cuentas en el panel (05/10/2026)
+
+**Seguridad › Usuarios** (`Panel/UsuarioController`, permiso `usuarios.ver`) lista todas las
+cuentas —los funcionarios y, con rol «Beneficiario», los beneficiarios—: estado (activa, clave temporal, desactivada), último ingreso y
+desde cuándo, con filtro por estado. Es solo para controlar quién tiene acceso; cada fila lleva a la pestaña Datos de
+la ficha, donde se resetea o desactiva. La pantalla no dice «portal»: se llama Usuarios.
+
 ## Lo que falta
 
 - Trámites desde el portal (pedir una faena, subir una boleta).
 - Marcar la copia impresa desde el portal (por ejemplo «COPIA DEL TITULAR»), si
   la unidad quiere distinguirla del papel entregado en ventanilla.
 
-## «Puede tramitar», en el inicio
+## «Lo que puede tramitar», en el inicio
+
+*(08/10/2026: el cuadro «Puede tramitar» se quitó; su dato vive en la vitrina
+`components/portal/catalogo-tramites.tsx`: el sello «Usted puede pedirlo» y, en
+faena y guía, los kilos que le quedan o por qué no puede. La vitrina muestra
+además, por trámite, para qué sirve, qué hay que llevar y cuánto vale.)*
 
 `App\Support\TramitesDisponibles::para()` dice qué documento puede pedir hoy en
 ventanilla y, si no, por qué. **No tiene reglas propias:** pregunta a los mismos

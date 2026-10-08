@@ -9,10 +9,9 @@ use App\Enums\TipoTransporte;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\ActualizarGuiaRequest;
-use App\Http\Requests\Panel\AnularGuiaRequest;
 use App\Http\Requests\Panel\CargarPagoRequest;
-use App\Http\Requests\Panel\EliminarGuiaRequest;
 use App\Http\Requests\Panel\EmitirGuiaRequest;
+use App\Http\Requests\Panel\MotivoRequest;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaDetalle;
@@ -21,6 +20,7 @@ use App\Models\ProductoHidrobiologico;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirGuiaService;
+use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Paginacion;
@@ -240,7 +240,7 @@ class GuiaController extends Controller
     /**
      * Eliminar — DELETE /panel/guias/{guia}
      */
-    public function destroy(EliminarGuiaRequest $request, GuiaMovimiento $guia, ConfirmarPagoService $pagos): RedirectResponse
+    public function destroy(MotivoRequest $request, GuiaMovimiento $guia, ConfirmarPagoService $pagos): RedirectResponse
     {
         $numero = $guia->numero_legible;
 
@@ -282,6 +282,8 @@ class GuiaController extends Controller
         $recibo = $guia->recibo;
 
         return Inertia::render('panel/guias/ver', [
+            // Solo al abrir «Generar nueva liquidación» (partial reload): consulta a SIREB.
+            'cotizacion_renovacion' => Inertia::optional(fn () => app(RenovarLiquidacionService::class)->cotizar($guia)),
             'guia' => [
                 ...$this->resumir($guia),
                 // Solo en la ficha: en el listado haría una consulta por fila.
@@ -305,19 +307,19 @@ class GuiaController extends Controller
     }
 
     /**
-     * Anular — PATCH /panel/guias/{guia}/anular
+     * Revocar — PATCH /panel/guias/{guia}/revocar
      */
-    public function anular(AnularGuiaRequest $request, GuiaMovimiento $guia): RedirectResponse
+    public function revocar(MotivoRequest $request, GuiaMovimiento $guia): RedirectResponse
     {
         try {
-            $this->servicio->anular($guia, $request->validated()['motivo']);
+            $this->servicio->revocar($guia, $request->validated()['motivo']);
         } catch (PermisoOperativoException $e) {
             return back()->withErrors(['motivo' => $e->getMessage()]);
         }
 
         return redirect()
             ->route('guias.show', $guia)
-            ->with('exito', 'Guía anulada. El número queda ocupado: la hoja del talonario se gastó.');
+            ->with('exito', 'Guía revocada. El número queda ocupado: la hoja del talonario se gastó.');
     }
 
     /**
@@ -330,6 +332,18 @@ class GuiaController extends Controller
         $resultado = $pagos->verificar($guia);
 
         return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /**
+     * Generar nueva liquidación — POST /panel/guias/{guia}/renovar-liquidacion
+     *
+     * La vencida sin pago pasa al historial y se pide otra con la tarifa vigente.
+     */
+    public function renovarLiquidacion(GuiaMovimiento $guia, RenovarLiquidacionService $renovacion): RedirectResponse
+    {
+        $resultado = $renovacion->renovar($guia);
+
+        return back()->with($resultado['renovada'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     /**
@@ -480,12 +494,12 @@ class GuiaController extends Controller
             // Las puertas del borrador: estado PENDIENTE y sin un peso cargado.
             // Se resuelven acá para que la pantalla no las recalcule.
             'puede_editarse' => $guia->puedeEditarse(),
-            'puede_eliminarse' => $guia->puedeEliminarse(),
-            'puede_anularse' => $guia->estado->permiteAnulacion(),
+            'puede_eliminarse' => $guia->puedeEliminarse() && $guia->sinPagoInformado(),
+            'puede_revocarse' => $guia->estado->permiteRevocacion(),
             'ya_fue_aprobada' => $guia->yaFueAprobada(),
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $guia->resumenSireb(),
-            'puede_verificar_pago' => $guia->estado->estaAbierto(),
+            'puede_verificar_pago' => $guia->puedeVerificarPago(),
             'puede_cargar_pago' => $guia->puedeCargarPago(),
             // Por qué todavía no ampara. Se resuelve en el servidor: React no
             // vuelve a evaluar el estado.

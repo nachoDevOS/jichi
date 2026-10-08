@@ -3,6 +3,7 @@ import { ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 import { Fragment } from 'react';
 import { LogoJichi, MarcaJichi } from '@/components/comunes/logo-jichi';
 import { moduloActual, NAVEGACION, type ItemNavegacion } from '@/components/panel/layout/navegacion';
+import { usePermisos } from '@/hooks/use-permisos';
 import { cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
@@ -25,12 +26,11 @@ export function BarraLateral({
      * HandleInertiaRequests manda en todas las páginas (usuario, institución,
      * flash, ziggy). No hay que pasarlas de componente en componente.
      */
-    const { auth, institucion, ziggy } = usePage<PageProps>().props;
-
-    const permisos = auth.user?.permisos ?? [];
+    const { institucion, ziggy } = usePage<PageProps>().props;
+    const { puede } = usePermisos();
 
     // Filtro 1: se descartan los módulos para los que el usuario no tiene permiso.
-    const items = NAVEGACION.filter((item) => !item.permiso || permisos.includes(item.permiso));
+    const items = NAVEGACION.filter((item) => !item.permiso || puede(item.permiso));
 
     // Filtro 2: Ziggy solo conoce las rutas ya declaradas en routes/. Los
     // módulos que todavía no existen se pintan en gris en vez de romper el
@@ -82,7 +82,7 @@ export function BarraLateral({
                 </button>
             </div>
 
-            <nav className="flex-1 overflow-x-hidden overflow-y-auto py-2">
+            <nav className="sin-barra-scroll flex-1 overflow-x-hidden overflow-y-auto py-2">
                 {items.map((item, i) => (
                     // Fragment porque cada vuelta puede dibujar DOS cosas —el
                     // rótulo del grupo y el ítem— y JSX no deja devolver dos

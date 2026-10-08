@@ -5,9 +5,10 @@ namespace App\Http\Requests\Panel;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Reglas para anular una guía.
+ * El motivo obligatorio de eliminar, revocar o reponer cualquier trámite: queda
+ * en la auditoría y es lo que explica después el hueco en la serie.
  */
-class AnularGuiaRequest extends FormRequest
+class MotivoRequest extends FormRequest
 {
     /** El permiso ya lo revisa el middleware de la ruta. */
     public function authorize(): bool
@@ -31,8 +32,9 @@ class AnularGuiaRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'motivo.required' => 'Escriba el motivo de la anulación.',
+            'motivo.required' => 'Escriba el motivo.',
             'motivo.min' => 'El motivo tiene que explicar la decisión: escriba al menos 10 caracteres.',
+            'motivo.max' => 'El motivo no puede pasar de 500 caracteres.',
         ];
     }
 

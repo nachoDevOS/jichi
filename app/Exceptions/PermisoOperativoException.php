@@ -32,8 +32,6 @@ class PermisoOperativoException extends RuntimeException
         $detalle = match ($estado) {
             EstadoCarnet::Pendiente => 'Está PENDIENTE: falta que se pague en Recaudaciones.',
             EstadoCarnet::Revocado => 'Está REVOCADO, y eso no se revierte: hay que emitir uno nuevo.',
-            EstadoCarnet::NoPagado => 'Está NO PAGADO: venció el plazo de pago en Recaudaciones. Hay que '.
-                'emitir otro carnet.',
             // El estado dice «activo» pero la fecha ya pasó: la columna la
             // escribe un comando diario y entre corrida y corrida miente.
             EstadoCarnet::Aprobado => 'Pasó su fecha de vencimiento.',
@@ -91,12 +89,12 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     * No se anula dos veces, y no se desanula.
+     * No se revoca dos veces, y no vuelve atrás.
      */
-    public static function guiaYaAnulada(): self
+    public static function guiaYaRevocada(): self
     {
         return new self(
-            'Esta guía ya está anulada. No se desanula: si hace falta, emita otra con otro código.',
+            'Esta guía ya está revocada. No vuelve atrás: si hace falta, emita otra con otro código.',
         );
     }
 
@@ -128,6 +126,19 @@ class PermisoOperativoException extends RuntimeException
         );
     }
 
+    public static function faenaYaRevocada(): self
+    {
+        return new self('Esta faena ya está revocada. No vuelve atrás: si hace falta, emita otra.');
+    }
+
+    /** Revocar es para la faena aprobada; el borrador se elimina. */
+    public static function faenaNoSeRevoca(string $estado): self
+    {
+        return new self(
+            "Una faena {$estado} no se revoca: revocar es para la faena aprobada. Un borrador se elimina.",
+        );
+    }
+
     /**
      *  El circuito de la guía: el mismo de la faena, sobre otro papel
      */
@@ -156,11 +167,11 @@ class PermisoOperativoException extends RuntimeException
         );
     }
 
-    /** Anular es para la guía aprobada; el borrador se elimina. */
-    public static function guiaNoSeAnula(string $estado): self
+    /** Revocar es para la guía aprobada; el borrador se elimina. */
+    public static function guiaNoSeRevoca(string $estado): self
     {
         return new self(
-            "Una guía {$estado} no se anula: anular es para la guía ya aprobada. ".
+            "Una guía {$estado} no se revoca: revocar es para la guía ya aprobada. ".
             'Un borrador se elimina.',
         );
     }
@@ -197,7 +208,7 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     * Anular sin motivo escrito no sirve de nada.
+     * Revocar sin motivo escrito no sirve de nada.
      *
      * El número del talonario queda quemado para siempre y deja un hueco en la
      * serie; sin el motivo, dentro de seis meses nadie puede explicarlo.

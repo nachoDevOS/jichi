@@ -24,13 +24,15 @@ interface PapelBase {
     siguiente_paso: string | null;
     /** Dónde está en el circuito, para la línea de avance. Null si no está abierto. */
     etapa: 'pago' | null;
+    /** En qué está el pago en SIREB. Null si no está abierto. */
+    pago: 'sin_pago' | 'revision' | 'validado' | 'caida' | null;
     /** Dónde va en «Mis papeles». Null si está abierto: eso va en «En curso». */
     situacion: 'vigente' | 'vencido' | 'revocado' | null;
     /** Hasta cuándo vale (o valió). La guía trae hora: vale por horas. */
     vence_el: string | null;
     /** Solo de lo vigente: para «faltan N días» y «vence pronto». */
     dias_restantes: number | null;
-    /** Por qué ya no vale: revocado, anulado, sin efecto o agotado. */
+    /** Por qué ya no vale: revocado, sin efecto o agotado. */
     motivo_baja: string | null;
     /** Lo que falta pagar en SIREB. */
     debe: number;

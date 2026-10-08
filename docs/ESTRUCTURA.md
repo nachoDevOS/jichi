@@ -30,10 +30,10 @@ Si sabés de qué mitad es lo que estás escribiendo, ya sabés dónde ponerlo.
 ```
 app/
 ├── Enums/                  Los valores fijos del negocio y sus TRANSICIONES
-│   ├── EstadoAprovechamiento.php  pendiente · aprobado · agotado · revocado · no_pagado
-│   ├── EstadoCarnet.php           pendiente · aprobado · revocado · no_pagado
-│   ├── EstadoFaena.php            pendiente · aprobado · completado · revocado · no_pagado
-│   ├── EstadoGuia.php             pendiente · aprobado · anulada · no_pagado
+│   ├── EstadoAprovechamiento.php  pendiente · aprobado · agotado · revocado
+│   ├── EstadoCarnet.php           pendiente · aprobado · revocado
+│   ├── EstadoFaena.php            pendiente · aprobado · revocado
+│   ├── EstadoGuia.php             pendiente · aprobado · revocado
 │   ├── EstadoLiquidacionSireb.php por_enviar · registrada · anulada
 │   ├── TipoActor.php              pescador · comercializador (qué emite cada carnet)
 │   ├── ModalidadAprovechamiento.php, ConceptoArancel.php, ConceptoRecibo.php,
@@ -64,7 +64,7 @@ app/
 │   │   EmitirFaenaService.php, EmitirGuiaService.php     crear, corregir, eliminar
 │   ├── Revisar{Cupo,Carnet,Faena,Guia}Service.php        aprobar (y revocar)
 │   ├── LiquidarSirebService.php    la liquidación en SIREB
-│   ├── ConfirmarPagoService.php    pregunta a SIREB: aprueba o «No pagado»
+│   ├── ConfirmarPagoService.php    pregunta a SIREB: si está pagada, aprueba
 │   ├── CargarPagoService.php       carga el pago en SIREB
 │   ├── CorrelativoService.php, CodigoService.php, CuentaPortalService.php
 ├── Sireb/                  El cliente de Recaudaciones (SirebService, PrecioSireb, VistaSireb)

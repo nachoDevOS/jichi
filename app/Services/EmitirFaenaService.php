@@ -229,12 +229,47 @@ class EmitirFaenaService
     }
 
     /**
+     * Da de baja una faena aprobada, con motivo. Igual que el carnet y la guía:
+     * queda en el historial. Sus kilos NO vuelven al cupo: ver `consumeCupo()`.
+     */
+    public function revocar(PermisoFaena $faena, string $motivo): PermisoFaena
+    {
+        if (trim($motivo) === '') {
+            throw PermisoOperativoException::motivoObligatorio();
+        }
+
+        if ($faena->estado === EstadoFaena::Revocado) {
+            throw PermisoOperativoException::faenaYaRevocada();
+        }
+
+        if (! $faena->estado->permiteRevocacion()) {
+            throw PermisoOperativoException::faenaNoSeRevoca(mb_strtolower($faena->estado->etiqueta()));
+        }
+
+        DB::transaction(function () use ($faena, $motivo): void {
+            $bloqueada = PermisoFaena::query()->whereKey($faena->id)->lockForUpdate()->firstOrFail();
+
+            // Otra ventanilla pudo revocarla mientras tanto.
+            if (! $bloqueada->estado->permiteRevocacion()) {
+                throw PermisoOperativoException::faenaNoSeRevoca(mb_strtolower($bloqueada->estado->etiqueta()));
+            }
+
+            // El motivo antes del update: `Auditable` lo lee en el evento. El cupo no
+            // se toca: la revocada sigue descontando, así que el saldo no cambia.
+            $bloqueada->motivoAuditoria = $motivo;
+            $bloqueada->update(['estado' => EstadoFaena::Revocado]);
+        });
+
+        return $faena->refresh();
+    }
+
+    /**
      * El precio de la salida según SIREB, de la fila `faena` de Aranceles. Sin
      * él no se emite: ninguna tarifa se escribe a mano.
      *
      * @return array{monto: float, tarifa_id: string}
      */
-    private function precioDeLaFaena(): array
+    public function precioDeLaFaena(): array
     {
         $arancel = ArancelSireb::de(ConceptoArancel::Faena);
 

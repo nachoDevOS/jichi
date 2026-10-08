@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha } from '@/lib/utils';
+import { bs, fecha, fechaInput } from '@/lib/utils';
 import type { PageProps, TipoActor } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { AsociacionElegible, CupoVigente, ReposicionDeCarnet, TipoElegible } from '@/types/carnets';
@@ -46,7 +46,7 @@ export default function CrearCarnet({
             beneficiario?.cupos_elegibles?.find((c) => c.id === aprovechamientoId)?.id ??
             beneficiario?.cupos_elegibles?.[0]?.id ??
             null) as number | null,
-        fecha_solicitud: new Date().toISOString().slice(0, 10),
+        fecha_solicitud: fechaInput(new Date()),
 
         // Los dos papeles que respaldan la emisión. Suben con el formulario,
         // así que el post va con `forceFormData`.
@@ -436,7 +436,7 @@ export default function CrearCarnet({
                                     A cobrar
                                 </p>
                                 {/* Sin precio: sin tarifa elegida o SIREB caído. Al emitir, el servidor dice cuál. */}
-                                <p className="text-2xl font-semibold tabular-nums">
+                                <p className="text-3xl font-semibold tabular-nums">
                                     {tipo.precio !== null ? bs(tipo.precio, institucion.moneda) : '—'}
                                 </p>
                                 <p className="text-xs text-muted-foreground">

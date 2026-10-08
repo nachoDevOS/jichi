@@ -21,7 +21,7 @@ class SoloBeneficiario
         $usuario = $request->user();
 
         if (! $usuario?->esBeneficiario()) {
-            return redirect()->route('dashboard');
+            return redirect()->route($usuario?->rutaInicio() ?? 'dashboard');
         }
 
         // Desactivada en ventanilla, o la persona dada de baja del padrón.

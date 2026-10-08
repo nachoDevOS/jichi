@@ -219,7 +219,7 @@ export default function IndiceGuias({
 
                                                 <td className="px-5 py-2.5 text-right tabular-nums">
                                                     {g.puede_verificar_pago ? (
-                                                        <span className="text-amber-700 dark:text-amber-400">
+                                                        <span className="text-base text-amber-700 dark:text-amber-400">
                                                             debe {bs(g.monto, institucion.moneda)}
                                                         </span>
                                                     ) : (

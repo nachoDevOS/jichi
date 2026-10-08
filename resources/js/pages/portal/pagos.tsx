@@ -40,8 +40,13 @@ export default function Pagos({
     );
 
     return (
-        <LayoutPortal titulo="Mis pagos" bajada={`Pagado en ${gestion}: ${bs(total_pagado, institucion.moneda)}`} extra={selector}>
+        <LayoutPortal titulo="Mis pagos" bajada={`Sus recibos de ${gestion}`} extra={selector}>
             <Head title="Mis pagos" />
+
+            <p className="mb-4 flex items-baseline justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/80">
+                <span className="text-sm font-semibold text-slate-600">Pagado en {gestion}</span>
+                <span className="text-xl font-extrabold text-rio-profundo tabular-nums">{bs(total_pagado, institucion.moneda)}</span>
+            </p>
 
             {recibos.length === 0 ? (
                 <Vacio>No tiene pagos en {gestion}.</Vacio>
@@ -60,7 +65,7 @@ export default function Pagos({
                                     {r.entidad_bancaria && <> ({r.entidad_bancaria})</>}
                                 </p>
                             </div>
-                            <p className="shrink-0 text-sm font-extrabold text-rio-profundo tabular-nums">
+                            <p className="shrink-0 text-base font-extrabold text-rio-profundo tabular-nums">
                                 {bs(r.monto_total, institucion.moneda)}
                             </p>
                             {r.descargar && <BotonDescarga url={r.descargar} etiqueta={`Descargar el recibo N° ${r.numero}`} />}

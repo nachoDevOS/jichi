@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useArchivos } from '@/hooks/use-archivos';
 import { cn } from '@/lib/utils';
-import { edadEnAnios, fecha } from '@/lib/utils';
+import { edadEnAnios, fecha, fechaInput } from '@/lib/utils';
 import type { BeneficiarioFicha, FormularioBeneficiario } from '@/types/beneficiarios';
 
 /**
@@ -274,7 +274,7 @@ export function FormularioBeneficiarioComponente({
                                     // que es el error de tipeo más común —escribir
                                     // el año en curso en vez del de nacimiento—.
                                     // El servidor lo valida igual con `before:today`.
-                                    max={new Date().toISOString().slice(0, 10)}
+                                    max={fechaInput(new Date())}
                                     value={form.data.fechaNacimiento}
                                     onChange={(e) => form.setData('fechaNacimiento', e.target.value)}
                                     aria-invalid={Boolean(form.errors.fechaNacimiento)}

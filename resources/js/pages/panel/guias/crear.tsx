@@ -9,7 +9,7 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs } from '@/lib/utils';
+import { bs, fechaInput } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 import type { CatalogosGuia, FormularioGuia } from '@/types/guias';
@@ -68,9 +68,7 @@ export default function CrearGuia({
          * vino al mostrador. La emisión —y con ella los cinco días de validez—
          * la escribe la APROBACIÓN.
          */
-        fecha_solicitud: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-            .toISOString()
-            .slice(0, 10),
+        fecha_solicitud: fechaInput(new Date()),
 
         detalles: [filaVacia()],
     });

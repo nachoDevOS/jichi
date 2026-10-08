@@ -70,7 +70,7 @@ unidad desde el panel.
 
 - **Una Autorización de Pesca para Aprovechamiento Pesquero a la vez por
   persona**: la que está pendiente o aprobada, en fecha, ocupa el lugar. Lo
-  libera pasar su fecha, agotarse, ser revocada o quedar «No pagado».
+  libera pasar su fecha, agotarse o ser revocada.
 - **Un carnet vigente por actividad**. Para reponer uno perdido se revoca y se
   emite otro con la misma autorización.
 - **El pescador no saca carnet sin autorización; el comercializador nunca lleva
@@ -85,19 +85,18 @@ El detalle, con ejemplos, está en [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md).
 ```
             ┌─(SIREB: liquidación «pagada»)──▶ APROBADO ──▶ revocado / agotado
 PENDIENTE ──┤                                     └── al aprobar sale el RECIBO
-(borrador)  └─(SIREB: «vencida», sin pago)──▶ NO PAGADO (no sigue su curso; 03/10/2026)
+(borrador)  └─(SIREB: «vencida»)──▶ sigue PENDIENTE (08/10/2026; antes NO PAGADO)
    └──[corregir / eliminar: consulta SIREB y anula la liquidación]
 ```
 
 *(02/10/2026: ya no hay `en_revision`, ni firma, ni tabla `pagos`. 03/10/2026: ya
-no hay `vencido`; está `no_pagado`.)*
+no hay `vencido`. 08/10/2026: tampoco `no_pagado`, ni `completado` en la faena.)*
 
 | Estado | Editar | Eliminar | Cargar pago | Verificar pago |
 | --- | :-: | :-: | :-: | :-: |
 | **Pendiente**, sin pago en SIREB | ✔ | ✔ | ✔ | ✔ |
 | **Pendiente**, con pago en revisión | ✘ (*) | ✘ | ✘ | ✔ |
 | **Aprobado** | ✘ | ✘ | ✘ | ✘ |
-| **No pagado** | ✘ | ✘ | ✘ | ✘ |
 
 (*) La autorización se corrige igual —solo la embarcación, sin tocar el cobro—;
 carnet, faena y guía no, si la corrección cambia lo que se cobra.
@@ -110,11 +109,11 @@ carnet, faena y guía no, si la corrección cambia lo que se cobra.
   recibo cuando SIREB da la liquidación por `pagada`. Recién aprobado el
   documento vale, se imprime y escribe sus fechas de vigencia.
 - **Dos plazos que no se mezclan.** El de **pago** lo pone SIREB
-  (`plazo_pago_dias`, 5 días): si la liquidación vence sin ningún pago, el
-  trámite pasa a **No pagado** y no sigue su curso. La **vigencia** del trámite
+  (`plazo_pago_dias`, 5 días): si la liquidación vence, el trámite **sigue
+  pendiente** (08/10/2026) y se elimina a mano si ya no corresponde. La **vigencia** del trámite
   (autorización y carnet al 31/12, faena 30 días, guía 5) **no es un estado**: un
   aprobado sigue `aprobado` y si vale hoy lo dicen sus fechas (`estaVigente()`).
-- **Revocar** (autorización y carnet) es de supervisión, con motivo, y no se
+- **Revocar** (los cuatro trámites) es de supervisión, con motivo, y no se
   revierte. Revocar la autorización deja **sin efecto** a sus carnets y faenas
   sin reescribirlos: su vigencia mira al padre.
 - La **guía** además se **anula**; no se registra su llegada: vence a los 5 días. La
@@ -135,7 +134,7 @@ en SIREB —allá, o desde la ficha de Jichi con **«Cargar pago»** (N° de
 transacción y banco), solo si la liquidación está pendiente y sin pago—. El
 encargado de SIREB lo valida. Jichi pregunta con `GET /liquidaciones/{id}` —botón
 «Verificar pago» y `jichi:verificar-pagos` cada 10 minutos—: `pagada` → aprueba;
-`vencida` sin pago → «No pagado». La ficha muestra el pago informado («Por
+`vencida` → sigue pendiente, con aviso. La ficha muestra el pago informado («Por
 validar» / «Validado»). Ver [modulos/SIREB.md](modulos/SIREB.md).
 
 **El recibo** es una tabla (`recibos`), uno por documento (`recibible`), con
@@ -212,9 +211,10 @@ resultado —o la excepción del dominio: `CarnetInvalidoException`,
 | `EmitirCarnetService` | Emitir, corregir, eliminar, revocar y reponer el carnet |
 | `RevisarCarnetService` | Aprobar el carnet (número de registro, vigencia) |
 | `EmitirFaenaService` / `RevisarFaenaService` | Lo mismo para la faena; controla los kilos libres |
-| `EmitirGuiaService` / `RevisarGuiaService` | Lo mismo para la guía, más anular |
+| `EmitirGuiaService` / `RevisarGuiaService` | Lo mismo para la guía; las dos con revocar |
 | `LiquidarSirebService` | La liquidación en SIREB: preparar, enviar y anular |
-| `ConfirmarPagoService` | Pregunta a SIREB: pagado → aprueba y emite el recibo; vencido sin pago → «No pagado». Guarda el pago informado |
+| `ConfirmarPagoService` | Pregunta a SIREB: pagado → aprueba y emite el recibo; vencido → solo avisa, sigue pendiente. Guarda el pago informado |
+| `RenovarLiquidacionService` | «Generar nueva liquidación»: la vencida sin pago pasa a `sireb_historial` y se pide otra con la tarifa vigente del catálogo (08/10/2026) |
 | `CorrelativoService` | Los números correlativos, con la fila del contador bloqueada |
 | `CodigoService` | El código de 16 caracteres |
 
@@ -329,18 +329,72 @@ tapa sin avisar.
 **Los permisos se declaran en las rutas** con el middleware `permiso:`. Esconder
 un botón con `usePermisos()` es solo comodidad; siempre van los dos.
 
-`RolSistema` reparte los permisos en bloques pensados para dos personas:
+**El catálogo es `RolSistema::CATALOGO`** (05/10/2026): módulo → nombre, sección del
+menú y acciones, en el orden del menú y del trámite. Es la única fuente: de ahí salen la lista
+completa, los nombres y las secciones del formulario de roles. 62 permisos:
 
-| Bloque | Qué hace |
-| --- | --- |
-| Lectura | Ver cada módulo |
-| **Ventanilla** (operación) | Registrar, corregir el borrador, cargar y verificar el pago en SIREB, imprimir |
-| **Supervisión** | Eliminar, revocar, anular |
-| Administración | Catálogos, usuarios, configuración |
+| Sección | Módulo | Acciones |
+| --- | --- | --- |
+| General | Panel | ver |
+| Ventanilla | Beneficiarios | ver, crear, editar, portal, eliminar |
+| Ventanilla | Autorizaciones, faenas, guías | ver, crear, editar, verificar-pago, cargar-pago, renovar-liquidacion, imprimir, eliminar, revocar |
+| Ventanilla | Carnets | lo mismo (reponer va con `crear`) |
+| Pagos | Recibos | ver, imprimir |
+| Parámetros | Asociaciones | ver, crear, editar |
+| Catálogos | Catálogos (los cuatro) | ver, crear, editar |
+| Administración | Reportes · Auditoría · Configuración | ver, exportar · ver · ver, editar |
+| Seguridad | Usuarios · Roles | ver, crear, editar · ver, crear, editar, eliminar |
 
-> ⚠️ **Hoy existe un solo rol, `administrador`, con todos los permisos.** Las
-> rutas ya están separadas, así que agregar el rol de ventanilla es una línea en
-> `RolSistema`. Aprobar ya no es de nadie: lo decide el pago validado en SIREB.
+**Un permiso por acción real**: si la pantalla tiene listar, crear y editar, son `ver`,
+`crear` y `editar`; nada de un `gestionar` que cubra varias. Reportes, auditoría,
+configuración, `usuarios.crear` y `usuarios.editar` están declarados sin ruta, a la espera
+de su módulo.
+
+**Seguridad › Usuarios** (`/panel/seguridad/usuarios`, `usuarios.ver`, 05/10/2026): todas
+las cuentas —funcionarios primero, con su rol; después los beneficiarios, con rol
+«Beneficiario»—, con estado, último ingreso y desde cuándo, filtros por tipo y estado, y
+búsqueda por nombre, C.I. o correo. Solo consulta: al beneficiario se le da, resetea y
+desactiva el acceso en su ficha (`beneficiarios.portal`). El estado (activa, clave temporal,
+desactivada) no es columna: sale de `activo` y `debe_cambiar_password` en
+`UsuarioController`. Crear y editar funcionarios todavía es por consola.
+`RolPermisoSeeder` borra de la base el permiso que sale del enum, y con él su asignación en
+los roles armados desde el panel.
+
+**Seguridad › Roles** (`/panel/seguridad/roles`, `roles.*`): la unidad crea, edita
+y elimina roles; la lista dice cuántos permisos y usuarios tiene cada uno, y los permisos
+se marcan módulo por módulo al crear o editar.
+**Los permisos son código** (`RolSistema`, atados a las rutas); **los roles, datos**.
+`administrador` es la excepción: lo siembra `RolPermisoSeeder` con todos y el panel no lo
+toca. Las reglas están en `GestionarRolService`: el rol del sistema no se modifica, un rol
+con usuarios no se borra, el nombre no repite a otro ni a uno del sistema (sin distinguir
+mayúsculas). `roles` es tabla de Spatie, sin `SoftDeletes`: la baja es real y lo que tenía
+queda en el motivo de la auditoría; los cambios de permisos se anotan a mano
+(`syncPermissions` no dispara eventos). Una acción nueva necesita además su nombre en
+`RolSistema::ACCIONES`, o la pantalla muestra la clave cruda.
+
+> Aprobar no es de nadie: lo decide el pago validado en SIREB. Los demás perfiles
+> (ventanilla, supervisión) se arman desde el panel; falta la pantalla de Usuarios
+> para asignarlos.
+
+**Lo que un rol a medida necesita para no chocar con un 403** (auditoría del 05/10/2026):
+
+- **Toda acción arrastra el `ver` de su módulo** (`RolSistema::requiere()`): al terminar se
+  vuelve a la ficha. Lo completa `GestionarRolService` al guardar y el formulario lo
+  marca en cadena.
+- **Reponer un carnet no tiene permiso propio**: va con `carnets.crear` (decidido el
+  05/10/2026). Ojo: reponer **revoca** el carnet actual, así que quien registra carnets
+  puede, por esta vía, dejar sin efecto uno sin tener `carnets.revocar`.
+- **Al entrar se va a la primera pantalla que el rol puede ver** (`User::rutaInicio()`), no
+  al tablero. Una cuenta sin ningún permiso no entra: el login le dice que pida un rol.
+- **El buscador de beneficiarios** lo abre `beneficiarios.ver` o cualquier `*.crear` de los
+  cuatro trámites: emitir exige elegir a la persona.
+- **Los enlaces entre módulos** de las fichas (titular, carnet, autorización, faenas, guías) y
+  el «Inicio» de las migas preguntan el permiso: sin él queda el texto
+  (`EnlacePermitido`) o el botón no aparece. En el tablero, los pendientes y los avisos
+  muestran el número igual, pero el enlace al listado llega `null` si el rol no ve ese
+  módulo (`DashboardController::siPuedeVer()`).
+- **Eliminar** se ofrece solo con el trámite `pendiente` y sin pago informado en la última
+  consulta (`sinPagoInformado()`); el servicio igual vuelve a preguntar a SIREB antes de borrar.
 
 **Login:** con `IBARE_ACTIVO=true` se entra con la cuenta del GAD por OAuth2
 (Ibare) y el login por correo queda solo para administradores. Ver

@@ -52,6 +52,9 @@ class GuiaMovimiento extends Model
 {
     use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
+    /** El historial ya es el registro de cada liquidación: no se copia a `auditorias`. */
+    protected $noAuditable = ['sireb_historial'];
+
     protected $table = 'guias_movimiento';
 
     /** Vigencia máxima de una guía, en días. Regla de la resolución, no del formulario. */
@@ -188,6 +191,20 @@ class GuiaMovimiento extends Model
             ->all();
     }
 
+    /** Para `sireb_historial`: cada renglón con su producto y su precio por kilo. */
+    public function itemsHistorialSireb(): array
+    {
+        return $this->detalles
+            ->map(fn (GuiaDetalle $d): array => [
+                'producto' => $d->especie,
+                'tarifa_id' => $d->sireb_tarifa_id,
+                'cantidad' => (float) $d->cantidad_kg,
+                'precio' => (float) $d->precio_kg,
+            ])
+            ->values()
+            ->all();
+    }
+
     /**
      * Lo que se cobra por ESTA guía. Sale de la
      * COLUMNA, calculada al emitir: cambiar el catálogo no mueve un papel entregado.
@@ -232,7 +249,7 @@ class GuiaMovimiento extends Model
                 'carnet de comercializador vigente. Vuelve a valer cuando se apruebe el carnet nuevo.',
             $this->estado === EstadoGuia::Pendiente => 'La guía está PENDIENTE: falta que se pague '.
                 'en Recaudaciones.',
-            $this->estado === EstadoGuia::Anulada => 'La guía fue anulada.',
+            $this->estado === EstadoGuia::Revocada => 'La guía fue revocada.',
             default => 'Pasó su fecha de vencimiento.',
         };
     }

@@ -21,16 +21,12 @@ enum EstadoCarnet: string
      */
     case Revocado = 'revocado';
 
-    /** Venció el plazo de pago en SIREB sin ningún pago: no sigue su curso. NO es la vigencia, que la dicen las fechas. */
-    case NoPagado = 'no_pagado';
-
     public function etiqueta(): string
     {
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::Aprobado => 'Aprobado',
             self::Revocado => 'Revocado',
-            self::NoPagado => 'No pagado',
         };
     }
 
@@ -46,7 +42,6 @@ enum EstadoCarnet: string
             self::Pendiente => 'sky',
             self::Aprobado => 'emerald',
             self::Revocado => 'rose',
-            self::NoPagado => 'slate',
         };
     }
 
@@ -88,8 +83,8 @@ enum EstadoCarnet: string
     }
 
     /**
-     * ¿Se puede revocar? Solo el APROBADO: el pendiente se elimina, y el no pagado
-     * o revocado ya no habilita nada.
+     * ¿Se puede revocar? Solo el APROBADO: el pendiente se elimina, y el revocado ya
+     * no habilita nada.
      */
     public function permiteRevocacion(): bool
     {

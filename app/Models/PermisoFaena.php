@@ -42,6 +42,9 @@ class PermisoFaena extends Model
 {
     use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
+    /** El historial ya es el registro de cada liquidación: no se copia a `auditorias`. */
+    protected $noAuditable = ['sireb_historial'];
+
     /** «PermisoFaena» pluraliza a «permiso_faenas», que no es la tabla. */
     protected $table = 'permisos_faena';
 
@@ -237,13 +240,8 @@ class PermisoFaena extends Model
                 'carnet de pescador vigente. Vuelve a valer cuando se apruebe el carnet nuevo.',
             $this->estado === EstadoFaena::Pendiente => 'La faena está PENDIENTE: falta que se pague '.
                 'en Recaudaciones.',
-            $this->estado === EstadoFaena::Completado => 'La salida ya se cerró: los kilos quedaron '.
-                'firmes contra el cupo.',
-            $this->estado === EstadoFaena::NoPagado => 'No se pagó a tiempo en Recaudaciones: no siguió su curso '.
-                'y sus kilos volvieron al cupo.',
-            // Estado histórico: hasta el 27/09/2026 la revocación lo escribía en cascada.
-            $this->estado === EstadoFaena::Revocado => 'Fue revocada junto con su Autorización de Pesca '.
-                'para Aprovechamiento Pesquero: ya no autoriza la salida.',
+            $this->estado === EstadoFaena::Revocado => 'Fue revocada por la Unidad de Pesca: ya no autoriza '.
+                'la salida. Sus kilos siguen descontados del cupo.',
             default => 'Pasó su fecha de desembarque.',
         };
     }

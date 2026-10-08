@@ -106,6 +106,34 @@ export interface VentaSireb {
     pago: PagoSireb | null;
     /** false = todavía no se verificó: sin pago no se sabe si se cargó. */
     pago_consultado: boolean;
+    /** La última verificación la dio por perdida: ya no se paga. */
+    caida: 'vencida' | 'anulada' | null;
+    /** Vencida o anulada: se ofrece «Generar nueva liquidación». */
+    puede_renovar: boolean;
+    /** Las liquidaciones ya cerradas, de la más vieja a la más nueva. */
+    historial: LiquidacionHistorial[];
+}
+
+/** Lo que cobraría una nueva liquidación con la tarifa vigente. Prop `cotizacion_renovacion` de las fichas. */
+export interface CotizacionRenovacion {
+    /** Null si no se puede cobrar hoy: el motivo dice por qué. */
+    monto: number | null;
+    anterior: number;
+    motivo: string | null;
+}
+
+/** Una liquidación pedida a SIREB, tal como quedó en `sireb_historial`. */
+export interface LiquidacionHistorial {
+    liquidacion_id: string;
+    codigo_publico: string | null;
+    items: { tarifa_id: string; cantidad: number; precio: number; producto?: string }[];
+    monto: number;
+    /** Instantes: se muestran con fechaHora(). */
+    solicitada_en: string;
+    vence_en: string | null;
+    estado: 'registrada' | 'vencida' | 'anulada' | 'pagada';
+    cerrada_en: string | null;
+    motivo: string | null;
 }
 
 export interface PagoSireb {

@@ -14,13 +14,6 @@ return [
 
     'por_pagina' => (int) env('JICHI_POR_PAGINA', 15),
 
-    /*
-    | Vacío = el formulario acepta cualquier correo; con valor, exige ese
-    | dominio. Hoy no lo lee nadie: es para el módulo de Usuarios, que todavía
-    | no existe. Ver docs/PENDIENTES.md.
-    */
-    'dominio_institucional' => env('JICHI_DOMINIO_INSTITUCIONAL'),
-
     // La SEMILLA de la tabla `departamentos`, que es la fuente en ejecución.
     // Vive acá para no tener los nueve nombres dentro de una migración.
     'expedido' => [
@@ -57,7 +50,6 @@ return [
 
         // Los respaldos aceptan PDF: la certificación del gremio llega
         // escaneada desde una fotocopiadora.
-        'extensiones' => ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
         'mimes' => 'application/pdf,image/jpeg,image/png,image/webp',
 
         // Las fotos NO: se imprimen en la credencial, y un PDF no se dibuja.
@@ -89,7 +81,7 @@ return [
     // Encendido, el login local queda solo para administradores. Ver docs/modulos/IBARE.md.
     'ibare' => [
         'activo' => (bool) env('IBARE_ACTIVO', false),
-        'url' => rtrim((string) env('IBARE_URL', 'http://localhost:8001'), '/'),
+        'url' => rtrim((string) env('IBARE_URL', 'http://localhost:8000'), '/'),
         'client_id' => env('IBARE_CLIENT_ID', 'jichi'),
         'client_secret' => env('IBARE_CLIENT_SECRET'),
         'timeout' => (int) env('IBARE_TIMEOUT', 10),

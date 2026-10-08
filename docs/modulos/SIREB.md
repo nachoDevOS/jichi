@@ -114,7 +114,7 @@ guía— filtra por `liquidable`, y `describir()` manda las dos cosas
 
 *(30/09/2026)* Alta y edición van en su **propia pantalla**
 (`escala-formulario.tsx`; rutas `…/crear` y `…/{categoria}/editar`, con
-`permiso:catalogos.gestionar`); la escala queda solo con la tabla. Los ids ya no
+`permiso:catalogos.editar`); la escala queda solo con la tabla. Los ids ya no
 se escriben a mano: un **select agrupado por
 servicio** (`<optgroup>`) lista cada tarifa con su etiqueta y su precio, y elegir
 una llena `tarifa_sireb` **y** `servicio_sireb` (el de su grupo). Así no se puede
@@ -354,8 +354,8 @@ otros tres es cambiar el `false` por defecto en su llamada a `de()`.
 *(02/10/2026)* **El pago se hace en SIREB.** Autorización, carnet, faena y guía
 registran su liquidación al crearse y se aprueban solos cuando SIREB la da por
 pagada. Jichi no valida pagos —puede cargarlos, ver abajo—; no hay tabla
-`pagos`, Caja ni `en_revision`. Si la liquidación vence sin pago, el documento
-queda «No pagado» (03/10/2026).
+`pagos`, Caja ni `en_revision`. Si la liquidación vence, el documento sigue
+pendiente y se genera otra (08/10/2026).
 
 ### Registrar la liquidación
 
@@ -408,13 +408,13 @@ Idempotency-Key: 9f3c2a1e-7b4d-4e8a-b1c2-5d6e7f8a9b0c
 ### Cargar el pago desde Jichi
 
 *(03/10/2026)* La ficha de los cuatro documentos ofrece **«Cargar pago»**
-(`POST /panel/{documento}/{id}/cargar-pago`, permiso `{documento}.crear`).
+(`POST /panel/{documento}/{id}/cargar-pago`, permiso `{documento}.cargar-pago`).
 `CargarPagoService::cargar()` **solo carga**: valida un encargado de SIREB y
 aprueba `ConfirmarPagoService`, como siempre.
 
 1. Consulta `GET /liquidaciones/{id}`. Se carga **solo** si está `pendiente` —ni
    vencida, ni pagada, ni anulada— **y sin ningún pago**. Si no, no carga y corre
-   `verificar()` para poner la ficha al día (muestra el pago, aprueba, o «No pagado»).
+   `verificar()` para poner la ficha al día (muestra el pago o aprueba).
 2. `POST /liquidaciones/{id}/pago-manual` con `numero_boleta` (el «N° de
    transacción», 50) y `entidad_bancaria` (100): lo único que acepta SIREB; monto
    y fecha los pone él, y no recibe imagen. Sin `Idempotency-Key`: reintentar es
@@ -449,10 +449,9 @@ responde, también frena.
 | --- | --- |
 | `pendiente`, sin pago | Sigue pendiente: «todavía no se registró ningún pago» (con el código) |
 | `pendiente`, pago `pendiente` | Sigue pendiente: «falta que lo validen en Recaudaciones» |
-| `vencida`, sin pago | **Pasa a `no_pagado`** (03/10/2026): no sigue su curso, libera el lugar y los kilos, el comando deja de consultarlo |
-| `vencida`, con pago en revisión | Sigue pendiente: «consulte con Recaudaciones» |
-| `anulada` | Sigue pendiente: «corrija el trámite para generar uno nuevo, o elimínelo» |
-| `pagada`, pago `confirmado` | **Aprueba** (`Revisar*Service::aprobar()`, con sus reglas) **y emite el recibo** con el pago (N° de transacción, banco, fecha), en una transacción |
+| `vencida` | **Sigue pendiente** (08/10/2026; antes pasaba a `no_pagado`) y la ficha ofrece **«Generar nueva liquidación»** (ver abajo). Nunca trae pago: vence porque no se pagó. Sigue ocupando el lugar y los kilos |
+| `anulada` | Igual que `vencida`: sigue pendiente y ofrece «Generar nueva liquidación» |
+| `pagada` | **Aprueba** (`Revisar*Service::aprobar()`, con sus reglas) **y emite el recibo** con el pago (N° de transacción, banco, fecha), en una transacción |
 
 Cada consulta guarda el `pago` que manda SIREB en `sireb_envio.pago` —solo si
 cambió: el comando corre cada 10 min y cada escritura audita— y la tarjeta lo
@@ -466,19 +465,94 @@ expone; el `Pago` trae solo `tipo_pago`, `monto_pagado`, `estado`, `fecha_pago`,
 
 Si una regla de Jichi lo frena al aprobar (autorización revocada, kilos), queda
 pendiente con ese motivo. Lo disparan el botón **«Verificar pago»** de la ficha
-(`POST /panel/{documento}/{id}/verificar-pago`, permiso `{documento}.crear`) y
+(`POST /panel/{documento}/{id}/verificar-pago`, permiso `{documento}.verificar-pago`) y
 `jichi:verificar-pagos` cada 10 minutos (`routes/console.php`; necesita el cron
-de Laravel).
+de Laravel). *(08/10/2026)* Y el **portal**: al abrir el inicio o «En curso», el
+titular dispara `VerificarPagoJob` por cada trámite abierto con liquidación viva —como
+mucho una vez cada 2 min por trámite (candado en caché)—, con `dispatchAfterResponse()`:
+corre en el mismo php-fpm después de mandar la página, sin trabajador de cola (en
+Coolify hay un solo contenedor). El refresco de «En curso» trae el resultado. En desarrollo, `composer run dev` levanta
+el programador (`schedule:work`, registrado en `AppServiceProvider`).
+
+**Para no cargar el servidor** (08/10/2026):
+
+| Protección | Dónde |
+|---|---|
+| Un **candado por trámite**: el botón, el comando y el portal no lo consultan a la vez | `ConfirmarPagoService::verificar()` (`candado-pago:*`, 120 s) |
+| **Una consulta automática cada 2 min por trámite**, compartida entre el portal y el comando | `ConfirmarPagoService::reservarConsulta()` (`consulta-pago:*`) |
+| **Interruptor**: si SIREB no conecta, lo automático no insiste por 2 min (el botón manual sí) | `SirebService::sinRespuestaReciente()`; además `connectTimeout(5)` |
+| **Topes del comando**: 150 consultas (`--maximo`) o 8 min por pasada, de a 100 filas (`lazyById`); `withoutOverlapping(15)` | `VerificarPagosCommand`, `routes/console.php` |
+| **El job del portal**: después de la respuesta, sin cola; acotado por el timeout de SIREB (5 s para conectar, 10 en total) | `VerificarPagoJob` |
+
+Probado con SIREB simulado: el tope consulta 1 con `--maximo=1`; con SIREB caído,
+0; lo recién consultado por el portal se saltea; con el candado tomado, la segunda
+consulta no llega a SIREB.
 
 | Pieza | Qué hace |
 | --- | --- |
 | `SirebService::registrarLiquidacion()` / `liquidacion()` / `anularLiquidacion()` | El HTTP. Las escrituras reintentan ante red, timeout o 5xx con `Http::retry()` (`REINTENTOS = 2`, 1 s; un 4xx no). Todo pasa por `enviar()` (token + reintento ante 401) |
 | `LiquidarSirebService` | `preparar()` (dentro de la transacción), `enviar()`, `enviarSinFrenar()`, `anularSiCambia()` y `anular()` (fuera) |
 | Trait `LiquidableSireb` | Columnas y casts, `titularSireb()`, `itemsSireb()`, `registradoEnSireb()`, `porPagar()`, `resumenSireb()` y la relación `recibo` |
-| `ConfirmarPagoService` | Consulta, aprueba y emite el recibo |
+| `ConfirmarPagoService` | Consulta, aprueba y emite el recibo; guarda en `sireb_envio.consulta` el estado de SIREB |
+| `RenovarLiquidacionService` | «Generar nueva liquidación»: la vencida al historial y otra con la tarifa vigente del catálogo |
 | `EstadoLiquidacionSireb` | `por_enviar` / `registrada` / `anulada` |
 | `TarjetaRecaudaciones` (React) | La tarjeta de las cuatro fichas: estado, código de pago, recibo y «Verificar pago» |
 | Flash `aviso` | El toast amarillo: se hizo, pero falta algo |
+
+### Generar nueva liquidación (08/10/2026)
+
+Una vencida sin pago no se cobra más. El botón **«Generar nueva liquidación»** de la
+tarjeta (`POST /panel/{documento}/{id}/renovar-liquidacion`, permiso
+`{documento}.renovar-liquidacion`) la cierra y pide otra. Lo hace
+`RenovarLiquidacionService::renovar()`, **solo a mano**: el comando no renueva, o un
+trámite abandonado generaría una deuda nueva cada 5 días.
+
+1. Vuelve a consultar SIREB. Pagada → aprueba en vez de renovar. Sin vencer ni
+   anular → no renueva.
+2. **La tarifa se relee del CATÁLOGO, no del trámite**: si SIREB dio de baja la
+   tarifa y creó otra, la unidad la elige en el catálogo y el trámite toma la nueva.
+   Cada servicio la busca como al emitir (`OtorgarCupoService::precioDe()`,
+   `EmitirCarnetService::precioDe()`, `EmitirFaenaService::precioDeLaFaena()`,
+   `EmitirGuiaService::precioDelProducto()` por renglón). De baja → no toca nada y
+   el aviso dice qué catálogo corregir.
+3. En una transacción, con la fila bloqueada: la vigente pasa a `vencida` en
+   `sireb_historial`, se escriben el `monto` y el `sireb_tarifa_id` nuevos (en la
+   guía, `precio_kg`, `sireb_tarifa_id` e `importe_total` de cada renglón y el
+   monto vuelto a sumar) y `preparar()` deja la clave nueva.
+4. Después del commit, `enviar()`. Si SIREB no responde, queda «por enviar» y
+   «Verificar pago» la reintenta con la misma clave.
+
+**Antes de confirmar, la ventana muestra el monto**: al abrirse pide la prop
+`cotizacion_renovacion` (`Inertia::optional`, partial reload: la ficha no consulta
+a SIREB al cargar) y `RenovarLiquidacionService::cotizar()` la calcula con el MISMO
+`precioVigente()` que cobra —lo que se ve es lo que se cobra—. **Solo lee**: no
+escribe nada. Si la tarifa ya no está vigente, muestra el motivo y «Sí, generar»
+queda deshabilitado.
+
+El estado del trámite no cambia nunca. La vencida no se pide anular en SIREB.
+
+**Decide SOLO el estado de la liquidación** (08/10/2026): `pagada` aprueba —sin
+exigir que el pago venga `confirmado`; sin detalle del pago, el recibo sale con el
+monto de la liquidación—; `vencida` y `anulada` no tocan el estado y ofrecen generar
+otra. **Una vencida nunca tiene pago**: en SIREB vence porque no se pagó, así que
+generar otra no puede cobrar dos veces.
+
+**Con la liquidación vencida o anulada la ficha ofrece este botón y «Verificar
+pago»**, pero no «Cargar pago» ni el QR (`liquidacionCaida()`, `puedeCargarPago()`).
+«Verificar pago» sí vuelve a consultar a SIREB; el comando de cada 10 minutos las
+saltea. Cargar pago lo frena además el servidor: solo carga sobre una
+liquidación `pendiente` y sin pago.
+
+**El historial** (`sireb_historial`) lo escribe `LiquidarSirebService`: `enviar()`
+agrega la entrada al registrarse —lo que SIREB no creó no se anota— y la cierran
+`anular()` (`anulada`, o `vencida` si ya había vencido), la renovación (`vencida`) y
+`ConfirmarPagoService` al aprobar (`pagada`). La tarjeta muestra las cerradas en
+«Liquidaciones anteriores».
+
+Probado el 08/10/2026 en una SQLite descartable con SIREB simulado en memoria:
+173 comprobaciones sobre los cuatro trámites (pedido, vencida con y sin pago,
+tarifa de baja, tarifa nueva, doble clic, segunda renovación, pago y recibo,
+SIREB caído al consultar y al registrar, eliminar).
 
 Probado el 02/10/2026 con SIREB simulado (`Http::fake`) dentro de transacciones
 deshechas: los cuatro documentos registran su liquidación, se aprueban al darlos

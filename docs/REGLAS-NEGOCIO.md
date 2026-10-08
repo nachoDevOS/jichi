@@ -34,9 +34,9 @@
   **`aprovechamientos_pesq`** que **hereda** la modalidad y el volumen total de
   kilos de la escala elegida.
 - Su ciclo de vida pasa por los estados `pendiente`, `aprobado`, `agotado`,
-  `revocado` o `no_pagado`. Pasa de `pendiente` a `aprobado` cuando SIREB
-  confirma el pago, y a `no_pagado` cuando la liquidación vence sin ningún pago
-  (ver Paso 6). **La vigencia no es un estado**: pasada su fecha sigue
+  `revocado` (`no_pagado` se quitó el 08/10/2026).
+  Pasa de `pendiente` a `aprobado` cuando SIREB confirma el pago; si la
+  liquidación vence sin pago, **sigue `pendiente`** (ver Paso 6). **La vigencia no es un estado**: pasada su fecha sigue
   `aprobado`, y si vale hoy lo dicen las fechas.
 - *(03/10/2026)* **El tramo de la escala no se cambia nunca**, en ningún estado:
   ni los kilos, ni el monto, ni las fechas. Corregir el borrador cambia **solo el
@@ -61,7 +61,6 @@ anterior está:
 | `pendiente` en fecha | ✘ | Es un trámite en curso: se corrige o se elimina, no se duplica |
 | `aprobado` en fecha | ✘ | Está vigente |
 | `aprobado` con la fecha pasada | ✔ | Ya no está vigente, aunque siga diciendo «aprobado» |
-| `no_pagado` | ✔ | Nunca se pagó: no ocupa el lugar |
 | `agotado` (pescó todos los kilos) | ✔ | No le queda nada que autorizar |
 | `revocado` (aunque siga en fecha) | ✔ | La unidad la dio de baja |
 
@@ -135,7 +134,7 @@ traba la regla de «un carnet vigente por actividad».
    efecto ya no ocupa el lugar.
 
 **Dónde vive:** `EstadoAprovechamiento::Revocado` y `permiteRevocacion()`,
-`RevisarCupoService::revocar()`, `RevocarCupoRequest`, la ruta
+`RevisarCupoService::revocar()`, `MotivoRequest`, la ruta
 `PATCH /panel/aprovechamientos/{id}/revocar`, y los controles en
 `Carnet::autorizacionRevocada()` / `PermisoFaena::autorizacionRevocada()` y los scopes `vigentes()` (la vigencia que mira al padre),
 los controles en `OtorgarCupoService` (scope `enCurso()`),
@@ -171,7 +170,7 @@ dentro de una transacción deshecha con `rollBack()`.
   «no vigente: el titular no tiene un carnet vigente que la ampare». Aprobado el
   nuevo, vuelven a valer solas hasta su propia fecha. Vale también en el cambio
   de año: una guía aprobada el 30/12 que vence el 04/01 no vale del 1 al 4 hasta
-  que se apruebe el carnet de la gestión nueva. Anular una guía, al revés, no
+  que se apruebe el carnet de la gestión nueva. Revocar una guía, al revés, no
   toca el carnet. Ver `Carnet::amparaSusPapeles()`.
 - **Una persona no tiene dos carnets vigentes de la misma actividad.** Para
   reponer uno perdido o dañado se revoca el actual y se emite otro con **la
@@ -188,7 +187,7 @@ dentro de una transacción deshecha con `rollBack()`.
   raíz al que está asociado el carnet.
 - Vigencia **máxima de 30 días** por salida: al aprobarla, `fecha_salida` es
   ese día y `fecha_desembarque` salida + 30. Estados `pendiente`,
-  `aprobado`, `completado`, `no_pagado` o `revocado` (este último
+  `aprobado` o `revocado` (este último
   es histórico: desde el 27/09/2026 revocar la autorización ya no lo escribe;
   la faena queda «sin efecto», ver Regla 5).
 - **Calca el talonario «PERMISO POR FAENA».** El Área de Fiscalización y
@@ -210,7 +209,7 @@ dentro de una transacción deshecha con `rollBack()`.
   | --- | :-: | :-: |
   | `pendiente` | ✘ | ✔ |
   | `aprobado` | ✔ | — |
-  | `no_pagado`, `revocado` | ✘ | ✘ |
+  | `revocado` | ✔ (sanción: no le devuelve los kilos) | ✘ |
 
   - **Descontar** mueve los kilos a «consumido». Solo la aprobada descuenta, y
     solo lo consumido puede dejar la autorización `agotado`.
@@ -259,8 +258,8 @@ dentro de una transacción deshecha con `rollBack()`.
   vuelve a estar vigente. Si Juan no saca otro carnet, la guía no vale. Ver el
   paso 3.
 - Vigencia de transporte de **máximo 5 días**, con los estados `pendiente`,
-  `aprobado` o `anulada`. **Anular** es solo para la guía aprobada; un borrador
-  se elimina. **No se
+  `aprobado` o `revocado`. **Revocar** es solo para la guía aprobada; un borrador
+  se elimina *(hasta el 05/10/2026 se decía «anular»)*. **No se
   registra la llegada de la carga** *(28/09/2026)*: la guía aprobada vale hasta
   que vence.
 - **Productos hidrobiológicos parametrizados** *(27/09/2026)*. El cuadro D ya no
@@ -286,7 +285,8 @@ boletas en Jichi y la firma de supervisión.)*
   y queda `pendiente`. El titular paga y el encargado de SIREB **valida** el
   pago. **Jichi no valida pagos**: como mucho los carga (ver abajo).
 - **Pagado en SIREB = aprobado en Jichi.** Cuando SIREB da la liquidación por
-  `pagada` (pago `confirmado`), el documento pasa solo a `aprobado`: no hay
+  `pagada`, el documento pasa solo a `aprobado` —decide el estado de la
+  liquidación, no el detalle del pago (08/10/2026)—: no hay
   `en_revision` ni firma. Jichi pregunta con el botón **«Verificar pago»** de la
   ficha y cada 10 minutos de forma automática (SIREB no avisa).
 - **Las reglas propias siguen valiendo al aprobar:** un carnet o una faena de una
@@ -305,10 +305,17 @@ boletas en Jichi y la firma de supervisión.)*
   antes de cargar. Validarlo sigue siendo de Recaudaciones.
 - *(03/10/2026)* **Dos plazos distintos.** El plazo **de pago** lo da SIREB
   (`plazo_pago_dias` del servicio: 5 días desde que se registra la liquidación).
-  Si al verificar SIREB dice `vencida` y **no hay ningún pago**, el trámite pasa
-  a **`no_pagado`**: no sigue su curso, libera el lugar de la persona y los kilos
-  reservados, y el comando deja de consultarlo. Si venció con un pago en
-  revisión, sigue pendiente y se consulta con Recaudaciones. La **vigencia** del
+  *(08/10/2026)* Si al verificar SIREB dice `vencida`, **el trámite NO cambia de
+  estado: sigue `pendiente`**. (Una vencida nunca tiene pago: en SIREB vence
+  justamente porque no se pagó.) Ocupa el lugar de la
+  persona y los kilos reservados hasta que se lo elimine (se puede: SIREB no
+  cobra una vencida). Lo decidió el responsable; antes pasaba a `no_pagado`.
+  **Para seguir cobrándolo, «Generar nueva liquidación»**: la vencida queda en el
+  historial del trámite y se pide otra con la tarifa que el catálogo tiene HOY
+  —si SIREB dio de baja la tarifa y creó otra, sale con la nueva y su precio—.
+  Si la tarifa del catálogo está de baja, no se genera. Vale igual para una
+  liquidación **anulada** en SIREB: decide solo el estado de la liquidación
+  (08/10/2026). La **vigencia** del
   trámite es otra cosa y empieza al aprobarse: autorización y carnet hasta el
   31/12, faena 30 días, guía 5 días.
 - *(03/10/2026)* **Antes de anular la liquidación —al eliminar, o al corregir
@@ -393,9 +400,8 @@ estar en manos de otro: vigente hasta que se apruebe el reemplazo, serviría en 
 control.
 
 **Dónde vive:** `EmitirCarnetService::reponer()` (revoca con el motivo
-«Reposición: …»), `ReponerCarnetRequest` (las reglas de revocar), la ruta
-`PATCH /panel/carnets/{carnet}/reponer` —pide `carnets.revocar` y
-`carnets.crear`— y `CarnetController::create()` con `?reemplaza=`, que precarga
+«Reposición: …»), `MotivoRequest`, la ruta
+`PATCH /panel/carnets/{carnet}/reponer` —pide `carnets.crear`— y `CarnetController::create()` con `?reemplaza=`, que precarga
 el formulario solo si ese carnet ya está revocado.
 
 **Tres decisiones tomadas por defecto, a confirmar con el responsable:**
@@ -451,7 +457,7 @@ el formulario solo si ese carnet ya está revocado.
 | Pescador SIN cupo no saca carnet | `EmitirCarnetService::emitir()` → `pescadorSinCupo()` |
 | Nada vale antes de pagarse en SIREB | `ConfirmarPagoService` (aprueba solo con la liquidación `pagada`) + los `Revisar*Service::aprobar()`; imprimir exige `yaFueAprobado()` |
 | Cada documento registra su cobro en SIREB y no lo duplica | `LiquidarSirebService` (clave guardada antes de llamar) + el trait `LiquidableSireb` |
-| Liquidación vencida sin pago → «No pagado» | `ConfirmarPagoService::verificar()` → `marcarNoPagado()`; los scopes con listas cerradas liberan el lugar y los kilos |
+| Liquidación vencida → el trámite sigue pendiente (08/10/2026) | `ConfirmarPagoService::verificar()` solo avisa; ya no hay `marcarNoPagado()` |
 | Cargar el pago solo si la liquidación está pendiente y sin pago | `CargarPagoService::cargar()` (consulta antes) + SIREB (`422 PAGO_YA_EXISTE` / `LIQUIDACION_NO_PAGABLE`) |
 | No se elimina con un pago cargado; con el pago validado, se aprueba | `LiquidarSirebService::anular()` (`pagoEnRevision()` / `liquidacionPagada()`) + `ConfirmarPagoService::alNoPoderEliminar()` en los cuatro `destroy()` |
 | La autorización solo corrige la embarcación | `OtorgarCupoService::editar()` + `EditarCupoRequest` |

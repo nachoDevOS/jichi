@@ -38,14 +38,14 @@ class CargarPagoService
         $pago = $liquidacion['pago'] ?? null;
 
         if ($estado !== 'pendiente' || $pago !== null) {
-            // Se pone al día la ficha: muestra el pago, aprueba si está pagada, «No pagado» si venció.
+            // Se pone al día la ficha: muestra el pago, aprueba si está pagada, ofrece generar otra si venció.
             $this->pagos->verificar($documento);
 
             return $this->no(match (true) {
                 $pago !== null => 'ya tiene un pago cargado en Recaudaciones (N° de transacción '.($pago['numero_boleta'] ?? '—').').',
-                $estado === 'vencida' => 'venció el plazo de pago en Recaudaciones.',
+                $estado === 'vencida' => 'venció el plazo de pago. Genere una nueva liquidación para cobrarlo.',
+                $estado === 'anulada' => 'Recaudaciones anuló el cobro. Genere una nueva liquidación para cobrarlo.',
                 $estado === 'pagada' => 'ya está pagado en Recaudaciones.',
-                $estado === 'anulada' => 'su cobro fue anulado en Recaudaciones.',
                 default => 'Recaudaciones no encuentra el cobro de este trámite.',
             });
         }

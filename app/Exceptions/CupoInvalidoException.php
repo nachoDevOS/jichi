@@ -116,8 +116,7 @@ class CupoInvalidoException extends RuntimeException
     public static function noSePuedeRevocar(string $estado): self
     {
         return new self(
-            "No se puede revocar una autorización {$estado}: el borrador se elimina, ".
-            'y la no pagada nunca autorizó nada.',
+            "No se puede revocar una autorización {$estado}: el borrador se elimina.",
         );
     }
 }

@@ -1,9 +1,10 @@
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Ban, Banknote, BadgeCheck, ExternalLink, Eye, Pencil, Plus, Printer, Receipt, RefreshCw, Ship, Trash2, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
 import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -68,15 +69,17 @@ export default function VerCupo({
             titulo="Autorización de Pesca para Aprovechamiento Pesquero"
             acciones={
                 <div className="flex flex-wrap gap-2">
-                    <Button
-                        variant="ver"
-                        onClick={() =>
-                            router.visit(route('beneficiarios.show', cupo.beneficiario_id))
-                        }
-                    >
-                        <Eye className="size-4" />
-                        Beneficiario
-                    </Button>
+                    {puede('beneficiarios.ver') && (
+                        <Button
+                            variant="ver"
+                            onClick={() =>
+                                router.visit(route('beneficiarios.show', cupo.beneficiario_id))
+                            }
+                        >
+                            <Eye className="size-4" />
+                            Beneficiario
+                        </Button>
+                    )}
 
                     {/* La autorización de pesca, en PDF. Sale recién con el cupo
                         firmado, y abre una pestaña porque lo que vuelve es un
@@ -165,12 +168,13 @@ export default function VerCupo({
                     <div className="min-w-0">
                         {/* Al nombre se le va: la ficha de la persona es donde
                             están sus otros carnets y sus otros trámites. */}
-                        <Link
+                        <EnlacePermitido
+                            permiso="beneficiarios.ver"
                             href={route('beneficiarios.show', cupo.beneficiario_id)}
                             className="text-lg font-semibold text-primary hover:underline"
                         >
                             {cupo.beneficiario ?? '—'}
-                        </Link>
+                        </EnlacePermitido>
 
                         {/* Con el rótulo adelante: «3944217 PT» solo no dice
                             qué número es. tabular-nums para que la cédula quede
@@ -319,7 +323,7 @@ export default function VerCupo({
                             <Dato etiqueta="Otorgado el" valor={fecha(cupo.fecha_emision)} />
                         )}
                         <Dato etiqueta="Vence el" valor={fecha(cupo.fecha_vencimiento)} />
-                        <Dato etiqueta="Monto" valor={bs(cupo.monto, institucion.moneda)} />
+                        <Dato etiqueta="Monto" valor={bs(cupo.monto, institucion.moneda)} destacado />
 
 
                         {/*
@@ -360,7 +364,8 @@ export default function VerCupo({
                     rutaVerificar={route('aprovechamientos.verificar-pago', cupo.id)}
                     puedeCargar={cupo.puede_cargar_pago}
                     rutaCargar={route('aprovechamientos.cargar-pago', cupo.id)}
-                    permiso="aprovechamientos.crear"
+                    rutaRenovar={route('aprovechamientos.renovar-liquidacion', cupo.id)}
+                    documento="aprovechamientos"
                 />
 
                 {/*
@@ -414,14 +419,14 @@ export default function VerCupo({
                                             {carnets.map((c) => (
                                                 <tr key={c.id} className="hover:bg-secondary/50">
                                                     <td className="px-5 py-2.5">
-                                                        <a
+                                                        <EnlacePermitido
+                                                            permiso="carnets.ver"
+                                                            nuevaPestana
                                                             href={route('carnets.show', c.id)}
-                                                            target="_blank"
-                                                            rel="noreferrer"
                                                             className="font-mono font-medium text-primary hover:underline"
                                                         >
                                                             {c.registro ?? c.codigo}
-                                                        </a>
+                                                        </EnlacePermitido>
 
                                                         {/* El código va debajo y en gris: en el
                                                             mostrador se dicta el registro. */}
@@ -466,8 +471,7 @@ export default function VerCupo({
                                                     */}
                                                     <td className="px-5 py-2.5">
                                                         <div className="flex justify-end gap-2">
-                                                            {puede('carnets.revocar') &&
-                                                                puede('carnets.crear') &&
+                                                            {puede('carnets.crear') &&
                                                                 c.puede_reponerse && (
                                                                     <Button
                                                                         size="sm"
@@ -489,22 +493,24 @@ export default function VerCupo({
                                                                     Imprimir
                                                                 </a>
                                                             )}
-                                                            <a
-                                                                href={route('carnets.show', c.id)}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                title="Abrir la cédula en otra pestaña"
-                                                                aria-label={`Ver la cédula ${c.registro ?? c.codigo}`}
-                                                                className={cn(
-                                                                    buttonVariants({
-                                                                        variant: 'ver',
-                                                                        size: 'sm',
-                                                                    }),
-                                                                )}
-                                                            >
-                                                                <ExternalLink className="size-4" />
-                                                                Ver
-                                                            </a>
+                                                            {puede('carnets.ver') && (
+                                                                <a
+                                                                    href={route('carnets.show', c.id)}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    title="Abrir la cédula en otra pestaña"
+                                                                    aria-label={`Ver la cédula ${c.registro ?? c.codigo}`}
+                                                                    className={cn(
+                                                                        buttonVariants({
+                                                                            variant: 'ver',
+                                                                            size: 'sm',
+                                                                        }),
+                                                                    )}
+                                                                >
+                                                                    <ExternalLink className="size-4" />
+                                                                    Ver
+                                                                </a>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -579,12 +585,13 @@ export default function VerCupo({
                                                         la columna que dice cuál gastó esos kilos. */}
                                                     <td className="px-5 py-2.5 font-mono tabular-nums text-muted-foreground">
                                                         {f.carnet_id !== null ? (
-                                                            <Link
+                                                            <EnlacePermitido
+                                                                permiso="carnets.ver"
                                                                 href={route('carnets.show', f.carnet_id)}
                                                                 className="text-primary hover:underline"
                                                             >
                                                                 N° {f.carnet_registro ?? '—'}
-                                                            </Link>
+                                                            </EnlacePermitido>
                                                         ) : (
                                                             '—'
                                                         )}
@@ -608,9 +615,7 @@ export default function VerCupo({
                                                         </span>
                                                         {!f.consume_cupo && (
                                                             <span className="ml-2 text-xs text-muted-foreground">
-                                                                {f.estado === 'no_pagado' || f.estado === 'revocado'
-                                                                    ? 'liberados'
-                                                                    : 'sin descontar'}
+                                                                sin descontar
                                                             </span>
                                                         )}
                                                     </td>
@@ -640,15 +645,17 @@ export default function VerCupo({
                                                                     Imprimir
                                                                 </a>
                                                             )}
-                                                            <a
-                                                                href={route('faenas.show', f.id)}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
-                                                            >
-                                                                <ExternalLink className="size-4" />
-                                                                Ver
-                                                            </a>
+                                                            {puede('faenas.ver') && (
+                                                                <a
+                                                                    href={route('faenas.show', f.id)}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
+                                                                >
+                                                                    <ExternalLink className="size-4" />
+                                                                    Ver
+                                                                </a>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -802,11 +809,11 @@ export default function VerCupo({
     );
 }
 
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+function Dato({ etiqueta, valor, destacado = false }: { etiqueta: string; valor: string; destacado?: boolean }) {
     return (
-        <div className="flex justify-between gap-3">
+        <div className="flex items-baseline justify-between gap-3">
             <span className="text-muted-foreground">{etiqueta}</span>
-            <span className="text-right font-medium tabular-nums">{valor}</span>
+            <span className={destacado ? 'text-right text-base font-medium tabular-nums' : 'text-right font-medium tabular-nums'}>{valor}</span>
         </div>
     );
 }

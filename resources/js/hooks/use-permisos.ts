@@ -2,25 +2,13 @@ import { usePage } from '@inertiajs/react';
 import type { PageProps } from '@/types';
 
 /**
- * Saber qué puede hacer el usuario conectado.
+ * Saber qué puede hacer el usuario conectado. Se pregunta siempre por PERMISO,
+ * nunca por rol: los roles los arma la unidad y cambian de nombre.
  */
 export function usePermisos() {
-    const { auth } = usePage<PageProps>().props;
-
-    const permisos = auth.user?.permisos ?? [];
-    const roles = auth.user?.roles ?? [];
+    const permisos = usePage<PageProps>().props.auth.user?.permisos ?? [];
 
     return {
-        /** ¿Tiene este permiso concreto? */
         puede: (permiso: string) => permisos.includes(permiso),
-
-        /** ¿Tiene al menos uno de estos permisos? */
-        puedeAlguno: (...lista: string[]) => lista.some((p) => permisos.includes(p)),
-
-        /** ¿Tiene este rol? */
-        tieneRol: (rol: string) => roles.includes(rol),
-
-        permisos,
-        roles,
     } as const;
 }

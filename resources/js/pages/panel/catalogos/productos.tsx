@@ -47,7 +47,7 @@ export default function CatalogoProductos({
             titulo="Productos hidrobiológicos"
             descripcion="Las especies del cuadro D de la guía y su tarifa por kilo en Recaudaciones (SIREB)."
             acciones={
-                puede('catalogos.gestionar') && (
+                puede('catalogos.crear') && (
                     <Link href={route('productos.create')} className={cn(buttonVariants())}>
                         <Plus className="size-4" />
                         Nuevo producto
@@ -179,7 +179,7 @@ export default function CatalogoProductos({
                                                                 <History className="size-4" />
                                                             </Link>
 
-                                                            {puede('catalogos.gestionar') && (
+                                                            {puede('catalogos.editar') && (
                                                                 <Link
                                                                     href={route('productos.edit', p.id)}
                                                                     className={cn(buttonVariants({ variant: 'editar', size: 'sm' }))}

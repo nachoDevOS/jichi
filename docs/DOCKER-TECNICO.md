@@ -60,10 +60,29 @@ Queda en **http://localhost:8090**, con `admin@admin.com` y la contraseña de
 - **`public/hot` en la imagen rompería todo:** la página pediría los assets al
   servidor de Vite. Está en `.dockerignore`.
 
-## Para Coolify (pendiente)
+## Para Coolify
 
-- `trustProxies(at: '*')` en `bootstrap/app.php`: detrás de Traefik, sin eso
-  Laravel arma URLs `http://` y el navegador bloquea los assets.
+### La verificación de pagos (obligatorio)
+
+En Coolify, con el build pack **Dockerfile**, corre **un solo contenedor**
+(nginx + php-fpm): no hay cron ni trabajador de cola adentro. Por eso:
+
+- **El cron va como «Scheduled Task» de Coolify** (Aplicación › Scheduled Tasks ›
+  Add): comando `php artisan schedule:run`, frecuencia `* * * * *`, contenedor el
+  de la app. Coolify lo ejecuta dentro del contenedor cada minuto y Laravel decide
+  qué toca —hoy, `jichi:verificar-pagos` cada 10 minutos—. **Sin esta tarea nada
+  se aprueba solo.**
+- **No hace falta trabajador de cola** (08/10/2026): lo único que usaba la cola era
+  `VerificarPagoJob`, y ahora corre con `dispatchAfterResponse()`, en el mismo
+  php-fpm, después de mandar la página al beneficiario.
+- **La carga está acotada**: el comando hace como mucho 150 consultas u 8 min por
+  pasada, no repite lo consultado hace menos de 2 min y no insiste si SIREB no
+  responde. Ver [modulos/SIREB.md](modulos/SIREB.md).
+
+### Lo demás
+
+- ✅ `trustProxies(at: '*')` en `bootstrap/app.php` (08/10/2026): detrás de Traefik,
+  sin eso Laravel arma URLs `http://` y el navegador bloquea los assets.
 - `APP_URL` con el dominio real en `https`: el QR impreso sale de ahí.
 - PostgreSQL como recurso de Coolify, con respaldos programados.
 - Persistir `storage/app` o usar S3/MinIO.

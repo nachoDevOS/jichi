@@ -16,7 +16,9 @@ use App\Http\Controllers\Panel\GuiaImpresionController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
 use App\Http\Controllers\Panel\ProductoHidrobiologicoController;
 use App\Http\Controllers\Panel\ReciboController;
+use App\Http\Controllers\Panel\RolController;
 use App\Http\Controllers\Panel\TipoCarnetController;
+use App\Http\Controllers\Panel\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -38,14 +40,15 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     | 1. Beneficiarios — la persona, UNA SOLA VEZ
     */
 
-    Route::middleware('permiso:beneficiarios.ver')->group(function () {
-        Route::get('/beneficiarios', [BeneficiarioController::class, 'index'])
-            ->name('beneficiarios.index');
+    Route::get('/beneficiarios', [BeneficiarioController::class, 'index'])
+        ->middleware('permiso:beneficiarios.ver')
+        ->name('beneficiarios.index');
 
-        // Devuelve JSON, no una pantalla. Va ANTES de {beneficiario}.
-        Route::get('/beneficiarios/buscar', [BeneficiarioController::class, 'buscar'])
-            ->name('beneficiarios.buscar');
-    });
+    // Devuelve JSON, no una pantalla. Va ANTES de {beneficiario}. Lo usan los cuatro
+    // formularios de alta: quien emite un trámite tiene que poder elegir a la persona.
+    Route::get('/beneficiarios/buscar', [BeneficiarioController::class, 'buscar'])
+        ->middleware('permiso:beneficiarios.ver|aprovechamientos.crear|carnets.crear|faenas.crear|guias.crear')
+        ->name('beneficiarios.buscar');
 
     Route::middleware('permiso:beneficiarios.crear')->group(function () {
         Route::get('/beneficiarios/crear', [BeneficiarioController::class, 'create'])
@@ -112,13 +115,18 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
     // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
     Route::post('/aprovechamientos/{aprovechamiento}/verificar-pago', [AprovechamientoController::class, 'verificarPago'])
-        ->middleware('permiso:aprovechamientos.crear')
+        ->middleware('permiso:aprovechamientos.verificar-pago')
         ->name('aprovechamientos.verificar-pago');
 
     // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
     Route::post('/aprovechamientos/{aprovechamiento}/cargar-pago', [AprovechamientoController::class, 'cargarPago'])
-        ->middleware('permiso:aprovechamientos.crear')
+        ->middleware('permiso:aprovechamientos.cargar-pago')
         ->name('aprovechamientos.cargar-pago');
+
+    // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
+    Route::post('/aprovechamientos/{aprovechamiento}/renovar-liquidacion', [AprovechamientoController::class, 'renovarLiquidacion'])
+        ->middleware('permiso:aprovechamientos.renovar-liquidacion')
+        ->name('aprovechamientos.renovar-liquidacion');
 
     // Revocar es una sanción, como en el carnet: permiso propio y motivo obligatorio.
     Route::patch('/aprovechamientos/{aprovechamiento}/revocar', [AprovechamientoController::class, 'revocar'])
@@ -172,21 +180,27 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
     // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
     Route::post('/carnets/{carnet}/verificar-pago', [CarnetController::class, 'verificarPago'])
-        ->middleware('permiso:carnets.crear')
+        ->middleware('permiso:carnets.verificar-pago')
         ->name('carnets.verificar-pago');
 
     // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
     Route::post('/carnets/{carnet}/cargar-pago', [CarnetController::class, 'cargarPago'])
-        ->middleware('permiso:carnets.crear')
+        ->middleware('permiso:carnets.cargar-pago')
         ->name('carnets.cargar-pago');
+
+    // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
+    Route::post('/carnets/{carnet}/renovar-liquidacion', [CarnetController::class, 'renovarLiquidacion'])
+        ->middleware('permiso:carnets.renovar-liquidacion')
+        ->name('carnets.renovar-liquidacion');
 
     Route::patch('/carnets/{carnet}/revocar', [CarnetController::class, 'revocar'])
         ->middleware('permiso:carnets.revocar')
         ->name('carnets.revocar');
 
-    // Reponer = revocar + abrir el formulario del nuevo: pide los dos permisos.
+    // Reponer revoca el perdido y abre el alta del nuevo. Es parte de registrar:
+    // va con `carnets.crear`, sin permiso propio (decidido el 05/10/2026).
     Route::patch('/carnets/{carnet}/reponer', [CarnetController::class, 'reponer'])
-        ->middleware(['permiso:carnets.revocar', 'permiso:carnets.crear'])
+        ->middleware('permiso:carnets.crear')
         ->name('carnets.reponer');
 
     // El plástico. Permiso propio, como el resto de las impresiones.
@@ -216,13 +230,18 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
     // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
     Route::post('/faenas/{faena}/verificar-pago', [FaenaController::class, 'verificarPago'])
-        ->middleware('permiso:faenas.crear')
+        ->middleware('permiso:faenas.verificar-pago')
         ->name('faenas.verificar-pago');
 
     // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
     Route::post('/faenas/{faena}/cargar-pago', [FaenaController::class, 'cargarPago'])
-        ->middleware('permiso:faenas.crear')
+        ->middleware('permiso:faenas.cargar-pago')
         ->name('faenas.cargar-pago');
+
+    // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
+    Route::post('/faenas/{faena}/renovar-liquidacion', [FaenaController::class, 'renovarLiquidacion'])
+        ->middleware('permiso:faenas.renovar-liquidacion')
+        ->name('faenas.renovar-liquidacion');
 
     // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
     // PENDIENTE: lo decide PermisoFaena::puedeEditarse().
@@ -237,6 +256,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::delete('/faenas/{faena}', [FaenaController::class, 'destroy'])
         ->middleware('permiso:faenas.eliminar')
         ->name('faenas.destroy');
+
+    // Revocar es de SUPERVISIÓN, como en el carnet y la guía.
+    Route::patch('/faenas/{faena}/revocar', [FaenaController::class, 'revocar'])
+        ->middleware('permiso:faenas.revocar')
+        ->name('faenas.revocar');
 
     // ANTES de '{faena}': con la ficha primero, «imprimir» se toma como id.
     Route::get('/faenas/{faena}/imprimir', [PermisoFaenaImpresionController::class, 'imprimir'])
@@ -265,13 +289,18 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
     // El pago se hace en SIREB: esto pregunta y, si está pagado, aprueba.
     Route::post('/guias/{guia}/verificar-pago', [GuiaController::class, 'verificarPago'])
-        ->middleware('permiso:guias.crear')
+        ->middleware('permiso:guias.verificar-pago')
         ->name('guias.verificar-pago');
 
     // Carga el pago en SIREB; validarlo sigue siendo de Recaudaciones.
     Route::post('/guias/{guia}/cargar-pago', [GuiaController::class, 'cargarPago'])
-        ->middleware('permiso:guias.crear')
+        ->middleware('permiso:guias.cargar-pago')
         ->name('guias.cargar-pago');
+
+    // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
+    Route::post('/guias/{guia}/renovar-liquidacion', [GuiaController::class, 'renovarLiquidacion'])
+        ->middleware('permiso:guias.renovar-liquidacion')
+        ->name('guias.renovar-liquidacion');
 
     // Corregir es de ventanilla y eliminar de supervisión. Las dos solo en
     // PENDIENTE: lo dice GuiaMovimiento::puedeEditarse().
@@ -287,10 +316,10 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware('permiso:guias.eliminar')
         ->name('guias.destroy');
 
-    // Anular es de SUPERVISIÓN: quema un número del talonario para siempre.
-    Route::patch('/guias/{guia}/anular', [GuiaController::class, 'anular'])
-        ->middleware('permiso:guias.anular')
-        ->name('guias.anular');
+    // Revocar es de SUPERVISIÓN, como en el carnet: quema un número del talonario para siempre.
+    Route::patch('/guias/{guia}/revocar', [GuiaController::class, 'revocar'])
+        ->middleware('permiso:guias.revocar')
+        ->name('guias.revocar');
 
     // ANTES de '{guia}': con la ficha primero, «imprimir» se toma como id.
     Route::get('/guias/{guia}/imprimir', [GuiaImpresionController::class, 'imprimir'])
@@ -326,24 +355,24 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
         // --- Asociaciones
         Route::get('/asociaciones', [AsociacionController::class, 'index'])
-            ->middleware('permiso:catalogos.ver')
+            ->middleware('permiso:asociaciones.ver')
             ->name('asociaciones.index');
 
         Route::get('/asociaciones/crear', [AsociacionController::class, 'create'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:asociaciones.crear')
             ->name('asociaciones.create');
 
         Route::get('/asociaciones/{asociacion}/editar', [AsociacionController::class, 'edit'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:asociaciones.editar')
             ->name('asociaciones.edit');
 
-        Route::middleware('permiso:catalogos.gestionar')->group(function () {
-            Route::post('/asociaciones', [AsociacionController::class, 'store'])
-                ->name('asociaciones.store');
+        Route::post('/asociaciones', [AsociacionController::class, 'store'])
+            ->middleware('permiso:asociaciones.crear')
+            ->name('asociaciones.store');
 
-            Route::put('/asociaciones/{asociacion}', [AsociacionController::class, 'update'])
-                ->name('asociaciones.update');
-        });
+        Route::put('/asociaciones/{asociacion}', [AsociacionController::class, 'update'])
+            ->middleware('permiso:asociaciones.editar')
+            ->name('asociaciones.update');
 
         // --- Escala de aprovechamiento
         Route::get('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'index'])
@@ -352,24 +381,24 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
         // ANTES de /{categoria}: si no, «crear» se toma como id.
         Route::get('/categorias-aprovechamiento/crear', [CategoriaAprovechamientoController::class, 'create'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:catalogos.crear')
             ->name('categorias-aprovechamiento.create');
 
         Route::get('/categorias-aprovechamiento/{categoria}/editar', [CategoriaAprovechamientoController::class, 'edit'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:catalogos.editar')
             ->name('categorias-aprovechamiento.edit');
 
         Route::get('/categorias-aprovechamiento/{categoria}', [CategoriaAprovechamientoController::class, 'show'])
             ->middleware('permiso:catalogos.ver')
             ->name('categorias-aprovechamiento.show');
 
-        Route::middleware('permiso:catalogos.gestionar')->group(function () {
-            Route::post('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'store'])
-                ->name('categorias-aprovechamiento.store');
+        Route::post('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'store'])
+            ->middleware('permiso:catalogos.crear')
+            ->name('categorias-aprovechamiento.store');
 
-            Route::put('/categorias-aprovechamiento/{categoria}', [CategoriaAprovechamientoController::class, 'update'])
-                ->name('categorias-aprovechamiento.update');
-        });
+        Route::put('/categorias-aprovechamiento/{categoria}', [CategoriaAprovechamientoController::class, 'update'])
+            ->middleware('permiso:catalogos.editar')
+            ->name('categorias-aprovechamiento.update');
 
         // --- Tipos de carnet
         Route::get('/tipos-carnet', [TipoCarnetController::class, 'index'])
@@ -381,13 +410,13 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->name('tipos-carnet.show');
 
         Route::get('/tipos-carnet/{tipo_carnet}/editar', [TipoCarnetController::class, 'edit'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:catalogos.editar')
             ->name('tipos-carnet.edit');
 
         // SIN alta: la lista sale de la resolución. Sacar el botón no alcanza,
         // la ruta seguía aceptando un POST armado a mano.
         Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:catalogos.editar')
             ->name('tipos-carnet.update');
 
         // --- Productos hidrobiológicos (cuadro D de la guía)
@@ -397,24 +426,24 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
         // ANTES de /{producto}: si no, «crear» se toma como id.
         Route::get('/productos/crear', [ProductoHidrobiologicoController::class, 'create'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:catalogos.crear')
             ->name('productos.create');
 
         Route::get('/productos/{producto}/editar', [ProductoHidrobiologicoController::class, 'edit'])
-            ->middleware('permiso:catalogos.gestionar')
+            ->middleware('permiso:catalogos.editar')
             ->name('productos.edit');
 
         Route::get('/productos/{producto}', [ProductoHidrobiologicoController::class, 'show'])
             ->middleware('permiso:catalogos.ver')
             ->name('productos.show');
 
-        Route::middleware('permiso:catalogos.gestionar')->group(function () {
-            Route::post('/productos', [ProductoHidrobiologicoController::class, 'store'])
-                ->name('productos.store');
+        Route::post('/productos', [ProductoHidrobiologicoController::class, 'store'])
+            ->middleware('permiso:catalogos.crear')
+            ->name('productos.store');
 
-            Route::put('/productos/{producto}', [ProductoHidrobiologicoController::class, 'update'])
-                ->name('productos.update');
-        });
+        Route::put('/productos/{producto}', [ProductoHidrobiologicoController::class, 'update'])
+            ->middleware('permiso:catalogos.editar')
+            ->name('productos.update');
 
         // --- Aranceles de SIREB (hoy, la faena). SIN alta ni baja: una fila por concepto.
         Route::get('/aranceles', [ArancelSirebController::class, 'index'])
@@ -425,13 +454,36 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:catalogos.ver')
             ->name('aranceles.show');
 
-        Route::middleware('permiso:catalogos.gestionar')->group(function () {
+        Route::middleware('permiso:catalogos.editar')->group(function () {
             Route::get('/aranceles/{arancel}/editar', [ArancelSirebController::class, 'edit'])
                 ->name('aranceles.edit');
 
             Route::put('/aranceles/{arancel}', [ArancelSirebController::class, 'update'])
                 ->name('aranceles.update');
         });
+    });
+
+    /*
+    | Seguridad — roles y, más adelante, usuarios
+    */
+
+    // Los de RolSistema son fijos; el resto los arma la unidad. `crear` va antes de `{rol}`.
+    Route::prefix('seguridad')->group(function () {
+        Route::get('/usuarios', [UsuarioController::class, 'index'])
+            ->middleware('permiso:usuarios.ver')->name('usuarios.index');
+
+        Route::get('/roles', [RolController::class, 'index'])
+            ->middleware('permiso:roles.ver')->name('roles.index');
+        Route::get('/roles/crear', [RolController::class, 'create'])
+            ->middleware('permiso:roles.crear')->name('roles.create');
+        Route::post('/roles', [RolController::class, 'store'])
+            ->middleware('permiso:roles.crear')->name('roles.store');
+        Route::get('/roles/{rol}/editar', [RolController::class, 'edit'])
+            ->middleware('permiso:roles.editar')->name('roles.edit');
+        Route::put('/roles/{rol}', [RolController::class, 'update'])
+            ->middleware('permiso:roles.editar')->name('roles.update');
+        Route::delete('/roles/{rol}', [RolController::class, 'destroy'])
+            ->middleware('permiso:roles.eliminar')->name('roles.destroy');
     });
 
     /*

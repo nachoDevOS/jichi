@@ -220,33 +220,33 @@ class EmitirGuiaService
     /**
      * Da de baja una guía, con motivo.
      */
-    public function anular(GuiaMovimiento $guia, string $motivo): GuiaMovimiento
+    public function revocar(GuiaMovimiento $guia, string $motivo): GuiaMovimiento
     {
         if (trim($motivo) === '') {
             throw PermisoOperativoException::motivoObligatorio();
         }
 
-        if ($guia->estado === EstadoGuia::Anulada) {
-            throw PermisoOperativoException::guiaYaAnulada();
+        if ($guia->estado === EstadoGuia::Revocada) {
+            throw PermisoOperativoException::guiaYaRevocada();
         }
 
-        if (! $guia->estado->permiteAnulacion()) {
-            throw PermisoOperativoException::guiaNoSeAnula(mb_strtolower($guia->estado->etiqueta()));
+        if (! $guia->estado->permiteRevocacion()) {
+            throw PermisoOperativoException::guiaNoSeRevoca(mb_strtolower($guia->estado->etiqueta()));
         }
 
         return DB::transaction(function () use ($guia, $motivo): GuiaMovimiento {
             $bloqueada = GuiaMovimiento::query()->whereKey($guia->id)->lockForUpdate()->firstOrFail();
 
-            // Otra ventanilla pudo anularla mientras tanto.
-            if (! $bloqueada->estado->permiteAnulacion()) {
-                throw PermisoOperativoException::guiaNoSeAnula(mb_strtolower($bloqueada->estado->etiqueta()));
+            // Otra ventanilla pudo revocarla mientras tanto.
+            if (! $bloqueada->estado->permiteRevocacion()) {
+                throw PermisoOperativoException::guiaNoSeRevoca(mb_strtolower($bloqueada->estado->etiqueta()));
             }
 
             // El motivo se deja ANTES de guardar: el trait Auditable lo lee en el
             // evento `updated`. Sin él la auditoría diría QUÉ cambió pero no POR
-            // QUÉ, que en un papel anulado es lo único que sirve después.
+            // QUÉ, que en un papel revocado es lo único que sirve después.
             $bloqueada->motivoAuditoria = $motivo;
-            $bloqueada->update(['estado' => EstadoGuia::Anulada]);
+            $bloqueada->update(['estado' => EstadoGuia::Revocada]);
 
             return $guia->refresh();
         });
@@ -294,12 +294,7 @@ class EmitirGuiaService
                     throw PermisoOperativoException::productoNoDisponible($producto?->nombre ?? '#'.$d['producto_id']);
                 }
 
-                try {
-                    $sireb = $this->precios->de($producto->servicio_sireb, $producto->tarifa_sireb);
-                } catch (SinPrecioException $e) {
-                    throw PermisoOperativoException::productoSinPrecio($producto->nombre, $e->getMessage());
-                }
-
+                $sireb = $this->precioDelProducto($producto);
                 $cantidad = round((float) ($d['cantidad_kg'] ?? 0), 2);
                 $precio = round($sireb['monto'], 2);
 
@@ -317,6 +312,20 @@ class EmitirGuiaService
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * El precio por kilo del producto según SIREB, el de ahora.
+     *
+     * @return array{monto: float, tarifa_id: string}
+     */
+    public function precioDelProducto(ProductoHidrobiologico $producto): array
+    {
+        try {
+            return $this->precios->de($producto->servicio_sireb, $producto->tarifa_sireb);
+        } catch (SinPrecioException $e) {
+            throw PermisoOperativoException::productoSinPrecio($producto->nombre, $e->getMessage());
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ import { usePermisos } from '@/hooks/use-permisos';
 import { bs, cn, fecha, fechaInput } from '@/lib/utils';
 import type { CarnetResumen, CupoResumen, FaenaDelBeneficiario } from '@/types/beneficiarios';
 import { AvisoRegistroAnterior, CredencialMini, HistorialCarnets, Seccion, TarjetaPeriodo } from './partes-ficha';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 
 /**
  * Un PERÍODO del pescador: una autorización, la cédula que se emitió con ella y
@@ -164,7 +165,7 @@ function BotonPeriodo({
 }) {
     const cedula = p.carnets.find((c) => c.vigente) ?? p.carnets[0] ?? null;
     const kilos = p.faenas
-        .filter((f) => f.estado === 'aprobado' || f.estado === 'completado')
+        .filter((f) => f.estado === 'aprobado')
         .reduce((total, f) => total + f.kilos_extraidos, 0);
 
     return (
@@ -215,12 +216,13 @@ function FilaFaena({ faena: f, moneda }: { faena: FaenaDelBeneficiario; moneda: 
     return (
         <tr className="hover:bg-secondary/50">
             <td className="px-4 py-2.5">
-                <Link
+                <EnlacePermitido
+                    permiso="faenas.ver"
                     href={route('faenas.show', f.id)}
                     className="font-mono font-medium tabular-nums text-primary hover:underline"
                 >
                     {f.numero_legible}
-                </Link>
+                </EnlacePermitido>
             </td>
             <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">{f.kilos_extraidos} kg</td>
             <td className="px-4 py-2.5">
@@ -274,14 +276,16 @@ function FilaFaena({ faena: f, moneda }: { faena: FaenaDelBeneficiario; moneda: 
                             <Printer className="size-4" />
                         </a>
                     )}
-                    <Link
-                        href={route('faenas.show', f.id)}
-                        title="Ver faena"
-                        aria-label={`Ver la faena ${f.numero_legible}`}
-                        className={cn(buttonVariants({ variant: 'ver', size: 'icon' }))}
-                    >
-                        <Eye className="size-4" />
-                    </Link>
+                    {puede('faenas.ver') && (
+                        <Link
+                            href={route('faenas.show', f.id)}
+                            title="Ver faena"
+                            aria-label={`Ver la faena ${f.numero_legible}`}
+                            className={cn(buttonVariants({ variant: 'ver', size: 'icon' }))}
+                        >
+                            <Eye className="size-4" />
+                        </Link>
+                    )}
                 </div>
             </td>
         </tr>
@@ -307,16 +311,14 @@ function vigenciaDe(f: FaenaDelBeneficiario): { etiqueta: string; color: string;
     }
 
     if (f.estado === 'revocado') {
-        return { etiqueta: 'Revocada', color: 'rose', detalle: 'con su autorización' };
+        return { etiqueta: 'Revocada', color: 'rose', detalle: 'por la Unidad' };
     }
 
     if (f.caducada) {
         return { etiqueta: 'Vencida', color: 'rose', detalle: 'sin cerrar' };
     }
 
-    return f.estado === 'completado'
-        ? { etiqueta: 'Cerrada', color: 'slate', detalle: 'volvió y descargó' }
-        : { etiqueta: 'Vencida', color: 'rose' };
+    return { etiqueta: 'Vencida', color: 'rose' };
 }
 
 /** Hoy como 'AAAA-MM-DD' local: para comparar días sin pasar por UTC. */
@@ -337,14 +339,14 @@ function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
     // La vigencia la dice la fecha, no el estado: aprobada sigue aprobada aunque pase su fecha.
     const vencido = cupo.ya_fue_aprobado && cupo.fecha_vencimiento !== null && cupo.fecha_vencimiento.slice(0, 10) < fechaInput(new Date());
     const revocado = cupo.estado === 'revocado';
-    const noPagado = cupo.estado === 'no_pagado';
     // Ninguna autoriza: lo que sobró no se puede pescar.
-    const cerrado = vencido || revocado || noPagado;
+    const cerrado = vencido || revocado;
     const escaso = !cerrado && cupo.volumen_total_kg > 0 && cupo.saldo_kg / cupo.volumen_total_kg < 0.2;
     const colorLibre = cerrado ? 'bg-slate-300 dark:bg-slate-600' : escaso ? 'bg-amber-500' : 'bg-sky-600';
 
     return (
-        <Link
+        <EnlacePermitido
+            permiso="aprovechamientos.ver"
             href={route('aprovechamientos.show', cupo.id)}
             className="block rounded-xl border border-border bg-card p-5 transition-colors hover:bg-secondary/40"
         >
@@ -365,11 +367,6 @@ function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
                             faenas ni carnets nuevos. Quedaron{' '}
                             <span className="text-3xl font-semibold tabular-nums text-foreground">{cupo.saldo_kg} kg</span> sin
                             pescar
-                        </p>
-                    ) : noPagado ? (
-                        <p className="text-sm text-muted-foreground">
-                            <span className="font-semibold text-foreground">No pagada:</span> venció el plazo de pago en
-                            Recaudaciones y no siguió su curso. No autoriza nada.
                         </p>
                     ) : vencido ? (
                         // Fuera de fecha no autoriza nada: lo que sobró no se puede pescar.
@@ -439,6 +436,6 @@ function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
                     <dd className="font-medium tabular-nums">{fecha(cupo.fecha_vencimiento)}</dd>
                 </div>
             </dl>
-        </Link>
+        </EnlacePermitido>
     );
 }

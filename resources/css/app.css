@@ -432,3 +432,12 @@
         border-radius: 0;
     }
 }
+
+/* Desplaza sin mostrar la barra: el menú lateral se ve limpio y en pantallas bajas sigue llegando abajo. */
+@utility sin-barra-scroll {
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}

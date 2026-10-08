@@ -30,7 +30,7 @@ export default function VerGuia({
     const { institucion } = usePage<PageProps>().props;
 
     const [eliminando, setEliminando] = useState(false);
-    const [anulando, setAnulando] = useState(false);
+    const [revocando, setRevocando] = useState(false);
 
     const borrado = useForm({ motivo: '' });
     const baja = useForm({ motivo: '' });
@@ -41,7 +41,7 @@ export default function VerGuia({
             descripcion={`${guia.comercializador ?? '—'} · ${guia.ruta}`}
             acciones={
                 <div className="flex flex-wrap gap-2">
-                    {guia.beneficiario_id !== null && (
+                    {puede('beneficiarios.ver') && guia.beneficiario_id !== null && (
                         <Button
                             variant="ver"
                             onClick={() => router.visit(route('beneficiarios.show', guia.beneficiario_id!))}
@@ -51,7 +51,7 @@ export default function VerGuia({
                         </Button>
                     )}
 
-                    {guia.carnet_id !== null && (
+                    {puede('carnets.ver') && guia.carnet_id !== null && (
                         <Button
                             variant="ver"
                             onClick={() => router.visit(route('carnets.show', guia.carnet_id!))}
@@ -109,10 +109,10 @@ export default function VerGuia({
                         </a>
                     )}
 
-                    {puede('guias.anular') && guia.puede_anularse && (
-                        <Button variant="eliminar" onClick={() => setAnulando(true)}>
+                    {puede('guias.revocar') && guia.puede_revocarse && (
+                        <Button variant="eliminar" onClick={() => setRevocando(true)}>
                             <Ban className="size-4" />
-                            Anular
+                            Revocar
                         </Button>
                     )}
                 </div>
@@ -132,7 +132,7 @@ export default function VerGuia({
 
                             <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                                 <Dato etiqueta="Carga" valor={`${guia.peso_total_kg} kg`} />
-                                <Dato etiqueta="Arancel" valor={bs(guia.monto, institucion.moneda)} />
+                                <Dato etiqueta="Arancel" valor={bs(guia.monto, institucion.moneda)} destacado />
                                 <Dato etiqueta="Solicitada" valor={fecha(guia.fecha_solicitud)} />
                                 {/* La emisión la escribe la aprobación: hasta
                                     entonces esto es una solicitud. */}
@@ -291,7 +291,8 @@ export default function VerGuia({
                         rutaVerificar={route('guias.verificar-pago', guia.id)}
                         puedeCargar={guia.puede_cargar_pago}
                         rutaCargar={route('guias.cargar-pago', guia.id)}
-                        permiso="guias.crear"
+                        rutaRenovar={route('guias.renovar-liquidacion', guia.id)}
+                        documento="guias"
                     />
                 </div>
 
@@ -358,10 +359,10 @@ export default function VerGuia({
                 }
             />
 
-            {/* ANULAR: sobre una guía YA APROBADA. No es lo mismo que eliminar. */}
+            {/* REVOCAR: sobre una guía YA APROBADA. No es lo mismo que eliminar. */}
             <ConfirmarConMotivo
-                abierto={anulando}
-                titulo="¿Anular la guía?"
+                abierto={revocando}
+                titulo="¿Revocar la guía?"
                 descripcion={
                     <div className="space-y-2">
                         <p>
@@ -369,24 +370,24 @@ export default function VerGuia({
                             <strong>{guia.numero_legible}</strong> queda ocupado para siempre: la
                             hoja del talonario se gastó.
                         </p>
-                        <p>No se desanula. Si hace falta, se emite otra.</p>
+                        <p>No vuelve atrás. Si hace falta, se emite otra.</p>
                     </div>
                 }
-                etiquetaMotivo="Motivo de la anulación"
+                etiquetaMotivo="Motivo de la revocación"
                 ayuda="Queda en la auditoría con su nombre. Deja un hueco en la serie que alguien va a tener que explicar."
                 placeholder="Se emitió con el destino equivocado; se reemplaza por la guía N° 000310."
-                textoConfirmar="Anular guía"
+                textoConfirmar="Revocar guía"
                 confirmacion="Entiendo que el número queda quemado y que esto no se puede revertir."
                 valor={baja.data.motivo}
                 onCambiar={(v) => baja.setData('motivo', v)}
                 error={baja.errors.motivo}
                 procesando={baja.processing}
-                onCancelar={() => setAnulando(false)}
+                onCancelar={() => setRevocando(false)}
                 onConfirmar={() =>
-                    baja.patch(route('guias.anular', guia.id), {
+                    baja.patch(route('guias.revocar', guia.id), {
                         preserveScroll: true,
                         onSuccess: () => {
-                            setAnulando(false);
+                            setRevocando(false);
                             baja.reset();
                         },
                     })
@@ -417,12 +418,12 @@ function Situacion({ guia }: { guia: GuiaFicha }) {
         );
     }
 
-    if (guia.estado === 'anulada') {
+    if (guia.estado === 'revocado') {
         return (
             <Marco
                 clase="bg-rose-50 text-rose-900 dark:bg-rose-500/10 dark:text-rose-200"
                 icono={<Ban className="mt-0.5 size-5 shrink-0" />}
-                titulo="Anulada"
+                titulo="Revocada"
                 texto="Este papel no ampara ningún traslado. El número queda ocupado: la hoja del talonario se gastó."
             />
         );
@@ -484,11 +485,11 @@ function Marco({
     );
 }
 
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: ReactNode }) {
+function Dato({ etiqueta, valor, destacado = false }: { etiqueta: string; valor: ReactNode; destacado?: boolean }) {
     return (
         <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</dt>
-            <dd className="font-medium tabular-nums">{valor}</dd>
+            <dd className={destacado ? 'text-base font-medium tabular-nums' : 'font-medium tabular-nums'}>{valor}</dd>
         </div>
     );
 }

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Panel;
 
-use App\Enums\EstadoCarnet;
 use App\Http\Controllers\Controller;
 use App\Models\Carnet;
 use App\Models\Configuracion;
@@ -35,27 +34,10 @@ class CarnetImpresionController extends Controller
         // error, y el renglón CUPO sale vacío en un carnet válido.
         $carnet->load(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
 
-        // Sin firmar no se imprime: quedaría en la calle una credencial que el
-        // sistema no autorizó, y que puede terminar rechazada.
-        if (! $carnet->yaFueAprobado()) {
-            return back()->with(
-                'error',
-                'El carnet está '.mb_strtolower($carnet->estado->etiqueta()).': se imprime recién '.
-                'cuando esté aprobado.',
-            );
-        }
-
-        /*
-         * Un carnet revocado no se imprime.
-         */
-        if ($carnet->estado === EstadoCarnet::Revocado) {
-            return back()->with('error', 'El carnet está revocado: no se puede imprimir.');
-        }
-
-        // Sin efecto: el plástico diría que habilita algo que ya no habilita.
-        if ($carnet->autorizacionRevocada()) {
-            return back()->with('error', 'El carnet quedó sin efecto porque su Autorización de Pesca '.
-                'para Aprovechamiento Pesquero fue revocada: no se puede imprimir.');
+        // Sin firmar, revocado o sin efecto no se imprime: el plástico diría que
+        // habilita algo que el sistema no autorizó o ya no autoriza.
+        if ($motivo = $carnet->motivoSinImpresion()) {
+            return back()->with('error', $motivo);
         }
 
         // `stream` y no `download`: se abre en el visor del navegador, que es

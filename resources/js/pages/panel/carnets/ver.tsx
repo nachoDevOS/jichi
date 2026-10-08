@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Ban, ExternalLink, Paperclip, Pencil, Printer, Receipt, Ship, Trash2, Truck, User, Waves } from 'lucide-react';
 import { useState } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
@@ -14,6 +14,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { cn, fecha, fechaHora } from '@/lib/utils';
 import type { ReciboDelCupo } from '@/types/aprovechamientos';
 import type { CarnetFicha, FaenaDelCarnet, GuiaDelCarnet } from '@/types/carnets';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 
 /**
  *  La ficha de un carnet
@@ -46,13 +47,15 @@ export default function VerCarnet({
             titulo={carnet.tipo ?? 'Carnet'}
             acciones={
                 <div className="flex flex-wrap gap-2">
-                    <Button
-                        variant="ver"
-                        onClick={() => router.visit(route('beneficiarios.show', carnet.beneficiario_id))}
-                    >
-                        <User className="size-4" />
-                        Beneficiario
-                    </Button>
+                    {puede('beneficiarios.ver') && (
+                        <Button
+                            variant="ver"
+                            onClick={() => router.visit(route('beneficiarios.show', carnet.beneficiario_id))}
+                        >
+                            <User className="size-4" />
+                            Beneficiario
+                        </Button>
+                    )}
 
                     {/*
                         IMPRIMIR abre en una pestaña aparte y no en un iframe: con
@@ -135,12 +138,13 @@ export default function VerCarnet({
                     />
 
                     <div className="min-w-0">
-                        <Link
+                        <EnlacePermitido
+                            permiso="beneficiarios.ver"
                             href={route('beneficiarios.show', carnet.beneficiario_id)}
                             className="text-lg font-semibold text-primary hover:underline"
                         >
                             {carnet.beneficiario ?? '—'}
-                        </Link>
+                        </EnlacePermitido>
 
                         <p className="tabular-nums text-sm text-muted-foreground">
                             C.I. {carnet.documento_identidad ?? '—'}
@@ -203,19 +207,21 @@ export default function VerCarnet({
                                         nuevo. Es un `<a>` y no `router.visit`:
                                         Inertia navega en la misma pestaña.
                                     */}
-                                    <a
-                                        href={route('aprovechamientos.show', carnet.cupo.id)}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        title="Abrir la autorización en otra pestaña"
-                                        className={cn(
-                                            'ml-auto',
-                                            buttonVariants({ variant: 'ver', size: 'sm' }),
-                                        )}
-                                    >
-                                        <ExternalLink className="size-4" />
-                                        Ver
-                                    </a>
+                                    {puede('aprovechamientos.ver') && (
+                                        <a
+                                            href={route('aprovechamientos.show', carnet.cupo.id)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            title="Abrir la autorización en otra pestaña"
+                                            className={cn(
+                                                'ml-auto',
+                                                buttonVariants({ variant: 'ver', size: 'sm' }),
+                                            )}
+                                        >
+                                            <ExternalLink className="size-4" />
+                                            Ver
+                                        </a>
+                                    )}
                                 </div>
 
                                 <p className="text-sm text-muted-foreground">
@@ -408,7 +414,8 @@ export default function VerCarnet({
                     rutaVerificar={route('carnets.verificar-pago', carnet.id)}
                     puedeCargar={carnet.puede_cargar_pago}
                     rutaCargar={route('carnets.cargar-pago', carnet.id)}
-                    permiso="carnets.crear"
+                    rutaRenovar={route('carnets.renovar-liquidacion', carnet.id)}
+                    documento="carnets"
                 />
             </div>
 
@@ -456,12 +463,13 @@ export default function VerCarnet({
                                     {faenas.map((f) => (
                                         <tr key={f.id} className="border-b border-border last:border-0">
                                             <td className="px-5 py-2.5">
-                                                <Link
+                                                <EnlacePermitido
+                                                    permiso="faenas.ver"
                                                     href={route('faenas.show', f.id)}
                                                     className="font-mono text-primary hover:underline"
                                                 >
                                                     {f.numero_legible}
-                                                </Link>
+                                                </EnlacePermitido>
                                             </td>
                                             <td className="px-5 py-2.5">
                                                 <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
@@ -524,12 +532,13 @@ export default function VerCarnet({
                                     {guias.map((g) => (
                                         <tr key={g.id} className="border-b border-border last:border-0">
                                             <td className="px-5 py-2.5">
-                                                <Link
+                                                <EnlacePermitido
+                                                    permiso="guias.ver"
                                                     href={route('guias.show', g.id)}
                                                     className="font-mono text-primary hover:underline"
                                                 >
                                                     {g.numero_legible}
-                                                </Link>
+                                                </EnlacePermitido>
                                             </td>
                                             <td className="px-5 py-2.5">
                                                 <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>

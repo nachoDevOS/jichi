@@ -8,7 +8,8 @@ import type { EstadoCarnet, TipoActor } from '@/types';
 export interface Pendiente {
     documento: string;
     por_pagar: number;
-    url_por_pagar: string;
+    /** null = el rol no ve ese módulo: el número va sin enlace. */
+    url_por_pagar: string | null;
 }
 
 /** Los cuatro números del tablero. «Vigente» lo calcula el servidor mirando estado y fecha. */
@@ -58,5 +59,5 @@ export interface Avisos {
     autorizaciones_por_vencer: number;
     autorizaciones_agotadas: number;
     /** Los listados ya filtrados; los arma el servidor con los enums. */
-    urls: { carnets: string; autorizaciones: string; agotadas: string };
+    urls: { carnets: string | null; autorizaciones: string | null; agotadas: string | null };
 }

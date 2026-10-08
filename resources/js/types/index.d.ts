@@ -19,7 +19,6 @@ export interface Usuario {
     /** Cuenta del portal /mi-cuenta: nunca entra al panel. */
     es_beneficiario: boolean;
     /** Nombres de rol. Por ahora el sistema tiene uno solo: 'administrador'. */
-    roles: string[];
     /** Permisos ya expandidos: 'beneficiarios.crear', 'pagos.registrar'... */
     permisos: string[];
 }
@@ -109,8 +108,7 @@ export interface Paginado<T> {
 export type EstadoCarnet =
     | 'pendiente'
     | 'aprobado'
-    | 'revocado'
-    | 'no_pagado';
+    | 'revocado';
 
 /**
  * Espejo de App\Enums\TipoActor.
@@ -124,8 +122,7 @@ export type EstadoAprovechamiento =
     | 'pendiente'
     | 'aprobado'
     | 'agotado'
-    | 'revocado'
-    | 'no_pagado';
+    | 'revocado';
 
 /**
  * Espejo de App\Enums\ModalidadAprovechamiento.
@@ -133,10 +130,10 @@ export type EstadoAprovechamiento =
 export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
 
 /** Espejo de App\Enums\EstadoFaena. */
-export type EstadoFaena = 'pendiente' | 'aprobado' | 'completado' | 'revocado' | 'no_pagado';
+export type EstadoFaena = 'pendiente' | 'aprobado' | 'revocado';
 
 /** Espejo de App\Enums\EstadoGuia. */
-export type EstadoGuia = 'pendiente' | 'aprobado' | 'anulada' | 'no_pagado';
+export type EstadoGuia = 'pendiente' | 'aprobado' | 'revocado';
 
 /**
  * Espejo de App\Enums\EstadoAsociacion.

@@ -215,7 +215,7 @@ class OtorgarCupoService
      *
      * @return array{monto: float, tarifa_id: string}
      */
-    private function precioDe(CategoriaAprovechamiento $tramo): array
+    public function precioDe(CategoriaAprovechamiento $tramo): array
     {
         try {
             return $this->precios->de($tramo->servicio_sireb, $tramo->tarifa_sireb, exigirLiquidable: true);

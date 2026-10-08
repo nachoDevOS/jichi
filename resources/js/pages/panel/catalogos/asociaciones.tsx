@@ -47,7 +47,7 @@ export default function CatalogoAsociaciones({
             titulo="Asociaciones"
             descripcion="Los gremios que certifican al beneficiario. Se imprimen en el carnet y en las guías."
             acciones={
-                puede('catalogos.gestionar') && (
+                puede('asociaciones.crear') && (
                     <Link href={route('asociaciones.create')} className={cn(buttonVariants())}>
                         <Plus className="size-4" />
                         Nueva asociación
@@ -199,7 +199,7 @@ export default function CatalogoAsociaciones({
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-right">
-                                                        {puede('catalogos.gestionar') && (
+                                                        {puede('asociaciones.editar') && (
                                                             <Link
                                                                 href={route('asociaciones.edit', a.id)}
                                                                 title="Editar"

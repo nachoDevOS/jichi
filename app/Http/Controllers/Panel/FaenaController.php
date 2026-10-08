@@ -8,8 +8,8 @@ use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\ActualizarFaenaRequest;
 use App\Http\Requests\Panel\CargarPagoRequest;
-use App\Http\Requests\Panel\EliminarFaenaRequest;
 use App\Http\Requests\Panel\EmitirFaenaRequest;
+use App\Http\Requests\Panel\MotivoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\ArancelSireb;
 use App\Models\Beneficiario;
@@ -18,6 +18,7 @@ use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirFaenaService;
+use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Paginacion;
@@ -260,7 +261,23 @@ class FaenaController extends Controller
     /**
      * Eliminar — DELETE /panel/faenas/{faena}
      */
-    public function destroy(EliminarFaenaRequest $request, PermisoFaena $faena, ConfirmarPagoService $pagos): RedirectResponse
+    /**
+     * Revocar — PATCH /panel/faenas/{faena}/revocar
+     */
+    public function revocar(MotivoRequest $request, PermisoFaena $faena): RedirectResponse
+    {
+        try {
+            $this->servicio->revocar($faena, $request->validated()['motivo']);
+        } catch (PermisoOperativoException $e) {
+            return back()->withErrors(['motivo' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('faenas.show', $faena)
+            ->with('exito', 'Faena revocada. Ya no autoriza la salida; sus kilos siguen descontados del cupo.');
+    }
+
+    public function destroy(MotivoRequest $request, PermisoFaena $faena, ConfirmarPagoService $pagos): RedirectResponse
     {
         $numero = $faena->numero_legible;
 
@@ -303,6 +320,8 @@ class FaenaController extends Controller
         $recibo = $faena->recibo;
 
         return Inertia::render('panel/faenas/ver', [
+            // Solo al abrir «Generar nueva liquidación» (partial reload): consulta a SIREB.
+            'cotizacion_renovacion' => Inertia::optional(fn () => app(RenovarLiquidacionService::class)->cotizar($faena)),
             'faena' => [
                 ...$this->resumir($faena),
                 'asociacion' => $faena->carnet?->asociacion?->sigla ?? $faena->carnet?->asociacion?->nombre,
@@ -346,6 +365,18 @@ class FaenaController extends Controller
         $resultado = $pagos->verificar($faena);
 
         return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /**
+     * Generar nueva liquidación — POST /panel/faenas/{faena}/renovar-liquidacion
+     *
+     * La vencida sin pago pasa al historial y se pide otra con la tarifa vigente.
+     */
+    public function renovarLiquidacion(PermisoFaena $faena, RenovarLiquidacionService $renovacion): RedirectResponse
+    {
+        $resultado = $renovacion->renovar($faena);
+
+        return back()->with($resultado['renovada'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     /**
@@ -417,7 +448,8 @@ class FaenaController extends Controller
             // Las dos puertas del borrador: estado PENDIENTE y sin un peso
             // cargado. Se resuelven acá para que la pantalla no las recalcule.
             'puede_editarse' => $faena->puedeEditarse(),
-            'puede_eliminarse' => $faena->puedeEliminarse(),
+            'puede_eliminarse' => $faena->puedeEliminarse() && $faena->sinPagoInformado(),
+            'puede_revocarse' => $faena->estado->permiteRevocacion(),
             // Por qué todavía no autoriza. Se resuelve en el servidor: React
             // no vuelve a evaluar el estado.
             'motivo_sin_autorizar' => $faena->motivoSinAutorizar(),
@@ -425,7 +457,7 @@ class FaenaController extends Controller
             'puede_imprimirse' => $faena->puedeImprimirse(),
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $faena->resumenSireb(),
-            'puede_verificar_pago' => $faena->estado->estaAbierto(),
+            'puede_verificar_pago' => $faena->puedeVerificarPago(),
             'puede_cargar_pago' => $faena->puedeCargarPago(),
 
             // El arancel de la salida y cómo va cobrado.

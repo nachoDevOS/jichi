@@ -1,4 +1,4 @@
-import { BadgeCheck, BarChart3, Building2, Coins, Fish, LayoutDashboard, ReceiptText, Ruler, Ship, Tags, Truck, Users, Waves, type LucideIcon } from 'lucide-react';
+import { BadgeCheck, BarChart3, Building2, Coins, Fish, LayoutDashboard, ReceiptText, Ruler, ShieldCheck, Ship, Tags, Truck, UserCog, Users, Waves, type LucideIcon } from 'lucide-react';
 
 /**
  * Un ítem del menú lateral.
@@ -40,7 +40,7 @@ export const NAVEGACION: ItemNavegacion[] = [
     { titulo: 'Recibos', ruta: 'recibos.index', icono: ReceiptText, permiso: 'recibos.ver', grupo: 'Pagos' },
 
     // --- Las asociaciones de pescadores, aparte de los catálogos.
-    { titulo: 'Asociaciones', ruta: 'asociaciones.index', icono: Building2, permiso: 'catalogos.ver', grupo: 'Parámetros' },
+    { titulo: 'Asociaciones', ruta: 'asociaciones.index', icono: Building2, permiso: 'asociaciones.ver', grupo: 'Parámetros' },
 
     // --- Lo que sale de una resolución y casi no se toca.
     { titulo: 'Tipos de carnet', ruta: 'tipos-carnet.index', icono: Tags, permiso: 'catalogos.ver', grupo: 'Catálogos' },
@@ -49,6 +49,10 @@ export const NAVEGACION: ItemNavegacion[] = [
     { titulo: 'Aranceles', tituloCompleto: 'Aranceles de SIREB', ruta: 'aranceles.index', icono: Coins, permiso: 'catalogos.ver', grupo: 'Catálogos' },
 
     { titulo: 'Reportes', ruta: 'reportes.index', icono: BarChart3, permiso: 'reportes.ver', grupo: 'Administración' },
+
+    // --- Quién entra y qué puede hacer.
+    { titulo: 'Usuarios', ruta: 'usuarios.index', icono: UserCog, permiso: 'usuarios.ver', grupo: 'Seguridad' },
+    { titulo: 'Roles', ruta: 'roles.index', icono: ShieldCheck, permiso: 'roles.ver', grupo: 'Seguridad' },
 ];
 
 /**

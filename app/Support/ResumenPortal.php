@@ -32,7 +32,8 @@ class ResumenPortal
             'verificar' => self::urlVerificar($a->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($a),
             // Con este código se paga en SIREB.
-            'codigo_pago' => $a->sireb_codigo_publico,
+            'codigo_pago' => self::codigoPago($a),
+            'pago' => self::estadoPago($a),
             'descargar' => self::urlDescargar($a),
             'escala' => $a->categoria?->descripcion_kg,
             'volumen_total_kg' => (float) $a->volumen_total_kg,
@@ -68,7 +69,8 @@ class ResumenPortal
             'verificar' => self::urlVerificar($c->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($c),
             // Con este código se paga en SIREB.
-            'codigo_pago' => $c->sireb_codigo_publico,
+            'codigo_pago' => self::codigoPago($c),
+            'pago' => self::estadoPago($c),
             // El carnet NO se descarga desde el portal: perdido, se repone en ventanilla.
             'descargar' => null,
             'asociacion' => $c->asociacion?->nombre,
@@ -101,7 +103,8 @@ class ResumenPortal
             'verificar' => self::urlVerificar($f->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($f),
             // Con este código se paga en SIREB.
-            'codigo_pago' => $f->sireb_codigo_publico,
+            'codigo_pago' => self::codigoPago($f),
+            'pago' => self::estadoPago($f),
             'descargar' => self::urlDescargar($f),
             'kilos' => (float) $f->kilos_extraidos,
             'embarcacion' => $f->embarcacion,
@@ -133,7 +136,8 @@ class ResumenPortal
             'verificar' => self::urlVerificar($g->codigo?->codigo),
             'vista_previa' => self::urlVistaPrevia($g),
             // Con este código se paga en SIREB.
-            'codigo_pago' => $g->sireb_codigo_publico,
+            'codigo_pago' => self::codigoPago($g),
+            'pago' => self::estadoPago($g),
             'descargar' => self::urlDescargar($g),
             'ruta' => $g->ruta,
             'kilos' => (float) $g->peso_total_kg,
@@ -188,15 +192,12 @@ class ResumenPortal
         return $documento->estado->estaAbierto() ? 'pago' : null;
     }
 
-    /** Los estados de baja: revocado por la Unidad, o la guía anulada. */
-    private const DE_BAJA = [EstadoAprovechamiento::Revocado, EstadoCarnet::Revocado, EstadoFaena::Revocado, EstadoGuia::Anulada];
-
-    /** Nunca se pagaron: no son papeles vencidos, así que van con los dados de baja. */
-    private const NO_PAGADOS = [EstadoAprovechamiento::NoPagado, EstadoCarnet::NoPagado, EstadoFaena::NoPagado, EstadoGuia::NoPagada];
+    /** Los estados de baja: revocado por la Unidad. */
+    private const DE_BAJA = [EstadoAprovechamiento::Revocado, EstadoCarnet::Revocado, EstadoFaena::Revocado, EstadoGuia::Revocada];
 
     /**
      * Dónde va en «Mis papeles»: `vigente`, `vencido` (incluye la autorización
-     * agotada) o `revocado` (incluye lo anulado y lo que quedó sin efecto). Null
+     * agotada) o `revocado` (incluye lo que quedó sin efecto). Null
      * si todavía está abierto: eso va en «En curso».
      */
     private static function situacion(Model $documento): ?string
@@ -212,7 +213,7 @@ class ResumenPortal
     /** La autorización no tiene «sin efecto»: la que se revoca es ella. */
     private static function deBaja(Model $documento): bool
     {
-        return in_array($documento->estado, [...self::DE_BAJA, ...self::NO_PAGADOS], true)
+        return in_array($documento->estado, self::DE_BAJA, true)
             || (! $documento instanceof AprovechamientoPesq && $documento->sinEfecto());
     }
 
@@ -233,12 +234,8 @@ class ResumenPortal
             return 'Se usaron todos los kilos autorizados.';
         }
 
-        if (in_array($documento->estado, self::NO_PAGADOS, true)) {
-            return 'No se pagó a tiempo en Recaudaciones: no siguió su curso.';
-        }
-
         if (in_array($documento->estado, self::DE_BAJA, true)) {
-            return $documento instanceof GuiaMovimiento ? 'Anulada por la Unidad de Pesca.' : 'Revocado por la Unidad de Pesca.';
+            return $documento instanceof GuiaMovimiento ? 'Revocada por la Unidad de Pesca.' : 'Revocado por la Unidad de Pesca.';
         }
 
         if (! $documento instanceof AprovechamientoPesq && ! $documento->estado->estaAbierto() && $documento->sinEfecto()) {
@@ -250,16 +247,48 @@ class ResumenPortal
         return null;
     }
 
-    /** Qué le falta a un trámite abierto, dicho para el titular. Null si no está abierto. */
-    private static function siguientePaso(Model $documento): ?string
+    /**
+     * En qué está el pago de un trámite abierto, según la última consulta a SIREB:
+     * `sin_pago`, `revision` (cargado, falta validar), `validado` (se aprueba en
+     * minutos) o `caida` (vencida o anulada: hace falta un código nuevo). Null si no está abierto.
+     */
+    private static function estadoPago(Model $documento): ?string
     {
         if (! $documento->estado->estaAbierto()) {
             return null;
         }
 
-        return 'Falta pagar '.self::bs($documento->porPagar()).' en Recaudaciones'
-            .($documento->sireb_codigo_publico ? ' con el código '.$documento->sireb_codigo_publico : '')
-            .'. Una vez validado el pago, queda aprobado solo.';
+        $pago = $documento->sireb_envio['pago'] ?? null;
+
+        return match (true) {
+            $documento->liquidacionCaida() !== null => 'caida',
+            ($pago['estado'] ?? null) === 'confirmado' => 'validado',
+            $pago !== null => 'revision',
+            default => 'sin_pago',
+        };
+    }
+
+    /** El código con el que se paga, solo si todavía sirve: el de una liquidación caída ya no cobra. */
+    private static function codigoPago(Model $documento): ?string
+    {
+        return self::estadoPago($documento) === 'caida' ? null : $documento->sireb_codigo_publico;
+    }
+
+    /** Qué le falta a un trámite abierto, dicho para el titular. Null si no está abierto. */
+    private static function siguientePaso(Model $documento): ?string
+    {
+        $monto = self::bs($documento->porPagar());
+
+        return match (self::estadoPago($documento)) {
+            null => null,
+            'caida' => ($documento->liquidacionCaida() === 'anulada' ? 'Recaudaciones anuló el cobro.' : 'Venció el plazo para pagar.')
+                .' Acérquese a ventanilla del SEDAG para que le den un nuevo código de pago.',
+            'validado' => 'Su pago de '.$monto.' ya fue validado. En unos minutos queda aprobado.',
+            'revision' => 'Su pago de '.$monto.' ya está cargado. Lo están revisando en Recaudaciones: cuando lo validen, queda aprobado solo.',
+            default => 'Falta pagar '.$monto.' en Recaudaciones'
+                .($documento->sireb_codigo_publico ? ' con el código '.$documento->sireb_codigo_publico : '')
+                .'. Una vez validado el pago, queda aprobado solo.',
+        };
     }
 
     private static function bs(float $monto): string

@@ -11,7 +11,7 @@ type Filtro = 'vigente' | 'vencido' | 'revocado' | 'todos';
 const VACIO: Record<Filtro, string> = {
     vigente: 'Hoy no tiene papeles vigentes. Lo que está tramitando aparece en «En curso».',
     vencido: 'No tiene papeles vencidos.',
-    revocado: 'No tiene papeles revocados ni anulados.',
+    revocado: 'No tiene papeles revocados.',
     todos: 'Todavía no tiene papeles aprobados. Lo que está tramitando aparece en «En curso».',
 };
 

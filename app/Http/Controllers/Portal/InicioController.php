@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\VerificarPagoJob;
 use App\Support\ExpedienteBeneficiario;
 use App\Support\ResumenPortal;
 use App\Support\TramitesDisponibles;
@@ -19,6 +20,8 @@ class InicioController extends Controller
     public function __invoke(Request $request): Response
     {
         $beneficiario = $request->user()->beneficiario;
+        // Al entrar ya se consultan sus pagos: cuando abra «En curso», el estado está al día.
+        VerificarPagoJob::encolarDe($beneficiario);
 
         $aprovechamientos = ExpedienteBeneficiario::aprovechamientos($beneficiario)->load('codigo');
         $carnets = ExpedienteBeneficiario::carnets($beneficiario);

@@ -319,7 +319,7 @@ class EmitirCarnetService
      *
      * @return array{monto: float, tarifa_id: string}
      */
-    private function precioDe(TipoCarnet $tipo): array
+    public function precioDe(TipoCarnet $tipo): array
     {
         try {
             return $this->precios->de($tipo->servicio_sireb, $tipo->tarifa_sireb);

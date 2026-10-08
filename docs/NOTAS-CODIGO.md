@@ -1407,9 +1407,9 @@
    día esto se consume desde una API— en vez de como un error 500 que no le
    explica nada a nadie.
 
-## `app/Http/Requests/Panel/AnularGuiaRequest.php`
+## `app/Http/Requests/Panel/MotivoRequest.php` (antes `AnularGuiaRequest`)
 
-### Reglas para anular una guía.
+### Reglas para anular una guía (hoy: revocar).
 
    UN SOLO CAMPO, Y ES EL MOTIVO
    El código sale de un talonario de papel que puede estar circulando dentro de
@@ -1419,7 +1419,7 @@
    garantiza que el motivo sirva, pero sí que alguien haya tenido que escribir
    una frase.
 
-## `app/Http/Requests/Panel/EliminarCupoRequest.php`
+## `app/Http/Requests/Panel/MotivoRequest.php` (antes `EliminarCupoRequest`)
 
 ### Reglas para ELIMINAR un aprovechamiento cargado por error.
 
@@ -1632,7 +1632,7 @@
    autorizó en papel la semana anterior, que es lo normal al poner
    al día una unidad.
 
-## `app/Http/Requests/Panel/RevocarCarnetRequest.php`
+## `app/Http/Requests/Panel/MotivoRequest.php` (antes `RevocarCarnetRequest`)
 
 ### Reglas para revocar una credencial.
 
@@ -4091,7 +4091,7 @@
    una tarea; marcar «entiendo que esto no se deshace» es una
    decisión, y son dos actos distintos a propósito.
    El mínimo de 10 caracteres es el mismo que exige
-   EliminarCupoRequest: si acá fuera menor, el botón se habilitaría
+   MotivoRequest: si acá fuera menor, el botón se habilitaría
    y el servidor rechazaría igual.
 
 ### ¿CON ESTO ALCANZA? Es lo que decide qué dice el botón y qué hace.

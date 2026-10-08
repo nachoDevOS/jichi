@@ -117,7 +117,7 @@ export interface GuiaFila extends RenglonesGuia {
     puede_editarse: boolean;
     puede_eliminarse: boolean;
     /** Solo una guía APROBADA se anula: el borrador se elimina. */
-    puede_anularse: boolean;
+    puede_revocarse: boolean;
     /** Ya pasó por la firma: es lo que habilita a imprimir el papel. */
     ya_fue_aprobada: boolean;
     /** Por qué todavía no ampara. Null cuando sí ampara. */

@@ -33,7 +33,7 @@ return new class extends Migration
             // Congelado de SIREB al otorgar o corregir: un cambio de arancel no
             // mueve lo que ya se está cobrando.
             $table->decimal('monto', 10, 2)->comment('Precio de SIREB al otorgar');
-            $table->string('sireb_tarifa_id', 36)->nullable()->comment('Tarifa de SIREB de ese precio');
+            $table->uuid('sireb_tarifa_id')->nullable()->comment('Tarifa de SIREB de ese precio');
 
             // La liquidación en SIREB (ahí se paga). La clave se guarda ANTES de llamar. Ver MER.md.
             $table->uuid('sireb_idempotency_key')->nullable()->unique()->comment('Header Idempotency-Key');
@@ -41,6 +41,7 @@ return new class extends Migration
             $table->string('sireb_codigo_publico', 40)->nullable()->comment('Con el que se paga en SIREB');
             $table->string('sireb_estado', 20)->nullable()->comment('EstadoLiquidacionSireb; null si nunca se vendió');
             $table->json('sireb_envio')->nullable()->comment('Lo enviado a SIREB y su respuesta o error');
+            $table->json('sireb_historial')->nullable()->comment('Cada liquidación pedida a SIREB: tarifa, monto, fechas y cómo terminó');
 
             // Renglón del talonario. Texto libre: no hay padrón de embarcaciones.
             $table->string('tipo_embarcacion', 120)->comment('Canoa, peque-peque, bote…');

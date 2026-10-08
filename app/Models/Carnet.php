@@ -42,6 +42,9 @@ class Carnet extends Model
 {
     use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
+    /** El historial ya es el registro de cada liquidación: no se copia a `auditorias`. */
+    protected $noAuditable = ['sireb_historial'];
+
     /**
      * Ver el comentario de Asociacion::$attributes: un default de la base NO
      * llega al objeto que devuelve create(). Pasó tres veces en un día en el
@@ -186,7 +189,7 @@ class Carnet extends Model
      * ¿Pasó alguna vez por la firma?
      *
      * A revocado se llega desde APROBADO, así que los dos se pagaron;
-     * pendiente y no pagado no. Es lo que habilita la impresión: el
+     * el pendiente no. Es lo que habilita la impresión: el
      * plástico no sale de un carnet que nadie aprobó.
      */
     public function yaFueAprobado(): bool
@@ -276,6 +279,19 @@ class Carnet extends Model
         return $this->yaFueAprobado()
             && $this->estado !== EstadoCarnet::Revocado
             && ! $this->autorizacionRevocada();
+    }
+
+    /** POR QUÉ no se imprime, o null si sí. Mismas tres condiciones que `puedeImprimirse()`. */
+    public function motivoSinImpresion(): ?string
+    {
+        return match (true) {
+            ! $this->yaFueAprobado() => 'El carnet está '.mb_strtolower($this->estado->etiqueta()).
+                ': se imprime recién cuando esté aprobado.',
+            $this->estado === EstadoCarnet::Revocado => 'El carnet está revocado: no se puede imprimir.',
+            $this->autorizacionRevocada() => 'El carnet quedó sin efecto porque su Autorización de Pesca '.
+                'para Aprovechamiento Pesquero fue revocada: no se puede imprimir.',
+            default => null,
+        };
     }
 
     /**

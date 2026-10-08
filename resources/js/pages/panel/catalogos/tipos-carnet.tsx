@@ -207,7 +207,7 @@ export default function CatalogoTiposCarnet({
                                                                 <History className="size-4" />
                                                             </Link>
 
-                                                            {puede('catalogos.gestionar') && (
+                                                            {puede('catalogos.editar') && (
                                                                 <Link
                                                                     href={route('tipos-carnet.edit', t.id)}
                                                                     className={cn(buttonVariants({ variant: 'editar', size: 'sm' }))}

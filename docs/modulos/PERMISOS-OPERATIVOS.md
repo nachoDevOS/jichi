@@ -28,7 +28,7 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
 | Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |
 | Vale | 30 días desde la aprobación | 5 días desde la aprobación (se cuentan con hora) |
-| Termina en | `aprobado` (no se registra la vuelta) | `aprobado` (no se registra la llegada), o `anulada` |
+| Termina en | `aprobado` (no se registra la vuelta), o `revocado` | `aprobado` (no se registra la llegada), o `revocado` |
 | Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
 
 ---
@@ -41,20 +41,19 @@ es a propósito: el operador aprende uno solo.
 ```
             ┌─(pagada en SIREB)──▶ APROBADO ──▶ (guía: anulada)
 PENDIENTE ──┤                         └── al aprobar sale el RECIBO
-(borrador)  └─(vencida en SIREB, sin pago)──▶ NO PAGADO (libera los kilos)
+(borrador)  └─(vencida en SIREB)──▶ sigue PENDIENTE: los kilos quedan reservados hasta eliminarla (08/10/2026)
    └──[eliminar, con motivo]──▶ baja lógica (consulta SIREB y anula la liquidación)
 ```
 
 *(02/10/2026: el pago se hace en SIREB; no hay `en_revision`, ni firma, ni
-depósitos en Jichi. 03/10/2026: «Cargar pago» desde la ficha, y `no_pagado` en
-vez de `vencido`. Ver [SIREB.md](SIREB.md).)*
+depósitos en Jichi. 03/10/2026: «Cargar pago» desde la ficha. 08/10/2026: sin
+`no_pagado`: la liquidación vencida no cambia el estado. Ver [SIREB.md](SIREB.md).)*
 
 | | Editar | Eliminar | Cargar pago | Verificar pago | Imprimir |
 | --- | :-: | :-: | :-: | :-: | :-: |
 | **Pendiente**, sin pago en SIREB | ✔ | ✔ | ✔ | ✔ | ✘ |
 | **Pendiente**, pago en revisión | ✘ (*) | ✘ | ✘ | ✔ | ✘ |
 | **Aprobado** | ✘ | ✘ | ✘ | ✘ | ✔ |
-| **No pagado** | ✘ | ✘ | ✘ | ✘ | ✘ |
 
 (*) Si la corrección cambia lo que se cobra: hay que anular la liquidación, y con
 un pago cargado SIREB no lo permite.
@@ -81,24 +80,29 @@ los campos `puede_*` de la ficha.
   donde estaba: la serie queda con un hueco, y eso es lo que el motivo
   obligatorio explica.
 
-### Lo que solo tiene la guía: anular
+### Revocar: la baja de lo ya aprobado *(05/10/2026)*
 
 - **No hay cierre** *(28/09/2026)*: se quitó «Registrar llegada» con su ruta,
   su permiso `guias.cerrar` y el estado `cerrada`. La guía aprobada vale sus 5
   días y vence; vencer es su final normal, no un trabajo pendiente.
-- **Anular** (`EmitirGuiaService::anular()`) da de baja una guía **ya aprobada**,
-  cuyo papel está en la calle, con motivo obligatorio. Es de supervisión
-  (`guias.anular`) y no se revierte. **Anular no es eliminar**: eliminar es
-  sobre el borrador, donde nunca hubo papel. Las dos queman el número.
+- **Revocar** (`EmitirFaenaService::revocar()`, `EmitirGuiaService::revocar()`) da
+  de baja una faena o una guía **ya aprobada**, cuyo papel está en la calle, con
+  motivo obligatorio. Es de supervisión (`faenas.revocar`, `guias.revocar`) y no
+  se revierte. **Revocar no es eliminar**: eliminar es sobre el borrador, donde
+  nunca hubo papel. Las dos queman el número.
+- **La guía se «anulaba»** hasta el 05/10/2026 (`guias.anular`, estado `anulada`).
+  Hacía lo mismo que revocar en el carnet y la autorización, así que se unificó:
+  los cuatro trámites dicen **Eliminar** (borrador) y **Revocar** (aprobado).
+- **La faena revocada NO devuelve sus kilos al cupo**: puede ser una sanción, y
+  devolverlos le regalaría cupo al infractor. `consumeCupo()` cuenta aprobadas,
+  completadas y revocadas, y `faenasQueConsumen()` dice lo mismo en SQL. La
+  completada no se revoca: ya cerró su salida.
 
-Anular lo dice `EstadoGuia::permiteAnulacion()`
-—solo `aprobado`—, y los usan el servicio (también sobre la fila bloqueada) y la
-ficha. Hasta el 27/09/2026 el servicio aceptaba anular un borrador o una guía en
-revisión aunque la pantalla no lo ofreciera.
-
-**La faena no se anula**: no tiene ese estado. Una faena aprobada deja de valer
-por fecha —sigue `aprobado`; la vigencia la dice `fecha_desembarque`— o porque
-quedó sin efecto (revocaron su autorización, o su carnet sin reemplazo).
+Lo dice `permiteRevocacion()` de cada enum —solo `aprobado`—, y lo usan el
+servicio (también sobre la fila bloqueada) y la ficha. Una faena aprobada además
+deja de valer por fecha —sigue `aprobado`; la vigencia la dice
+`fecha_desembarque`— o porque quedó sin efecto (revocaron su autorización, o su
+carnet sin reemplazo).
 
 ---
 
@@ -234,12 +238,14 @@ lógica no la dispara: `EmitirGuiaService::eliminar()` baja el detalle a mano.
 | `GET /panel/faenas` | `faenas.ver` | Listado, con filtro por estado |
 | `GET /panel/faenas/crear` | `faenas.crear` | Formulario. Acepta `?beneficiario=` y `?carnet=` para llegar con todo elegido |
 | `POST /panel/faenas` | `faenas.crear` | Alta, nace pendiente |
-| `POST /panel/faenas/{faena}/verificar-pago` | `faenas.crear` | Pregunta a SIREB; si está pagada, la aprueba y emite el recibo |
+| `POST /panel/faenas/{faena}/verificar-pago` | `faenas.verificar-pago` | Pregunta a SIREB; si está pagada, la aprueba y emite el recibo |
+| `POST /panel/faenas/{faena}/cargar-pago` | `faenas.cargar-pago` | Carga el pago en SIREB; validarlo es de Recaudaciones |
 | `GET /panel/faenas/{faena}/editar` · `PATCH /panel/faenas/{faena}` | `faenas.editar` | Corregir el borrador. `editar` va ANTES de `/{faena}` o se toma como id |
 | `DELETE /panel/faenas/{faena}` | `faenas.eliminar` | Baja con motivo |
 | `GET /panel/faenas/{faena}/imprimir` | `faenas.imprimir` | El «Permiso por Faena» en PDF. Solo aprobada |
 | `GET /panel/faenas/{faena}` | `faenas.ver` | Ficha |
-| `/panel/guias/…` | `guias.*` | Lo mismo para guías, más `PATCH …/anular` (`guias.anular`) |
+| `PATCH /panel/faenas/{faena}/revocar` | `faenas.revocar` | Baja de la aprobada, con motivo; sus kilos siguen descontados |
+| `/panel/guias/…` | `guias.*` | Lo mismo para guías, con `PATCH …/revocar` (`guias.revocar`) |
 
 Los pasos del circuito van por **PATCH o POST, nunca GET**: un verbo de lectura
 que escribe se dispara solo con que el navegador precargue el enlace.
@@ -266,8 +272,8 @@ de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitida
   texto libre —el formulario se llena a mano y llega incompleto—; los kilos son
   lo único obligatorio.
 - **No se registra la vuelta de la faena** (retirado el 25/09/2026): termina en
-  `aprobado` y sus kilos cuentan como consumidos. `Completado` sigue en el enum,
-  pero hoy nada lleva a ese estado.
+  `aprobado` y sus kilos cuentan como consumidos. `Completado` se quitó del enum
+  el 08/10/2026.
 - **Revocar el carnet NO reescribe sus faenas ni sus guías, pero dejan de valer
   mientras el titular no tenga OTRO carnet vigente de la actividad** (27/09/2026):
   figuran «Sin efecto» y vuelven a valer solas cuando se aprueba el nuevo. Lo
@@ -304,7 +310,7 @@ de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitida
 | `app/Enums/CondicionProducto.php`, `MedioTransporte.php`, `TipoTransporte.php` | Las casillas del talonario de la guía |
 | `app/Services/EmitirFaenaService.php` | Emitir, corregir y eliminar la faena; controla los kilos libres |
 | `app/Services/RevisarFaenaService.php` | Aprobar la faena cuando SIREB la da por pagada (fechas, kilos libres) |
-| `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar y anular la guía |
+| `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar y revocar la guía |
 | `app/Services/RevisarGuiaService.php` | Aprobar la guía cuando SIREB la da por pagada (vigencia de 5 días) |
 | `app/Http/Controllers/Panel/FaenaController.php` / `GuiaController.php` | Listado, formulario, ficha y circuito |
 | `resources/js/pages/panel/faenas/`, `resources/js/pages/panel/guias/` | Las pantallas |

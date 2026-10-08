@@ -1,5 +1,5 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { BadgeCheck, CalendarX, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Trash2, User, Waves } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { BadgeCheck, Ban, CalendarX, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Trash2, User, Waves } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
@@ -14,6 +14,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha } from '@/lib/utils';
 import type { ReciboDelCupo } from '@/types/aprovechamientos';
 import type { FaenaFicha } from '@/types/faenas';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 
 /**
  *  La ficha de una faena
@@ -30,15 +31,17 @@ export default function VerFaena({
 }) {
     const { puede } = usePermisos();
     const [eliminando, setEliminando] = useState(false);
+    const [revocando, setRevocando] = useState(false);
 
     const borrado = useForm({ motivo: '' });
+    const baja = useForm({ motivo: '' });
 
     return (
         <LayoutPanel
             titulo={faena.etiqueta}
             acciones={
                 <div className="flex flex-wrap gap-2">
-                    {faena.beneficiario_id !== null && (
+                    {puede('beneficiarios.ver') && faena.beneficiario_id !== null && (
                         <Button
                             variant="ver"
                             onClick={() => router.visit(route('beneficiarios.show', faena.beneficiario_id!))}
@@ -48,7 +51,7 @@ export default function VerFaena({
                         </Button>
                     )}
 
-                    {faena.carnet_id !== null && (
+                    {puede('carnets.ver') && faena.carnet_id !== null && (
                         <Button
                             variant="ver"
                             onClick={() => router.visit(route('carnets.show', faena.carnet_id!))}
@@ -58,7 +61,7 @@ export default function VerFaena({
                         </Button>
                     )}
 
-                    {faena.cupo && (
+                    {puede('aprovechamientos.ver') && faena.cupo && (
                         <Button
                             variant="ver"
                             onClick={() => router.visit(route('aprovechamientos.show', faena.cupo!.id))}
@@ -85,6 +88,13 @@ export default function VerFaena({
                         <Button variant="eliminar" onClick={() => setEliminando(true)}>
                             <Trash2 className="size-4" />
                             Eliminar
+                        </Button>
+                    )}
+
+                    {puede('faenas.revocar') && faena.puede_revocarse && (
+                        <Button variant="eliminar" onClick={() => setRevocando(true)}>
+                            <Ban className="size-4" />
+                            Revocar
                         </Button>
                     )}
 
@@ -131,12 +141,13 @@ export default function VerFaena({
 
                     <div className="min-w-0">
                         {faena.beneficiario_id !== null ? (
-                            <Link
+                            <EnlacePermitido
+                                permiso="beneficiarios.ver"
                                 href={route('beneficiarios.show', faena.beneficiario_id)}
                                 className="text-lg font-semibold text-primary hover:underline"
                             >
                                 {faena.beneficiario ?? '—'}
-                            </Link>
+                            </EnlacePermitido>
                         ) : (
                             <p className="text-lg font-semibold">{faena.beneficiario ?? '—'}</p>
                         )}
@@ -235,7 +246,7 @@ export default function VerFaena({
                             {/* Las dos las escribe la aprobación: en «—» hasta la firma. */}
                             <Renglon etiqueta="Salida el" valor={fecha(faena.fecha_salida)} />
                             <Renglon etiqueta="Desembarque el" valor={fecha(faena.fecha_desembarque)} />
-                            <Renglon etiqueta="Arancel" valor={bs(faena.monto)} />
+                            <Renglon etiqueta="Arancel" valor={bs(faena.monto)} destacado />
 
                         </CardContent>
                     </Card>
@@ -270,10 +281,10 @@ export default function VerFaena({
                                         cuadrar con la lista de faenas.
                                     */}
                                     <p className="text-xs text-muted-foreground">
-                                        {faena.consume_cupo
-                                            ? 'Esta faena está descontando sus kilos del saldo.'
-                                            : faena.estado === 'no_pagado' || faena.estado === 'revocado'
-                                              ? `Esta faena ${faena.estado === 'no_pagado' ? 'no se pagó a tiempo' : 'fue revocada'}: sus kilos volvieron al cupo.`
+                                        {faena.estado === 'revocado'
+                                            ? 'Esta faena fue revocada: ya no vale, pero sus kilos siguen descontados del saldo.'
+                                            : faena.consume_cupo
+                                              ? 'Esta faena está descontando sus kilos del saldo.'
                                               : 'Todavía no descuenta: la bolsa se mueve recién cuando se aprueba.'}
                                     </p>
                                 </>
@@ -299,7 +310,8 @@ export default function VerFaena({
                     rutaVerificar={route('faenas.verificar-pago', faena.id)}
                     puedeCargar={faena.puede_cargar_pago}
                     rutaCargar={route('faenas.cargar-pago', faena.id)}
-                    permiso="faenas.crear"
+                    rutaRenovar={route('faenas.renovar-liquidacion', faena.id)}
+                    documento="faenas"
                 />
             </div>
 
@@ -345,6 +357,44 @@ export default function VerFaena({
                     })
                 }
             />
+
+            {/* REVOCAR: sobre una faena YA APROBADA. No es lo mismo que eliminar. */}
+            <ConfirmarConMotivo
+                abierto={revocando}
+                titulo="¿Revocar el permiso de faena?"
+                descripcion={
+                    <div className="space-y-2">
+                        <p>
+                            La faena <strong>N° {faena.numero_legible}</strong> deja de autorizar la salida al
+                            instante. Sus {faena.kilos_extraidos} kg <strong>siguen descontados</strong> del cupo: no
+                            vuelven a la autorización.
+                        </p>
+                        <p>Queda en el historial como revocada y no vuelve atrás. Si hace falta, se emite otra.</p>
+                    </div>
+                }
+                etiquetaMotivo="Motivo de la revocación"
+                ayuda="Queda en la auditoría con su nombre."
+                placeholder="El pescador incumplió la veda; se le retira el permiso de esta salida."
+                textoConfirmar="Revocar faena"
+                confirmacion="Entiendo que la faena deja de valer y que esto no se puede revertir."
+                valor={baja.data.motivo}
+                onCambiar={(v) => baja.setData('motivo', v)}
+                error={baja.errors.motivo}
+                procesando={baja.processing}
+                onCancelar={() => {
+                    setRevocando(false);
+                    baja.reset();
+                }}
+                onConfirmar={() =>
+                    baja.patch(route('faenas.revocar', faena.id), {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            setRevocando(false);
+                            baja.reset();
+                        },
+                    })
+                }
+            />
         </LayoutPanel>
     );
 }
@@ -376,7 +426,7 @@ function Situacion({ faena }: { faena: FaenaFicha }) {
                 clase="bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
                 icono={<CalendarX className="mt-0.5 size-5 shrink-0" />}
                 titulo="Venció sin cerrarse"
-                texto="El pescador se llevó el papel y nadie registró la vuelta. Sus kilos ya volvieron al cupo; el número del talonario queda ocupado igual."
+                texto="El pescador se llevó el papel y nadie registró la vuelta. Sus kilos siguen descontados del cupo; el número del talonario queda ocupado igual."
             />
         );
     }
@@ -408,11 +458,7 @@ function Situacion({ faena }: { faena: FaenaFicha }) {
             clase="bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
             icono={<CheckCheck className="mt-0.5 size-5 shrink-0" />}
             titulo={faena.estado_etiqueta}
-            texto={
-                faena.estado === 'completado'
-                    ? 'El pescador volvió y descargó. El volumen quedó firme contra el cupo.'
-                    : 'La salida ya no autoriza nada.'
-            }
+            texto="La salida ya no autoriza nada."
         />
     );
 }
@@ -440,11 +486,11 @@ function Marco({
 }
 
 /** Renglón «etiqueta ····· valor» de la columna lateral. */
-function Renglon({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+function Renglon({ etiqueta, valor, destacado = false }: { etiqueta: string; valor: string; destacado?: boolean }) {
     return (
-        <div className="flex justify-between gap-3">
+        <div className="flex items-baseline justify-between gap-3">
             <span className="text-muted-foreground">{etiqueta}</span>
-            <span className="text-right font-medium tabular-nums">{valor}</span>
+            <span className={destacado ? 'text-right text-base font-medium tabular-nums' : 'text-right font-medium tabular-nums'}>{valor}</span>
         </div>
     );
 }

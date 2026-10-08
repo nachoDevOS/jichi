@@ -10,8 +10,6 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Spatie\Permission\Middleware\PermissionMiddleware;
-use Spatie\Permission\Middleware\RoleMiddleware;
-use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,15 +20,16 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['apariencia']);
 
+        // Coolify pone Traefik adelante: sin esto Laravel arma URLs http:// y el navegador bloquea los assets.
+        $middleware->trustProxies(at: '*');
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         $middleware->alias([
-            'rol' => RoleMiddleware::class,
             'permiso' => PermissionMiddleware::class,
-            'rol_o_permiso' => RoleOrPermissionMiddleware::class,
             'funcionario' => SoloFuncionario::class,
             'beneficiario' => SoloBeneficiario::class,
         ]);
@@ -40,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('mi-cuenta', 'mi-cuenta/*') ? route('portal.ingresar') : route('login'),
         );
         $middleware->redirectUsersTo(
-            fn (Request $request) => $request->user()?->esBeneficiario() ? route('portal.inicio') : route('dashboard'),
+            fn (Request $request) => $request->user()?->esBeneficiario() ? route('portal.inicio') : route($request->user()?->rutaInicio() ?? 'dashboard'),
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {

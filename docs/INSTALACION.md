@@ -103,11 +103,34 @@ que van a usar ya están repartidos por bloque en `app/Enums/RolSistema.php`.
 ## 4. Levantar
 
 ```sh
-composer run dev     # servidor + vite + cola + logs
+composer run dev     # servidor + cola + vite + programador (verifica pagos cada 10 min)
 # o por separado:
 php artisan serve
+php artisan queue:listen --tries=1
+php artisan schedule:work
 npm run dev
 ```
+
+> Sin el programador, ningún pago se aprueba solo: hay que apretar «Verificar
+> pago» en cada ficha. `php artisan dev:list` muestra qué levanta `composer run dev`.
+
+### En producción (Coolify): una tarea programada que no puede faltar
+
+Los pagos se verifican solos con **`php artisan schedule:run` cada minuto**. En
+Coolify va como **Scheduled Task** de la aplicación (comando `php artisan
+schedule:run`, frecuencia `* * * * *`): ver [DOCKER-TECNICO.md](DOCKER-TECNICO.md#para-coolify).
+En un servidor sin Coolify, la misma línea en el cron:
+
+```cron
+* * * * * cd /ruta/a/jichi && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Corre `jichi:verificar-pagos` cada 10 minutos, con topes para no cargar el
+servidor: 150 consultas u 8 minutos por pasada, no repite lo que el portal
+consultó hace menos de 2 minutos, y si SIREB no responde corta la pasada y espera
+2 minutos. **No hace falta trabajador de cola:** lo que pide el portal corre
+después de mandar la página (`dispatchAfterResponse`). Sin trámites pendientes no
+hace ninguna consulta.
 
 ## Estructura del proyecto
 

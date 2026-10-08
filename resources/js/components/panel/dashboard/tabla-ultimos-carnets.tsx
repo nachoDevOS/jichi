@@ -1,8 +1,8 @@
-import { Link } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { bs, fecha } from '@/lib/utils';
 import type { UltimoCarnet } from '@/types/dashboard';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 
 /**
  * Las últimas diez credenciales emitidas.
@@ -41,12 +41,13 @@ export function TablaUltimosCarnets({ carnets, moneda }: { carnets: UltimoCarnet
                                 {carnets.map((c) => (
                                     <tr key={c.id} className="hover:bg-secondary/50">
                                         <td className="px-5 py-2.5">
-                                            <Link
+                                            <EnlacePermitido
+                                                permiso="carnets.ver"
                                                 href={route('carnets.show', c.id)}
                                                 className="font-medium text-primary hover:underline"
                                             >
                                                 {c.beneficiario ?? '—'}
-                                            </Link>
+                                            </EnlacePermitido>
                                             {/*
                                                 El código va en grupos de cuatro —lo arma
                                                 el servidor con `codigoLegible`— porque

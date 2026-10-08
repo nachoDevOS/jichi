@@ -23,7 +23,8 @@ class CambiarClaveRequest extends FormRequest
     {
         return [
             'actual' => ['required', 'string', 'current_password:web'],
-            'password' => ['required', 'string', 'confirmed', 'different:actual', Password::min(8)->letters()->numbers()],
+            // Solo letras y números: fácil de escribir en cualquier celular (08/10/2026).
+            'password' => ['required', 'string', 'confirmed', 'different:actual', 'regex:/^[\pL\pN]+$/u', Password::min(8)->letters()->numbers()],
         ];
     }
 
@@ -41,6 +42,7 @@ class CambiarClaveRequest extends FormRequest
             'password.min' => 'La contraseña nueva tiene que tener al menos 8 caracteres.',
             'password.letters' => 'La contraseña nueva tiene que tener al menos una letra.',
             'password.numbers' => 'La contraseña nueva tiene que tener al menos un número.',
+            'password.regex' => 'Use solo letras y números, sin signos ni espacios.',
         ];
     }
 }

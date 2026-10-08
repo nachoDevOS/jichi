@@ -58,6 +58,7 @@ export interface FaenaFila {
     caducada: boolean;
     puede_editarse: boolean;
     puede_eliminarse: boolean;
+    puede_revocarse: boolean;
     /** Por qué todavía no autoriza a salir. `null` cuando sí autoriza. */
     motivo_sin_autorizar: string | null;
     /** Si pasó por la firma. Hasta entonces el permiso no vale. */

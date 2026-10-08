@@ -13,7 +13,14 @@ emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
 por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
 que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
-## 🔴 Hay que rearmar la base de trabajo — 03/10/2026
+## 🔴 Hay que rearmar la base de trabajo — 03/10/2026 (y de nuevo el 08/10/2026)
+
+**08/10/2026:** columna `sireb_historial` en `aprovechamientos_pesq`, `carnets`,
+`permisos_faena` y `guias_movimiento`, y `aprovechamientos_pesq.sireb_tarifa_id`
+pasó a `uuid`. Además, permiso nuevo `*.renovar-liquidacion` en los cuatro módulos:
+`php artisan db:seed --class=RolPermisoSeeder`. Sin migrar, las fichas responden
+`column "sireb_historial" does not exist`. Verificado sobre SQLite descartables
+(mismos 60 índices que antes).
 
 Cambiaron migraciones ya corridas (regla 12): la columna `nro` en
 `aprovechamientos_pesq`, `carnets`, `permisos_faena` y `guias_movimiento`
@@ -28,7 +35,7 @@ sobre SQLite descartables. Antes ya hacía falta por las columnas del portal
 
 Los cuatro documentos registran su liquidación en SIREB, el pago se puede cargar
 desde Jichi («Cargar pago»), y se aprueban solos cuando SIREB los da por pagados
-o pasan a «No pagado» si la liquidación vence sin pago. Probado con SIREB
+(si la liquidación vence, siguen pendientes: 08/10/2026). Probado con SIREB
 simulado y con la consulta real de una liquidación de test.sireb (solo lectura).
 **Falta, contra test.sireb:** cargar un pago desde Jichi, validarlo allá y ver la
 aprobación y el recibo; dejar vencer una liquidación sin pago; eliminar un
@@ -36,9 +43,8 @@ pendiente y ver la anulación. Ver [modulos/PAGOS.md](modulos/PAGOS.md).
 
 ## 🟠 Lo que falta definir con Recaudaciones — 03/10/2026
 
-- **Vencida con un pago en revisión:** ¿SIREB la deja `pendiente` hasta validar,
-  o pasa a `vencida`? Hoy Jichi, si la ve vencida con pago, la deja pendiente y
-  avisa «consulte con Recaudaciones».
+- ~~Vencida con un pago en revisión~~ — **resuelto el 08/10/2026**: no existe. En
+  SIREB una liquidación vence PORQUE no se pagó; vencida nunca tiene pago.
 - **La imagen del comprobante:** la API no la expone (el `Pago` trae N°, banco,
   fechas, monto y estado). Hace falta un `comprobante_url` o un endpoint.
 - **Una liquidación anulada desde SIREB** deja el documento pendiente sin salida
@@ -47,6 +53,10 @@ pendiente y ver la anulación. Ver [modulos/PAGOS.md](modulos/PAGOS.md).
   en `sireb_envio.respuesta.fecha_vencimiento`.
 
 ## 🔴 En producción hace falta el cron de Laravel — 02/10/2026
+
+*(08/10/2026)* **En Coolify:** «Scheduled Task» con `php artisan schedule:run` cada
+minuto (ver DOCKER-TECNICO.md). No hace falta trabajador de cola: el portal corre
+sus consultas después de la respuesta (`dispatchAfterResponse`).
 
 `jichi:verificar-pagos` está programado cada 10 minutos en `routes/console.php`,
 pero corre solo si el servidor tiene el cron de `php artisan schedule:run` (cada
@@ -98,7 +108,8 @@ servicio entero (`servicio($id)`, que trae todas sus tarifas con su `estado`).
 
 - **Hay un solo rol, `administrador`, con todos los permisos.** Aprobar ya no es
   de nadie —lo decide el pago validado en SIREB, 02/10/2026—, pero eliminar,
-  revocar y anular siguen siendo de cualquiera. Los permisos ya están repartidos por bloque
+  revocar sigue siendo de cualquiera. Los permisos ya están repartidos por bloque
+  —y desde el 05/10/2026 pago, reposición y asociaciones tienen el suyo—
   (`$lectura`, `$operacion`, `$supervision`, `$administracion`) y cada ruta
   declara su `permiso:`, así que el rol de ventanilla es una línea:
 
@@ -109,7 +120,12 @@ servicio entero (`servicio($id)`, que trae todas sus tarifas con su `estado`).
 - La clave `pagos.revisor_distinto` salió de `ConfiguracionSeeder` (ya no hay
   control de boletas en Jichi). Si quedó en la tabla `configuraciones` de una base
   vieja, no la lee nadie.
-- **No hay pantalla de usuarios**: se crean por consola (`php artisan tinker`).
+- **Roles: se crean desde el panel** en Seguridad › Roles (05/10/2026), pero **todavía
+  no se pueden asignar**: falta la pantalla de Usuarios. Mientras tanto, por tinker:
+  `User::find($id)->syncRoles(['Operador'])`.
+- **Seguridad › Usuarios lista hoy solo a los beneficiarios con cuenta** (05/10/2026).
+  **Los funcionarios** siguen creándose por consola (`php artisan tinker`), sin pantalla
+  para darles rol, activarlos ni vincularlos con Ibare (`jichi:vincular-ibare`).
   El borrador `GuardarUsuarioRequest` se quitó el 28/09/2026 por no tener ruta
   ni controlador; está en el historial de git (commit `8511537`).
 
@@ -118,9 +134,9 @@ servicio entero (`servicio($id)`, que trae todas sus tarifas con su `estado`).
 Ya no hay estado `vencido` ni comando diario: la **vigencia** se lee de las fechas
 (`estaVigente()`, scopes `vigentes()` y `enCurso()`) y un aprobado queda
 `aprobado` —en el filtro «Aprobado» de los listados aparecen también los que
-pasaron su fecha, y es a propósito—. El plazo de **pago** sí cambia el estado:
-`no_pagado` al verificar, y eso libera los kilos de una faena abandonada sin
-pagar y el lugar de una autorización.
+pasaron su fecha, y es a propósito—. Desde el 08/10/2026 el plazo de **pago**
+tampoco cambia el estado: con la liquidación vencida el trámite sigue pendiente
+y se genera otra, o se elimina para liberar los kilos y el lugar.
 
 ## 🟠 Datos de desarrollo con 4 horas de corrimiento
 
@@ -369,10 +385,10 @@ Aparece en gris en el menú. La tabla `configuraciones` existe y está sembrada;
 falta la pantalla para editarla agrupada por `grupo`, subir el logo y el escudo
 (tipo `archivo`) y el alta de usuarios (ver arriba).
 
-> Al construir usuarios, ojo con una regla escrita y APAGADA: el correo del
-> funcionario puede exigirse que termine en el dominio de la Gobernación. La
-> enciende `jichi.dominio_institucional`; para encenderla se agrega al `.env`,
-> sin arroba: `JICHI_DOMINIO_INSTITUCIONAL=beniautonomo.gob.bo`.
+> Al construir usuarios, se pensó exigir que el correo del funcionario termine en
+> el dominio de la Gobernación (`beniautonomo.gob.bo`). La clave de configuración
+> que lo iba a encender (`jichi.dominio_institucional`) se quitó el 08/10/2026
+> porque nadie la leía: va de nuevo con el módulo.
 
 ---
 

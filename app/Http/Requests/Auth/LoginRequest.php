@@ -92,6 +92,18 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // Sin rol, o con un rol sin pantallas: entraría a un 403 sin explicación.
+        if ($this->user()->rutaInicio() === null) {
+            $userId = $this->user()->id;
+            Auth::guard('web')->logout();
+
+            $this->registrarAcceso('fallido', $userId);
+
+            throw ValidationException::withMessages([
+                'email' => 'Su cuenta no tiene permisos en el sistema. Pida a un administrador que le asigne un rol.',
+            ]);
+        }
+
         $this->user()->forceFill(['ultimo_acceso_at' => now()])->saveQuietly();
 
         $this->registrarAcceso('login', $this->user()->id);

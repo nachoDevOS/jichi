@@ -8,9 +8,8 @@ use App\Exceptions\CupoInvalidoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EditarCupoRequest;
-use App\Http\Requests\Panel\EliminarCupoRequest;
+use App\Http\Requests\Panel\MotivoRequest;
 use App\Http\Requests\Panel\OtorgarCupoRequest;
-use App\Http\Requests\Panel\RevocarCupoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
@@ -19,6 +18,7 @@ use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\OtorgarCupoService;
+use App\Services\RenovarLiquidacionService;
 use App\Services\RevisarCupoService;
 use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
@@ -176,6 +176,18 @@ class AprovechamientoController extends Controller
     }
 
     /**
+     * Generar nueva liquidación — POST /panel/aprovechamientos/{aprovechamiento}/renovar-liquidacion
+     *
+     * La vencida sin pago pasa al historial y se pide otra con la tarifa vigente.
+     */
+    public function renovarLiquidacion(AprovechamientoPesq $aprovechamiento, RenovarLiquidacionService $renovacion): RedirectResponse
+    {
+        $resultado = $renovacion->renovar($aprovechamiento);
+
+        return back()->with($resultado['renovada'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /**
      * Cargar pago — POST /panel/aprovechamientos/{aprovechamiento}/cargar-pago
      *
      * Lo carga en SIREB, que lo valida allá.
@@ -203,6 +215,8 @@ class AprovechamientoController extends Controller
         $recibo = $aprovechamiento->recibo;
 
         return Inertia::render('panel/aprovechamientos/ver', [
+            // Solo al abrir «Generar nueva liquidación» (partial reload): consulta a SIREB.
+            'cotizacion_renovacion' => Inertia::optional(fn () => app(RenovarLiquidacionService::class)->cotizar($aprovechamiento)),
             'cupo' => [
                 ...$this->resumir($aprovechamiento),
 
@@ -365,7 +379,7 @@ class AprovechamientoController extends Controller
     /**
      * Eliminar — DELETE /panel/aprovechamientos/{id}
      */
-    public function destroy(EliminarCupoRequest $request, AprovechamientoPesq $aprovechamiento, ConfirmarPagoService $pagos): RedirectResponse
+    public function destroy(MotivoRequest $request, AprovechamientoPesq $aprovechamiento, ConfirmarPagoService $pagos): RedirectResponse
     {
         $persona = $aprovechamiento->beneficiario?->nombreCompleto ?? 'el pescador';
 
@@ -391,7 +405,7 @@ class AprovechamientoController extends Controller
     /**
      * Revocar — PATCH /panel/aprovechamientos/{id}/revocar
      */
-    public function revocar(RevocarCupoRequest $request, AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
+    public function revocar(MotivoRequest $request, AprovechamientoPesq $aprovechamiento, RevisarCupoService $revision): RedirectResponse
     {
         try {
             $revision->revocar($aprovechamiento, $request->validated()['motivo']);
@@ -505,11 +519,11 @@ class AprovechamientoController extends Controller
              * en React.
              */
             'puede_editarse' => $cupo->puedeEditarse(),
-            'puede_eliminarse' => $cupo->puedeEliminarse(),
+            'puede_eliminarse' => $cupo->puedeEliminarse() && $cupo->sinPagoInformado(),
 
             // El cobro está en SIREB: la ficha muestra su estado y ofrece verificar el pago.
             'sireb' => $cupo->resumenSireb(),
-            'puede_verificar_pago' => $cupo->estado->estaAbierto(),
+            'puede_verificar_pago' => $cupo->puedeVerificarPago(),
             'puede_cargar_pago' => $cupo->puedeCargarPago(),
             // La autorización en papel sale recién con el cupo aprobado.
             'ya_fue_aprobado' => $cupo->yaFueAprobado(),

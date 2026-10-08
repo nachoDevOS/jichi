@@ -41,6 +41,9 @@ class AprovechamientoPesq extends Model
 {
     use Auditable, Codificable, LiquidableSireb, SoftDeletes;
 
+    /** El historial ya es el registro de cada liquidación: no se copia a `auditorias`. */
+    protected $noAuditable = ['sireb_historial'];
+
     /** «AprovechamientoPesq» no pluraliza a «aprovechamientos_pesq» por sí solo. */
     protected $table = 'aprovechamientos_pesq';
 
@@ -154,7 +157,7 @@ class AprovechamientoPesq extends Model
         // Calificada: `carnets` entra en el join y también tiene `estado`.
         return $this->faenas()->whereIn('permisos_faena.estado', [
             EstadoFaena::Aprobado,
-            EstadoFaena::Completado,
+            EstadoFaena::Revocado,
         ]);
     }
 
@@ -192,8 +195,8 @@ class AprovechamientoPesq extends Model
     public function sincronizarEstadoPorSaldo(): void
     {
         // Solo se mueve entre aprobado y agotado. Un REVOCADO volvería a `aprobado` al
-        // anular una faena —reviviría una autorización dada de baja—, y un pendiente o
-        // no pagado nunca se aprobó.
+        // anular una faena —reviviría una autorización dada de baja—, y un pendiente
+        // nunca se aprobó.
         if (! in_array($this->estado, [EstadoAprovechamiento::Aprobado, EstadoAprovechamiento::Agotado], true)) {
             return;
         }
@@ -265,7 +268,7 @@ class AprovechamientoPesq extends Model
      * ¿Pasó alguna vez por la firma? Es lo que habilita la autorización en papel.
      *
      * A agotado y revocado se llega desde APROBADO, así que tuvieron su
-     * aprobación; pendiente y no pagado no. Fuera de fecha se reimprime igual:
+     * aprobación; el pendiente no. Fuera de fecha se reimprime igual:
      * puede hacer falta reponer el papel de una gestión cerrada.
      */
     public function yaFueAprobado(): bool

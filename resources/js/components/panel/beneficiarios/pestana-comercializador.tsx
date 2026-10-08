@@ -1,4 +1,3 @@
-import { Link } from '@inertiajs/react';
 import { Truck } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +5,7 @@ import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { bs, fechaHora } from '@/lib/utils';
 import type { CarnetResumen, GuiaDelBeneficiario } from '@/types/beneficiarios';
 import { AvisoRegistroAnterior, CredencialMini, Seccion, TarjetaPeriodo } from './partes-ficha';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 
 /**
  * Todo lo del comercializador: su cédula y sus guías de traslado.
@@ -88,12 +88,13 @@ export function PestanaComercializador({
                                 {guiasDelPeriodo.map((g) => (
                                     <tr key={g.id} className="hover:bg-secondary/50">
                                         <td className="px-4 py-2.5">
-                                            <Link
+                                            <EnlacePermitido
+                                                permiso="guias.ver"
                                                 href={route('guias.show', g.id)}
                                                 className="font-mono font-medium tabular-nums text-primary hover:underline"
                                             >
                                                 {g.numero_legible}
-                                            </Link>
+                                            </EnlacePermitido>
                                         </td>
                                         <td className="px-4 py-2.5">{g.ruta}</td>
                                         <td className="px-4 py-2.5 text-right tabular-nums">{g.peso_total_kg} kg</td>

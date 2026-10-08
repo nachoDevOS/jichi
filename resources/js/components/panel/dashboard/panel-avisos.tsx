@@ -2,6 +2,7 @@ import { Link } from '@inertiajs/react';
 import { BadgeCheck, BellRing, CalendarClock, CheckCircle2, PackageX } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import type { Avisos } from '@/types/dashboard';
 
 /**
@@ -9,7 +10,7 @@ import type { Avisos } from '@/types/dashboard';
  * una lista de ceros enseña a no mirarla.
  */
 export function PanelAvisos({ avisos }: { avisos: Avisos }) {
-    const lista: { icono: LucideIcon; cantidad: number; texto: string; accion: string; href: string }[] = [
+    const lista: { icono: LucideIcon; cantidad: number; texto: string; accion: string; href: string | null }[] = [
         {
             icono: BadgeCheck,
             cantidad: avisos.carnets_por_vencer,
@@ -51,12 +52,9 @@ export function PanelAvisos({ avisos }: { avisos: Avisos }) {
                     </p>
                 ) : (
                     <ul className="space-y-2">
-                        {lista.map((a) => (
-                            <li key={a.texto}>
-                                <Link
-                                    href={a.href}
-                                    className="flex items-start gap-3 rounded-md border border-amber-600/20 bg-amber-50 p-3 transition-colors hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/15"
-                                >
+                        {lista.map((a) => {
+                            const contenido = (
+                                <>
                                     <a.icono className="mt-0.5 size-4.5 shrink-0 text-amber-700 dark:text-amber-300" />
                                     <span className="text-sm">
                                         <span className="font-semibold">
@@ -64,9 +62,23 @@ export function PanelAvisos({ avisos }: { avisos: Avisos }) {
                                         </span>
                                         <span className="block text-xs text-muted-foreground">{a.accion}</span>
                                     </span>
-                                </Link>
-                            </li>
-                        ))}
+                                </>
+                            );
+                            const clase = 'flex items-start gap-3 rounded-md border border-amber-600/20 bg-amber-50 p-3 dark:bg-amber-500/10';
+
+                            // Sin el permiso del módulo, el aviso se lee igual pero no lleva a un 403.
+                            return (
+                                <li key={a.texto}>
+                                    {a.href ? (
+                                        <Link href={a.href} className={cn(clase, 'transition-colors hover:bg-amber-100 dark:hover:bg-amber-500/15')}>
+                                            {contenido}
+                                        </Link>
+                                    ) : (
+                                        <div className={clase}>{contenido}</div>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </CardContent>

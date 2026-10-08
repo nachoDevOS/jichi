@@ -42,6 +42,7 @@ return new class extends Migration
             $table->string('sireb_codigo_publico', 40)->nullable()->comment('Con el que se paga en SIREB');
             $table->string('sireb_estado', 20)->nullable()->comment('EstadoLiquidacionSireb');
             $table->json('sireb_envio')->nullable()->comment('Lo enviado a SIREB y su respuesta o error');
+            $table->json('sireb_historial')->nullable()->comment('Cada liquidación pedida a SIREB: tarifa, monto, fechas y cómo terminó');
 
             // Correlativo por gestión, asignado al aprobar. Índice y no único:
             // lo garantiza CorrelativoService. Ver MER.md.

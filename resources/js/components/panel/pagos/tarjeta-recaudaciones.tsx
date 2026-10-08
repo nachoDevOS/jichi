@@ -1,5 +1,5 @@
-import { useForm } from '@inertiajs/react';
-import { Banknote, Printer, QrCode, RefreshCw } from 'lucide-react';
+import { router, useForm, usePage } from '@inertiajs/react';
+import { AlertTriangle, Banknote, FilePlus, Printer, QrCode, RefreshCw } from 'lucide-react';
 import { useCallback, useState, type FormEvent } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Badge } from '@/components/ui/badge';
@@ -7,10 +7,11 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { ConfirmarNuevaLiquidacion } from '@/components/panel/pagos/confirmar-nueva-liquidacion';
 import { ModalPagoQr, type DetallePago } from '@/components/panel/pagos/modal-pago-qr';
 import { usePermisos } from '@/hooks/use-permisos';
 import { bs, cn, fecha, fechaHora } from '@/lib/utils';
-import type { ReciboDelCupo, VentaSireb } from '@/types/aprovechamientos';
+import type { CotizacionRenovacion, LiquidacionHistorial, ReciboDelCupo, VentaSireb } from '@/types/aprovechamientos';
 
 /**
  * El cobro de un documento, que se paga en SIREB. La comparten las cuatro fichas:
@@ -25,7 +26,8 @@ export function TarjetaRecaudaciones({
     rutaVerificar,
     puedeCargar = false,
     rutaCargar,
-    permiso,
+    rutaRenovar,
+    documento,
     pago,
     className,
 }: {
@@ -39,14 +41,34 @@ export function TarjetaRecaudaciones({
     puedeCargar?: boolean;
     /** `route('carnets.cargar-pago', id)`. */
     rutaCargar?: string;
-    /** El permiso de los botones: el `crear` del documento. */
-    permiso: string;
+    /** `route('carnets.renovar-liquidacion', id)`: se ofrece si la liquidación venció sin pago. */
+    rutaRenovar?: string;
+    /** Prefijo de los permisos `<documento>.verificar-pago` y `.cargar-pago`. */
+    documento: 'aprovechamientos' | 'carnets' | 'faenas' | 'guias';
     /** Qué se paga, para el detalle de la ventana del QR. */
     pago?: DetallePago;
     className?: string;
 }) {
     const { puede } = usePermisos();
+    const ofreceVerificar = puede(`${documento}.verificar-pago`) && puedeVerificar;
+    const ofreceCarga = puede(`${documento}.cargar-pago`) && puedeCargar;
+    const ofreceRenovar = puede(`${documento}.renovar-liquidacion`) && Boolean(sireb?.puede_renovar) && Boolean(rutaRenovar);
     const verificacion = useForm({});
+    const renovacion = useForm({});
+    const [confirmandoRenovar, setConfirmandoRenovar] = useState(false);
+    const cerrarRenovar = useCallback(() => setConfirmandoRenovar(false), []);
+    // El monto con la tarifa vigente: se pide a SIREB recién al abrir la ventana.
+    const cotizacion = usePage<{ cotizacion_renovacion?: CotizacionRenovacion }>().props.cotizacion_renovacion ?? null;
+    const [cotizando, setCotizando] = useState(false);
+
+    function abrirRenovar() {
+        setConfirmandoRenovar(true);
+        router.reload({
+            only: ['cotizacion_renovacion'],
+            onStart: () => setCotizando(true),
+            onFinish: () => setCotizando(false),
+        });
+    }
     const carga = useForm({ numero_transaccion: '', banco: '' });
     // Cómo se ofrece pagar: con el QR o cargando la transacción de un depósito.
     const [modo, setModo] = useState<'qr' | 'carga' | null>(null);
@@ -76,7 +98,7 @@ export function TarjetaRecaudaciones({
                 <div className="space-y-3">
                     <div className="flex items-baseline justify-between gap-3">
                         <span className="text-muted-foreground">Monto</span>
-                        <span className="text-lg font-semibold tabular-nums">{bs(monto)}</span>
+                        <span className="text-xl font-semibold tabular-nums">{bs(monto)}</span>
                     </div>
 
                     {sireb && (
@@ -91,6 +113,26 @@ export function TarjetaRecaudaciones({
                         <div className="flex items-center justify-between gap-3">
                             <span className="text-muted-foreground">Código de pago</span>
                             <TextoCopiable texto={sireb.codigo_publico} className="-mr-1.5" />
+                        </div>
+                    )}
+
+                    {sireb?.caida && (
+                        // Un cobro vencido no avanza solo: el aviso tiene que verse antes que todo lo demás.
+                        <div
+                            role="alert"
+                            className="flex gap-3 rounded-lg border-2 border-amber-500 bg-amber-100 p-4 text-amber-950 shadow-md dark:border-amber-400 dark:bg-amber-500/20 dark:text-amber-100"
+                        >
+                            <span className="relative flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white dark:text-amber-950">
+                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-60 motion-reduce:hidden" />
+                                <AlertTriangle className="relative size-5" />
+                            </span>
+                            <div className="space-y-1">
+                                <p className="text-base font-bold">{sireb.caida === 'anulada' ? 'Cobro anulado' : 'Plazo de pago vencido'}</p>
+                                <p className="font-medium">
+                                    {sireb.caida === 'anulada' ? 'Recaudaciones anuló el cobro.' : 'Venció el plazo de pago.'} El trámite sigue
+                                    pendiente: genere una nueva liquidación para cobrarlo.
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -181,7 +223,7 @@ export function TarjetaRecaudaciones({
                             </div>
                             <div className="flex justify-between gap-3">
                                 <span className="text-muted-foreground">Monto pagado</span>
-                                <span className="tabular-nums">{bs(sireb.pago.monto_pagado)}</span>
+                                <span className="text-base tabular-nums">{bs(sireb.pago.monto_pagado)}</span>
                             </div>
                             {sireb.pago.fecha_validacion && (
                                 <div className="flex justify-between gap-3">
@@ -195,7 +237,7 @@ export function TarjetaRecaudaciones({
                         </div>
                     ) : null}
                     {/* Solo CARGA el pago en SIREB: validarlo sigue siendo de Recaudaciones. */}
-                    {puede(permiso) && puedeCargar && rutaCargar && (
+                    {ofreceCarga && rutaCargar && (
                         <div className="space-y-2">
                             <p className="font-medium">¿Cómo paga?</p>
                             <div className="grid grid-cols-2 gap-2">
@@ -203,17 +245,19 @@ export function TarjetaRecaudaciones({
                                     key="opcion-qr"
                                     activa={modo === 'qr'}
                                     onClick={() => setModo(modo === 'qr' ? null : 'qr')}
-                                    icono={<QrCode className="size-5" />}
+                                    icono={<QrCode className="size-4" />}
                                     titulo="Pagar por QR"
                                     detalle="Desde la app del banco"
+                                    tono="sky"
                                 />
                                 <OpcionPago
                                     key="opcion-carga"
                                     activa={cargando}
                                     onClick={() => setCargando(!cargando)}
-                                    icono={<Banknote className="size-5" />}
+                                    icono={<Banknote className="size-4" />}
                                     titulo="Cargar pago"
                                     detalle="Ya depositó en el banco"
+                                    tono="emerald"
                                 />
                             </div>
                         </div>
@@ -271,7 +315,14 @@ export function TarjetaRecaudaciones({
                         </form>
                     )}
 
-                    {puede(permiso) && puedeVerificar && (
+                    {ofreceRenovar && rutaRenovar && (
+                        <Button key="renovar" type="button" className="w-full" onClick={abrirRenovar}>
+                            <FilePlus className="size-4" />
+                            Generar nueva liquidación
+                        </Button>
+                    )}
+
+                    {ofreceVerificar && (
                         <Button
                             variant="outline"
                             className="w-full"
@@ -287,14 +338,25 @@ export function TarjetaRecaudaciones({
                         </Button>
                     )}
                 </div>
+
+                {sireb && sireb.historial.length > 0 && <HistorialLiquidaciones historial={sireb.historial} />}
             </CardContent>
+
+            <ConfirmarNuevaLiquidacion
+                abierto={confirmandoRenovar}
+                cotizando={cotizando}
+                cotizacion={cotizacion}
+                procesando={renovacion.processing}
+                onCerrar={cerrarRenovar}
+                onConfirmar={() => rutaRenovar && renovacion.post(rutaRenovar, { preserveScroll: true, onFinish: cerrarRenovar })}
+            />
 
             <ModalPagoQr
                 abierto={modo === 'qr'}
                 monto={monto}
                 codigoPago={sireb?.codigo_publico ?? null}
                 pago={pago}
-                puedeVerificar={puede(permiso) && puedeVerificar}
+                puedeVerificar={ofreceVerificar}
                 verificando={verificacion.processing}
                 onVerificar={() => verificacion.post(rutaVerificar, { preserveScroll: true, onSuccess: () => setModo(null) })}
                 onCerrar={cerrarModal}
@@ -303,32 +365,98 @@ export function TarjetaRecaudaciones({
     );
 }
 
+const ESTADO_LIQUIDACION: Record<LiquidacionHistorial['estado'], { etiqueta: string; color: string }> = {
+    registrada: { etiqueta: 'Registrada', color: 'sky' },
+    vencida: { etiqueta: 'Vencida', color: 'amber' },
+    anulada: { etiqueta: 'Anulada', color: 'slate' },
+    pagada: { etiqueta: 'Pagada', color: 'emerald' },
+};
+
+/** Las liquidaciones ya cerradas: con qué tarifa y monto se pidieron y cómo terminaron. */
+function HistorialLiquidaciones({ historial }: { historial: LiquidacionHistorial[] }) {
+    return (
+        <details className="@3xl:col-span-2">
+            <summary className="cursor-pointer text-muted-foreground">Liquidaciones anteriores ({historial.length})</summary>
+            <ul className="mt-3 space-y-2">
+                {[...historial].reverse().map((l) => (
+                    <li key={l.liquidacion_id} className="space-y-1 rounded-md border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono">{l.codigo_publico ?? '—'}</span>
+                            <Badge color={ESTADO_LIQUIDACION[l.estado].color}>{ESTADO_LIQUIDACION[l.estado].etiqueta}</Badge>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                            <span className="text-muted-foreground">Monto</span>
+                            <span className="text-base tabular-nums">{bs(l.monto)}</span>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                            <span className="text-muted-foreground">Solicitada</span>
+                            <span>{fechaHora(l.solicitada_en)}</span>
+                        </div>
+                        {l.cerrada_en && (
+                            <div className="flex justify-between gap-3">
+                                <span className="text-muted-foreground">Cerrada</span>
+                                <span>{fechaHora(l.cerrada_en)}</span>
+                            </div>
+                        )}
+                        <p className="text-xs break-all text-muted-foreground">
+                            {l.items.map((i) => `${i.producto ? i.producto + ': ' : ''}tarifa ${i.tarifa_id} a ${bs(i.precio)}`).join(' · ')}
+                        </p>
+                    </li>
+                ))}
+            </ul>
+        </details>
+    );
+}
+
+/** Cada forma de pago con su color, para distinguirlas de un vistazo. Clases completas: ver badge.tsx. */
+const TONO_OPCION = {
+    sky: {
+        caja: 'border-sky-200 bg-sky-50/60 hover:border-sky-400 hover:bg-sky-50 dark:border-sky-500/30 dark:bg-sky-500/5 dark:hover:bg-sky-500/10',
+        activa: 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-500/15',
+        icono: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300',
+        titulo: 'text-sky-900 dark:text-sky-100',
+    },
+    emerald: {
+        caja: 'border-emerald-200 bg-emerald-50/60 hover:border-emerald-400 hover:bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10',
+        activa: 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-500 dark:bg-emerald-500/15',
+        icono: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+        titulo: 'text-emerald-900 dark:text-emerald-100',
+    },
+} as const;
+
 function OpcionPago({
     activa,
     onClick,
     icono,
     titulo,
     detalle,
+    tono,
 }: {
     activa: boolean;
     onClick: () => void;
     icono: React.ReactNode;
     titulo: string;
     detalle: string;
+    tono: keyof typeof TONO_OPCION;
 }) {
+    const estilo = TONO_OPCION[tono];
+
     return (
         <button
             type="button"
             onClick={onClick}
             aria-pressed={activa}
             className={cn(
-                'flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors hover:bg-muted/50',
-                activa && 'border-primary bg-primary/5 ring-1 ring-primary',
+                'flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all',
+                estilo.caja,
+                activa && estilo.activa,
             )}
         >
-            <span className={cn('text-muted-foreground', activa && 'text-primary')}>{icono}</span>
-            <span className="font-medium">{titulo}</span>
-            <span className="text-xs text-muted-foreground">{detalle}</span>
+            <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', estilo.icono)}>{icono}</span>
+            <span className="min-w-0 leading-tight">
+                <span className={cn('block text-sm font-semibold', estilo.titulo)}>{titulo}</span>
+                <span className="block text-xs text-muted-foreground">{detalle}</span>
+            </span>
         </button>
     );
 }

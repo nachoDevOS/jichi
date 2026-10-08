@@ -50,17 +50,17 @@ class DashboardController extends Controller
     private function pendientes(): array
     {
         $documentos = [
-            ['Autorizaciones de pesca', 'aprovechamientos.index', AprovechamientoPesq::query(), EstadoAprovechamiento::Pendiente],
-            ['Carnets', 'carnets.index', Carnet::query(), EstadoCarnet::Pendiente],
-            ['Permisos de faena', 'faenas.index', PermisoFaena::query(), EstadoFaena::Pendiente],
-            ['Guías de transporte', 'guias.index', GuiaMovimiento::query(), EstadoGuia::Pendiente],
+            ['Autorizaciones de pesca', 'aprovechamientos', AprovechamientoPesq::query(), EstadoAprovechamiento::Pendiente],
+            ['Carnets', 'carnets', Carnet::query(), EstadoCarnet::Pendiente],
+            ['Permisos de faena', 'faenas', PermisoFaena::query(), EstadoFaena::Pendiente],
+            ['Guías de transporte', 'guias', GuiaMovimiento::query(), EstadoGuia::Pendiente],
         ];
 
         return collect($documentos)
             ->map(fn (array $d): array => [
                 'documento' => $d[0],
                 'por_pagar' => $d[2]->where('estado', $d[3])->count(),
-                'url_por_pagar' => route($d[1], ['estado' => $d[3]->value]),
+                'url_por_pagar' => $this->siPuedeVer($d[1], ['estado' => $d[3]->value]),
             ])
             ->all();
     }
@@ -193,10 +193,21 @@ class DashboardController extends Controller
                 ->count(),
 
             'urls' => [
-                'carnets' => route('carnets.index', ['estado' => EstadoCarnet::Aprobado->value]),
-                'autorizaciones' => route('aprovechamientos.index', ['estado' => EstadoAprovechamiento::Aprobado->value]),
-                'agotadas' => route('aprovechamientos.index', ['estado' => EstadoAprovechamiento::Agotado->value]),
+                'carnets' => $this->siPuedeVer('carnets', ['estado' => EstadoCarnet::Aprobado->value]),
+                'autorizaciones' => $this->siPuedeVer('aprovechamientos', ['estado' => EstadoAprovechamiento::Aprobado->value]),
+                'agotadas' => $this->siPuedeVer('aprovechamientos', ['estado' => EstadoAprovechamiento::Agotado->value]),
             ],
         ];
+    }
+
+    /**
+     * El listado del módulo, o null si el rol no lo ve: el número se muestra
+     * igual, pero sin un enlace que termine en 403.
+     *
+     * @param  array<string, string>  $filtros
+     */
+    private function siPuedeVer(string $modulo, array $filtros): ?string
+    {
+        return auth()->user()?->can("{$modulo}.ver") ? route("{$modulo}.index", $filtros) : null;
     }
 }

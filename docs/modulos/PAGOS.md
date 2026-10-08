@@ -17,7 +17,7 @@ Jichi registra el documento ──▶ registra su LIQUIDACIÓN en SIREB (código
 Jichi pregunta (botón «Verificar pago» / jichi:verificar-pagos cada 10 min)
           ├─ pendiente, pago en revisión ─▶ la ficha muestra «Pago informado · Por validar»
           ├─ pagada, pago confirmado     ─▶ APROBADO + RECIBO
-          └─ vencida, sin ningún pago    ─▶ NO PAGADO (no sigue su curso)
+          └─ vencida                     ─▶ sigue PENDIENTE (08/10/2026)
 ```
 
 | Pieza | Qué hace |
@@ -25,7 +25,7 @@ Jichi pregunta (botón «Verificar pago» / jichi:verificar-pagos cada 10 min)
 | Trait `LiquidableSireb` + columnas `sireb_*` | La liquidación de cada documento: clave, id, código público, estado, y en `sireb_envio` lo enviado, la respuesta y el último `pago` informado |
 | `LiquidarSirebService` | Prepara, envía y anula la liquidación. La `Idempotency-Key` se guarda antes de llamar. **Antes de anular consulta**: con un pago cargado no anula |
 | `CargarPagoService` | «Cargar pago»: N° de transacción y banco, solo si la liquidación está pendiente y sin pago |
-| `ConfirmarPagoService` | Consulta `GET /liquidaciones/{id}`: aprueba y emite el recibo, o marca «No pagado», y guarda el pago informado |
+| `ConfirmarPagoService` | Consulta `GET /liquidaciones/{id}`: aprueba y emite el recibo, y guarda el pago informado |
 | `VerificarPagosCommand` | `jichi:verificar-pagos`, cada 10 minutos (necesita el cron de Laravel) |
 | `TarjetaRecaudaciones` | La tarjeta de las cuatro fichas: estado de la liquidación, código de pago copiable, pago informado o «Pago cargado: No / Sin verificar», «Cargar pago», «Verificar pago» y el recibo |
 
@@ -36,9 +36,8 @@ Jichi pregunta (botón «Verificar pago» / jichi:verificar-pagos cada 10 min)
 | Pendiente, sin pago | ✔ | ✔ se anula la liquidación | Sigue pendiente |
 | Pendiente, pago en revisión | ✘ | ✘ | Sigue pendiente, muestra el pago |
 | Pagada | ✘ | ✘ se aprueba en su lugar | Aprueba + recibo |
-| Vencida, sin pago | ✘ | ✔ sin pedir anular | Pasa a «No pagado» |
-| Vencida, con pago en revisión | ✘ | ✘ | Sigue pendiente: consultar con Recaudaciones |
-| Anulada | ✘ | ✔ | Sigue pendiente: corregir o eliminar |
+| Vencida (nunca tiene pago: vence porque no se pagó) | ✘ | ✔ sin pedir anular | Se ofrece junto a «Generar nueva liquidación»; el comando no la consulta (08/10/2026) |
+| Anulada | ✘ | ✔ sin pedir anular | Igual que vencida |
 
 El detalle —contrato con SIREB, reintentos, idempotencia— está en
 [SIREB.md](SIREB.md). El recibo, en [RECIBOS.md](RECIBOS.md).

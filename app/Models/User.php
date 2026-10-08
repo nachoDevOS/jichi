@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Route;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['beneficiario_id', 'name', 'ci', 'mamore_id', 'email', 'cargo', 'telefono', 'password', 'activo', 'debe_cambiar_password'])]
@@ -60,6 +61,28 @@ class User extends Authenticatable
     public function esBeneficiario(): bool
     {
         return $this->beneficiario_id !== null;
+    }
+
+    /** Los módulos cuya pantalla de entrada no es `<modulo>.index`. */
+    private const PANTALLA = ['dashboard' => 'dashboard', 'catalogos' => 'tipos-carnet.index'];
+
+    /**
+     * Su pantalla de inicio: el primer módulo del menú que puede ver y que ya tiene
+     * pantalla. null = no puede ver nada del panel.
+     */
+    public function rutaInicio(): ?string
+    {
+        $permisos = $this->getAllPermissions()->pluck('name');
+
+        foreach (array_keys(RolSistema::CATALOGO) as $modulo) {
+            $ruta = self::PANTALLA[$modulo] ?? "{$modulo}.index";
+
+            if ($permisos->contains("{$modulo}.ver") && Route::has($ruta)) {
+                return $ruta;
+            }
+        }
+
+        return null;
     }
 
     public function esAdministrador(): bool

@@ -9,7 +9,7 @@ import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs } from '@/lib/utils';
+import { bs, fechaInput } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { TramoElegible } from '@/types/aprovechamientos';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
@@ -39,7 +39,7 @@ export default function CrearCupo({
         tipo_embarcacion: '',
         // Lo normal es otorgar hoy. El servidor rechaza fechas futuras: el cupo
         // vence con la gestión, así que una del año que viene arrancaría vencida.
-        fecha_solicitud: new Date().toISOString().slice(0, 10),
+        fecha_solicitud: fechaInput(new Date()),
     });
 
     const tramo = escala.find((t) => String(t.id) === String(form.data.categoria_aprov_id)) ?? null;
@@ -237,7 +237,7 @@ export default function CrearCupo({
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                         A cobrar
                                     </p>
-                                    <p className="text-2xl font-semibold tabular-nums">
+                                    <p className="text-3xl font-semibold tabular-nums">
                                         {tramo.monto !== null ? bs(tramo.monto, institucion.moneda) : '—'}
                                     </p>
                                     {tramo.monto === null && (

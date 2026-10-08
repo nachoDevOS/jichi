@@ -21,8 +21,8 @@ class Codigo extends Model
      * El documento al que pertenece.
      *
      * VA CON `withTrashed()`: si se anula un carnet y alguien escanea su QR, la
-     * respuesta correcta es «este documento fue anulado», no «no existe».
-     * Sin esto, anular vuelve invisible en vez de inválido.
+     * respuesta correcta es «este documento fue revocado», no «no existe».
+     * Sin esto, revocar vuelve invisible en vez de inválido.
      */
     public function codigable(): MorphTo
     {

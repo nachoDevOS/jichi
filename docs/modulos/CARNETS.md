@@ -59,7 +59,7 @@ imprimir es el archivo que va a salir, no una promesa de cómo va a salir.
 PENDIENTE ──(SIREB: pagada)──▶ APROBADO ──▶ ACÁ se puede imprimir
    │                              └── revocado: ya no se imprime
    └── el carnet YA EXISTE, pero no autoriza a nada
-PENDIENTE ──(SIREB: vencida, sin pago)──▶ NO PAGADO: nunca se imprime
+PENDIENTE ──(SIREB: vencida)──▶ sigue PENDIENTE (08/10/2026): nunca se imprime
 ```
 
 **El carnet existe desde PENDIENTE y no se puede imprimir hasta APROBADO.** No

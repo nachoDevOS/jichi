@@ -293,11 +293,12 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `modalidad` | string(30) | **Copiada** del tramo |
 | `volumen_total_kg` | decimal(12,2) | **Copiado** del techo del tramo |
 | `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar. Corregir no lo toca: solo cambia la embarcación (03/10/2026) |
-| `sireb_tarifa_id` | string(36) **null** | La tarifa de SIREB de ese monto, como constancia |
+| `sireb_tarifa_id` | uuid **null** | La tarifa de SIREB de ese monto (string(36) hasta el 08/10/2026, igualada a los otros tres) |
 | `sireb_idempotency_key` | uuid **null**, único global | La `Idempotency-Key` de la venta en SIREB. Se guarda ANTES de llamar; corregir con otra tarifa genera otra (02/10/2026) |
 | `sireb_liquidacion_id`, `sireb_codigo_publico` | null | Lo que devuelve SIREB. Null mientras la venta está por enviar |
 | `sireb_estado` | string(20) **null** | `EstadoLiquidacionSireb`: `por_enviar` / `registrada` / `anulada`. Null si nunca se vendió |
-| `sireb_envio` | json **null** | Constancia: la clave, lo enviado, cuándo, y la respuesta o el error; al anular, el motivo. Las versiones anteriores quedan en `auditorias` |
+| `sireb_envio` | json **null** | Constancia: la clave, lo enviado, cuándo, y la respuesta o el error; al anular, el motivo; en `consulta`, el último estado que dio SIREB (08/10/2026). Las versiones anteriores quedan en `auditorias` |
+| `sireb_historial` | json **null** | *(08/10/2026)* **Cada liquidación pedida**, desde que SIREB la registra: id, código, clave, ítems (tarifa, cantidad, precio), monto, `solicitada_en`, `vence_en`, `estado` (`registrada` / `vencida` / `anulada` / `pagada`), `cerrada_en` y `motivo`. La vigente es la última y coincide con las columnas `sireb_*`. Fuera de `auditorias` (`$noAuditable`): ya es el registro |
 | `tipo_embarcacion` | string(120) | El renglón del talonario. **Obligatorio** |
 | `estado` | string(20) | `EstadoAprovechamiento` |
 | `fecha_solicitud` | date | El día que la persona lo pidió |
@@ -400,10 +401,10 @@ bajo su nombre.
 | `tipo_actor` | string(20) | `TipoActor`: pescador / comercializador |
 | `monto` | decimal(10,2) | **Copia congelada** del precio de SIREB al emitir (y al corregir el borrador). Es lo que lee `montoACobrar()`: un cambio de tarifa después no toca lo ya emitido (30/09/2026) |
 | `sireb_tarifa_id` | uuid, nullable | La tarifa de SIREB de ese precio |
-| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
+| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio`, `sireb_historial` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
 | `nro` | unsigned **null**, índice (no único) | El número de registro: correlativo **por gestión**, asignado AL APROBAR. Se imprime con seis dígitos (`registro_legible`). Ver abajo por qué no es único |
 | `archivo_ci`, `archivo_asociacion` | string(255) **null** | Escaneos de la cédula y la carta del gremio. Nullable para cargar lo emitido en papel; el formulario sí los exige. Se suben con `StorageController` ANTES de la transacción |
-| `estado` | string(20) | `EstadoCarnet`: `pendiente`, `aprobado`, `revocado`, `no_pagado` |
+| `estado` | string(20) | `EstadoCarnet`: `pendiente`, `aprobado`, `revocado` |
 | `fecha_solicitud` | date | El día que se pidió |
 | `fecha_emision` | date **null** | El día que se aprobó |
 | `fecha_vencimiento` | date, índice | El 31/12 de la gestión de la aprobación. **Es la vigencia: no hay estado `vencido`** |
@@ -486,7 +487,7 @@ producto.
 | `nro` | int | Correlativo **global y continuo**. Lo pone el sistema |
 | `monto` | decimal(10,2) | Copia congelada del precio de SIREB al emitir |
 | `sireb_tarifa_id` | uuid, null | La tarifa de SIREB de ese precio (30/09/2026) |
-| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
+| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio`, `sireb_historial` | | Su liquidación en SIREB, igual que en `aprovechamientos_pesq` (02/10/2026) |
 | `kilos_extraidos` | decimal(12,2) | |
 | `embarcacion`, `propietario`, `comandante_barco` | string, **null** | Renglones del papel |
 | `matricula_naval`, `nro_kardex` | string, **null** | Renglones del papel |
@@ -530,7 +531,7 @@ que el carnet y el cupo—.
 
 **NO SE REGISTRA LA VUELTA** —retirado el 25/09/2026 a pedido—. La faena
 aprobada queda así: los kilos autorizados cuentan como consumidos desde la aprobación.
-`EstadoFaena::Completado` sigue en el enum, pero hoy nada lleva a ese estado.
+`EstadoFaena::Completado` se quitó del enum el 08/10/2026: nada llevaba a ese estado.
 
 **`revocado` es un estado HISTÓRICO de la faena.** Durante el 27/09/2026 lo
 escribía en cascada la revocación de su autorización; ya nada lo escribe: una faena cuya autorización se revocó queda `aprobado` y figura
@@ -626,7 +627,7 @@ salida no ocurrió.
 | `asociacion_id` | FK RESTRICT | El aval impreso, COPIADO del carnet |
 | `nro` | unsigned, único **global** | Correlativo **continuo**: `000308` |
 | `monto` | decimal(10,2) | Total del cuadro D al emitir, con el descuento |
-| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio` | | Su liquidación en SIREB, un ítem por renglón del cuadro D (tarifa por kilo × kilos); igual que en `aprovechamientos_pesq` (02/10/2026) |
+| `sireb_idempotency_key`, `sireb_liquidacion_id`, `sireb_codigo_publico`, `sireb_estado`, `sireb_envio`, `sireb_historial` | | Su liquidación en SIREB, un ítem por renglón del cuadro D (tarifa por kilo × kilos); igual que en `aprovechamientos_pesq` (02/10/2026) |
 | `origen` / `destino` | string(160) | Bloque B del papel |
 | `origen_*` / `destino_*` | string(100), nullable | Departamento, provincia, distrito o cuenca |
 | `medio_transporte` | string(20), nullable | `MedioTransporte`: el casillero 10 |
@@ -696,18 +697,19 @@ o se le quitaría al transportista casi un día.
 
 ```
 PENDIENTE ──(pagada en SIREB)──▶ APROBADA ──▶ vence a los 5 días
-(en la base: `aprobado`)              └──[anular]──▶ ANULADA
+(en la base: `aprobado`)              └──[revocar]──▶ REVOCADA (`revocado`)
                                       └── acá sale el RECIBO
 ```
 
 Lo decide `EstadoGuia`, no el controlador: `permiteEdicion()`,
-`permiteEliminacion()`, `permiteAnulacion()` y `estaAbierto()`. Editar y
+`permiteEliminacion()`, `permiteRevocacion()` y `estaAbierto()`. Editar y
 eliminar valen SOLO en pendiente, y anulan antes la liquidación en SIREB (si ya
 tiene un pago allá, SIREB no deja y no se corrige).
 
-> **ANULAR Y ELIMINAR NO SON LO MISMO.** Eliminar es sobre el BORRADOR —la fila
-> se dio de baja y nunca hubo papel—; anular es sobre una guía YA APROBADA, cuyo
-> papel está en la calle. Las dos queman el número del talonario igual.
+> **REVOCAR Y ELIMINAR NO SON LO MISMO.** Eliminar es sobre el BORRADOR —la fila
+> se dio de baja y nunca hubo papel—; revocar es sobre una guía YA APROBADA, cuyo
+> papel está en la calle. Las dos queman el número del talonario igual. Hasta el
+> 05/10/2026 se llamaba «anular» y el estado era `anulada`.
 
 ---
 
@@ -861,8 +863,8 @@ dos viven en `App\Traits\Codificable`.
 > ⚠️ **`UNIQUE(codigo)` es COMPLETO, no parcial.** Un código que salió impreso
 > queda **quemado para siempre**, aunque su documento se dé de baja: es papel
 > entregado, y el criterio está en §3. Y el `morphTo` va con `withTrashed()`,
-> porque un documento anulado tiene que contestar «fue anulado» y no
-> «no existe» — si no, anular vuelve el documento invisible en vez de inválido.
+> porque un documento revocado tiene que contestar «fue revocado» y no
+> «no existe» — si no, revocar vuelve el documento invisible en vez de inválido.
 
 > ⚠️ **TODA consulta que muestre el código necesita `with('codigo')`.** Sin eso
 > no falla: hace N+1 en silencio. Y en `carnets` el accesor va en `#[Appends]`,

@@ -3,11 +3,56 @@
 namespace App\Enums;
 
 /**
- * Los roles del sistema y qué puede hacer cada uno.
+ * El catálogo de permisos y los roles fijos del sistema. Los demás roles los
+ * arma la unidad en Seguridad › Roles.
  */
 enum RolSistema: string
 {
     case Administrador = 'administrador';
+
+    /**
+     * El catálogo, módulo por módulo en el orden del menú: [nombre, sección, acciones].
+     * Las acciones van en el orden del trámite. Un permiso nuevo va acá y en su ruta.
+     */
+    public const CATALOGO = [
+        'dashboard' => ['Panel', 'General', ['ver']],
+
+        'beneficiarios' => ['Beneficiarios', 'Ventanilla', ['ver', 'crear', 'editar', 'portal', 'eliminar']],
+        'aprovechamientos' => ['Autorizaciones de pesca', 'Ventanilla', ['ver', 'crear', 'editar', 'verificar-pago', 'cargar-pago', 'renovar-liquidacion', 'imprimir', 'eliminar', 'revocar']],
+        // Reponer no lleva permiso propio: es parte de registrar (`carnets.crear`).
+        'carnets' => ['Carnets', 'Ventanilla', ['ver', 'crear', 'editar', 'verificar-pago', 'cargar-pago', 'renovar-liquidacion', 'imprimir', 'eliminar', 'revocar']],
+        'faenas' => ['Permisos de faena', 'Ventanilla', ['ver', 'crear', 'editar', 'verificar-pago', 'cargar-pago', 'renovar-liquidacion', 'imprimir', 'eliminar', 'revocar']],
+        'guias' => ['Guías de transporte', 'Ventanilla', ['ver', 'crear', 'editar', 'verificar-pago', 'cargar-pago', 'renovar-liquidacion', 'imprimir', 'eliminar', 'revocar']],
+
+        'recibos' => ['Recibos', 'Pagos', ['ver', 'imprimir']],
+
+        'asociaciones' => ['Asociaciones', 'Parámetros', ['ver', 'crear', 'editar']],
+        // Tipos de carnet, productos, escala y aranceles: cambian por la misma vía, una resolución.
+        'catalogos' => ['Catálogos', 'Catálogos', ['ver', 'crear', 'editar']],
+
+        // Sin pantalla todavía: se declaran para que el rol ya los pueda llevar.
+        'reportes' => ['Reportes', 'Administración', ['ver', 'exportar']],
+        'auditoria' => ['Auditoría', 'Administración', ['ver']],
+        'configuracion' => ['Configuración', 'Administración', ['ver', 'editar']],
+
+        'usuarios' => ['Usuarios', 'Seguridad', ['ver', 'crear', 'editar']],
+        'roles' => ['Roles', 'Seguridad', ['ver', 'crear', 'editar', 'eliminar']],
+    ];
+
+    /** Cómo se lee la segunda mitad de un permiso. */
+    public const ACCIONES = [
+        'ver' => 'Ver',
+        'crear' => 'Registrar',
+        'editar' => 'Editar',
+        'verificar-pago' => 'Verificar pago',
+        'cargar-pago' => 'Cargar pago',
+        'renovar-liquidacion' => 'Generar nueva liquidación',
+        'imprimir' => 'Imprimir',
+        'portal' => 'Acceso al portal',
+        'eliminar' => 'Eliminar',
+        'revocar' => 'Revocar',
+        'exportar' => 'Exportar',
+    ];
 
     public function etiqueta(): string
     {
@@ -25,99 +70,58 @@ enum RolSistema: string
     }
 
     /**
-     * Permisos asignados al rol durante el seeding.
-     *
-     * El reparto, en una línea: VENTANILLA arma, SUPERVISIÓN deshace. Aprobar ya no
-     * es de nadie: lo hace el pago confirmado en SIREB. Ver docs/ARQUITECTURA.md.
+     * Permisos que el seeder le da al rol. Aprobar no es de nadie: lo hace el
+     * pago confirmado en SIREB.
      *
      * @return array<int, string>
      */
     public function permisos(): array
     {
-        $lectura = [
-            'dashboard.ver',
-            'beneficiarios.ver',
-            'aprovechamientos.ver',
-            'carnets.ver',
-            'faenas.ver',
-            'guias.ver',
-            'recibos.ver',
-            'catalogos.ver',
-            'reportes.ver',
-        ];
-
-        // VENTANILLA: cargar, corregir el borrador, verificar el pago en SIREB
-        // (el permiso `crear` de cada documento) y entregar los papeles.
-        $operacion = [
-            'beneficiarios.crear',
-            'beneficiarios.editar',
-            // Dar acceso al portal /mi-cuenta y resetear su clave, en ventanilla.
-            'beneficiarios.portal',
-
-            'aprovechamientos.crear',
-            'aprovechamientos.editar',
-
-            'carnets.crear',
-            'carnets.editar',
-
-            'faenas.crear',
-            'faenas.editar',
-
-            'guias.crear',
-            'guias.editar',
-
-            // Entregar un papel es un acto distinto de consultar la ficha, así
-            // que cada documento lleva su propio permiso.
-            'aprovechamientos.imprimir',
-            'carnets.imprimir',
-            'faenas.imprimir',
-            'guias.imprimir',
-            'recibos.imprimir',
-        ];
-
-        // SUPERVISIÓN: deshacer lo que ya no se puede corregir.
-        $supervision = [
-            // Eliminar deja la fila fuera de los listados y solo queda la
-            // auditoría con el motivo. Solo sobre borradores; anula el cobro en SIREB.
-            'aprovechamientos.eliminar',
-            'carnets.eliminar',
-            'faenas.eliminar',
-            'guias.eliminar',
-
-            // Revocar es una sanción y anular quema un número del talonario:
-            // ninguna de las dos se revierte.
-            'carnets.revocar',
-            'aprovechamientos.revocar',
-            'guias.anular',
-
-            'reportes.exportar',
-            'auditoria.ver',
-        ];
-
-        $administracion = [
-            'beneficiarios.eliminar',
-
-            // Los TRES catálogos con un solo permiso: cambian por la misma vía
-            // —una resolución— y se otorgarían siempre juntos.
-            'catalogos.gestionar',
-
-            'usuarios.gestionar',
-            'roles.gestionar',
-            'configuracion.gestionar',
-        ];
-
         return match ($this) {
-            self::Administrador => [...$lectura, ...$operacion, ...$supervision, ...$administracion],
+            self::Administrador => self::todosLosPermisos(),
         };
     }
 
     /**
-     * Catálogo completo de permisos del sistema.
+     * Qué otros permisos necesita uno para no terminar en un 403: toda acción
+     * vuelve a la ficha o al listado, así que arrastra el `ver` de su módulo.
+     *
+     * @return list<string>
+     */
+    public static function requiere(string $permiso): array
+    {
+        $ver = strstr($permiso, '.', true).'.ver';
+
+        // No todo módulo tiene `ver` (Usuarios sí, pero un catálogo futuro podría no tenerlo).
+        return $ver !== $permiso && in_array($ver, self::todosLosPermisos(), true) ? [$ver] : [];
+    }
+
+    /**
+     * La lista con todo lo que sus permisos arrastran.
+     *
+     * @param  list<string>  $permisos
+     * @return list<string>
+     */
+    public static function conDependencias(array $permisos): array
+    {
+        return array_values(array_unique(array_merge($permisos, ...array_map(self::requiere(...), $permisos))));
+    }
+
+    /**
+     * Catálogo completo de permisos del sistema, en el orden del menú.
      *
      * @return array<int, string>
      */
     public static function todosLosPermisos(): array
     {
-        return array_values(array_unique(self::Administrador->permisos()));
+        $todos = [];
+
+        foreach (self::CATALOGO as $modulo => [, , $acciones]) {
+            foreach ($acciones as $accion) {
+                $todos[] = "{$modulo}.{$accion}";
+            }
+        }
+
+        return $todos;
     }
 }
