@@ -6,6 +6,14 @@
 
 ---
 
+## 🔴 Ibare rechaza la credencial de Jichi para SIREB — 09/10/2026
+
+`POST /oauth/token` de `test.ibare.beni.gob.bo` contesta **401 `invalid_client`
+(«Client authentication failed»)** con el `client_id` `sedag` del `.env` de
+desarrollo. Sin token no se habla con SIREB: no se otorga, no se liquida y no se
+verifica ningún pago. Lo destapó el log nuevo (`storage/logs/sireb-*.log`).
+Revisar `SIREB_CLIENT_SECRET` con quien administra Ibare.
+
 ## ✅ Precios de SIREB conectados — 30/09/2026
 
 La autorización, el carnet, la faena y la guía piden el precio a SIREB al

@@ -221,7 +221,7 @@ class OtorgarCupoService
             return $this->precios->de($tramo->servicio_sireb, $tramo->tarifa_sireb, exigirLiquidable: true);
         } catch (SinPrecioException $e) {
             // El motivo exacto (tarifa de baja, servicio de baja…) es para quien administra SIREB.
-            Log::warning('SIREB rechazó el precio del tramo', [
+            Log::channel('sireb')->warning('SIN PRECIO para el tramo '.$tramo->id, [
                 'tramo' => $tramo->id, 'tarifa' => $tramo->tarifa_sireb, 'motivo' => $e->getMessage(),
             ]);
 

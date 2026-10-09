@@ -562,6 +562,30 @@ por pagados, emiten su recibo con la boleta y no duplican al reintentar; corregi
 y eliminar anulan. La consulta real (`GET /liquidaciones/{id}`) se probó contra
 test.sireb. **Falta pagar una de punta a punta en test.sireb.**
 
+## El registro de cada llamada — `storage/logs/sireb-AAAA-MM-DD.log`
+
+Desde el 09/10/2026 cada pedido a SIREB **y el del token a Ibare** queda en un
+archivo propio, uno por día, que se guarda 90 días (`LOG_SIREB_DIAS`). Lo escribe
+`SirebService::registrar()`, llamado desde `pedir()` y `token()`: no hay forma de
+hablar con SIREB sin pasar por ahí.
+
+| Nivel | Cuándo | Ejemplo |
+| --- | --- | --- |
+| `INFO` | contestó bien (2xx) | `OK GET …/liquidaciones/7f3a… → 200 en 840 ms` |
+| `WARNING` | contestó que no (4xx/5xx) | `ERROR POST …/oauth/token → 401 en 202 ms` |
+| `ERROR` | no contestó (timeout, sin conexión) | `SIN RESPUESTA POST …/oauth/token en 2203 ms` |
+
+Cada línea lleva `quien` (el funcionario, o «automático» si fue un comando), lo
+`enviado` y la `respuesta` de SIREB tal cual —o el `error` de cURL si no hubo—.
+`client_secret`, `access_token`, `refresh_token` y `password` salen como `***`;
+una respuesta de más de 20.000 caracteres (una página del catálogo) se recorta.
+Además van ahí los dos avisos con contexto del trámite: `LiquidarSirebService`
+(«NO SE REGISTRÓ la liquidación de …») y `OtorgarCupoService` («SIN PRECIO para
+el tramo …»).
+
+Un reintento de `Http::retry()` no deja una línea por intento: queda la respuesta
+final, con el tiempo total.
+
 ## Lo que falta
 
 - Probar de punta a punta contra test.sireb: cargar el pago desde Jichi, validarlo

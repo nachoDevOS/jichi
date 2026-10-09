@@ -37,23 +37,28 @@ class SirebService
             return $token;
         }
 
+        $url = config('jichi.sireb.ibare_url').'/oauth/token';
+        $datos = [
+            'grant_type' => 'client_credentials',
+            'client_id' => config('jichi.sireb.client_id'),
+            'client_secret' => config('jichi.sireb.client_secret'),
+        ];
+        $inicio = microtime(true);
+
         try {
             $respuesta = Http::asForm()->acceptJson()
                 ->timeout(config('jichi.sireb.timeout'))
-                ->post(config('jichi.sireb.ibare_url').'/oauth/token', [
-                    'grant_type' => 'client_credentials',
-                    'client_id' => config('jichi.sireb.client_id'),
-                    'client_secret' => config('jichi.sireb.client_secret'),
-                ]);
-        } catch (ConnectionException) {
+                ->post($url, $datos);
+        } catch (ConnectionException $e) {
+            $this->registrar('post', $url, $datos, null, $inicio, $e->getMessage());
+
             throw SirebException::noResponde();
         }
 
+        $this->registrar('post', $url, $datos, $respuesta, $inicio);
         $token = $respuesta->json('access_token');
 
         if (! $respuesta->successful() || ! is_string($token)) {
-            Log::warning('Ibare no emitió el token para SIREB', ['status' => $respuesta->status(), 'cuerpo' => $respuesta->body()]);
-
             throw SirebException::rechazado($respuesta->status());
         }
 
@@ -198,8 +203,6 @@ class SirebService
     private function liquidacionDe(Response $respuesta, ?string $referencia): array
     {
         if (in_array($respuesta->status(), [404, 422], true)) {
-            Log::warning('SIREB rechazó la liquidación', ['referencia' => $referencia, 'cuerpo' => $respuesta->body()]);
-
             throw SirebException::liquidacionRechazada((string) $respuesta->json('codigo'));
         }
 
@@ -230,8 +233,6 @@ class SirebService
         }
 
         if (in_array($respuesta->status(), [401, 403], true)) {
-            Log::warning('SIREB rechazó la consulta', ['ruta' => $ruta, 'status' => $respuesta->status(), 'cuerpo' => $respuesta->body()]);
-
             throw SirebException::rechazado($respuesta->status());
         }
 
@@ -250,8 +251,11 @@ class SirebService
     /** `$reintentos`: veces de más ante red, timeout o 5xx, con 1 s de pausa. Un 4xx no cambia por insistir. */
     private function pedir(string $metodo, string $ruta, array $datos, array $cabeceras, int $reintentos, string $token): Response
     {
+        $url = config('jichi.sireb.url').$ruta;
+        $inicio = microtime(true);
+
         try {
-            return Http::acceptJson()
+            $respuesta = Http::acceptJson()
                 ->withToken($token)
                 ->withHeaders($cabeceras)
                 ->connectTimeout(5)
@@ -263,20 +267,77 @@ class SirebService
                         || ($e instanceof RequestException && $e->response->serverError()),
                     throw: false,
                 )
-                ->{$metodo}(config('jichi.sireb.url').$ruta, $datos);
-        } catch (ConnectionException) {
+                ->{$metodo}($url, $datos);
+        } catch (ConnectionException $e) {
+            $this->registrar($metodo, $url, $datos, null, $inicio, $e->getMessage());
             Cache::put(self::CACHE_SIN_RESPUESTA, true, now()->addMinutes(2));
 
             throw SirebException::noResponde();
         }
+
+        $this->registrar($metodo, $url, $datos, $respuesta, $inicio);
+
+        return $respuesta;
+    }
+
+    /** Claves que nunca se escriben en el log, ni de ida ni de vuelta. */
+    private const OCULTAS = ['client_secret', 'access_token', 'refresh_token', 'password'];
+
+    /** Tope del cuerpo en el log: una página del catálogo puede ser enorme. */
+    private const MAX_CUERPO = 20000;
+
+    /**
+     * Anota en storage/logs/sireb-AAAA-MM-DD.log qué se pidió y qué contestó:
+     * info si salió bien, warning si SIREB dijo que no, error si no contestó.
+     */
+    private function registrar(string $metodo, string $url, array $datos, ?Response $respuesta, float $inicio, ?string $falla = null): void
+    {
+        $ms = (int) round((microtime(true) - $inicio) * 1000);
+        $usuario = auth()->user();
+
+        $contexto = [
+            'quien' => $usuario ? "{$usuario->name} (#{$usuario->id})" : (app()->runningInConsole() ? 'automático' : 'sin sesión'),
+            'enviado' => $this->ocultar($datos),
+        ];
+
+        if ($respuesta === null) {
+            Log::channel('sireb')->error('SIN RESPUESTA '.mb_strtoupper($metodo)." {$url} en {$ms} ms", $contexto + ['error' => $falla]);
+
+            return;
+        }
+
+        $json = $respuesta->json();
+        $contexto['respuesta'] = is_array($json) ? $this->ocultar($json) : mb_substr($respuesta->body(), 0, self::MAX_CUERPO);
+
+        if (is_array($contexto['respuesta']) && strlen($respuesta->body()) > self::MAX_CUERPO) {
+            $contexto['respuesta'] = mb_substr(json_encode($contexto['respuesta'], JSON_UNESCAPED_UNICODE), 0, self::MAX_CUERPO).'… (recortado)';
+        }
+
+        $linea = mb_strtoupper($metodo)." {$url} → {$respuesta->status()} en {$ms} ms";
+
+        $respuesta->successful()
+            ? Log::channel('sireb')->info("OK {$linea}", $contexto)
+            : Log::channel('sireb')->warning("ERROR {$linea}", $contexto);
+    }
+
+    /** Copia del arreglo con los secretos tapados, a cualquier profundidad. */
+    private function ocultar(array $datos): array
+    {
+        foreach ($datos as $clave => $valor) {
+            if (is_array($valor)) {
+                $datos[$clave] = $this->ocultar($valor);
+            } elseif (in_array($clave, self::OCULTAS, true)) {
+                $datos[$clave] = '***';
+            }
+        }
+
+        return $datos;
     }
 
     /** El JSON de una respuesta exitosa; cualquier otra cosa es «no responde». */
     private function cuerpo(Response $respuesta, string $ruta): array
     {
         if (! $respuesta->successful() || ! is_array($respuesta->json())) {
-            Log::warning('SIREB respondió con error', ['ruta' => $ruta, 'status' => $respuesta->status(), 'cuerpo' => $respuesta->body()]);
-
             throw SirebException::noResponde();
         }
 

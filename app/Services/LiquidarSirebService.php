@@ -57,7 +57,7 @@ class LiquidarSirebService
         try {
             $liquidacion = $this->sireb->registrarLiquidacion($cuerpo, $documento->sireb_idempotency_key);
         } catch (SirebException $e) {
-            Log::warning('SIREB no registró la liquidación', ['documento' => $documento::class.':'.$documento->getKey(), 'motivo' => $e->getMessage()]);
+            Log::channel('sireb')->warning('NO SE REGISTRÓ la liquidación de '.$documento->codigo_legible, ['documento' => $documento::class.':'.$documento->getKey(), 'motivo' => $e->getMessage()]);
             $documento->update(['sireb_envio' => [...$envio, 'error' => $e->getMessage()]]);
 
             throw $e;

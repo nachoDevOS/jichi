@@ -73,6 +73,15 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Cada llamada a SIREB (y el token de Ibare): qué se pidió y qué contestó. Ver docs/modulos/SIREB.md.
+        'sireb' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/sireb.log'),
+            'level' => 'debug',
+            'max_files' => env('LOG_SIREB_DIAS', 90),
+            'replace_placeholders' => true,
+        ],
+
         'monthly' => [
             'driver' => 'monthly',
             'path' => storage_path('logs/laravel.log'),
