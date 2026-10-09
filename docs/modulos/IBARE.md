@@ -1,7 +1,7 @@
 # Autenticación con Ibare
 
 Ibare es el servidor de autenticación centralizado del GAD Beni (OAuth2,
-repositorio `gadbeni/ibare`). Jichi es un **cliente** de Ibare: no guarda la
+repositorio [`sir-beni/ibare`](https://github.com/sir-beni/ibare)). Jichi es un **cliente** de Ibare: no guarda la
 contraseña del funcionario ni consulta mamoré. Ibare autentica y revisa el
 contrato vigente; Jichi solo resuelve **qué usuario suyo** es.
 
@@ -223,7 +223,14 @@ a `storage/logs/laravel.log`.
 
 ### 7.1 En Ibare — solo datos, su código no se toca
 
-Desde `D:\garoto\gadbeni\ibare`, con los contenedores levantados:
+Desde la carpeta de Ibare, con los contenedores levantados:
+
+> **Sin Docker (Linux, 08/10/2026):** Ibare exige PHP 8.4 y Jichi corre en 8.3;
+> conviven usando `php8.4` para Ibare. Necesita `php8.4-pgsql` (si falta:
+> «could not find driver»), una base `ibare` y en su `.env` `APP_URL=http://localhost:8001`,
+> `MAMORE_FAKE=true`, `APP_DEBUG=true`. Después `php8.4 artisan migrate --seed`,
+> `php8.4 artisan ibare:oauth-keys` y `php8.4 artisan serve --host=localhost --port=8001`;
+> los comandos de abajo, con `php8.4 artisan` en vez de `docker compose exec backend php artisan`.
 
 ```sh
 # 1. Registrar Jichi como cliente. Muestra el client_secret UNA sola vez.
