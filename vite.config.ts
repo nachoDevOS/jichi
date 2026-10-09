@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
-import { bunny } from 'laravel-vite-plugin/fonts';
+import { fontsource } from 'laravel-vite-plugin/fonts';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
@@ -14,7 +14,8 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
+                // Desde npm, no de fonts.bunny.net: el build de Coolify a veces no resuelve ese DNS.
+                fontsource('Instrument Sans', {
                     weights: [400, 500, 600, 700],
                 }),
             ],

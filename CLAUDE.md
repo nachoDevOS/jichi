@@ -712,6 +712,12 @@ Los tres tienen que pasar.
   «Beneficiario», «Autorización» y las faenas a quien no podía verlos, y cada clic
   terminaba en 403. Va `EnlacePermitido` o `puede('x.ver') &&`. Lo mismo para
   redirigir: el login manda a `User::rutaInicio()`, nunca a `dashboard` a secas.
+- **El build de Coolify no puede depender de internet fuera de npm** (09/10/2026).
+  `bunny('Instrument Sans')` en `vite.config.ts` bajaba la fuente durante
+  `npm run build` y el deploy murió con `getaddrinfo EAI_AGAIN fonts.bunny.net`.
+  Va `fontsource()`, que la lee de `@fontsource/instrument-sans` en `node_modules`.
+  Probarlo borrando antes `node_modules/.cache/laravel-vite-plugin`: con la caché
+  local el build anda aunque falte la red y no delata nada.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **NADA AVISA SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Una tabla, un
