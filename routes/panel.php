@@ -16,6 +16,7 @@ use App\Http\Controllers\Panel\GuiaImpresionController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
 use App\Http\Controllers\Panel\ProductoHidrobiologicoController;
 use App\Http\Controllers\Panel\ReciboController;
+use App\Http\Controllers\Panel\RegistroSirebController;
 use App\Http\Controllers\Panel\RolController;
 use App\Http\Controllers\Panel\TipoCarnetController;
 use App\Http\Controllers\Panel\UsuarioController;
@@ -512,6 +513,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:roles.editar')->name('roles.update');
         Route::delete('/roles/{rol}', [RolController::class, 'destroy'])
             ->middleware('permiso:roles.eliminar')->name('roles.destroy');
+
+        Route::get('/sireb', [RegistroSirebController::class, 'index'])
+            ->middleware('permiso:sireb.ver')->name('registro-sireb.index');
+        Route::get('/sireb/{dia}/descargar', [RegistroSirebController::class, 'descargar'])
+            ->middleware('permiso:sireb.exportar')->where('dia', '\d{4}-\d{2}-\d{2}')->name('registro-sireb.descargar');
     });
 
     /*

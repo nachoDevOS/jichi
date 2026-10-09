@@ -70,7 +70,8 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `SirebService.php` | 277 | Token de Ibare (client_credentials) en caché. `servicios()` en caché `SIREB_CACHE_MINUTOS`; `tarifa()` sin caché. Liquidaciones: `registrarLiquidacion()`, `liquidacion()`, `registrarPagoManual()`, `anularLiquidacion()`. Las escrituras reintentan ante red o 5xx, nunca ante 4xx |
+| `SirebService.php` | 277 | Token de Ibare (client_credentials) en caché. `servicios()` en caché `SIREB_CACHE_MINUTOS`; `tarifa()` sin caché. Liquidaciones: `registrarLiquidacion()`, `liquidacion()`, `registrarPagoManual()`, `anularLiquidacion()`. Las escrituras reintentan ante red o 5xx, nunca ante 4xx. `registrar()` anota cada pedido y el token en `storage/logs/sireb-*.log`, secretos tapados |
+| `RegistroSireb.php` | 140 | Lee los `sireb-*.log` para la pantalla Registro SIREB. El día se valida con patrón: no sale de `storage/logs` |
 | `PrecioSireb.php` | 60 | El precio al emitir, para congelarlo. Tarifa y servicio `activo` o no se emite (`liquidable` para la autorización) |
 | `VistaSireb.php` | 162 | Lo que las pantallas de catálogo necesitan ya armado: select, precios, historial. Abre con SIREB caído |
 | `SirebException.php` | 75 | Códigos propios de Jichi `LIQUIDACION_PAGADA` y `PAGO_EN_REVISION` (`frenaPorPago()`). `paraVentanilla()` es lo que muestra el manejador de `bootstrap/app.php` |

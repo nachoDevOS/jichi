@@ -37,6 +37,8 @@ enum RolSistema: string
 
         'usuarios' => ['Usuarios', 'Seguridad', ['ver', 'crear', 'editar']],
         'roles' => ['Roles', 'Seguridad', ['ver', 'crear', 'editar', 'eliminar']],
+        // Lo que se habló con SIREB, leído del log. `exportar` = descargar el archivo del día.
+        'sireb' => ['Registro SIREB', 'Seguridad', ['ver', 'exportar']],
     ];
 
     /** Cómo se lee la segunda mitad de un permiso. */

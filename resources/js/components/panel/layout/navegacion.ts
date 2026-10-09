@@ -1,4 +1,22 @@
-import { BadgeCheck, BarChart3, Building2, Coins, Fish, LayoutDashboard, ReceiptText, Ruler, ShieldCheck, Ship, Tags, Truck, UserCog, Users, Waves, type LucideIcon } from 'lucide-react';
+import {
+    BadgeCheck,
+    BarChart3,
+    Building2,
+    Coins,
+    Fish,
+    LayoutDashboard,
+    ReceiptText,
+    Ruler,
+    ScrollText,
+    ShieldCheck,
+    Ship,
+    Tags,
+    Truck,
+    UserCog,
+    Users,
+    Waves,
+    type LucideIcon,
+} from "lucide-react";
 
 /**
  * Un ítem del menú lateral.
@@ -27,43 +45,149 @@ export interface ItemNavegacion {
  * El menú del panel de administración.
  */
 export const NAVEGACION: ItemNavegacion[] = [
-    { titulo: 'Panel', ruta: 'dashboard', icono: LayoutDashboard, permiso: 'dashboard.ver' },
+    {
+        titulo: "Panel",
+        ruta: "dashboard",
+        icono: LayoutDashboard,
+        permiso: "dashboard.ver",
+    },
 
     // --- El flujo del mostrador, en orden.
-    { titulo: 'Beneficiarios', ruta: 'beneficiarios.index', icono: Users, permiso: 'beneficiarios.ver', grupo: 'Ventanilla' },
-    { titulo: 'Aprov. Pesquero', tituloCompleto: 'Autorización de Pesca para Aprovechamiento Pesquero', ruta: 'aprovechamientos.index', icono: Waves, permiso: 'aprovechamientos.ver', grupo: 'Ventanilla' },
-    { titulo: 'Carnets', ruta: 'carnets.index', icono: BadgeCheck, permiso: 'carnets.ver', grupo: 'Ventanilla' },
-    { titulo: 'Faenas', tituloCompleto: 'Permisos de faena', ruta: 'faenas.index', icono: Ship, permiso: 'faenas.ver', grupo: 'Ventanilla' },
-    { titulo: 'Guías', tituloCompleto: 'Guías de movimiento', ruta: 'guias.index', icono: Truck, permiso: 'guias.ver', grupo: 'Ventanilla' },
+    {
+        titulo: "Beneficiarios",
+        ruta: "beneficiarios.index",
+        icono: Users,
+        permiso: "beneficiarios.ver",
+        grupo: "Ventanilla",
+    },
+    {
+        titulo: "Aprov. Pesquero",
+        tituloCompleto: "Autorización de Pesca para Aprovechamiento Pesquero",
+        ruta: "aprovechamientos.index",
+        icono: Waves,
+        permiso: "aprovechamientos.ver",
+        grupo: "Ventanilla",
+    },
+    {
+        titulo: "Carnets",
+        ruta: "carnets.index",
+        icono: BadgeCheck,
+        permiso: "carnets.ver",
+        grupo: "Ventanilla",
+    },
+    {
+        titulo: "Faenas",
+        tituloCompleto: "Permisos de faena",
+        ruta: "faenas.index",
+        icono: Ship,
+        permiso: "faenas.ver",
+        grupo: "Ventanilla",
+    },
+    {
+        titulo: "Guías",
+        tituloCompleto: "Guías de movimiento",
+        ruta: "guias.index",
+        icono: Truck,
+        permiso: "guias.ver",
+        grupo: "Ventanilla",
+    },
 
     // --- Lo pagado en Recaudaciones (SIREB): un recibo por documento.
-    { titulo: 'Recibos', ruta: 'recibos.index', icono: ReceiptText, permiso: 'recibos.ver', grupo: 'Pagos' },
+    {
+        titulo: "Recibos",
+        ruta: "recibos.index",
+        icono: ReceiptText,
+        permiso: "recibos.ver",
+        grupo: "Pagos",
+    },
 
     // --- Las asociaciones de pescadores, aparte de los catálogos.
-    { titulo: 'Asociaciones', ruta: 'asociaciones.index', icono: Building2, permiso: 'asociaciones.ver', grupo: 'Parámetros' },
+    {
+        titulo: "Asociaciones",
+        ruta: "asociaciones.index",
+        icono: Building2,
+        permiso: "asociaciones.ver",
+        grupo: "Parámetros",
+    },
 
     // --- Lo que sale de una resolución y casi no se toca.
-    { titulo: 'Tipos de carnet', ruta: 'tipos-carnet.index', icono: Tags, permiso: 'catalogos.ver', grupo: 'Catálogos' },
-    { titulo: 'Productos', tituloCompleto: 'Productos hidrobiológicos', ruta: 'productos.index', icono: Fish, permiso: 'catalogos.ver', grupo: 'Catálogos' },
-    { titulo: 'Escala', tituloCompleto: 'Escala de aprovechamiento', ruta: 'categorias-aprovechamiento.index', icono: Ruler, permiso: 'catalogos.ver', grupo: 'Catálogos' },
-    { titulo: 'Aranceles', tituloCompleto: 'Aranceles de SIREB', ruta: 'aranceles.index', icono: Coins, permiso: 'catalogos.ver', grupo: 'Catálogos' },
+    {
+        titulo: "Tipos de carnet",
+        ruta: "tipos-carnet.index",
+        icono: Tags,
+        permiso: "catalogos.ver",
+        grupo: "Catálogos",
+    },
+    {
+        titulo: "Productos",
+        tituloCompleto: "Productos hidrobiológicos",
+        ruta: "productos.index",
+        icono: Fish,
+        permiso: "catalogos.ver",
+        grupo: "Catálogos",
+    },
+    {
+        titulo: "Escala",
+        tituloCompleto: "Escala de aprovechamiento",
+        ruta: "categorias-aprovechamiento.index",
+        icono: Ruler,
+        permiso: "catalogos.ver",
+        grupo: "Catálogos",
+    },
+    {
+        titulo: "Aranceles",
+        tituloCompleto: "Aranceles de SIREB",
+        ruta: "aranceles.index",
+        icono: Coins,
+        permiso: "catalogos.ver",
+        grupo: "Catálogos",
+    },
 
-    { titulo: 'Reportes', ruta: 'reportes.index', icono: BarChart3, permiso: 'reportes.ver', grupo: 'Administración' },
+    {
+        titulo: "Reportes",
+        ruta: "reportes.index",
+        icono: BarChart3,
+        permiso: "reportes.ver",
+        grupo: "Administración",
+    },
 
     // --- Quién entra y qué puede hacer.
-    { titulo: 'Usuarios', ruta: 'usuarios.index', icono: UserCog, permiso: 'usuarios.ver', grupo: 'Seguridad' },
-    { titulo: 'Roles', ruta: 'roles.index', icono: ShieldCheck, permiso: 'roles.ver', grupo: 'Seguridad' },
+    {
+        titulo: "Usuarios",
+        ruta: "usuarios.index",
+        icono: UserCog,
+        permiso: "usuarios.ver",
+        grupo: "Seguridad",
+    },
+    {
+        titulo: "Roles",
+        ruta: "roles.index",
+        icono: ShieldCheck,
+        permiso: "roles.ver",
+        grupo: "Seguridad",
+    },
+    {
+        titulo: "Registro SIREB",
+        ruta: "registro-sireb.index",
+        icono: ScrollText,
+        permiso: "sireb.ver",
+        grupo: "Seguridad",
+    },
 ];
 
 /**
  * En qué módulo está parado el usuario, según la URL.
  */
-export function moduloActual(ubicacion: string | undefined): ItemNavegacion | undefined {
+export function moduloActual(
+    ubicacion: string | undefined,
+): ItemNavegacion | undefined {
     if (!ubicacion) {
         return undefined;
     }
 
-    return NAVEGACION.find((item) => ubicacion.includes(item.ruta.split('.')[0] ?? ''));
+    return NAVEGACION.find((item) =>
+        ubicacion.includes(item.ruta.split(".")[0] ?? ""),
+    );
 }
 
 /**

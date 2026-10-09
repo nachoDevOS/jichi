@@ -586,6 +586,11 @@ el tramo …»).
 Un reintento de `Http::retry()` no deja una línea por intento: queda la respuesta
 final, con el tiempo total.
 
+**Se lee desde el panel**: Seguridad › Registro SIREB (`RegistroSirebController`,
+permiso `sireb.ver`; descargar el archivo, `sireb.exportar`). `App\Sireb\RegistroSireb`
+parte cada línea; si cambia el formato del mensaje en `registrar()`, cambia
+también su expresión regular, o las filas pasan a salir como «Aviso».
+
 ## Lo que falta
 
 - Probar de punta a punta contra test.sireb: cargar el pago desde Jichi, validarlo
