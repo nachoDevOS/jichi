@@ -68,7 +68,7 @@ class UsuarioController extends Controller
                     // El funcionario entra con su correo; el beneficiario, con su C.I.
                     'detalle' => $beneficiario ? 'C.I. '.$beneficiario->documento_identidad
                         : collect([$u->email, $u->mamore_id ? 'Ibare '.$u->mamore_id : null])->filter()->implode(' · '),
-                    'foto_url' => $beneficiario?->foto_url,
+                    'foto_url' => $beneficiario ? $beneficiario->foto_url : User::FOTO,
                     'rol' => $beneficiario ? 'Beneficiario' : ($u->roles->map(fn (Rol $r) => $r->etiqueta())->implode(', ') ?: 'Sin rol'),
                     'estado_etiqueta' => $etiqueta,
                     'estado_color' => $color,

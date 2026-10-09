@@ -49,44 +49,44 @@ export default function Ingresar() {
             <FranjaTricolor className="absolute inset-x-0 top-0 z-20" />
             <Cardumen />
 
-            <div className="relative z-10 mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-4 pt-12 pb-36 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+            <div className="relative z-10 mx-auto grid min-h-screen max-w-5xl items-center gap-8 px-4 pt-10 pb-32 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-14">
                 {/* La bienvenida: qué gana con entrar. En el celular se resume debajo de la tarjeta. */}
                 <section className="hidden lg:block">
                     <Marca />
-                    <h1 className="mt-10 text-5xl leading-[1.05] font-extrabold tracking-tight">
+                    <h1 className="mt-7 text-4xl leading-[1.1] font-bold tracking-tight">
                         Todos sus trámites,
                         <span className="block text-rio-claro">a mano.</span>
                     </h1>
-                    <p className="mt-5 max-w-md text-lg text-white/80">
+                    <p className="mt-3 max-w-md text-base text-white/75">
                         Consulte su carnet, su autorización, sus faenas, sus
                         guías y sus pagos cuando quiera, desde su celular.
                     </p>
 
-                    <MuyPronto className="mt-8" />
+                    <MuyPronto className="mt-6" />
 
-                    <ul className="mt-6 space-y-3">
+                    <ul className="mt-4 space-y-2.5">
                         {BENEFICIOS.map((b) => (
                             <Beneficio key={b.titulo} {...b} />
                         ))}
                     </ul>
                 </section>
 
-                <div className="mx-auto w-full max-w-md">
+                <div className="mx-auto w-full max-w-[25rem]">
                     <div className="mb-6 lg:hidden">
                         <Marca centrada />
                     </div>
 
                     <form
                         onSubmit={enviar}
-                        className="animar-entrada rounded-3xl bg-white p-6 text-slate-900 shadow-2xl ring-1 ring-white/20 sm:p-8"
+                        className="animar-entrada rounded-3xl bg-white p-6 text-slate-900 shadow-2xl ring-1 ring-white/20 sm:p-7"
                     >
-                        <p className="text-sm font-semibold tracking-wide text-rio uppercase">
+                        <p className="text-xs font-semibold tracking-wider text-rio uppercase">
                             ¡Hola!
                         </p>
-                        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-rio-profundo">
+                        <h2 className="mt-0.5 text-xl font-bold tracking-tight text-rio-profundo">
                             Ingrese a su cuenta
                         </h2>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-[13px] text-slate-500">
                             Con su cédula y la contraseña que le dieron en
                             ventanilla.
                         </p>
@@ -120,7 +120,7 @@ export default function Ingresar() {
                         <button
                             type="submit"
                             disabled={form.processing}
-                            className="group mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-rio px-4 py-3.5 text-base font-semibold text-white shadow-lg shadow-rio/30 transition-all hover:bg-rio-profundo hover:shadow-xl disabled:opacity-70"
+                            className="group mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-rio px-4 py-3 text-base font-semibold text-white shadow-lg shadow-rio/30 transition-all hover:bg-rio-profundo hover:shadow-xl disabled:opacity-70"
                         >
                             {form.processing ? (
                                 <>
@@ -136,15 +136,15 @@ export default function Ingresar() {
                         </button>
 
                         {/* Sin «olvidé mi contraseña»: la cuenta se entrega y se resetea en ventanilla. */}
-                        <div className="mt-6 flex gap-3 rounded-2xl bg-rio-espuma p-4">
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-rio shadow-sm">
-                                <LifeBuoy className="size-5" />
+                        <div className="mt-5 flex gap-3 rounded-2xl bg-rio-espuma p-4">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-rio shadow-sm">
+                                <LifeBuoy className="size-4" />
                             </span>
                             <div className="text-sm">
                                 <p className="font-semibold text-rio-profundo">
                                     ¿Primera vez u olvidó su contraseña?
                                 </p>
-                                <p className="mt-0.5 leading-relaxed text-slate-600">
+                                <p className="mt-0.5 text-[13px] leading-snug text-slate-600">
                                     Acérquese a ventanilla de la Unidad de Pesca
                                     con su cédula: le entregan su cuenta en el
                                     momento.
@@ -193,10 +193,13 @@ export default function Ingresar() {
 function MuyPronto({ className = "" }: { className?: string }) {
     return (
         <aside
-            className={`relative overflow-hidden rounded-3xl bg-gradient-to-br from-institucional-dorado to-amber-300 p-5 text-rio-profundo shadow-2xl shadow-black/20 ring-1 ring-white/40 ${className}`}
+            className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-institucional-dorado to-amber-300 p-4 text-rio-profundo shadow-2xl shadow-black/20 ring-1 ring-white/40 ${className}`}
         >
             {/* Un brillo de fondo: que se note que es otra cosa, no un dato más. */}
-            <span className="pointer-events-none absolute -top-10 -right-10 size-36 rounded-full bg-white/30 blur-2xl" aria-hidden />
+            <span
+                className="pointer-events-none absolute -top-10 -right-10 size-36 rounded-full bg-white/30 blur-2xl"
+                aria-hidden
+            />
 
             <span className="relative inline-flex items-center gap-1.5 rounded-full bg-rio-profundo px-3 py-1 text-xs font-bold tracking-wider text-institucional-dorado uppercase">
                 <span className="relative flex size-2">
@@ -206,27 +209,28 @@ function MuyPronto({ className = "" }: { className?: string }) {
                 Muy pronto
             </span>
 
-            <p className="relative mt-3 text-2xl leading-tight font-extrabold tracking-tight">
+            <p className="relative mt-2.5 text-lg leading-tight font-bold tracking-tight">
                 Pague con QR y tramite al momento
             </p>
-            <p className="relative mt-1.5 text-sm font-medium text-rio-profundo/80">
-                Sin ir al banco ni a ventanilla del SEDAG: todo desde su celular.
+            <p className="relative mt-1 text-[13px] font-medium text-rio-profundo/80">
+                Sin ir al banco ni a ventanilla del SEDAG: todo desde su
+                celular.
             </p>
 
-            <div className="relative mt-4 grid gap-2.5 sm:grid-cols-2">
-                <span className="flex items-center gap-2.5 rounded-2xl bg-white/60 p-3 backdrop-blur-sm">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rio-profundo text-institucional-dorado">
+            <div className="relative mt-3 grid gap-2 sm:grid-cols-2">
+                <span className="flex items-center gap-2.5 rounded-xl bg-white/60 p-2.5 backdrop-blur-sm">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-rio-profundo text-institucional-dorado">
                         <QrCode className="size-5" />
                     </span>
-                    <span className="text-sm leading-tight font-semibold">
+                    <span className="text-[13px] leading-tight font-semibold">
                         Pague con la app de su banco
                     </span>
                 </span>
-                <span className="flex items-center gap-2.5 rounded-2xl bg-white/60 p-3 backdrop-blur-sm">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rio-profundo text-institucional-dorado">
+                <span className="flex items-center gap-2.5 rounded-xl bg-white/60 p-2.5 backdrop-blur-sm">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-rio-profundo text-institucional-dorado">
                         <Zap className="size-5" />
                     </span>
-                    <span className="text-sm leading-tight font-semibold">
+                    <span className="text-[13px] leading-tight font-semibold">
                         Su trámite listo al momento
                     </span>
                 </span>
@@ -245,7 +249,12 @@ function MuyPronto({ className = "" }: { className?: string }) {
     );
 }
 
-const TRAMITES = ["Autorización de pesca", "Carnet", "Permiso de faena", "Guía de transporte"];
+const TRAMITES = [
+    "Autorización de pesca",
+    "Carnet",
+    "Permiso de faena",
+    "Guía de transporte",
+];
 
 /** Lo que puede hacer adentro, dicho para el pescador y el comercializador. */
 const BENEFICIOS: { icono: ReactNode; titulo: string; texto: string }[] = [
@@ -276,13 +285,13 @@ function Beneficio({
     texto: string;
 }) {
     return (
-        <li className="flex gap-3.5 rounded-2xl bg-white/[0.07] p-3.5 ring-1 ring-white/10 backdrop-blur-sm">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rio-claro/30 text-white ring-1 ring-white/15">
+        <li className="flex items-center gap-3 rounded-2xl bg-white/[0.07] px-3.5 py-3 ring-1 ring-white/10 backdrop-blur-sm">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rio-claro/30 text-white ring-1 ring-white/15">
                 {icono}
             </span>
             <span>
-                <span className="block font-semibold">{titulo}</span>
-                <span className="block text-sm text-white/70">{texto}</span>
+                <span className="block text-sm font-semibold">{titulo}</span>
+                <span className="block text-xs text-white/65">{texto}</span>
             </span>
         </li>
     );
@@ -293,7 +302,7 @@ function Marca({ centrada = false }: { centrada?: boolean }) {
         <div
             className={`flex items-center gap-3 ${centrada ? "flex-col text-center" : ""}`}
         >
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-white/95 p-2 shadow-lg">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-white/95 p-1.5 shadow-lg">
                 <img
                     src="/image/icon.png"
                     alt=""
@@ -302,10 +311,10 @@ function Marca({ centrada = false }: { centrada?: boolean }) {
                 />
             </span>
             <span>
-                <span className="block text-2xl font-extrabold tracking-tight">
+                <span className="block text-lg leading-tight font-bold tracking-tight">
                     Mi cuenta
                 </span>
-                <span className="block text-sm text-white/75">
+                <span className="block text-xs text-white/70">
                     Pescadores y comercializadores · SEDAG Beni
                 </span>
             </span>

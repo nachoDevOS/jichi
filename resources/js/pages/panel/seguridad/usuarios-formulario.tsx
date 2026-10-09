@@ -112,7 +112,7 @@ export default function UsuariosFormulario({
                                 htmlFor="mamore_id"
                                 error={form.errors.mamore_id}
                                 obligatorio
-                                ayuda="El número que muestra «Su cuenta de funcionario (id …) no tiene acceso a Jichi»."
+                                ayuda="Su número de funcionario en Ibare. Si ya intentó entrar, queda anotado en el registro del sistema."
                             >
                                 <Input
                                     id="mamore_id"

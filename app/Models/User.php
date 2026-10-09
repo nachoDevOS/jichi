@@ -63,6 +63,9 @@ class User extends Authenticatable
         return $this->beneficiario_id !== null;
     }
 
+    /** Todos los funcionarios llevan la misma foto: no se cargan fotos de perfil. */
+    public const FOTO = '/image/user-default.png';
+
     /** Los módulos cuya pantalla de entrada no es `<modulo>.index`. */
     private const PANTALLA = ['dashboard' => 'dashboard', 'catalogos' => 'tipos-carnet.index'];
 

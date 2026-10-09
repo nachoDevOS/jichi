@@ -152,9 +152,11 @@ function MenuPerfil() {
                 aria-expanded={abierto}
                 className="flex items-center gap-2.5 rounded-md py-1 pr-1.5 pl-1 text-left hover:bg-secondary"
             >
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                    {iniciales(usuario?.name ?? "")}
-                </span>
+                <Avatar
+                    url={usuario?.foto_url}
+                    nombre={usuario?.name ?? ""}
+                    className="size-8 text-xs"
+                />
 
                 {/* El nombre se esconde en pantallas chicas: con el título de
                     la página abajo, es lo primero que se puede sacrificar. */}
@@ -182,9 +184,11 @@ function MenuPerfil() {
                     className="absolute right-0 mt-2 w-72 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
                 >
                     <div className="flex items-center gap-3 border-b border-border p-4">
-                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                            {iniciales(usuario?.name ?? "")}
-                        </span>
+                        <Avatar
+                            url={usuario?.foto_url}
+                            nombre={usuario?.name ?? ""}
+                            className="size-11 text-sm"
+                        />
                         <div className="min-w-0">
                             <p className="truncate font-semibold">
                                 {usuario?.name}
@@ -234,6 +238,39 @@ function MenuPerfil() {
                 </div>
             )}
         </div>
+    );
+}
+
+/** La foto del funcionario; si no carga, sus iniciales. */
+function Avatar({
+    url,
+    nombre,
+    className,
+}: {
+    url?: string | null;
+    nombre: string;
+    className?: string;
+}) {
+    const [fallo, setFallo] = useState(false);
+
+    return (
+        <span
+            className={cn(
+                "flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary font-semibold text-primary-foreground ring-2 ring-border",
+                className,
+            )}
+        >
+            {url && !fallo ? (
+                <img
+                    src={url}
+                    alt=""
+                    className="size-full object-cover"
+                    onError={() => setFallo(true)}
+                />
+            ) : (
+                iniciales(nombre)
+            )}
+        </span>
     );
 }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Configuracion;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
@@ -42,6 +43,8 @@ class HandleInertiaRequests extends Middleware
                     'name' => $usuario->name,
                     'email' => $usuario->email,
                     'es_beneficiario' => $usuario->esBeneficiario(),
+                    // La foto es del panel: a la cuenta del portal no se le manda.
+                    'foto_url' => $usuario->esBeneficiario() ? null : User::FOTO,
                     'roles' => $usuario->getRoleNames(),
                     'permisos' => $usuario->getAllPermissions()->pluck('name'),
                 ] : null,
