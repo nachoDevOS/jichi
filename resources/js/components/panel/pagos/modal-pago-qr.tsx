@@ -1,7 +1,7 @@
 import { QrCode, RefreshCw, X } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
-import { QrSimulado } from '@/components/panel/pagos/qr-simulado';
+import { QrSimulado } from '@/components/comunes/qr-simulado';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { bs, cn } from '@/lib/utils';

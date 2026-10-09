@@ -5,6 +5,7 @@ use App\Http\Controllers\Portal\DescargarController;
 use App\Http\Controllers\Portal\DescargarReciboController;
 use App\Http\Controllers\Portal\EnCursoController;
 use App\Http\Controllers\Portal\InicioController;
+use App\Http\Controllers\Portal\PagoQrController;
 use App\Http\Controllers\Portal\PagosController;
 use App\Http\Controllers\Portal\PapelesController;
 use App\Http\Controllers\Portal\PerfilController;
@@ -46,5 +47,10 @@ Route::prefix('mi-cuenta')->name('portal.')->group(function () {
 
         // Lo abierto se VE con «NO VÁLIDO», no se descarga.
         Route::get('/vista-previa/{codigo}', VistaPreviaController::class)->name('vista-previa');
+
+        // Consulta SIREB en el momento: throttle para que no se use de martillo contra Recaudaciones.
+        Route::get('/pagar-qr/{codigo}', PagoQrController::class)
+            ->middleware('throttle:20,1')
+            ->name('pagar-qr');
     });
 });

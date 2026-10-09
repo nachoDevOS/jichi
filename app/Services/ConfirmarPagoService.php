@@ -68,6 +68,51 @@ class ConfirmarPagoService
     }
 
     /**
+     * Si el titular puede pagar por QR: pregunta a SIREB en el momento, y solo con la
+     * liquidación `pendiente` y sin ningún pago cargado. No aprueba nada.
+     *
+     * @return array{puede: bool, mensaje: ?string}
+     */
+    public function puedePagarPorQr(Model $documento): array
+    {
+        $vivo = $documento->sireb_liquidacion_id !== null
+            && ! in_array($documento->sireb_estado, [null, EstadoLiquidacionSireb::Anulada], true);
+
+        if (! $documento->estado->estaAbierto() || ! $vivo) {
+            return ['puede' => false, 'mensaje' => 'Este trámite no tiene un cobro abierto en Recaudaciones.'];
+        }
+
+        try {
+            $liquidacion = $this->sireb->liquidacion($documento->sireb_liquidacion_id);
+        } catch (SirebException) {
+            return ['puede' => false, 'mensaje' => 'Recaudaciones no responde en este momento. Intente de nuevo en unos minutos.'];
+        }
+
+        $estado = $liquidacion['estado'] ?? null;
+        $pago = $liquidacion['pago'] ?? null;
+        $this->anotarConsulta($documento, $estado, $pago);
+
+        return match (true) {
+            $estado === 'pendiente' && $pago === null => ['puede' => true, 'mensaje' => null],
+            $estado === 'pagada' => ['puede' => false, 'mensaje' => 'Ya está pagado. En unos minutos queda aprobado.'],
+            $pago !== null => ['puede' => false, 'mensaje' => 'Ya tiene un pago cargado: lo están revisando en Recaudaciones.'],
+            default => ['puede' => false, 'mensaje' => 'Este código de pago ya no sirve. Acérquese a ventanilla del SEDAG por uno nuevo.'],
+        };
+    }
+
+    /** La ficha muestra la boleta y si venció. Solo si cambió: el comando corre cada 10 min y audita. */
+    private function anotarConsulta(Model $documento, ?string $estado, ?array $pago): void
+    {
+        if (($documento->sireb_envio['pago'] ?? null) !== $pago || ($documento->sireb_envio['consulta']['estado'] ?? null) !== $estado) {
+            $documento->update(['sireb_envio' => [
+                ...($documento->sireb_envio ?? []),
+                'pago' => $pago,
+                'consulta' => ['estado' => $estado, 'en' => now()->toIso8601String()],
+            ]]);
+        }
+    }
+
+    /**
      * @return array{aprobado: bool, mensaje: string}
      */
     private function consultar(Model $documento): array
@@ -93,15 +138,7 @@ class ConfirmarPagoService
 
         $pago = $liquidacion['pago'] ?? null;
         $estado = $liquidacion['estado'] ?? null;
-
-        // La ficha muestra la boleta y si venció. Solo si cambió: el comando corre cada 10 min y audita.
-        if (($documento->sireb_envio['pago'] ?? null) !== $pago || ($documento->sireb_envio['consulta']['estado'] ?? null) !== $estado) {
-            $documento->update(['sireb_envio' => [
-                ...($documento->sireb_envio ?? []),
-                'pago' => $pago,
-                'consulta' => ['estado' => $estado, 'en' => now()->toIso8601String()],
-            ]]);
-        }
+        $this->anotarConsulta($documento, $estado, $pago);
 
         // Decide SOLO el estado de la liquidación: `pagada` aprueba; vencida, anulada y pendiente
         // no tocan el estado del trámite (08/10/2026).

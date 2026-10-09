@@ -97,7 +97,17 @@ la misma página que abre el QR.
 
 ### El pago se hace en SIREB (02/10/2026)
 
-El «Pagar con QR» simulado se retiró. Un trámite pendiente muestra el **código de
+**Pagar por QR, de muestra (08/10/2026).** Los cuatro trámites (autorización,
+carnet, faena y guía) ofrecen «Pagar por QR» en «En curso» cuando la última
+consulta dice `sin_pago` (`puede_pagar_qr`, de `ResumenPortal`). Al abrirlo,
+`GET /mi-cuenta/pagar-qr/{codigo}` (`Portal\PagoQrController`, `throttle:20,1`)
+**vuelve a preguntar a SIREB** con `ConfirmarPagoService::puedePagarPorQr()`: el QR sale
+solo con la liquidación `pendiente` y **sin ningún pago cargado**; si no, la ventana
+dice por qué. El QR es `components/comunes/qr-simulado.tsx`, el mismo del panel:
+**no se puede leer ni cobra**, es para probar el circuito. «Descargar QR» lo baja
+en PNG con el monto y el código de pago debajo, armado en el navegador (canvas).
+
+Un trámite pendiente muestra además el **código de
 pago** de su liquidación en SIREB (`codigo_pago`, de `ResumenPortal`) y el texto
 de qué falta; cuando Recaudaciones valida el pago, el documento se aprueba solo.
 

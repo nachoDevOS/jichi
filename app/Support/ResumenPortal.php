@@ -33,6 +33,7 @@ class ResumenPortal
             'vista_previa' => self::urlVistaPrevia($a),
             // Con este código se paga en SIREB.
             'codigo_pago' => self::codigoPago($a),
+            'puede_pagar_qr' => self::puedePagarQr($a),
             'pago' => self::estadoPago($a),
             'descargar' => self::urlDescargar($a),
             'escala' => $a->categoria?->descripcion_kg,
@@ -70,6 +71,7 @@ class ResumenPortal
             'vista_previa' => self::urlVistaPrevia($c),
             // Con este código se paga en SIREB.
             'codigo_pago' => self::codigoPago($c),
+            'puede_pagar_qr' => self::puedePagarQr($c),
             'pago' => self::estadoPago($c),
             // El carnet NO se descarga desde el portal: perdido, se repone en ventanilla.
             'descargar' => null,
@@ -104,6 +106,7 @@ class ResumenPortal
             'vista_previa' => self::urlVistaPrevia($f),
             // Con este código se paga en SIREB.
             'codigo_pago' => self::codigoPago($f),
+            'puede_pagar_qr' => self::puedePagarQr($f),
             'pago' => self::estadoPago($f),
             'descargar' => self::urlDescargar($f),
             'kilos' => (float) $f->kilos_extraidos,
@@ -137,6 +140,7 @@ class ResumenPortal
             'vista_previa' => self::urlVistaPrevia($g),
             // Con este código se paga en SIREB.
             'codigo_pago' => self::codigoPago($g),
+            'puede_pagar_qr' => self::puedePagarQr($g),
             'pago' => self::estadoPago($g),
             'descargar' => self::urlDescargar($g),
             'ruta' => $g->ruta,
@@ -272,6 +276,12 @@ class ResumenPortal
     private static function codigoPago(Model $documento): ?string
     {
         return self::estadoPago($documento) === 'caida' ? null : $documento->sireb_codigo_publico;
+    }
+
+    /** Ofrece el QR según la última consulta; al abrirlo se vuelve a preguntar a SIREB (`PagoQrController`). */
+    private static function puedePagarQr(Model $documento): bool
+    {
+        return self::estadoPago($documento) === 'sin_pago' && $documento->sireb_codigo_publico !== null;
     }
 
     /** Qué le falta a un trámite abierto, dicho para el titular. Null si no está abierto. */

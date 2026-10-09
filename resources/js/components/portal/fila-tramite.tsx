@@ -1,7 +1,8 @@
-import { AlertTriangle, Check, CheckCircle2, ExternalLink, Eye, Hourglass, Search } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, ExternalLink, Eye, Hourglass, QrCode, Search } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { detalleDocumento, ICONO_DOCUMENTO } from '@/components/portal/documento';
 import { ConMontoResaltado, EstadoChip } from '@/components/portal/piezas';
+import { VentanaPagoQr } from '@/components/portal/ventana-pago-qr';
 import { VisorVistaPrevia } from '@/components/portal/visor-vista-previa';
 import { cn } from '@/lib/utils';
 import type { PapelPortal } from '@/types/portal';
@@ -27,6 +28,7 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
     const { icono: Icono, tono } = ICONO_DOCUMENTO[tramite.clase];
     const actual = tramite.etapa ? PASO_ACTUAL[tramite.etapa] : 0;
     const [viendo, setViendo] = useState(false);
+    const [pagando, setPagando] = useState(false);
 
     return (
         <li className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md sm:p-4">
@@ -127,13 +129,34 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
                     )}
                 </div>
 
-                {/* Con este código se paga en Recaudaciones. */}
-                {tramite.codigo_pago && (
-                    <p className="shrink-0 rounded-full bg-rio-espuma px-3.5 py-2 text-sm text-rio-profundo">
-                        Código de pago <strong className="font-mono tracking-wider">{tramite.codigo_pago}</strong>
-                    </p>
-                )}
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                    {/* Con este código se paga en Recaudaciones. */}
+                    {tramite.codigo_pago && (
+                        <p className="rounded-full bg-rio-espuma px-3.5 py-2 text-sm text-rio-profundo">
+                            Código de pago <strong className="font-mono tracking-wider">{tramite.codigo_pago}</strong>
+                        </p>
+                    )}
+                    {tramite.puede_pagar_qr && tramite.codigo && (
+                        <button
+                            type="button"
+                            onClick={() => setPagando(true)}
+                            className="flex items-center justify-center gap-1.5 rounded-full bg-rio px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-rio-profundo"
+                        >
+                            <QrCode className="size-4" />
+                            Pagar por QR
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {pagando && tramite.codigo && (
+                <VentanaPagoQr
+                    codigo={tramite.codigo}
+                    titulo={tramite.tipo}
+                    detalle={detalleDocumento(tramite)}
+                    onCerrar={() => setPagando(false)}
+                />
+            )}
 
             {viendo && tramite.vista_previa && (
                 <VisorVistaPrevia url={tramite.vista_previa} titulo={tramite.tipo} onCerrar={() => setViendo(false)} />
