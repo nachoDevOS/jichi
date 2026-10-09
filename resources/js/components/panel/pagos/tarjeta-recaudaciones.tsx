@@ -7,6 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import { ConfirmarNuevaLiquidacion } from '@/components/panel/pagos/confirmar-nueva-liquidacion';
 import { ModalPagoQr, type DetallePago } from '@/components/panel/pagos/modal-pago-qr';
 import { usePermisos } from '@/hooks/use-permisos';
@@ -26,6 +27,7 @@ export function TarjetaRecaudaciones({
     rutaVerificar,
     puedeCargar = false,
     rutaCargar,
+    rutaConsultarQr,
     rutaRenovar,
     documento,
     pago,
@@ -41,6 +43,8 @@ export function TarjetaRecaudaciones({
     puedeCargar?: boolean;
     /** `route('carnets.cargar-pago', id)`. */
     rutaCargar?: string;
+    /** `route('carnets.consultar-qr', id)`: la ventana del QR pregunta a SIREB al abrirse. */
+    rutaConsultarQr?: string;
     /** `route('carnets.renovar-liquidacion', id)`: se ofrece si la liquidación venció sin pago. */
     rutaRenovar?: string;
     /** Prefijo de los permisos `<documento>.verificar-pago` y `.cargar-pago`. */
@@ -69,7 +73,11 @@ export function TarjetaRecaudaciones({
             onFinish: () => setCotizando(false),
         });
     }
-    const carga = useForm({ numero_transaccion: '', banco: '' });
+    const carga = useForm<{ numero_transaccion: string; banco: string; comprobante: File | null }>({
+        numero_transaccion: '',
+        banco: '',
+        comprobante: null,
+    });
     // Cómo se ofrece pagar: con el QR o cargando la transacción de un depósito.
     const [modo, setModo] = useState<'qr' | 'carga' | null>(null);
     const cargando = modo === 'carga';
@@ -81,6 +89,7 @@ export function TarjetaRecaudaciones({
         if (!rutaCargar) return;
         carga.post(rutaCargar, {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 setCargando(false);
                 carga.reset();
@@ -291,6 +300,14 @@ export function TarjetaRecaudaciones({
                                     ))}
                                 </datalist>
                             </Campo>
+                            <Campo etiqueta="Comprobante (PDF o imagen, hasta 3 MB)" htmlFor="comprobante">
+                                <SelectorArchivo
+                                    id="comprobante"
+                                    archivo={carga.data.comprobante}
+                                    onElegir={(archivo) => carga.setData('comprobante', archivo)}
+                                    error={carga.errors.comprobante}
+                                />
+                            </Campo>
                             <p className="text-xs text-muted-foreground">
                                 Queda por validar en Recaudaciones. Cuando lo validen, el trámite se aprueba solo.
                             </p>
@@ -355,6 +372,7 @@ export function TarjetaRecaudaciones({
                 abierto={modo === 'qr'}
                 monto={monto}
                 codigoPago={sireb?.codigo_publico ?? null}
+                rutaConsultar={rutaConsultarQr}
                 pago={pago}
                 puedeVerificar={ofreceVerificar}
                 verificando={verificacion.processing}

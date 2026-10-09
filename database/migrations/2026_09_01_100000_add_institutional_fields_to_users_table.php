@@ -16,9 +16,7 @@ return new class extends Migration
             $table->string('ci', 20)->nullable()->after('name');
             // Vínculo con Ibare: el `sub` del token es este id de mamoré.
             $table->string('mamore_id', 50)->nullable()->unique()->after('ci');
-            $table->string('cargo')->nullable()->after('email');
-            $table->string('telefono', 30)->nullable()->after('cargo');
-            $table->boolean('activo')->default(true)->after('telefono');
+            $table->boolean('activo')->default(true)->after('email');
             $table->timestamp('ultimo_acceso_at')->nullable()->after('activo');
             // La clave que se entrega en ventanilla es temporal: al entrar hay que cambiarla.
             $table->boolean('debe_cambiar_password')->default(false)->after('password');
@@ -39,7 +37,7 @@ return new class extends Migration
 
         Schema::table('users', function (Blueprint $table) {
             $table->dropSoftDeletes();
-            $table->dropColumn(['beneficiario_id', 'ci', 'mamore_id', 'cargo', 'telefono', 'activo', 'ultimo_acceso_at', 'debe_cambiar_password']);
+            $table->dropColumn(['beneficiario_id', 'ci', 'mamore_id', 'activo', 'ultimo_acceso_at', 'debe_cambiar_password']);
         });
     }
 };

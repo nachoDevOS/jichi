@@ -5,8 +5,8 @@ namespace App\Http\Requests\Panel;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * El pago que se carga en SIREB: lo único que SIREB acepta es el N° y el banco.
- * Los largos son los de su API.
+ * El pago que se carga en SIREB: el N°, el banco y, si lo hay, el comprobante
+ * (se sube acá y SIREB recibe su URL). Los largos son los de su API.
  */
 class CargarPagoRequest extends FormRequest
 {
@@ -24,6 +24,7 @@ class CargarPagoRequest extends FormRequest
         return [
             'numero_transaccion' => ['required', 'string', 'max:50'],
             'banco' => ['required', 'string', 'max:100'],
+            'comprobante' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:'.config('jichi.archivos.max_kb')],
         ];
     }
 
@@ -37,6 +38,8 @@ class CargarPagoRequest extends FormRequest
             'numero_transaccion.max' => 'El N° de transacción no puede pasar de 50 caracteres.',
             'banco.required' => 'Indique el banco donde se pagó.',
             'banco.max' => 'El banco no puede pasar de 100 caracteres.',
+            'comprobante.mimes' => 'El comprobante tiene que ser una imagen (JPG, PNG, WEBP) o un PDF.',
+            'comprobante.max' => 'El comprobante no puede pasar de 3 MB.',
         ];
     }
 

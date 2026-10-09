@@ -1,12 +1,21 @@
-import { Link, router, usePage } from '@inertiajs/react';
-import { ChevronRight, LogOut, Menu, PanelLeft } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { LogoJichi } from '@/components/comunes/logo-jichi';
-import { ToggleApariencia } from '@/components/comunes/toggle-apariencia';
-import { moduloActual, nombreDe } from '@/components/panel/layout/navegacion';
-import { usePermisos } from '@/hooks/use-permisos';
-import { iniciales } from '@/lib/utils';
-import type { PageProps } from '@/types';
+import { Link, router, usePage } from "@inertiajs/react";
+import {
+    Building2,
+    ChevronDown,
+    ChevronRight,
+    LogOut,
+    Menu,
+    PanelLeft,
+    ShieldCheck,
+    type LucideIcon,
+} from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { LogoJichi } from "@/components/comunes/logo-jichi";
+import { ToggleApariencia } from "@/components/comunes/toggle-apariencia";
+import { moduloActual, nombreDe } from "@/components/panel/layout/navegacion";
+import { usePermisos } from "@/hooks/use-permisos";
+import { cn, iniciales } from "@/lib/utils";
+import type { PageProps } from "@/types";
 
 /**
  *  El encabezado del panel, en dos franjas
@@ -27,8 +36,6 @@ export function BarraSuperior({
     /** Escritorio: achica la barra lateral a solo iconos. */
     onAlternarAngosto: () => void;
 }) {
-    const { auth, institucion } = usePage<PageProps>().props;
-
     return (
         <header className="sticky top-0 z-20 bg-card">
             {/* ------------------------------------------- Franja de sesión */}
@@ -63,7 +70,9 @@ export function BarraSuperior({
                     desaparecería de la pantalla: se repite acá. */}
                 <span className="flex items-center gap-2 lg:hidden">
                     <LogoJichi className="size-7" />
-                    <span className="text-base font-bold tracking-tight">Jichi</span>
+                    <span className="text-base font-bold tracking-tight">
+                        Jichi
+                    </span>
                 </span>
 
                 <div className="flex-1" />
@@ -72,36 +81,7 @@ export function BarraSuperior({
 
                 <span aria-hidden className="h-6 w-px bg-border" />
 
-                <div className="flex items-center gap-2.5">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                        {iniciales(auth.user?.name ?? '')}
-                    </span>
-
-                    {/* El nombre se esconde en pantallas chicas: con el título de
-                        la página abajo, es lo primero que se puede sacrificar. */}
-                    <div className="hidden min-w-0 leading-tight sm:block">
-                        <p className="truncate text-sm font-medium">{auth.user?.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                            {auth.user?.cargo ?? institucion?.sigla}
-                        </p>
-                    </div>
-                </div>
-
-                {/*
-                    Cerrar sesión tiene que ser POST, no un enlace GET. Si fuera
-                    un enlace, cualquier sitio externo podría hacer que el
-                    navegador lo visite y cerrarte la sesión sin querer. Además
-                    router.post() adjunta el token CSRF automáticamente.
-                */}
-                <button
-                    type="button"
-                    onClick={() => router.post(route('logout'))}
-                    title="Cerrar sesión"
-                    aria-label="Cerrar sesión"
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-destructive"
-                >
-                    <LogOut className="size-4" />
-                </button>
+                <MenuPerfil />
             </div>
 
             {/* ------------------------------------------- Franja de página */}
@@ -112,17 +92,171 @@ export function BarraSuperior({
                     <div className="min-w-0">
                         {/* truncate corta con «...» los títulos largos en vez de
                             empujar los botones fuera de la pantalla. */}
-                        <h1 className="truncate text-xl font-semibold tracking-tight">{titulo}</h1>
+                        <h1 className="truncate text-xl font-semibold tracking-tight">
+                            {titulo}
+                        </h1>
 
                         {descripcion && (
-                            <p className="truncate text-sm text-muted-foreground">{descripcion}</p>
+                            <p className="truncate text-sm text-muted-foreground">
+                                {descripcion}
+                            </p>
                         )}
                     </div>
 
-                    {acciones && <div className="flex shrink-0 items-center gap-2">{acciones}</div>}
+                    {acciones && (
+                        <div className="flex shrink-0 items-center gap-2">
+                            {acciones}
+                        </div>
+                    )}
                 </div>
             </div>
         </header>
+    );
+}
+
+/**
+ * El avatar abre un cuadro con los datos de la cuenta y el cierre de sesión.
+ */
+function MenuPerfil() {
+    const { auth, institucion } = usePage<PageProps>().props;
+    const [abierto, setAbierto] = useState(false);
+    const contenedor = useRef<HTMLDivElement>(null);
+    const usuario = auth.user;
+
+    // Se cierra al hacer clic afuera o con Escape, como cualquier menú.
+    useEffect(() => {
+        if (!abierto) return;
+
+        const alClic = (e: MouseEvent) => {
+            if (!contenedor.current?.contains(e.target as Node))
+                setAbierto(false);
+        };
+        const alTecla = (e: KeyboardEvent) =>
+            e.key === "Escape" && setAbierto(false);
+
+        document.addEventListener("mousedown", alClic);
+        document.addEventListener("keydown", alTecla);
+
+        return () => {
+            document.removeEventListener("mousedown", alClic);
+            document.removeEventListener("keydown", alTecla);
+        };
+    }, [abierto]);
+
+    return (
+        <div ref={contenedor} className="relative">
+            <button
+                type="button"
+                onClick={() => setAbierto((a) => !a)}
+                aria-haspopup="menu"
+                aria-expanded={abierto}
+                className="flex items-center gap-2.5 rounded-md py-1 pr-1.5 pl-1 text-left hover:bg-secondary"
+            >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {iniciales(usuario?.name ?? "")}
+                </span>
+
+                {/* El nombre se esconde en pantallas chicas: con el título de
+                    la página abajo, es lo primero que se puede sacrificar. */}
+                <span className="hidden min-w-0 leading-tight sm:block">
+                    <span className="block truncate text-sm font-medium">
+                        {usuario?.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                        {usuario?.roles[0] ?? institucion?.sigla}
+                    </span>
+                </span>
+
+                <ChevronDown
+                    aria-hidden
+                    className={cn(
+                        "size-4 text-muted-foreground transition-transform",
+                        abierto && "rotate-180",
+                    )}
+                />
+            </button>
+
+            {abierto && (
+                <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-72 overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+                >
+                    <div className="flex items-center gap-3 border-b border-border p-4">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                            {iniciales(usuario?.name ?? "")}
+                        </span>
+                        <div className="min-w-0">
+                            <p className="truncate font-semibold">
+                                {usuario?.name}
+                            </p>
+                            {usuario?.email && (
+                                <p className="truncate text-xs text-muted-foreground">
+                                    {usuario.email}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <dl className="space-y-2.5 p-4 text-sm">
+                        <DatoPerfil
+                            icono={ShieldCheck}
+                            rotulo={
+                                usuario?.roles.length === 1 ? "Rol" : "Roles"
+                            }
+                            valor={
+                                usuario?.roles.length
+                                    ? usuario.roles.join(", ")
+                                    : "Sin rol"
+                            }
+                        />
+                        <DatoPerfil
+                            icono={Building2}
+                            rotulo="Institución"
+                            valor={
+                                institucion?.municipio ??
+                                institucion?.sigla ??
+                                "—"
+                            }
+                        />
+                    </dl>
+
+                    {/* Cerrar sesión va por POST: un enlace GET lo podría disparar
+                        cualquier sitio externo. router.post() adjunta el CSRF. */}
+                    <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => router.post(route("logout"))}
+                        className="flex w-full items-center gap-2 border-t border-border px-4 py-3 text-sm text-destructive hover:bg-secondary"
+                    >
+                        <LogOut className="size-4" />
+                        Cerrar sesión
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function DatoPerfil({
+    icono: Icono,
+    rotulo,
+    valor,
+}: {
+    icono: LucideIcon;
+    rotulo: string;
+    valor: string;
+}) {
+    return (
+        <div className="flex items-start gap-2.5">
+            <Icono
+                aria-hidden
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            />
+            <div className="min-w-0">
+                <dt className="text-xs text-muted-foreground">{rotulo}</dt>
+                <dd className="break-words">{valor}</dd>
+            </div>
+        </div>
     );
 }
 
@@ -134,7 +268,7 @@ function Migas({ titulo }: { titulo: string }) {
     const { puede } = usePermisos();
 
     const modulo = moduloActual(ziggy?.location);
-    const enElTablero = modulo?.ruta === 'dashboard';
+    const enElTablero = modulo?.ruta === "dashboard";
 
     // Ziggy solo conoce las rutas ya declaradas: un módulo todavía sin rutas se
     // muestra como texto y no como enlace, en vez de romper el render.
@@ -144,10 +278,16 @@ function Migas({ titulo }: { titulo: string }) {
         (!modulo.permiso || puede(modulo.permiso));
 
     return (
-        <nav aria-label="Ruta de navegación" className="flex items-center gap-1 text-xs text-muted-foreground">
+        <nav
+            aria-label="Ruta de navegación"
+            className="flex items-center gap-1 text-xs text-muted-foreground"
+        >
             {/* Sin el permiso del tablero, «Inicio» es texto: el enlace terminaría en 403. */}
-            {puede('dashboard.ver') ? (
-                <Link href={route('dashboard')} className="hover:text-foreground hover:underline">
+            {puede("dashboard.ver") ? (
+                <Link
+                    href={route("dashboard")}
+                    className="hover:text-foreground hover:underline"
+                >
                     Inicio
                 </Link>
             ) : (
@@ -159,7 +299,10 @@ function Migas({ titulo }: { titulo: string }) {
                     <ChevronRight aria-hidden className="size-3" />
 
                     {enlazable ? (
-                        <Link href={route(modulo.ruta)} className="hover:text-foreground hover:underline">
+                        <Link
+                            href={route(modulo.ruta)}
+                            className="hover:text-foreground hover:underline"
+                        >
                             {nombreDe(modulo)}
                         </Link>
                     ) : (
@@ -171,7 +314,9 @@ function Migas({ titulo }: { titulo: string }) {
             {!enElTablero && (
                 <>
                     <ChevronRight aria-hidden className="size-3" />
-                    <span className="truncate font-medium text-foreground">{titulo}</span>
+                    <span className="truncate font-medium text-foreground">
+                        {titulo}
+                    </span>
                 </>
             )}
         </nav>

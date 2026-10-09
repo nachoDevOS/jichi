@@ -291,6 +291,7 @@ export default function VerGuia({
                         rutaVerificar={route('guias.verificar-pago', guia.id)}
                         puedeCargar={guia.puede_cargar_pago}
                         rutaCargar={route('guias.cargar-pago', guia.id)}
+                        rutaConsultarQr={route('guias.consultar-qr', guia.id)}
                         rutaRenovar={route('guias.renovar-liquidacion', guia.id)}
                         documento="guias"
                     />

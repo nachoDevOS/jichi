@@ -40,7 +40,7 @@ class IbareController extends Controller
             $this->registrarAcceso($request, 'fallido', $usuario->id, $usuario->email);
 
             return redirect()->route('login')->withErrors([
-                'ibare' => 'Su cuenta no tiene permisos en el sistema. Pida a un administrador que le asigne un rol.',
+                'ibare' => 'Ya tiene una cuenta, pero todavía no le asignaron qué tareas puede hacer. Pida al encargado de Jichi que le asigne un rol.',
             ]);
         }
 

@@ -26,6 +26,7 @@ use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -529,9 +530,15 @@ class CarnetController extends Controller
     public function cargarPago(CargarPagoRequest $request, Carnet $carnet, CargarPagoService $carga): RedirectResponse
     {
         $datos = $request->validated();
-        $resultado = $carga->cargar($carnet, $datos['numero_transaccion'], $datos['banco']);
+        $resultado = $carga->cargar($carnet, $datos['numero_transaccion'], $datos['banco'], $request->file('comprobante'));
 
         return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /** Antes de mostrar el QR: pregunta a SIREB si el cobro sigue pendiente y sin pago. */
+    public function consultarQr(Carnet $carnet, ConfirmarPagoService $pagos): JsonResponse
+    {
+        return response()->json($pagos->puedePagarPorQr($carnet, desdeElPanel: true));
     }
 
     //  Auxiliares

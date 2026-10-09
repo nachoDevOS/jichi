@@ -1,5 +1,5 @@
-import { Head, router } from '@inertiajs/react';
-import { Eye, Search, UserCog } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Eye, Pencil, Plus, Search, UserCog } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
 import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
@@ -47,6 +47,14 @@ export default function Usuarios({
         <LayoutPanel
             titulo="Usuarios"
             descripcion="Las cuentas de acceso al sistema: funcionarios y beneficiarios. Al beneficiario se le da, resetea y desactiva el acceso desde su ficha."
+            acciones={
+                puede('usuarios.crear') && (
+                    <Link href={route('usuarios.create')} className={cn(buttonVariants())}>
+                        <Plus className="size-4" />
+                        Nuevo usuario
+                    </Link>
+                )
+            }
         >
             <Head title="Usuarios" />
 
@@ -194,6 +202,15 @@ export default function Usuarios({
                                                     <td className="px-5 py-2.5 text-xs text-muted-foreground">{fechaHora(c.creada)}</td>
 
                                                     <td className="px-5 py-2.5 text-right">
+                                                        {c.beneficiario_id === null && puede('usuarios.editar') && (
+                                                            <Link
+                                                                href={route('usuarios.edit', c.id)}
+                                                                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                                                                title="Editar"
+                                                            >
+                                                                <Pencil className="size-4" />
+                                                            </Link>
+                                                        )}
                                                         {c.beneficiario_id !== null && puede('beneficiarios.ver') && (
                                                             <a
                                                                 href={`${route('beneficiarios.show', c.beneficiario_id)}?pestana=datos`}

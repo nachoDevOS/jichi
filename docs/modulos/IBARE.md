@@ -319,8 +319,9 @@ Quien entra por Ibare sin usuario vinculado —o con el usuario dado de baja— 
 - **El contrato se revisa solo al entrar.** Un funcionario dado de baja en mamoré
   sigue adentro de Jichi hasta que venza su sesión (`SESSION_LIFETIME`, hoy 120
   minutos).
-- **No hay pantalla para vincular usuarios**: se hace con `jichi:vincular-ibare`
-  hasta que exista el módulo de Usuarios.
+- **Alta y edición en Seguridad › Usuarios** (09/10/2026), con el
+  `mamore_id` (obligatorio con Ibare encendido) y el rol. Vincular un usuario que
+  ya existe: el lápiz de su fila, o `jichi:vincular-ibare`.
 - **Problemas de Ibare que Jichi no puede arreglar:** su login de funcionarios no
   tiene límite de intentos, y su refresh token no vuelve a consultar el contrato
   (Jichi no usa refresh, así que no le afecta). Anotados en `PENDIENTES.md`.

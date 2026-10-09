@@ -310,6 +310,7 @@ export default function VerFaena({
                     rutaVerificar={route('faenas.verificar-pago', faena.id)}
                     puedeCargar={faena.puede_cargar_pago}
                     rutaCargar={route('faenas.cargar-pago', faena.id)}
+                    rutaConsultarQr={route('faenas.consultar-qr', faena.id)}
                     rutaRenovar={route('faenas.renovar-liquidacion', faena.id)}
                     documento="faenas"
                 />

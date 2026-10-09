@@ -25,6 +25,7 @@ use App\Sireb\SirebException;
 use App\Sireb\VistaSireb;
 use App\Support\Paginacion;
 use App\Support\Sql;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -354,9 +355,15 @@ class GuiaController extends Controller
     public function cargarPago(CargarPagoRequest $request, GuiaMovimiento $guia, CargarPagoService $carga): RedirectResponse
     {
         $datos = $request->validated();
-        $resultado = $carga->cargar($guia, $datos['numero_transaccion'], $datos['banco']);
+        $resultado = $carga->cargar($guia, $datos['numero_transaccion'], $datos['banco'], $request->file('comprobante'));
 
         return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
+    }
+
+    /** Antes de mostrar el QR: pregunta a SIREB si el cobro sigue pendiente y sin pago. */
+    public function consultarQr(GuiaMovimiento $guia, ConfirmarPagoService $pagos): JsonResponse
+    {
+        return response()->json($pagos->puedePagarPorQr($guia, desdeElPanel: true));
     }
 
     //  Auxiliares

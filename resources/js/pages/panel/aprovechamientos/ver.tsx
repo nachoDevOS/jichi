@@ -364,6 +364,7 @@ export default function VerCupo({
                     rutaVerificar={route('aprovechamientos.verificar-pago', cupo.id)}
                     puedeCargar={cupo.puede_cargar_pago}
                     rutaCargar={route('aprovechamientos.cargar-pago', cupo.id)}
+                    rutaConsultarQr={route('aprovechamientos.consultar-qr', cupo.id)}
                     rutaRenovar={route('aprovechamientos.renovar-liquidacion', cupo.id)}
                     documento="aprovechamientos"
                 />

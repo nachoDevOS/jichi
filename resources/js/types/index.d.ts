@@ -15,10 +15,10 @@ export interface Usuario {
     name: string;
     /** Null en las cuentas del portal: el beneficiario entra con su C.I. */
     email: string | null;
-    cargo: string | null;
     /** Cuenta del portal /mi-cuenta: nunca entra al panel. */
     es_beneficiario: boolean;
-    /** Nombres de rol. Por ahora el sistema tiene uno solo: 'administrador'. */
+    /** Nombres de rol; los arma la unidad en Seguridad › Roles. */
+    roles: string[];
     /** Permisos ya expandidos: 'beneficiarios.crear', 'pagos.registrar'... */
     permisos: string[];
 }

@@ -414,6 +414,7 @@ export default function VerCarnet({
                     rutaVerificar={route('carnets.verificar-pago', carnet.id)}
                     puedeCargar={carnet.puede_cargar_pago}
                     rutaCargar={route('carnets.cargar-pago', carnet.id)}
+                    rutaConsultarQr={route('carnets.consultar-qr', carnet.id)}
                     rutaRenovar={route('carnets.renovar-liquidacion', carnet.id)}
                     documento="carnets"
                 />

@@ -416,8 +416,10 @@ aprueba `ConfirmarPagoService`, como siempre.
    vencida, ni pagada, ni anulada— **y sin ningún pago**. Si no, no carga y corre
    `verificar()` para poner la ficha al día (muestra el pago o aprueba).
 2. `POST /liquidaciones/{id}/pago-manual` con `numero_boleta` (el «N° de
-   transacción», 50) y `entidad_bancaria` (100): lo único que acepta SIREB; monto
-   y fecha los pone él, y no recibe imagen. Sin `Idempotency-Key`: reintentar es
+   transacción», 50), `entidad_bancaria` (100) y, si se adjuntó, `comprobante_url`
+   (09/10/2026): el archivo se sube antes con `StorageController::file()` a `pagos/`
+   y va su URL completa (`Archivos::url()`), no la ruta; si SIREB no lo toma, se
+   borra. La ruta queda en `sireb_envio.comprobante`. Monto y fecha los pone SIREB. Sin `Idempotency-Key`: reintentar es
    seguro porque un segundo pago da `422 PAGO_YA_EXISTE`.
 3. 201 → guarda el pago en `sireb_envio.pago` y la ficha lo muestra «Por validar».
    422 o sin respuesta → no carga y vuelve a consultar.

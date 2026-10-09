@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\StorageController;
 use App\Sireb\SirebException;
 use App\Sireb\SirebService;
+use App\Support\Archivos;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\UploadedFile;
 
 /**
  * Carga desde Jichi el pago de un trámite en su liquidación de SIREB. Solo CARGA:
@@ -21,7 +24,7 @@ class CargarPagoService
     /**
      * @return array{cargado: bool, mensaje: string}
      */
-    public function cargar(Model $documento, string $numeroTransaccion, string $banco): array
+    public function cargar(Model $documento, string $numeroTransaccion, string $banco, ?UploadedFile $comprobante = null): array
     {
         if (! $documento->estado->estaAbierto() || ! $documento->registradoEnSireb()) {
             return $this->no('el trámite ya no está pendiente de pago, o su cobro todavía no llegó a Recaudaciones.');
@@ -50,9 +53,13 @@ class CargarPagoService
             });
         }
 
+        // Se sube recién acá, cuando ya se sabe que se va a cargar; si SIREB no lo toma, se borra.
+        $ruta = $comprobante ? app(StorageController::class)->file($comprobante, 'pagos') : null;
+
         try {
-            $registrado = $this->sireb->registrarPagoManual($documento->sireb_liquidacion_id, $numeroTransaccion, $banco);
+            $registrado = $this->sireb->registrarPagoManual($documento->sireb_liquidacion_id, $numeroTransaccion, $banco, Archivos::url($ruta));
         } catch (SirebException $e) {
+            Archivos::borrar($ruta);
             // Pudo quedar cargado igual (timeout) o lo cargaron en el medio: se consulta y la ficha muestra lo que haya.
             $this->pagos->verificar($documento);
 
@@ -61,7 +68,7 @@ class CargarPagoService
                 : 'Recaudaciones no lo aceptó: el cobro ya no admite pagos o ya tiene uno cargado.');
         }
 
-        $documento->update(['sireb_envio' => [...($documento->sireb_envio ?? []), 'pago' => $registrado]]);
+        $documento->update(['sireb_envio' => [...($documento->sireb_envio ?? []), 'pago' => $registrado, 'comprobante' => $ruta]]);
 
         return [
             'cargado' => true,

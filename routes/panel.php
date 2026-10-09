@@ -123,6 +123,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware('permiso:aprovechamientos.cargar-pago')
         ->name('aprovechamientos.cargar-pago');
 
+    // Consulta SIREB al abrir el QR: throttle para no martillar a Recaudaciones.
+    Route::get('/aprovechamientos/{aprovechamiento}/consultar-qr', [AprovechamientoController::class, 'consultarQr'])
+        ->middleware(['permiso:aprovechamientos.cargar-pago', 'throttle:20,1'])
+        ->name('aprovechamientos.consultar-qr');
+
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/aprovechamientos/{aprovechamiento}/renovar-liquidacion', [AprovechamientoController::class, 'renovarLiquidacion'])
         ->middleware('permiso:aprovechamientos.renovar-liquidacion')
@@ -188,6 +193,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware('permiso:carnets.cargar-pago')
         ->name('carnets.cargar-pago');
 
+    // Consulta SIREB al abrir el QR: throttle para no martillar a Recaudaciones.
+    Route::get('/carnets/{carnet}/consultar-qr', [CarnetController::class, 'consultarQr'])
+        ->middleware(['permiso:carnets.cargar-pago', 'throttle:20,1'])
+        ->name('carnets.consultar-qr');
+
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/carnets/{carnet}/renovar-liquidacion', [CarnetController::class, 'renovarLiquidacion'])
         ->middleware('permiso:carnets.renovar-liquidacion')
@@ -237,6 +247,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::post('/faenas/{faena}/cargar-pago', [FaenaController::class, 'cargarPago'])
         ->middleware('permiso:faenas.cargar-pago')
         ->name('faenas.cargar-pago');
+
+    // Consulta SIREB al abrir el QR: throttle para no martillar a Recaudaciones.
+    Route::get('/faenas/{faena}/consultar-qr', [FaenaController::class, 'consultarQr'])
+        ->middleware(['permiso:faenas.cargar-pago', 'throttle:20,1'])
+        ->name('faenas.consultar-qr');
 
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/faenas/{faena}/renovar-liquidacion', [FaenaController::class, 'renovarLiquidacion'])
@@ -296,6 +311,11 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::post('/guias/{guia}/cargar-pago', [GuiaController::class, 'cargarPago'])
         ->middleware('permiso:guias.cargar-pago')
         ->name('guias.cargar-pago');
+
+    // Consulta SIREB al abrir el QR: throttle para no martillar a Recaudaciones.
+    Route::get('/guias/{guia}/consultar-qr', [GuiaController::class, 'consultarQr'])
+        ->middleware(['permiso:guias.cargar-pago', 'throttle:20,1'])
+        ->name('guias.consultar-qr');
 
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/guias/{guia}/renovar-liquidacion', [GuiaController::class, 'renovarLiquidacion'])
@@ -471,6 +491,14 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::prefix('seguridad')->group(function () {
         Route::get('/usuarios', [UsuarioController::class, 'index'])
             ->middleware('permiso:usuarios.ver')->name('usuarios.index');
+        Route::get('/usuarios/crear', [UsuarioController::class, 'create'])
+            ->middleware('permiso:usuarios.crear')->name('usuarios.create');
+        Route::post('/usuarios', [UsuarioController::class, 'store'])
+            ->middleware('permiso:usuarios.crear')->name('usuarios.store');
+        Route::get('/usuarios/{usuario}/editar', [UsuarioController::class, 'edit'])
+            ->middleware('permiso:usuarios.editar')->name('usuarios.edit');
+        Route::put('/usuarios/{usuario}', [UsuarioController::class, 'update'])
+            ->middleware('permiso:usuarios.editar')->name('usuarios.update');
 
         Route::get('/roles', [RolController::class, 'index'])
             ->middleware('permiso:roles.ver')->name('roles.index');

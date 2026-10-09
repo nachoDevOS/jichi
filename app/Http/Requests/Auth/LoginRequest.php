@@ -23,7 +23,8 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email', 'max:255'],
+            // Sin regla `email`: el acceso de emergencia admite un usuario sin @ (sedag.encargado).
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
             'remember' => ['boolean'],
         ];
@@ -35,8 +36,7 @@ class LoginRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.required' => 'Ingrese su correo institucional.',
-            'email.email' => 'El correo institucional no tiene un formato válido.',
+            'email.required' => 'Ingrese su correo o usuario.',
             'password.required' => 'Ingrese su contraseña.',
         ];
     }
@@ -63,7 +63,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido');
 
             throw ValidationException::withMessages([
-                'email' => 'Las credenciales no coinciden con ningún usuario activo del sistema.',
+                'email' => 'El correo o la contraseña no son correctos. Revíselos y vuelva a intentar.',
             ]);
         }
 
@@ -76,7 +76,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido', $userId);
 
             throw ValidationException::withMessages([
-                'email' => 'Las credenciales no coinciden con ningún usuario activo del sistema.',
+                'email' => 'El correo o la contraseña no son correctos. Revíselos y vuelva a intentar.',
             ]);
         }
 
@@ -88,7 +88,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido', $userId);
 
             throw ValidationException::withMessages([
-                'email' => 'Ingrese con «Ingresar con Ibare». El acceso con correo queda solo para administradores.',
+                'email' => 'Esta entrada es solo para el administrador. Use el botón «Ingresar con mi cuenta de la Gobernación».',
             ]);
         }
 
@@ -100,7 +100,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido', $userId);
 
             throw ValidationException::withMessages([
-                'email' => 'Su cuenta no tiene permisos en el sistema. Pida a un administrador que le asigne un rol.',
+                'email' => 'Ya tiene una cuenta, pero todavía no le asignaron qué tareas puede hacer. Pida al encargado de Jichi que le asigne un rol.',
             ]);
         }
 
@@ -125,7 +125,7 @@ class LoginRequest extends FormRequest
         $segundos = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => "Demasiados intentos fallidos. Vuelva a intentar en {$segundos} segundos.",
+            'email' => "Hubo demasiados intentos seguidos. Por seguridad, espere {$segundos} segundos y vuelva a intentar.",
         ]);
     }
 

@@ -1,5 +1,5 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { LoaderCircle, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { CircleAlert, LoaderCircle, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { LogoJichi } from '@/components/comunes/logo-jichi';
 import { ToggleApariencia } from '@/components/comunes/toggle-apariencia';
@@ -78,6 +78,19 @@ export default function Login({ ibare }: { ibare: boolean }) {
                             </p>
                         </div>
 
+                        {ibare && erroresPagina.ibare && (
+                            <div
+                                role="alert"
+                                className="mb-5 flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4"
+                            >
+                                <CircleAlert aria-hidden className="mt-0.5 size-5 shrink-0 text-destructive" />
+                                <div className="space-y-1">
+                                    <p className="text-sm font-semibold">No pudo ingresar</p>
+                                    <p className="text-sm text-muted-foreground">{erroresPagina.ibare}</p>
+                                </div>
+                            </div>
+                        )}
+
                         {ibare && (
                             <div className="mb-6 space-y-3">
                                 <a
@@ -85,13 +98,14 @@ export default function Login({ ibare }: { ibare: boolean }) {
                                     className={cn(buttonVariants({ size: 'lg' }), 'w-full')}
                                 >
                                     <ShieldCheck className="size-4" />
-                                    Ingresar con Ibare
+                                    Ingresar con mi cuenta de la Gobernación
                                 </a>
-                                {erroresPagina.ibare && (
-                                    <p className="text-sm text-destructive" role="alert">
-                                        {erroresPagina.ibare}
-                                    </p>
-                                )}
+                                {/* Ibare es el nombre del sistema de cuentas: el
+                                    funcionario lo reconoce por su usuario, no por el nombre. */}
+                                <p className="text-center text-xs text-muted-foreground">
+                                    Use el mismo usuario y contraseña con que entra a los demás sistemas de la
+                                    Gobernación (Ibare).
+                                </p>
                                 {!loginLocal && (
                                     <button
                                         type="button"
@@ -107,12 +121,12 @@ export default function Login({ ibare }: { ibare: boolean }) {
                         {loginLocal && (
                             <form onSubmit={enviar} className="space-y-4" noValidate>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email">Correo institucional</Label>
+                                    <Label htmlFor="email">Correo o usuario</Label>
                                     <div className="relative">
                                         <Mail className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
                                         <Input
                                             id="email"
-                                            type="email"
+                                            type="text"
                                             name="email"
                                             value={data.email}
                                             onChange={(e) => setData('email', e.target.value)}

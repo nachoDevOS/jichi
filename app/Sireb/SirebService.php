@@ -159,13 +159,15 @@ class SirebService
      *
      * @throws SirebException
      */
-    public function registrarPagoManual(string $liquidacionId, string $numeroBoleta, string $entidadBancaria): array
+    public function registrarPagoManual(string $liquidacionId, string $numeroBoleta, string $entidadBancaria, ?string $comprobanteUrl = null): array
     {
         $ruta = self::RUTA_LIQUIDACIONES.'/'.$this->id($liquidacionId).'/pago-manual';
-        $respuesta = $this->enviar('post', $ruta, [
+        $respuesta = $this->enviar('post', $ruta, array_filter([
             'numero_boleta' => mb_substr($numeroBoleta, 0, 50),
             'entidad_bancaria' => mb_substr($entidadBancaria, 0, 100),
-        ], reintentos: self::REINTENTOS);
+            // La dirección completa: SIREB no puede resolver una ruta de nuestro disco.
+            'comprobante_url' => $comprobanteUrl,
+        ], fn ($valor) => $valor !== null), reintentos: self::REINTENTOS);
 
         if (in_array($respuesta->status(), [404, 422], true)) {
             throw SirebException::liquidacionRechazada((string) $respuesta->json('codigo'));

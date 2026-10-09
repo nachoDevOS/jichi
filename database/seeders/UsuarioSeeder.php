@@ -18,7 +18,6 @@ class UsuarioSeeder extends Seeder
             ['email' => 'admin@admin.com'],
             [
                 'name' => 'Administrador Jichi',
-                'cargo' => 'Administrador del Sistema',
                 'password' => Hash::make(config('jichi.password_semilla')),
                 'activo' => true,
                 'email_verified_at' => now(),

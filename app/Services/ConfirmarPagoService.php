@@ -73,7 +73,7 @@ class ConfirmarPagoService
      *
      * @return array{puede: bool, mensaje: ?string}
      */
-    public function puedePagarPorQr(Model $documento): array
+    public function puedePagarPorQr(Model $documento, bool $desdeElPanel = false): array
     {
         $vivo = $documento->sireb_liquidacion_id !== null
             && ! in_array($documento->sireb_estado, [null, EstadoLiquidacionSireb::Anulada], true);
@@ -96,7 +96,9 @@ class ConfirmarPagoService
             $estado === 'pendiente' && $pago === null => ['puede' => true, 'mensaje' => null],
             $estado === 'pagada' => ['puede' => false, 'mensaje' => 'Ya está pagado. En unos minutos queda aprobado.'],
             $pago !== null => ['puede' => false, 'mensaje' => 'Ya tiene un pago cargado: lo están revisando en Recaudaciones.'],
-            default => ['puede' => false, 'mensaje' => 'Este código de pago ya no sirve. Acérquese a ventanilla del SEDAG por uno nuevo.'],
+            default => ['puede' => false, 'mensaje' => $desdeElPanel
+                ? 'La liquidación venció o fue anulada. Genere una nueva liquidación para cobrarlo.'
+                : 'Este código de pago ya no sirve. Acérquese a ventanilla del SEDAG por uno nuevo.'],
         };
     }
 

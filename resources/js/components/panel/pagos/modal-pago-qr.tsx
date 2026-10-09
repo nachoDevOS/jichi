@@ -1,10 +1,17 @@
-import { QrCode, RefreshCw, X } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
-import { TextoCopiable } from '@/components/comunes/texto-copiable';
-import { QrSimulado } from '@/components/comunes/qr-simulado';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { bs, cn } from '@/lib/utils';
+import { router } from "@inertiajs/react";
+import {
+    LoaderCircle,
+    QrCode,
+    RefreshCw,
+    TriangleAlert,
+    X,
+} from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { TextoCopiable } from "@/components/comunes/texto-copiable";
+import { QrSimulado } from "@/components/comunes/qr-simulado";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { bs, cn } from "@/lib/utils";
 
 /** Qué se paga: lo arma cada ficha con sus propios datos. */
 export interface DetallePago {
@@ -21,6 +28,7 @@ export function ModalPagoQr({
     abierto,
     monto,
     codigoPago,
+    rutaConsultar,
     pago,
     puedeVerificar,
     verificando,
@@ -30,19 +38,52 @@ export function ModalPagoQr({
     abierto: boolean;
     monto: number;
     codigoPago: string | null;
+    /** Al abrirse pregunta a SIREB: el QR sale solo con el cobro pendiente y sin pago. */
+    rutaConsultar?: string;
     pago?: DetallePago;
     puedeVerificar: boolean;
     verificando: boolean;
     onVerificar: () => void;
     onCerrar: () => void;
 }) {
+    const [consulta, setConsulta] = useState<{
+        puede: boolean;
+        mensaje: string | null;
+    } | null>(null);
+
+    useEffect(() => {
+        if (!abierto || !rutaConsultar) return;
+        setConsulta(null);
+        const peticion = new AbortController();
+        fetch(rutaConsultar, {
+            headers: { Accept: "application/json" },
+            signal: peticion.signal,
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject()))
+            .then((r: { puede: boolean; mensaje: string | null }) => {
+                setConsulta(r);
+                // Pudo traer un pago o el vencimiento: la ficha de atrás se pone al día.
+                if (!r.puede) router.reload();
+            })
+            .catch(() => {
+                if (!peticion.signal.aborted)
+                    setConsulta({
+                        puede: false,
+                        mensaje:
+                            "No se pudo consultar el cobro en Recaudaciones. Intente de nuevo.",
+                    });
+            });
+
+        return () => peticion.abort();
+    }, [abierto, rutaConsultar]);
+
     useEffect(() => {
         if (!abierto) return;
         const alPresionar = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onCerrar();
+            if (e.key === "Escape") onCerrar();
         };
-        document.addEventListener('keydown', alPresionar);
-        return () => document.removeEventListener('keydown', alPresionar);
+        document.addEventListener("keydown", alPresionar);
+        return () => document.removeEventListener("keydown", alPresionar);
     }, [abierto, onCerrar]);
 
     if (!abierto) return null;
@@ -63,45 +104,131 @@ export function ModalPagoQr({
                         <h2 id="titulo-pago-qr" className="font-semibold">
                             Pagar por QR
                         </h2>
-                        <p className="text-sm text-muted-foreground">Pago en Recaudaciones del GAD Beni</p>
+                        <p className="text-sm text-muted-foreground">
+                            Pago en Recaudaciones del GAD Beni
+                        </p>
                     </div>
-                    <button type="button" onClick={onCerrar} className="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Cerrar">
+                    <button
+                        type="button"
+                        onClick={onCerrar}
+                        className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+                        aria-label="Cerrar"
+                    >
                         <X className="size-5" />
                     </button>
                 </div>
 
-                <div className="grid gap-6 p-5 text-sm md:grid-cols-[1fr_18rem]">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="rounded-lg border bg-white p-3 shadow-sm">
-                            <QrSimulado texto={codigoPago ?? String(monto)} className="size-64 sm:size-80" />
-                        </div>
-                        <Badge color="amber">QR de muestra: todavía no cobra</Badge>
-                    </div>
+                {rutaConsultar && !consulta && (
+                    <p className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+                        <LoaderCircle className="size-5 animate-spin" />
+                        Consultando el cobro en Recaudaciones…
+                    </p>
+                )}
 
-                    <div className="space-y-4">
-                        <div className="rounded-lg bg-muted/40 p-4 text-center">
-                            <p className="text-muted-foreground">Monto a pagar</p>
-                            <p className="text-3xl font-semibold tabular-nums">{bs(monto)}</p>
+                {consulta && !consulta.puede && (
+                    <div className="p-5">
+                        <p className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                            <TriangleAlert className="mt-0.5 size-5 shrink-0" />
+                            {consulta.mensaje}
+                        </p>
+                    </div>
+                )}
+
+                {(!rutaConsultar || consulta?.puede) && (
+                    <div className="grid gap-6 p-5 text-sm md:grid-cols-[1fr_18rem]">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                            <div className="rounded-lg border bg-white p-3 shadow-sm">
+                                <QrSimulado
+                                    texto={codigoPago ?? String(monto)}
+                                    className="size-64 sm:size-80"
+                                />
+                            </div>
+                            <Badge color="amber">
+                                QR de muestra: todavía no cobra
+                            </Badge>
                         </div>
 
-                        <dl className="space-y-2">
-                            {pago && <Renglon etiqueta="Concepto" valor={pago.concepto} />}
-                            {pago?.numero && <Renglon etiqueta="N°" valor={pago.numero} />}
-                            {pago?.titular && <Renglon etiqueta="Titular" valor={pago.titular} />}
-                            {pago?.documento && <Renglon etiqueta="C.I." valor={pago.documento} />}
-                            {pago?.detalle && <Renglon etiqueta="Detalle" valor={pago.detalle} />}
-                            <Renglon etiqueta="Código de pago" valor={codigoPago ? <TextoCopiable texto={codigoPago} className="-mr-1.5" /> : '—'} />
-                        </dl>
+                        <div className="space-y-4">
+                            <div className="rounded-lg bg-muted/40 p-4 text-center">
+                                <p className="text-muted-foreground">
+                                    Monto a pagar
+                                </p>
+                                <p className="text-3xl font-semibold tabular-nums">
+                                    {bs(monto)}
+                                </p>
+                            </div>
+
+                            <dl className="space-y-2">
+                                {pago && (
+                                    <Renglon
+                                        etiqueta="Concepto"
+                                        valor={pago.concepto}
+                                    />
+                                )}
+                                {pago?.numero && (
+                                    <Renglon
+                                        etiqueta="N°"
+                                        valor={pago.numero}
+                                    />
+                                )}
+                                {pago?.titular && (
+                                    <Renglon
+                                        etiqueta="Titular"
+                                        valor={pago.titular}
+                                    />
+                                )}
+                                {pago?.documento && (
+                                    <Renglon
+                                        etiqueta="C.I."
+                                        valor={pago.documento}
+                                    />
+                                )}
+                                {pago?.detalle && (
+                                    <Renglon
+                                        etiqueta="Detalle"
+                                        valor={pago.detalle}
+                                    />
+                                )}
+                                <Renglon
+                                    etiqueta="Código de pago"
+                                    valor={
+                                        codigoPago ? (
+                                            <TextoCopiable
+                                                texto={codigoPago}
+                                                className="-mr-1.5"
+                                            />
+                                        ) : (
+                                            "—"
+                                        )
+                                    }
+                                />
+                            </dl>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <div className="flex flex-col-reverse gap-2 border-t p-4 sm:flex-row sm:justify-end">
-                    <Button key="cerrar-qr" type="button" variant="outline" onClick={onCerrar}>
+                    <Button
+                        key="cerrar-qr"
+                        type="button"
+                        variant="outline"
+                        onClick={onCerrar}
+                    >
                         Cerrar
                     </Button>
                     {puedeVerificar && (
-                        <Button key="verificar-qr" type="button" disabled={verificando} onClick={onVerificar}>
-                            <RefreshCw className={cn('size-4', verificando && 'animate-spin')} />
+                        <Button
+                            key="verificar-qr"
+                            type="button"
+                            disabled={verificando}
+                            onClick={onVerificar}
+                        >
+                            <RefreshCw
+                                className={cn(
+                                    "size-4",
+                                    verificando && "animate-spin",
+                                )}
+                            />
                             Verificar pago
                         </Button>
                     )}
