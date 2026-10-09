@@ -11,28 +11,28 @@ class IbareException extends RuntimeException
 {
     public static function noResponde(): self
     {
-        return new self('El servicio de ingreso de la Gobernación no responde en este momento. Espere unos minutos y vuelva a intentar. Si sigue igual, llame a la Unidad de Sistemas.');
+        return new self('El sistema no responde en este momento. Intente de nuevo en unos minutos.');
     }
 
     // El `state` no coincide o se perdió la sesión: la vuelta no es la de este navegador.
     public static function solicitudVencida(): self
     {
-        return new self('Pasó demasiado tiempo y el ingreso se canceló. Presione de nuevo el botón para ingresar.');
+        return new self('Tardó demasiado. Vuelva a presionar el botón para ingresar.');
     }
 
     public static function rechazado(): self
     {
-        return new self('No se completó el ingreso. Si lo canceló sin querer, presione de nuevo el botón para ingresar.');
+        return new self('No se completó el ingreso. Vuelva a intentar.');
     }
 
     public static function tokenInvalido(): self
     {
-        return new self('No pudimos confirmar su identidad. Vuelva a intentar; si sigue pasando, llame a la Unidad de Sistemas.');
+        return new self('Algo salió mal. Vuelva a intentar en unos minutos.');
     }
 
-    // El funcionario existe en Ibare pero nadie le dio cuenta en Jichi: los roles los asigna un administrador.
-    public static function sinCuenta(string $mamoreId): self
+    // Existe en Ibare pero nadie le dio cuenta en Jichi. El id va al log, no a la pantalla.
+    public static function sinCuenta(): self
     {
-        return new self("Su usuario de la Gobernación es correcto, pero todavía no está habilitado en este sistema. Pida al encargado de Jichi que le dé acceso y dígale su número de funcionario: {$mamoreId}.");
+        return new self('Todavía no tiene acceso a este sistema. Pida al encargado que lo habilite.');
     }
 }

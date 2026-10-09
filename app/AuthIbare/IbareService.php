@@ -77,7 +77,9 @@ class IbareService
         $usuario = User::where('mamore_id', $mamoreId)->where('activo', true)->first();
 
         if (! $usuario) {
-            throw IbareException::sinCuenta($mamoreId);
+            Log::info("Ibare: el funcionario {$mamoreId} intentó entrar sin cuenta en Jichi.");
+
+            throw IbareException::sinCuenta();
         }
 
         return $usuario;

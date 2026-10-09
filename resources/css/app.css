@@ -441,3 +441,44 @@
         display: none;
     }
 }
+
+/*
+| El botón de ingreso del login: un halo dorado que late y la flecha que empuja.
+| Llaman la atención sin pedir el mouse.
+*/
+@keyframes halo-boton {
+    0%,
+    100% {
+        opacity: 0.35;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.04);
+    }
+}
+
+@keyframes empuje-flecha {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(4px);
+    }
+}
+
+.animar-halo-boton {
+    animation: halo-boton 2.4s ease-in-out infinite;
+}
+
+.animar-empuje-flecha {
+    animation: empuje-flecha 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animar-halo-boton,
+    .animar-empuje-flecha {
+        animation: none;
+    }
+}

@@ -63,7 +63,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido');
 
             throw ValidationException::withMessages([
-                'email' => 'El correo o la contraseña no son correctos. Revíselos y vuelva a intentar.',
+                'email' => 'El correo o la contraseña no son correctos.',
             ]);
         }
 
@@ -76,7 +76,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido', $userId);
 
             throw ValidationException::withMessages([
-                'email' => 'El correo o la contraseña no son correctos. Revíselos y vuelva a intentar.',
+                'email' => 'El correo o la contraseña no son correctos.',
             ]);
         }
 
@@ -88,7 +88,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido', $userId);
 
             throw ValidationException::withMessages([
-                'email' => 'Esta entrada es solo para el administrador. Use el botón «Ingresar con mi cuenta de la Gobernación».',
+                'email' => 'Use el botón «Ingresar con mi cuenta».',
             ]);
         }
 
@@ -100,7 +100,7 @@ class LoginRequest extends FormRequest
             $this->registrarAcceso('fallido', $userId);
 
             throw ValidationException::withMessages([
-                'email' => 'Ya tiene una cuenta, pero todavía no le asignaron qué tareas puede hacer. Pida al encargado de Jichi que le asigne un rol.',
+                'email' => 'Todavía no tiene acceso a este sistema. Pida al encargado que lo habilite.',
             ]);
         }
 
@@ -125,7 +125,7 @@ class LoginRequest extends FormRequest
         $segundos = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => "Hubo demasiados intentos seguidos. Por seguridad, espere {$segundos} segundos y vuelva a intentar.",
+            'email' => "Demasiados intentos. Espere {$segundos} segundos y vuelva a intentar.",
         ]);
     }
 
