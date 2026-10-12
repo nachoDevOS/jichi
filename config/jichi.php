@@ -62,20 +62,7 @@ return [
     ],
 
     // Los precios de la faena y de la guía NO viven acá: los pone SIREB
-    // (Catálogos › Aranceles y › Productos). Ver docs/modulos/SIREB.md.
-
-    /*
-    | ESTRICTO: el cupo es un LÍMITE. Al emitir una faena se comprueba que los
-    | kilos entren en el saldo, y en cero el cupo pasa a `agotado`. Es lo que
-    | dice la resolución, y por eso es el valor por defecto.
-    |
-    | FLEXIBLE: el cupo es una REFERENCIA. Existe para poner al día un padrón
-    | donde el papel ya fue más allá. NO borra el dato: el exceso se sigue
-    | midiendo con `AprovechamientoPesq::kilosExcedidos()`.
-    */
-    'aprovechamiento' => [
-        'estricto' => (bool) env('APROVECHAMIENTO_ESTRICTO', true),
-    ],
+    // (Catálogos › Aranceles). Ver docs/modulos/SIREB.md.
 
     // Login centralizado del GAD (OAuth2). Apagado = login propio por correo.
     // Encendido, el login local queda solo para administradores. Ver docs/modulos/IBARE.md.

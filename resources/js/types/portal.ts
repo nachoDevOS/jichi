@@ -34,7 +34,7 @@ interface PapelBase {
     vence_el: string | null;
     /** Solo de lo vigente: para «faltan N días» y «vence pronto». */
     dias_restantes: number | null;
-    /** Por qué ya no vale: revocado, sin efecto o agotado. */
+    /** Por qué ya no vale: revocado o sin efecto. */
     motivo_baja: string | null;
     /** Lo que falta pagar en SIREB. */
     debe: number;
@@ -45,9 +45,7 @@ export interface AprovechamientoPortal extends PapelBase {
     escala: string | null;
     volumen_total_kg: number;
     ya_fue_aprobado: boolean;
-    kilos_consumidos: number;
-    saldo_kg: number;
-    porcentaje_usado: number;
+    kilos_disponibles: number;
     fecha_solicitud: string | null;
     fecha_vencimiento: string | null;
 }

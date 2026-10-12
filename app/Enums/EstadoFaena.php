@@ -34,34 +34,6 @@ enum EstadoFaena: string
         };
     }
 
-    /**
-     * ¿Sus kilos pesan contra el cupo de la bolsa madre?
-     *
-     * Solo desde la aprobación (19/09/2026, a pedido del responsable). Una faena
-     * pendiente es una SOLICITUD: todavía no autoriza a pescar, así que no puede
-     * estar restándole kilos a la bolsa.
-     *
-     * En modo estricto la solicitud no descuenta pero RESERVA —ver `reservaCupo()`—,
-     * así que el cupo no se sobrecompromete. `RevisarFaenaService::aprobar()`
-     * vuelve a medir igual, por si la faena nació en modo flexible.
-     *
-     * La REVOCADA sigue descontando (05/10/2026): puede ser una sanción, y devolverle
-     * los kilos le regalaría cupo al infractor.
-     */
-    public function consumeCupo(): bool
-    {
-        return $this === self::Aprobado || $this === self::Revocado;
-    }
-
-    /**
-     * ¿APARTA sus kilos sin descontarlos? La solicitud abierta: en modo estricto
-     * nadie más puede usarlos hasta que se elimine. Ver REGLAS-NEGOCIO.md.
-     */
-    public function reservaCupo(): bool
-    {
-        return $this === self::Pendiente;
-    }
-
     /** ¿Autoriza a estar pescando hoy? Solo la aprobada. */
     public function habilita(): bool
     {

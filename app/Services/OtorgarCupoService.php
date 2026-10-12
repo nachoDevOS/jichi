@@ -47,7 +47,6 @@ class OtorgarCupoService
             if ($vigente !== null) {
                 throw CupoInvalidoException::yaTieneCupoVigente(
                     $beneficiario->nombreCompleto,
-                    $vigente->saldoKg(),
                     $vigente->fecha_vencimiento->format('d/m/Y'),
                 );
             }
@@ -64,6 +63,8 @@ class OtorgarCupoService
                 'tramo' => $tramo['etiqueta'],
                 // Los escribe ventanilla: la tarifa de SIREB solo trae el precio.
                 'volumen_total_kg' => $kilos,
+                // Arranca entero: lo baja cada faena aprobada.
+                'kilos_disponibles' => $kilos,
 
                 // Obligatorio: va impreso en la autorización. Texto libre porque no
                 // hay padrón de embarcaciones.
@@ -170,8 +171,6 @@ class OtorgarCupoService
              * una bolsa por persona viene a impedir.
              */
             ->enCurso()
-            ->withSum('faenasQueConsumen', 'kilos_extraidos')
-            ->withSum('faenasQueReservan', 'kilos_extraidos')
             ->latest('fecha_solicitud')
             ->first();
     }

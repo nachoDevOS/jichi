@@ -10,7 +10,6 @@ use App\Http\Requests\Panel\ActualizarFaenaRequest;
 use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EmitirFaenaRequest;
 use App\Http\Requests\Panel\MotivoRequest;
-use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
@@ -113,9 +112,7 @@ class FaenaController extends Controller
                     ->vigentes()
                     ->with([
                         'codigo',
-                        'aprovechamiento' => fn ($a) => $a
-                            ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                            ->withSum('faenasQueReservan', 'kilos_extraidos'),
+                        'aprovechamiento',
                     ])
                     ->get()
                     ->map(fn (Carnet $c): array => $c->resumenParaEmitir())
@@ -132,10 +129,6 @@ class FaenaController extends Controller
             // El precio es de referencia: el que vale lo congela la emisión.
             'tarifas' => $tarifario->tarifas(ConceptoArancel::Faena),
             'servicioConfigurado' => $tarifario->servicioId(ConceptoArancel::Faena) !== null,
-
-            // En modo FLEXIBLE el formulario no frena, así que tampoco puede decir
-            // que va a frenar: el aviso pasa a «va a quedar por encima».
-            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
         ]);
     }
 
@@ -149,18 +142,13 @@ class FaenaController extends Controller
         try {
             $faena = $this->servicio->emitir(
                 Carnet::query()->findOrFail($datos['carnet_id']),
-                (float) $datos['kilos_extraidos'],
                 $datos['tarifa_sireb'],
                 // `validated()` devuelve SOLO lo que vino: un nullable que el
                 // formulario no mandó no existe en el arreglo.
                 $datos,
             );
         } catch (PermisoOperativoException $e) {
-            // Al campo que el operador PUEDE corregir: lo del carnet no tiene
-            // arreglo desde acá, el exceso de cupo sí.
-            $campo = str_contains($e->getMessage(), 'quedan') ? 'kilos_extraidos' : 'carnet_id';
-
-            return back()->withInput()->withErrors([$campo => $e->getMessage()]);
+            return back()->withInput()->withErrors(['carnet_id' => $e->getMessage()]);
         }
 
         return redirect()
@@ -190,11 +178,8 @@ class FaenaController extends Controller
             'carnet:id,beneficiario_id,tipo_actor,aprovechamiento_id,nro,fecha_emision,estado,fecha_vencimiento',
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
-            'carnet.aprovechamiento' => fn ($a) => $a->withSum('faenasQueConsumen', 'kilos_extraidos')
-                ->withSum('faenasQueReservan', 'kilos_extraidos'),
+            'carnet.aprovechamiento',
         ]);
-
-        $cupo = $faena->carnet?->aprovechamiento;
 
         return Inertia::render('panel/faenas/editar', [
             // La persona y el carnet llegan FIJOS: cambiar de titular no es
@@ -209,16 +194,7 @@ class FaenaController extends Controller
                 /* El número del libro: «000001». Ver resumir(). */
                 'carnet_registro' => $faena->carnet?->registro_legible,
 
-                // Los kilos propios se suman SOLO si descontaban: la pendiente ya
-                // no resta, así que devolvérselos mostraría el doble de cupo.
-                'saldo_kg' => $cupo !== null
-                    ? $cupo->saldoKg() + ($faena->consumeCupo() ? (float) $faena->kilos_extraidos : 0.0)
-                    : null,
-                // Lo libre más lo que ella misma reserva: es lo que puede pedir al corregirse.
-                'libre_kg' => $cupo !== null
-                    ? $cupo->libreKg() + ($faena->estado->reservaCupo() ? (float) $faena->kilos_extraidos : 0.0)
-                    : null,
-
+                // Fijos: los copió de la autorización al emitirse. No se corrigen.
                 'kilos_extraidos' => (float) $faena->kilos_extraidos,
                 'embarcacion' => $faena->embarcacion,
                 'propietario' => $faena->propietario,
@@ -230,7 +206,6 @@ class FaenaController extends Controller
             ],
 
             'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
-            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
         ]);
     }
 
@@ -242,16 +217,10 @@ class FaenaController extends Controller
         $datos = $request->validated();
 
         try {
-            $this->servicio->editar(
-                $faena,
-                (float) $datos['kilos_extraidos'],
-                // `validated()` devuelve SOLO lo que vino: ver store().
-                $datos,
-            );
+            // `validated()` devuelve SOLO lo que vino: el servicio normaliza con `?? ''`.
+            $this->servicio->editar($faena, $datos);
         } catch (PermisoOperativoException $e) {
-            // El único campo con el que el operador puede reaccionar desde acá
-            // son los kilos: el titular y el carnet no se editan.
-            return back()->withInput()->withErrors(['kilos_extraidos' => $e->getMessage()]);
+            return back()->withInput()->withErrors(['general' => $e->getMessage()]);
         }
 
         return redirect()
@@ -327,15 +296,12 @@ class FaenaController extends Controller
                 ...$this->resumir($faena),
                 'asociacion' => $faena->carnet?->asociacion?->sigla ?? $faena->carnet?->asociacion?->nombre,
 
-                /*
-                 * El cupo del que salieron los kilos.
-                 */
+                // La autorización de la que copió los kilos. No descuenta de ella.
                 'cupo' => $faena->cupo() ? [
                     'id' => $faena->cupo()->id,
                     'descripcion' => $faena->cupo()->tramo,
                     'volumen_total_kg' => (float) $faena->cupo()->volumen_total_kg,
-                    'saldo_kg' => $faena->cupo()->saldoKg(),
-                    'porcentaje_usado' => $faena->cupo()->porcentajeUsado(),
+                    'kilos_disponibles' => (float) $faena->cupo()->kilos_disponibles,
                 ] : null,
             ],
 
@@ -441,8 +407,6 @@ class FaenaController extends Controller
             'estado_etiqueta' => $faena->etiquetaEstado(),
             'estado_color' => $faena->colorEstado(),
             'vigente' => $faena->estaVigente(),
-            // Una faena vencida LIBERA su volumen: la salida no ocurrió.
-            'consume_cupo' => $faena->consumeCupo(),
             'caducada' => $faena->estaCaducada(),
             // Las dos puertas del borrador: estado PENDIENTE y sin un peso
             // cargado. Se resuelven acá para que la pantalla no las recalcule.

@@ -146,15 +146,13 @@ export interface CupoResumen {
     /** El tramo: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
     descripcion: string | null;
     volumen_total_kg: number;
-    /** Lo comprometido por las faenas que consumen cupo (todas menos las vencidas). */
-    kilos_consumidos: number;
-    saldo_kg: number;
-    porcentaje_usado: number;
+    /** Los kilos que sale cada faena, fijos: las faenas no descuentan. */
+    kilos_disponibles: number;
     estado: EstadoAprovechamiento;
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
-    /** Si pasó por la firma. En `false` todavía no hay saldo que mostrar. */
+    /** Si pasó por la firma. En `false` es un volumen pedido. */
     ya_fue_aprobado: boolean;
     saldo_pendiente: number;
     fecha_solicitud: string | null;
@@ -238,18 +236,12 @@ export interface CarnetVigenteSugerido {
     volumen_total_kg: number | null;
     tipo_actor: TipoActor;
     tipo_actor_etiqueta: string;
-    /** Exige además una bolsa madre con saldo, no solo que sea de pescador. */
+    /** Exige además una autorización aprobada y en fecha, no solo que sea de pescador. */
     puede_emitir_faenas: boolean;
     puede_emitir_guias: boolean;
 
-    /**
-     * Kilos que quedan en la bolsa madre. Null si el carnet no lleva cupo.
-     */
-    saldo_kg: number | null;
-    /** Apartado por faenas pendientes o en revisión: no descuenta, pero no está libre. */
-    reservado_kg: number | null;
-    /** Lo que una faena nueva puede pedir: saldo menos reservado. */
-    libre_kg: number | null;
+    /** Los kilos que sale cada faena, fijos. Null si el carnet no lleva autorización. */
+    kilos_disponibles: number | null;
 }
 
 /** Una coincidencia del autocompletado de los formularios de emisión. */

@@ -15,15 +15,14 @@ class CupoInvalidoException extends RuntimeException
     /**
      *  Una persona, una bolsa madre vigente a la vez
      */
-    public static function yaTieneCupoVigente(string $persona, float $saldo, string $vence): self
+    public static function yaTieneCupoVigente(string $persona, string $vence): self
     {
         return new self(sprintf(
-            '%s ya tiene un aprovechamiento vigente hasta el %s, con %s kg sin usar. '.
-            'No se otorga un segundo cupo. Si el que tiene todavía está pendiente de pago, '.
-            'elimínelo y registre el que corresponde; si ya se pagó, hay que esperar a que venza o revocarlo.',
+            '%s ya tiene un aprovechamiento vigente hasta el %s. No se otorga un segundo cupo. '.
+            'Si el que tiene todavía está pendiente de pago, elimínelo y registre el que corresponde; '.
+            'si ya se pagó, hay que esperar a que venza o revocarlo.',
             $persona,
             $vence,
-            number_format($saldo, 2, ',', '.'),
         ));
     }
 
@@ -107,7 +106,7 @@ class CupoInvalidoException extends RuntimeException
         return new self('Esta Autorización de Pesca para Aprovechamiento Pesquero ya está revocada.');
     }
 
-    /** Solo se revoca lo aprobado o agotado. */
+    /** Solo se revoca lo aprobado. */
     public static function noSePuedeRevocar(string $estado): self
     {
         return new self(

@@ -1,9 +1,8 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Ban, Banknote, BadgeCheck, ExternalLink, Eye, Pencil, Plus, Printer, Receipt, RefreshCw, Ship, Trash2, TriangleAlert } from 'lucide-react';
+import { Ban, Banknote, BadgeCheck, ExternalLink, Eye, Pencil, Plus, Printer, Receipt, RefreshCw, Ship, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
-import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +29,6 @@ export default function VerCupo({
     carnets,
     faenas,
     recibo,
-    modoEstricto,
     carnetParaFaena,
 }: {
     cupo: CupoFicha;
@@ -38,8 +36,6 @@ export default function VerCupo({
     faenas: FaenaDelCupo[];
     /** El recibo: llega en null mientras está pendiente; se emite cuando SIREB confirma el pago. */
     recibo: ReciboDelCupo | null;
-    /** Lo que dice APROVECHAMIENTO_ESTRICTO: cambia qué significa un saldo en cero. */
-    modoEstricto: boolean;
     /** El carnet aprobado con el que se emite la próxima faena; null si ninguno puede. */
     carnetParaFaena: number | null;
 }) {
@@ -187,7 +183,7 @@ export default function VerCupo({
             </Card>
 
             <div className="grid gap-6 lg:grid-cols-3">
-                {/* ------------------------------------------------ El saldo */}
+                {/* ------------------------------------------------ El volumen */}
                 <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Volumen</CardTitle>
@@ -195,46 +191,15 @@ export default function VerCupo({
                     </CardHeader>
 
                     <CardContent className="space-y-5">
-                        {/* Antes de la firma dice «kg solicitados» y no dibuja saldo. */}
-                        <BarraSaldo cupo={cupo} />
-
-                        {/*
-                            EL DESGLOSE APARECE CUANDO HAY ALGO QUE DESGLOSAR.
-                            «Otorgado» recién después de la firma —antes es lo
-                            pedido— y consumido/disponible/usado recién cuando
-                            se emitió alguna faena: con el cupo entero los tres
-                            dicen lo mismo que el primero, y «disponible 300 de
-                            300» sobre un cupo sin usar suena a que algo pasó.
-                        */}
-                        <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                            {! cupo.ya_fue_aprobado ? (
-                                <Dato etiqueta="Solicitado" valor={`${cupo.volumen_total_kg} kg`} />
-                            ) : cupo.kilos_consumidos <= 0 && cupo.kilos_reservados <= 0 ? (
-                                <Dato etiqueta="Otorgado" valor={`${cupo.volumen_total_kg} kg`} />
-                            ) : (
-                                <>
-                                    <Dato etiqueta="Otorgado" valor={`${cupo.volumen_total_kg} kg`} />
-                                    <Dato etiqueta="Consumido" valor={`${cupo.kilos_consumidos} kg`} />
-                                    <Dato etiqueta="Disponible" valor={`${cupo.saldo_kg} kg`} />
-                                    <Dato etiqueta="Usado" valor={`${cupo.porcentaje_usado}%`} />
-                                    {/* Reservar no descuenta: aparta kilos de faenas pendientes o en revisión. */}
-                                    {cupo.kilos_reservados > 0 && (
-                                        <>
-                                            <Dato etiqueta="Reservado" valor={`${cupo.kilos_reservados} kg`} />
-                                            <Dato etiqueta="Libre para faena" valor={`${cupo.libre_kg} kg`} />
-                                        </>
-                                    )}
-                                </>
-                            )}
+                        {/* Las faenas no descuentan: cada una sale con los kilos disponibles, fijos. */}
+                        <dl className="grid grid-cols-2 gap-4 text-sm">
+                            <Dato
+                                etiqueta={cupo.ya_fue_aprobado ? 'Otorgado' : 'Solicitado'}
+                                valor={`${cupo.volumen_total_kg} kg`}
+                            />
+                            <Dato etiqueta="Kilos por faena" valor={`${cupo.kilos_disponibles} kg`} />
                         </dl>
 
-                        {/*
-                            EL EXCESO SOLO PUEDE EXISTIR EN MODO FLEXIBLE: con la
-                            validación encendida la emisión frena antes. Cuando
-                            aparece es un hecho consumado —el pescado ya se
-                            extrajo— así que se muestra como dato, no como un error
-                            que alguien pueda corregir desde acá.
-                        */}
                         {/*
                             PENDIENTE NO ES UN DETALLE DE COLOR: el cupo existe,
                             está en fecha y con el volumen entero, y aun así NO
@@ -249,19 +214,6 @@ export default function VerCupo({
                                     <strong>Pendiente.</strong> Todavía no autoriza a pescar: falta
                                     que se pague y se valide en Recaudaciones. Mientras tanto se puede
                                     corregir o eliminar.
-                                </span>
-                            </p>
-                        )}
-
-
-                        {cupo.excedido && (
-                            <p className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                                <span>
-                                    Las faenas emitidas suman{' '}
-                                    <strong>{cupo.kilos_excedidos} kg por encima</strong> del volumen
-                                    otorgado. El control de cupo está desactivado, así que la emisión
-                                    no lo frenó.
                                 </span>
                             </p>
                         )}
@@ -322,11 +274,7 @@ export default function VerCupo({
                                     : 'rounded-md bg-amber-50 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200'
                             }
                         >
-                            {cupo.puede_emitir_faena
-                                ? modoEstricto
-                                    ? 'Habilitado para emitir faenas.'
-                                    : 'Habilitado para emitir faenas. El control de saldo está desactivado: se siguen emitiendo aunque el cupo se agote.'
-                                : cupo.motivo_sin_faena}
+                            {cupo.puede_emitir_faena ? 'Habilitado para emitir faenas.' : cupo.motivo_sin_faena}
                         </p>
                     </CardContent>
                 </Card>
@@ -583,26 +531,7 @@ export default function VerCupo({
                                                     </td>
 
                                                     <td className="px-5 py-2.5 text-right tabular-nums">
-                                                        {/*
-                                                            Tachado cuando NO consume cupo —todavía sin
-                                                            firmar, o vencida—: es lo que hace que la
-                                                            suma de la columna cuadre con el saldo de
-                                                            arriba.
-                                                        */}
-                                                        <span
-                                                            className={
-                                                                f.consume_cupo
-                                                                    ? undefined
-                                                                    : 'text-muted-foreground line-through'
-                                                            }
-                                                        >
-                                                            {f.kilos_extraidos} kg
-                                                        </span>
-                                                        {!f.consume_cupo && (
-                                                            <span className="ml-2 text-xs text-muted-foreground">
-                                                                sin descontar
-                                                            </span>
-                                                        )}
+                                                        {f.kilos_extraidos} kg
                                                     </td>
 
                                                     <td className="px-5 py-2.5">

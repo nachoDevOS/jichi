@@ -123,7 +123,6 @@ export type TipoActor = 'pescador' | 'comercializador';
 export type EstadoAprovechamiento =
     | 'pendiente'
     | 'aprobado'
-    | 'agotado'
     | 'revocado';
 
 /** Espejo de App\Enums\EstadoFaena. */

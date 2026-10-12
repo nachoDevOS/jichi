@@ -34,9 +34,9 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 
 | Archivo | Ln | Valores | No obvio |
 | --- | --- | --- | --- |
-| `EstadoAprovechamiento.php` | 98 | `pendiente`, `aprobado`, `agotado`, `revocado` | `estaAbierto()` = esperando pago. **No hay `vencido`**: la vigencia la dicen las fechas. `no_pagado` = venció el plazo de pago en SIREB sin pago |
+| `EstadoAprovechamiento.php` | 98 | `pendiente`, `aprobado`, `revocado` (sin `agotado` desde el 12/10/2026) | `estaAbierto()` = esperando pago. **No hay `vencido`**: la vigencia la dicen las fechas. `no_pagado` = venció el plazo de pago en SIREB sin pago |
 | `EstadoCarnet.php` | 116 | `pendiente`, `aprobado`, `revocado` | Solo `aprobado` habilita; si vale HOY lo dice `Carnet::estaVigente()` con la fecha |
-| `EstadoFaena.php` | 122 | `pendiente`, `aprobado`, `revocado` | `consumeCupo()` (aprobado/revocado) y `reservaCupo()` (pendiente): de acá sale el saldo de kilos. `revocado` es histórico |
+| `EstadoFaena.php` | 122 | `pendiente`, `aprobado`, `revocado` | `revocado` es histórico. Ningún estado descuenta kilos (12/10/2026) |
 | `EstadoGuia.php` | 101 | `pendiente`, `aprobado` (`Aprobada`), `revocado` (`Revocada`) | Los casos van en femenino; los valores, iguales a los otros tres |
 | `EstadoLiquidacionSireb.php` | 36 | `por_enviar`, `registrada`, `anulada` | Dónde está la liquidación respecto de SIREB, no si se pagó: eso se pregunta |
 | `TipoActor.php` | 60 | `pescador`, `comercializador` | **Qué emite cada carnet**: `emiteFaenas()`, `emiteGuias()`, `requiereAprovechamiento()`. Nunca por el nombre del tipo de carnet |
@@ -53,7 +53,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | --- | --- | --- | --- |
 | `OtorgarCupoService.php` | 231 | Otorgar, corregir y eliminar la autorización | Una autorización en curso por persona (`enCurso()`). Recibe la tarifa de SIREB elegida: `verificarTramo()` saca de ella precio, etiqueta y kilos. **Corregir cambia solo la embarcación**: el tramo no se toca nunca. El N° (`nro`) es correlativo continuo |
 | `EmitirCarnetService.php` | 383 | Emitir, corregir, eliminar, revocar y reponer el carnet | Un carnet vigente por actividad. Pescador exige autorización; comercializador la prohíbe. El precio es la tarifa del servicio «Carnet» elegida (`precioDe($tarifaId)`); al corregir, la suya. Adjuntos SUBIDOS antes de la transacción |
-| `EmitirFaenaService.php` | 295 | Emitir, corregir y eliminar la faena | Reserva kilos al registrarse; en modo estricto no deja pasar lo libre. Ver `PermisoFaena::cupo` |
+| `EmitirFaenaService.php` | 295 | Emitir, corregir y eliminar la faena | Copia `kilos_disponibles` de la autorización en `kilos_extraidos`; no descuenta. Ver `PermisoFaena::cupo` |
 | `EmitirGuiaService.php` | 356 | Emitir, corregir, eliminar y revocar la guía | Cabecera y detalle en la misma transacción. Cada renglón es una tarifa de SIREB (fila `guia`): copia etiqueta y precio. `eliminar()` baja el detalle a mano: CASCADE no corre con baja lógica |
 | `Revisar*Service.php` (Cupo, Carnet, Faena, Guia) | 41–76 | `aprobar()` de cada documento | **Los llama solo `ConfirmarPagoService`.** Conservan las reglas propias (autorización revocada, kilos libres, fechas, número de registro). `RevisarCupoService` además revoca |
 | `LiquidarSirebService.php` | 145 | La liquidación de un documento en SIREB | Dos tiempos: `preparar()` guarda la `Idempotency-Key` DENTRO de la transacción, `enviar()` llama DESPUÉS. `anular()` **consulta antes**: con pago cargado o validado frena (`SirebException::pagoEnRevision()` / `liquidacionPagada()`); vencida sin pago no pide anular |
@@ -80,7 +80,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
 | `Rol.php` | 39 | Hereda el `Role` de Spatie para llevar `Auditable`; registrado en `config/permission.php`. `esDelSistema()` = está en `RolSistema` |
-| `AprovechamientoPesq.php` | 451 | La bolsa madre. **Sin columnas de saldo**: `kilosConsumidos()`, `kilosReservados()`, `saldoKg()`, `libreKg()` se calculan sobre las faenas, reusando el `withSum` si vino (por CLAVE, no por null). `sincronizarEstadoPorSaldo()` solo mueve entre aprobado y agotado. `numeroLegible()` lee `nro` |
+| `AprovechamientoPesq.php` | 451 | La bolsa madre. `volumen_total_kg` y `kilos_disponibles` los escribe ventanilla; las faenas no descuentan (12/10/2026). `puedeEmitirFaena()` = `estaVigente()`. `numeroLegible()` lee `nro` |
 | `Carnet.php` | 425 | `estaVigente()`, `sinEfecto()` y `etiquetaEstado()` **miran a su autorización**: la consulta tiene que precargarla. `amparaSusPapeles()`: faenas y guías valen si el titular tiene carnet vigente de la actividad. `registro_legible` = `nro` con seis dígitos |
 | `PermisoFaena.php` | 305 | Vigencia de 30 días (`fecha_desembarque`). Vale si su carnet y su autorización valen. `$attributes` lleva los defaults que lee el código |
 | `GuiaMovimiento.php` | 330 | Vigencia de 5 días. `factorArancel()`: piscicultura al 50%. `numero_legible` lee `nro` |

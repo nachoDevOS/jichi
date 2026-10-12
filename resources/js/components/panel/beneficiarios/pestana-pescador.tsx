@@ -334,15 +334,11 @@ function diasEntre(desde: string | null, hasta: string | null): number | null {
     return Number.isNaN(dias) ? null : dias;
 }
 
-/** La bolsa madre con su saldo: lo que dice si puede salir mañana. */
+/** La autorización: lo otorgado y los kilos con que sale cada faena. */
 function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
     // La vigencia la dice la fecha, no el estado: aprobada sigue aprobada aunque pase su fecha.
     const vencido = cupo.ya_fue_aprobado && cupo.fecha_vencimiento !== null && cupo.fecha_vencimiento.slice(0, 10) < fechaInput(new Date());
     const revocado = cupo.estado === 'revocado';
-    // Ninguna autoriza: lo que sobró no se puede pescar.
-    const cerrado = vencido || revocado;
-    const escaso = !cerrado && cupo.volumen_total_kg > 0 && cupo.saldo_kg / cupo.volumen_total_kg < 0.2;
-    const colorLibre = cerrado ? 'bg-slate-300 dark:bg-slate-600' : escaso ? 'bg-amber-500' : 'bg-sky-600';
 
     return (
         <EnlacePermitido
@@ -357,70 +353,25 @@ function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
                 <Badge color={cupo.estado_color}>{cupo.estado_etiqueta}</Badge>
             </div>
 
-            {/* Antes de la firma no se consumió nada: solo hay un volumen pedido. */}
-            {cupo.ya_fue_aprobado ? (
-                <div className="mt-4 space-y-3">
-                    {/* En palabras, para que se entienda sin hacer cuentas. */}
-                    {revocado ? (
-                        <p className="text-sm text-muted-foreground">
-                            <span className="font-semibold text-rose-700 dark:text-rose-400">Revocada:</span> no autoriza
-                            faenas ni carnets nuevos. Quedaron{' '}
-                            <span className="text-3xl font-semibold tabular-nums text-foreground">{cupo.saldo_kg} kg</span> sin
-                            pescar
-                        </p>
-                    ) : vencido ? (
-                        // Fuera de fecha no autoriza nada: lo que sobró no se puede pescar.
-                        <p className="text-sm text-muted-foreground">
-                            Venció el {fecha(cupo.fecha_vencimiento)} con{' '}
-                            <span className="text-3xl font-semibold tabular-nums text-foreground">{cupo.saldo_kg} kg</span> sin
-                            pescar
-                        </p>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            {cupo.saldo_kg > 0 ? 'Le quedan' : 'No le quedan kilos:'}{' '}
-                            <span className={cn('text-3xl font-semibold tabular-nums text-foreground', escaso && 'text-amber-700 dark:text-amber-400')}>
-                                {cupo.saldo_kg} kg
-                            </span>{' '}
-                            {cupo.saldo_kg > 0 ? 'para pescar' : 'hay que tramitar otra autorización'}
-                        </p>
-                    )}
-
-                    {/* Dos tramos: lo usado en faenas y lo que todavía puede pescar. */}
-                    <div className="flex h-3 overflow-hidden rounded-full bg-secondary">
-                        <div className="h-full bg-slate-400 dark:bg-slate-500" style={{ width: `${cupo.porcentaje_usado}%` }} />
-                        <div
-                            className={cn('h-full', colorLibre)}
-                            style={{ width: `${Math.max(0, 100 - cupo.porcentaje_usado)}%` }}
-                        />
-                    </div>
-
-                    <dl className="grid grid-cols-3 gap-3 text-xs">
-                        <div>
-                            <dt className="text-muted-foreground">Autorizado</dt>
-                            <dd className="text-sm font-semibold tabular-nums">{cupo.volumen_total_kg} kg</dd>
-                        </div>
-                        <div>
-                            <dt className="flex items-center gap-1.5 text-muted-foreground">
-                                <span className="size-2 rounded-full bg-slate-400 dark:bg-slate-500" />
-                                Usado en faenas
-                            </dt>
-                            <dd className="text-sm font-semibold tabular-nums">{cupo.kilos_consumidos} kg</dd>
-                        </div>
-                        <div>
-                            <dt className="flex items-center gap-1.5 text-muted-foreground">
-                                <span className={cn('size-2 rounded-full', colorLibre)} />
-                                {cerrado ? 'Sin pescar' : 'Disponible'}
-                            </dt>
-                            <dd className="text-sm font-semibold tabular-nums">{cupo.saldo_kg} kg</dd>
-                        </div>
-                    </dl>
+            {/* Las faenas no descuentan: cada una sale con los kilos disponibles, fijos. */}
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                    <dt className="text-muted-foreground">{cupo.ya_fue_aprobado ? 'Autorizado' : 'Solicitado'}</dt>
+                    <dd className="text-2xl font-semibold tabular-nums">{cupo.volumen_total_kg} kg</dd>
                 </div>
-            ) : (
-                <p className="mt-4 tabular-nums">
-                    <span className="text-3xl font-semibold">{cupo.volumen_total_kg}</span>
-                    <span className="text-muted-foreground"> kg solicitados · todavía sin firmar</span>
-                </p>
-            )}
+                <div>
+                    <dt className="text-muted-foreground">Kilos por faena</dt>
+                    <dd className="text-2xl font-semibold tabular-nums">{cupo.kilos_disponibles} kg</dd>
+                </div>
+            </dl>
+
+            {revocado ? (
+                <p className="mt-2 text-sm text-rose-700 dark:text-rose-400">Revocada: no autoriza faenas ni carnets nuevos.</p>
+            ) : vencido ? (
+                <p className="mt-2 text-sm text-muted-foreground">Venció el {fecha(cupo.fecha_vencimiento)}.</p>
+            ) : !cupo.ya_fue_aprobado ? (
+                <p className="mt-2 text-sm text-muted-foreground">Todavía sin firmar.</p>
+            ) : null}
 
             <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3 text-xs">
                 <div>

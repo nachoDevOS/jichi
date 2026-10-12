@@ -22,14 +22,12 @@ class ExpedienteBeneficiario
     public static function carnets(Beneficiario $beneficiario): Collection
     {
         return $beneficiario->carnets()
-            // El cupo con su saldo precargado: `motivoSinPermisos()` y
+            // La autorización precargada: `motivoSinPermisos()` y
             // `puedeEmitirFaenas()` lo leen, y sin esto son dos consultas por carnet.
             ->with([
                 'codigo',
                 'asociacion:id,nombre,sigla',
-                'aprovechamiento' => fn ($a) => $a
-                    ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                    ->withSum('faenasQueReservan', 'kilos_extraidos'),
+                'aprovechamiento',
             ])
             // Por id y no por emisión: la emisión es NULL hasta la firma, y
             // cada motor ordena los NULL en otra punta.
@@ -67,8 +65,6 @@ class ExpedienteBeneficiario
     public static function aprovechamientos(Beneficiario $beneficiario): Collection
     {
         return $beneficiario->aprovechamientos()
-            ->withSum('faenasQueConsumen', 'kilos_extraidos')
-            ->withSum('faenasQueReservan', 'kilos_extraidos')
             // Por la SOLICITUD: la emisión está en NULL hasta la firma.
             ->orderByDesc('fecha_solicitud')
             ->get();

@@ -134,7 +134,7 @@ export default function IndiceFaenas({
                             descripcion={
                                 filtros.buscar || filtros.estado
                                     ? 'Ninguna coincide con los filtros.'
-                                    : 'La faena cuelga del carnet de pescador: la persona necesita carnet vigente y cupo con saldo.'
+                                    : 'La faena cuelga del carnet de pescador: la persona necesita carnet vigente y autorización vigente.'
                             }
                         />
                     ) : (
@@ -201,21 +201,7 @@ export default function IndiceFaenas({
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-right tabular-nums">
-                                                    {/*
-                                                        Tachado cuando NO consume cupo: todavía sin
-                                                        firmar, o vencida. Es lo que hace que la
-                                                        suma cuadre con el saldo del
-                                                        aprovechamiento.
-                                                    */}
-                                                    <span
-                                                        className={
-                                                            f.consume_cupo
-                                                                ? undefined
-                                                                : 'text-muted-foreground line-through'
-                                                        }
-                                                    >
-                                                        {f.kilos_extraidos} kg
-                                                    </span>
+                                                    {f.kilos_extraidos} kg
                                                 </td>
 
                                                 <td className="px-5 py-2.5 text-muted-foreground">

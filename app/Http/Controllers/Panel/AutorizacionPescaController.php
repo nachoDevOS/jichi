@@ -56,7 +56,7 @@ class AutorizacionPescaController extends Controller
     /**
      * Imprimir — GET /panel/aprovechamientos/{aprovechamiento}/autorizacion
      *
-     * Solo con el cupo APROBADO. Un vencido o agotado sí se reimprime: puede
+     * Solo con el cupo APROBADO. Un vencido sí se reimprime: puede
      * hacer falta reponer el papel de una gestión cerrada.
      */
     public function imprimir(AprovechamientoPesq $aprovechamiento): Response|RedirectResponse

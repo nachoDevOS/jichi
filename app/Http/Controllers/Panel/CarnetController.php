@@ -243,15 +243,12 @@ class CarnetController extends Controller
                 'provincia' => $carnet->beneficiario?->provincia,
                 'asociacion_nombre' => $carnet->asociacion?->nombre,
 
-                // El cupo con su saldo: es lo que decide si hoy se le puede emitir
-                // una faena.
+                // La autorización que respalda el carnet: sus kilos salen fijos en cada faena.
                 'cupo' => $carnet->aprovechamiento ? [
                     'id' => $carnet->aprovechamiento->id,
                     'descripcion' => $carnet->aprovechamiento->tramo,
                     'volumen_total_kg' => (float) $carnet->aprovechamiento->volumen_total_kg,
-                    'kilos_consumidos' => $carnet->aprovechamiento->kilosConsumidos(),
-                    'saldo_kg' => $carnet->aprovechamiento->saldoKg(),
-                    'porcentaje_usado' => $carnet->aprovechamiento->porcentajeUsado(),
+                    'kilos_disponibles' => (float) $carnet->aprovechamiento->kilos_disponibles,
                     'vigente' => $carnet->aprovechamiento->estaVigente(),
 
                     // Las tres FECHAS y el estado: sin ellas, la tarjeta decía

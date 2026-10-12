@@ -53,7 +53,8 @@ para no equivocarse:
                  │
                  ▼
         PERMISO DE FAENA (una por salida, 30 días;
-        reserva kilos al registrarse, los descuenta al aprobarse)
+        sale con los kilos_disponibles de la autorización, fijos;
+        NO descuenta nada — 12/10/2026)
 
  Los cuatro se PAGAN EN SIREB (Recaudaciones): cada uno registra su liquidación
  y, cuando SIREB la da por pagada, Jichi lo aprueba y emite su RECIBO.
@@ -71,7 +72,7 @@ para no equivocarse:
   (`EstadoAprovechamiento`, `EstadoCarnet`, `EstadoFaena`, `EstadoGuia`):
 
   ```
-                ┌─(SIREB: «pagada»)──▶ APROBADO ──▶ revocado / agotado
+                ┌─(SIREB: «pagada»)──▶ APROBADO ──▶ revocado
   PENDIENTE ────┤                          └── al aprobar sale el RECIBO
   (borrador)    └─(SIREB: «vencida»)──▶ sigue PENDIENTE (08/10/2026)
   ```
@@ -90,8 +91,10 @@ para no equivocarse:
   «sin efecto»**, porque su vigencia se calcula mirando al padre. Ver la trampa
   de la vigencia, más abajo.
 - **Lo que se entregó, se congela**: el recibo copia monto, concepto y la boleta
-  de SIREB; la guía copia el precio de cada producto. **No hay columnas de
-  saldo**: el saldo de kilos se calcula sobre las faenas.
+  de SIREB; la guía copia el precio de cada producto. **Las faenas NO
+  descuentan de la autorización** (12/10/2026): cada faena sale con
+  `aprovechamientos_pesq.kilos_disponibles`, un valor fijo que pone ventanilla al
+  otorgar. No hay saldo, reserva, `agotado` ni `APROVECHAMIENTO_ESTRICTO`.
 
 Todo eso vive en `app/Services/` (`OtorgarCupoService`, `Emitir*Service`,
 `Revisar*Service`, `LiquidarSirebService`, `ConfirmarPagoService`), en transacciones con
@@ -503,8 +506,8 @@ Los tres tienen que pasar.
   hecho `with('relacion')` justamente para evitarlo. El `with()` queda escrito,
   se ve correcto, y el N+1 sigue ahí en silencio —el autocompletado de
   beneficiarios hacía 18 consultas por tecleada con el eager loading puesto—. Un
-  método del modelo que lo use debe preguntar antes con `relationLoaded()`; ver
-  `AprovechamientoPesq::kilosConsumidos()`.
+  método del modelo que lo use debe preguntar antes con `relationLoaded()` (el
+  caso fue el viejo `kilosReservados()`, retirado el 12/10/2026).
 - **`php artisan serve` LEE EL `.env` UNA SOLA VEZ, y REINICIAR EL SERVIDOR NO
   ES LO QUE PARECE.** Es la trampa más cara de este proyecto hasta ahora: costó
   dos diagnósticos equivocados.
@@ -548,8 +551,8 @@ Los tres tienen que pasar.
   faenas —la que más aparece en un listado— se cae a la consulta agregada suelta,
   con el `withSum` puesto, viéndose correcto y sin ningún error. El N+1 sigue
   ahí para la mitad de las filas. Se pregunta si la CLAVE EXISTE:
-  `array_key_exists('faenas_que_consumen_sum_kilos_extraidos', $this->getAttributes())`.
-  Ver `AprovechamientoPesq::kilosConsumidos()`.
+  `array_key_exists('x_sum_kilos', $this->getAttributes())`. (Mordió con el
+  saldo de kilos, retirado el 12/10/2026; vale para cualquier `withSum`.)
 - **El trait `Auditable` YA registra el borrado: escribir la auditoría a mano
   deja DOS filas.** Engancha `created`, `updated` y `deleted`, así que un
   servicio que además llame a `registrarAuditoria('eliminado', …)` duplica el
@@ -633,16 +636,17 @@ Los tres tienen que pasar.
   `<script data-page="app" type="application/json">`. Un parser que busque el
   atributo lee «app» y revienta con «is not valid JSON». Un 409 acá NO es un error de la pantalla.
 - **Una bandera de configuración que apaga una validación tiene que llegar a la
-  PANTALLA, o la pantalla miente.** Con `APROVECHAMIENTO_ESTRICTO=false` el
+  PANTALLA, o la pantalla miente.** (La bandera se retiró el 12/10/2026; la
+  lección vale para la próxima.) Con `APROVECHAMIENTO_ESTRICTO=false` el
   servidor acepta una faena que se pasa del cupo, y el formulario la seguía
   frenando con «no entra en el cupo»: una regla inventada en React sobre algo
   que el sistema permite, sin ningún mensaje que lo explicara. El patrón que
   quedó es separar el HECHO de la CONSECUENCIA —`excede` y `bloquea`— y mandar
-  el modo como prop. Ver `FaenaController::create()` y `faenas/crear.tsx`.
+  el modo como prop.
 - **`estaVigente()` mezcla estado y fecha, y eso esconde botones.** Un cupo
-  AGOTADO no está vigente —su estado no habilita— y es exactamente el que hay
-  que poder tocar. Mordió diciendo «no tiene un aprovechamiento vigente» al
-  emitir una faena sobre un cupo agotado pero en fecha, lo que mandaba al
+  que su estado no habilita no está vigente aunque esté en fecha. Mordió (con el
+  viejo estado `agotado`, retirado el 12/10/2026) diciendo «no tiene un
+  aprovechamiento vigente» al emitir una faena sobre un cupo en fecha, lo que mandaba al
   operador a otorgar uno nuevo que la regla de una bolsa por persona iba a
   rechazar. **Antes de usar `estaVigente()` como permiso, preguntarse qué se está
   preguntando de verdad**: hay `estaEnFecha()`, `puedeEditarse()`,

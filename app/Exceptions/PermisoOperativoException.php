@@ -61,34 +61,6 @@ class PermisoOperativoException extends RuntimeException
     }
 
     /**
-     * La faena pedida no entra en lo que queda del cupo.
-     */
-    public static function excedeCupo(float $pedido, float $saldo): self
-    {
-        return new self(sprintf(
-            'La faena declara %s kg y en la bolsa madre quedan %s kg. '.
-            'Hay que bajar los kilos o tramitar un aprovechamiento nuevo.',
-            number_format($pedido, 2, ',', '.'),
-            number_format($saldo, 2, ',', '.'),
-        ));
-    }
-
-    /**
-     * Hay saldo, pero parte está apartado por otras solicitudes abiertas.
-     * Lleva «quedan»: FaenaController lo manda al campo de kilos por esa palabra.
-     */
-    public static function excedeLibre(float $pedido, float $libre, float $reservado): self
-    {
-        return new self(sprintf(
-            'La faena declara %s kg y quedan libres %s kg: %s kg están reservados por faenas '.
-            'pendientes. Baje los kilos o elimine la faena que no vaya a salir.',
-            number_format($pedido, 2, ',', '.'),
-            number_format($libre, 2, ',', '.'),
-            number_format($reservado, 2, ',', '.'),
-        ));
-    }
-
-    /**
      * No se revoca dos veces, y no vuelve atrás.
      */
     public static function guiaYaRevocada(): self

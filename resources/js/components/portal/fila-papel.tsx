@@ -53,20 +53,11 @@ export function FilaPapel({ papel }: { papel: PapelPortal }) {
                 </div>
             </div>
 
-            {/* La autorización vigente muestra su saldo: es lo que el pescador consulta. */}
+            {/* La autorización vigente muestra los kilos con que sale cada permiso de faena. */}
             {papel.clase === 'aprovechamiento' && vigente && (
-                <div className="mt-3">
-                    <div className="flex justify-between text-[11px] font-semibold text-slate-500">
-                        <span>Usado {kg(papel.kilos_consumidos)}</span>
-                        <span className="text-rio">Le quedan {kg(papel.saldo_kg)}</span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                            className="h-full rounded-full bg-linear-to-r from-rio-claro to-rio"
-                            style={{ width: `${Math.min(100, papel.porcentaje_usado)}%` }}
-                        />
-                    </div>
-                </div>
+                <p className="mt-3 text-[11px] font-semibold text-slate-500">
+                    Cada permiso de faena sale por <span className="text-rio">{kg(papel.kilos_disponibles)}</span>
+                </p>
             )}
 
             <p

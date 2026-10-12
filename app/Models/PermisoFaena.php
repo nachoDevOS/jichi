@@ -278,12 +278,6 @@ class PermisoFaena extends Model
             && $this->fecha_desembarque->endOfDay()->isPast();
     }
 
-    /** ¿Sus kilos pesan contra el cupo de la bolsa madre? */
-    public function consumeCupo(): bool
-    {
-        return $this->estado->consumeCupo();
-    }
-
     //  Scopes
 
     /**

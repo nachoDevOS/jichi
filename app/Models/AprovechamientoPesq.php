@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\EstadoAprovechamiento;
-use App\Enums\EstadoFaena;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
@@ -17,16 +16,15 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * La bolsa madre del pescador: el cupo anual en kilos, con fecha.
- *
- * @property-read string|null $faenas_que_consumen_sum_kilos_extraidos columna virtual que agrega withSum()
- * @property-read string|null $faenas_que_reservan_sum_kilos_extraidos columna virtual que agrega withSum()
+ * La autorización de pesca del pescador: el volumen anual en kilos, con fecha.
+ * Las faenas NO descuentan de acá (12/10/2026): se emiten por el carnet.
  */
 #[Fillable([
     'beneficiario_id',
     'nro',
     'tramo',
     'volumen_total_kg',
+    'kilos_disponibles',
     'monto',
     'sireb_tarifa_id',
     'tipo_embarcacion',
@@ -62,6 +60,7 @@ class AprovechamientoPesq extends Model
     {
         return [
             'volumen_total_kg' => 'decimal:2',
+            'kilos_disponibles' => 'decimal:2',
             'monto' => 'decimal:2',
             'estado' => EstadoAprovechamiento::class,
             'fecha_solicitud' => 'date',
@@ -78,11 +77,8 @@ class AprovechamientoPesq extends Model
     }
 
     /**
-     * Las salidas que descuentan de esta bolsa, A TRAVÉS de los carnets.
-     *
-     * `permisos_faena` no guarda `aprovechamiento_id`: la faena cuelga del
-     * carnet y el carnet sabe de qué cupo se apoya. Es `hasManyThrough`, así
-     * que `withSum` y `withMax` siguen funcionando igual.
+     * Las faenas de esta autorización, A TRAVÉS de los carnets: `permisos_faena`
+     * no guarda `aprovechamiento_id`, la faena cuelga del carnet.
      */
     public function faenas(): HasManyThrough
     {
@@ -117,125 +113,10 @@ class AprovechamientoPesq extends Model
         return (float) $this->monto;
     }
 
-    /**
-     * Kilos ya comprometidos por las faenas.
-     */
-    public function kilosConsumidos(): float
-    {
-        if (array_key_exists('faenas_que_consumen_sum_kilos_extraidos', $this->getAttributes())) {
-            return (float) $this->faenas_que_consumen_sum_kilos_extraidos;
-        }
-
-        if ($this->relationLoaded('faenas')) {
-            return (float) $this->faenas
-                ->filter(fn (PermisoFaena $f): bool => $f->estado->consumeCupo())
-                ->sum('kilos_extraidos');
-        }
-
-        return (float) $this->faenasQueConsumen()->sum('kilos_extraidos');
-    }
-
-    /**
-     * Las faenas cuyo volumen pesa contra el cupo: las FIRMADAS y las cerradas.
-     *
-     * La lista sale de `EstadoFaena::consumeCupo()` y tiene que decir lo mismo
-     * que él: una es el filtro en SQL y la otra el filtro en memoria, y si se
-     * separan el listado y la ficha muestran saldos distintos.
-     */
-    public function faenasQueConsumen(): HasManyThrough
-    {
-        // Calificada: `carnets` entra en el join y también tiene `estado`.
-        return $this->faenas()->whereIn('permisos_faena.estado', [
-            EstadoFaena::Aprobado,
-            EstadoFaena::Revocado,
-        ]);
-    }
-
-    /** Las solicitudes abiertas: apartan kilos sin descontarlos. Ver `EstadoFaena::reservaCupo()`. */
-    public function faenasQueReservan(): HasManyThrough
-    {
-        return $this->faenas()->whereIn('permisos_faena.estado', [
-            EstadoFaena::Pendiente,
-        ]);
-    }
-
-    /** Kilos apartados por faenas pendientes. Mismo patrón que `kilosConsumidos()`. */
-    public function kilosReservados(): float
-    {
-        if (array_key_exists('faenas_que_reservan_sum_kilos_extraidos', $this->getAttributes())) {
-            return (float) $this->faenas_que_reservan_sum_kilos_extraidos;
-        }
-
-        if ($this->relationLoaded('faenas')) {
-            return (float) $this->faenas
-                ->filter(fn (PermisoFaena $f): bool => $f->estado->reservaCupo())
-                ->sum('kilos_extraidos');
-        }
-
-        return (float) $this->faenasQueReservan()->sum('kilos_extraidos');
-    }
-
-    /**
-     * Pone el cupo en `agotado` o lo devuelve a `aprobado` según su saldo real.
-     *
-     * Vive en el modelo y no en un servicio porque lo necesitan los dos: el
-     * que emite y corrige faenas, y el que las firma —que es donde ahora se
-     * consume el volumen—.
-     */
-    public function sincronizarEstadoPorSaldo(): void
-    {
-        // Solo se mueve entre aprobado y agotado. Un REVOCADO volvería a `aprobado` al
-        // anular una faena —reviviría una autorización dada de baja—, y un pendiente
-        // nunca se aprobó.
-        if (! in_array($this->estado, [EstadoAprovechamiento::Aprobado, EstadoAprovechamiento::Agotado], true)) {
-            return;
-        }
-
-        $deberiaEstar = $this->saldoKg() <= 0.0
-            ? EstadoAprovechamiento::Agotado
-            : EstadoAprovechamiento::Aprobado;
-
-        if ($this->estado !== $deberiaEstar) {
-            $this->update(['estado' => $deberiaEstar]);
-        }
-    }
-
     /** El N° de la autorización impresa, con los ceros del talonario: «000001». */
     public function numeroLegible(): string
     {
         return CorrelativoService::rellenar($this->nro);
-    }
-
-    /**
-     * Kilos que quedan. Se corta en cero: un cupo excedido no es un saldo
-     * negativo del que se pueda seguir restando, es un cupo agotado.
-     */
-    public function saldoKg(): float
-    {
-        return max(0.0, round((float) $this->volumen_total_kg - $this->kilosConsumidos(), 2));
-    }
-
-    /**
-     * Kilos que una faena NUEVA puede pedir: el saldo menos lo reservado. No
-     * mueve el estado: una reserva se elimina y no agota el cupo.
-     */
-    public function libreKg(): float
-    {
-        return max(0.0, round($this->saldoKg() - $this->kilosReservados(), 2));
-    }
-
-    /**
-     *  Los kilos que se pasaron del cupo
-     */
-    public function kilosExcedidos(): float
-    {
-        return max(0.0, round($this->kilosConsumidos() - (float) $this->volumen_total_kg, 2));
-    }
-
-    /** ¿Se pasó del volumen otorgado? Solo puede ocurrir en modo flexible. */
-    public function estaExcedido(): bool
-    {
-        return $this->kilosExcedidos() > 0.0;
     }
 
     /**
@@ -255,20 +136,12 @@ class AprovechamientoPesq extends Model
     }
 
     /**
-     * ¿Pasó alguna vez por la firma? Es lo que habilita la autorización en papel.
-     *
-     * A agotado y revocado se llega desde APROBADO, así que tuvieron su
-     * aprobación; el pendiente no. Fuera de fecha se reimprime igual:
-     * puede hacer falta reponer el papel de una gestión cerrada.
+     * ¿Pasó alguna vez por la firma? A revocado se llega desde APROBADO; el
+     * pendiente no. Fuera de fecha se reimprime igual.
      */
     public function yaFueAprobado(): bool
     {
-        return in_array($this->estado, [
-            EstadoAprovechamiento::Aprobado,
-            EstadoAprovechamiento::Agotado,
-            // Revocado también pasó por la firma; lo que pierde es la impresión.
-            EstadoAprovechamiento::Revocado,
-        ], true);
+        return in_array($this->estado, [EstadoAprovechamiento::Aprobado, EstadoAprovechamiento::Revocado], true);
     }
 
     /** ¿Se imprime la autorización? Aprobada y no revocada, como el carnet. */
@@ -294,22 +167,6 @@ class AprovechamientoPesq extends Model
         return $this->estado->permiteRevocacion();
     }
 
-    /** ¿El tope de la bolsa madre se hace cumplir? Ver `config/jichi.php`. */
-    public static function modoEstricto(): bool
-    {
-        return (bool) config('jichi.aprovechamiento.estricto', true);
-    }
-
-    /** Qué porcentaje del cupo se usó. Para la barra de progreso de la ficha. */
-    public function porcentajeUsado(): float
-    {
-        $total = (float) $this->volumen_total_kg;
-
-        // El cupo de 0 kg no debería existir, pero si existe la división
-        // reventaría y la ficha entera dejaría de abrir por un dato mal cargado.
-        return $total <= 0.0 ? 100.0 : min(100.0, round($this->kilosConsumidos() / $total * 100, 1));
-    }
-
     /**
      * ¿Vale HOY?
      */
@@ -327,86 +184,21 @@ class AprovechamientoPesq extends Model
             && $this->fecha_vencimiento->endOfDay()->isFuture();
     }
 
-    /**
-     * ¿Se le puede colgar una faena hoy?
-     *
-     * Las tres condiciones juntas: vigente, con saldo, y el volumen pedido —si
-     * se pasa— entrando en ese saldo. Sin la tercera, el cupo sería decorativo.
-     */
-    public function puedeEmitirFaena(?float $kilos = null): bool
+    /** ¿Se le puede colgar una faena hoy? Aprobada y en fecha: las faenas no descuentan kilos. */
+    public function puedeEmitirFaena(): bool
     {
-        /*
-         * La fecha manda en los dos modos. Un cupo vencido no habilita nada, y
-         * eso no lo afloja el modo flexible: lo que ese modo relaja es el TOPE
-         * en kilos, no el calendario. Una faena colgada de un cupo del año
-         * pasado sería un permiso sin ninguna autorización detrás.
-         */
-        if (! $this->estaEnFecha()) {
-            return false;
-        }
-
-        // Revocada no autoriza en NINGÚN modo: el flexible afloja los kilos, no una baja.
-        if ($this->estado === EstadoAprovechamiento::Revocado) {
-            return false;
-        }
-
-        /*
-         * En modo flexible no se mira el saldo, y por eso tampoco se mira el
-         * ESTADO: un cupo `agotado` sigue emitiendo, que es exactamente lo que
-         * ese modo significa. Preguntar por `estaVigente()` acá lo bloquearía
-         * igual —`agotado` no habilita— y el modo no serviría de nada.
-         */
-        if (! self::modoEstricto()) {
-            return true;
-        }
-
-        // Se mide contra lo LIBRE: lo reservado por otra solicitud ya no está.
-        if (! $this->estado->habilita() || $this->libreKg() <= 0.0) {
-            return false;
-        }
-
-        return $kilos === null || $kilos <= $this->libreKg();
+        return $this->estaVigente();
     }
 
-    /**
-     * POR QUÉ no se le puede colgar una faena, o null si sí se puede.
-     *
-     * `puedeEmitirFaena()` contesta sí o no, y la pantalla decía «vencido o sin
-     * saldo» para todos los noes: sobre un cupo recién creado eso era falso y
-     * mandaba al operador a buscar un problema que no existía.
-     */
+    /** POR QUÉ no se le puede colgar una faena, o null si sí se puede. */
     public function motivoSinFaena(): ?string
     {
-        if ($this->puedeEmitirFaena()) {
-            return null;
-        }
-
-        // El orden importa: el primer motivo que aparece es el que el operador
-        // tiene que resolver antes que los demás.
         return match (true) {
+            $this->puedeEmitirFaena() => null,
             $this->estado === EstadoAprovechamiento::Revocado => 'No autoriza faenas: la autorización fue revocada.',
             $this->estado === EstadoAprovechamiento::Pendiente => 'Todavía no autoriza carnet ni faenas: falta que se pague en Recaudaciones.',
-            ! $this->estaEnFecha() => 'No autoriza faenas: el cupo venció.',
-            $this->estaAgotado() => 'No autoriza faenas: el cupo se quedó sin kilos.',
-            $this->libreKg() <= 0.0 => $this->motivoReservado(),
-            default => 'No autoriza faenas.',
+            default => 'No autoriza faenas: la autorización venció.',
         };
-    }
-
-    /** Lo que se dice cuando el saldo existe pero está todo apartado. */
-    public function motivoReservado(): string
-    {
-        return sprintf(
-            'Sin kilos libres: %s kg están reservados por faenas pendientes. '
-            .'Hay que eliminar la que no vaya a salir para registrar otra.',
-            number_format($this->kilosReservados(), 2, ',', '.'),
-        );
-    }
-
-    /** ¿Se le acabaron los kilos, aunque la fecha no haya llegado? */
-    public function estaAgotado(): bool
-    {
-        return $this->saldoKg() <= 0.0;
     }
 
     //  Scopes

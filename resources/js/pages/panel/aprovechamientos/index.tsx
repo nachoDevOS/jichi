@@ -7,12 +7,10 @@ import {
     Receipt,
     Search,
     Trash2,
-    TriangleAlert,
     Waves,
 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
-import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,16 +33,11 @@ export default function IndiceCupos({
     filtros,
     estados,
     opcionesPorPagina,
-    modoEstricto,
 }: {
     cupos: Paginado<CupoFila>;
     filtros: { buscar: string | null; estado: string | null; por_pagina: number };
     estados: OpcionEnum[];
     opcionesPorPagina: number[];
-    /**
-     * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor.
-     */
-    modoEstricto: boolean;
 }) {
     const { puede } = usePermisos();
     const [buscar, setBuscar] = useState(filtros.buscar ?? '');
@@ -81,7 +74,6 @@ export default function IndiceCupos({
         >
             <Head title="Autorizaciones de pesca" />
 
-            {!modoEstricto && <AvisoModoFlexible />}
 
             {/* `min-w-0`: sin él la tarjeta se estira al ancho de la tabla y el
                 que termina con barra de desplazamiento es el documento entero. */}
@@ -175,7 +167,7 @@ export default function IndiceCupos({
                                             <th className="px-5 py-2.5 font-medium">N°</th>
                                             <th className="px-5 py-2.5 font-medium">Beneficiario</th>
                                             <th className="px-5 py-2.5 font-medium">Capacidad</th>
-                                            <th className="px-5 py-2.5 font-medium">Saldo</th>
+                                            <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
                                             <th className="px-5 py-2.5 font-medium">Solicitado</th>
                                             {/* Vacío mientras no lo firmen: ver
                                                 `fecha_emision` en el MER. */}
@@ -245,8 +237,8 @@ export default function IndiceCupos({
                                                     {c.descripcion ?? '—'}
                                                 </td>
 
-                                                <td className="min-w-40 px-5 py-2.5">
-                                                    <BarraSaldo cupo={c} />
+                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    {c.volumen_total_kg} kg
                                                 </td>
 
 
@@ -436,30 +428,5 @@ export default function IndiceCupos({
                 }}
             />
         </LayoutPanel>
-    );
-}
-
-/**
- * El aviso de modo flexible.
- */
-function AvisoModoFlexible() {
-    return (
-        <Card className="mb-6 border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10">
-            <CardContent className="flex items-start gap-3 pt-5">
-                <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" />
-
-                <div className="min-w-0 text-sm">
-                    <p className="font-medium text-amber-900 dark:text-amber-200">
-                        Control de cupo desactivado
-                    </p>
-
-                    <p className="text-amber-800/80 dark:text-amber-200/80">
-                        El sistema está en modo flexible (<code>APROVECHAMIENTO_ESTRICTO=false</code>):
-                        las faenas se emiten aunque el cupo esté agotado. Los saldos se siguen
-                        calculando y los excesos quedan a la vista, pero nada los frena.
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
     );
 }

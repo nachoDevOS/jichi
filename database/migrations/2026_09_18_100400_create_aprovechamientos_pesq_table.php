@@ -24,7 +24,9 @@ return new class extends Migration
             // La escala es el tarifario de SIREB: el tramo elegido se COPIA, porque
             // Recaudaciones puede renombrar o dar de baja la tarifa después.
             $table->string('tramo', 160)->comment('Etiqueta de la tarifa de SIREB al otorgar');
-            $table->decimal('volumen_total_kg', 12, 2)->comment('Techo del tramo, copiado al otorgar');
+            $table->decimal('volumen_total_kg', 12, 2)->comment('Kilos autorizados: los escribe ventanilla');
+            // Fijo: las faenas no descuentan. Cada faena sale con este valor.
+            $table->decimal('kilos_disponibles', 12, 2)->comment('Kilos con que sale cada faena');
 
             // Congelado de SIREB al otorgar o corregir: un cambio de arancel no
             // mueve lo que ya se está cobrando.

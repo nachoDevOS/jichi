@@ -327,23 +327,17 @@ class Carnet extends Model
             $this->aprovechamiento === null => 'No tiene una Autorización de Pesca para Aprovechamiento Pesquero asociada.',
             $this->aprovechamiento->estado === EstadoAprovechamiento::Revocado => 'La Autorización de Pesca para Aprovechamiento Pesquero '
                 .'fue revocada: no autoriza faenas.',
-            // Antes que `habilita()`: agotada no es «todavía no», es «ya no».
-            $this->aprovechamiento->estado === EstadoAprovechamiento::Agotado => 'La Autorización de Pesca para Aprovechamiento '
-                .'Pesquero se quedó sin kilos. Hay que tramitar otra.',
             ! $this->aprovechamiento->estado->habilita() => 'La Autorización de Pesca para Aprovechamiento Pesquero está '
                 .mb_strtolower($this->aprovechamiento->estado->etiqueta()).': todavía no autoriza faenas.',
             ! $this->aprovechamiento->estaEnFecha() => 'La Autorización de Pesca para Aprovechamiento Pesquero venció.',
-            $this->aprovechamiento->saldoKg() <= 0.0 => 'La Autorización de Pesca para Aprovechamiento Pesquero se quedó sin '
-                .'kilos. Hay que tramitar otra.',
-            $this->aprovechamiento->libreKg() <= 0.0 => $this->aprovechamiento->motivoReservado(),
             default => 'No autoriza a emitir.',
         };
     }
 
     /**
      * El carnet como lo muestran el buscador y los formularios de faena y guía.
-     * Un solo lugar: con tres copias, una se queda vieja. Precargar `codigo`,
-     * y `aprovechamiento` con el `withSum` del saldo.
+     * Un solo lugar: con tres copias, una se queda vieja. Precargar `codigo` y
+     * `aprovechamiento`.
      *
      * @return array<string, mixed>
      */
@@ -365,10 +359,8 @@ class Carnet extends Model
             // El cupo que respalda al pescador. Null en el comercializador.
             'capacidad' => $cupo?->tramo,
             'volumen_total_kg' => $cupo !== null ? (float) $cupo->volumen_total_kg : null,
-            'saldo_kg' => $cupo?->saldoKg(),
-            // Lo que una faena nueva puede pedir: el saldo menos lo reservado.
-            'reservado_kg' => $cupo?->kilosReservados(),
-            'libre_kg' => $cupo?->libreKg(),
+            // Los kilos que sale cada faena, fijos: las faenas no descuentan.
+            'kilos_disponibles' => $cupo !== null ? (float) $cupo->kilos_disponibles : null,
         ];
     }
 

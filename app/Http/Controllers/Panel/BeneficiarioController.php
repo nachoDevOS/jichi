@@ -230,14 +230,12 @@ class BeneficiarioController extends Controller
                     'id' => $a->id,
                     'descripcion' => $a->tramo,
                     'volumen_total_kg' => (float) $a->volumen_total_kg,
-                    'kilos_consumidos' => $a->kilosConsumidos(),
-                    'saldo_kg' => $a->saldoKg(),
-                    'porcentaje_usado' => $a->porcentajeUsado(),
+                    'kilos_disponibles' => (float) $a->kilos_disponibles,
                     'estado' => $a->estado->value,
                     'estado_etiqueta' => $a->estado->etiqueta(),
                     'estado_color' => $a->estado->color(),
                     'vigente' => $a->estaVigente(),
-                    // Antes de la firma no hay saldo que mostrar: no se consumió.
+                    // Si pasó por la firma: antes es un volumen pedido.
                     'ya_fue_aprobado' => $a->yaFueAprobado(),
                     'saldo_pendiente' => $a->porPagar(),
                     'fecha_solicitud' => $a->fecha_solicitud?->toDateString(),
@@ -329,22 +327,15 @@ class BeneficiarioController extends Controller
              * El cupo viaja con el carnet, y los dos agregados con él.
              */
             /*
-             * Su bolsa madre, para el formulario de carnet: es de dónde va a
+             * Su autorización, para el formulario de carnet: es de dónde va a
              * salir el cupo impreso, y la pantalla tiene que poder decir cuál.
-             * Va con el agregado de kilos, o cada fila del
-             * autocompletado dispararía dos consultas más.
              */
-            ->with(['aprovechamientos' => fn ($a) => $a
-                ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                ->withSum('faenasQueReservan', 'kilos_extraidos'),
-            ])
+            ->with('aprovechamientos')
             ->with(['carnets' => fn ($q) => $q
                 ->vigentes()
                 ->with([
                     'codigo',
-                    'aprovechamiento' => fn ($a) => $a
-                        ->withSum('faenasQueConsumen', 'kilos_extraidos')
-                        ->withSum('faenasQueReservan', 'kilos_extraidos'),
+                    'aprovechamiento',
                 ]),
             ])
             ->ordenAlfabetico()
@@ -396,7 +387,7 @@ class BeneficiarioController extends Controller
                 'id' => $a->id,
                 'descripcion' => $a->tramo,
                 'volumen_total_kg' => (float) $a->volumen_total_kg,
-                'saldo_kg' => $a->saldoKg(),
+                'kilos_disponibles' => (float) $a->kilos_disponibles,
                 'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
                 // El estado va a la pantalla: un cupo PENDIENTE respalda el
                 // carnet igual, pero todavía no autoriza a pescar, y quien

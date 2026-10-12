@@ -47,7 +47,8 @@ salen **dos ramas**, según la actividad:
                  ▼
         PERMISO DE FAENA
         (una por salida, 30 días;
-         reserva y descuenta kg de la autorización)
+         sale con los kilos_disponibles de la autorización;
+         no descuenta nada)
 
    Los cuatro —autorización, carnet, faena y guía— se PAGAN EN SIREB; al
    confirmarse el pago quedan aprobados y se entrega el RECIBO.
@@ -55,7 +56,7 @@ salen **dos ramas**, según la actividad:
 
 | Rama | Documento anual | Permiso de cada día | Controla kilos |
 | --- | --- | --- | --- |
-| **Pescador** | Autorización de Pesca para Aprovechamiento Pesquero + carnet de pescador | Permiso de faena | **Sí**: la faena reserva y descuenta del cupo |
+| **Pescador** | Autorización de Pesca para Aprovechamiento Pesquero + carnet de pescador | Permiso de faena | No: cada faena sale con `kilos_disponibles`, fijo (12/10/2026) |
 | **Comercializador** | Carnet de comercializador | Guía única de transporte | No |
 
 **EL CARNET ES LA LLAVE ANUAL; CON ÉL SOLO NO SE SALE A TRABAJAR.** Lo que
@@ -84,7 +85,7 @@ El detalle, con ejemplos, está en [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md).
 ## 2. El circuito, igual para los cuatro documentos
 
 ```
-            ┌─(SIREB: liquidación «pagada»)──▶ APROBADO ──▶ revocado / agotado
+            ┌─(SIREB: liquidación «pagada»)──▶ APROBADO ──▶ revocado
 PENDIENTE ──┤                                     └── al aprobar sale el RECIBO
 (borrador)  └─(SIREB: «vencida»)──▶ sigue PENDIENTE (08/10/2026; antes NO PAGADO)
    └──[corregir / eliminar: consulta SIREB y anula la liquidación]
@@ -166,7 +167,7 @@ El esquema completo, con el porqué de cada columna e índice, está en
 | Tabla | Qué guarda | Lo que no es obvio |
 | --- | --- | --- |
 | `beneficiarios` | La persona | C.I. único con índice **parcial** (`WHERE deleted_at IS NULL`). Columnas en camelCase desde `primerNombre` |
-| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Copia el tramo (etiqueta de la tarifa de SIREB) y sus kilos. Sin columna de saldo: consumido y reservado se calculan de las faenas. Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
+| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Copia el tramo (etiqueta de la tarifa de SIREB) y sus kilos. `kilos_disponibles` fijo: con eso sale cada faena, que no descuenta (12/10/2026). Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
 | `carnets` | La credencial anual | `tipo_actor` decide qué emite. El de pescador lleva `aprovechamiento_id`; el de comercializador, NULL |
 | `permisos_faena` | Una salida de pesca | Cuelga **solo** del carnet; llega a la autorización por `hasManyThrough` |
 | `guias_movimiento` | Un traslado | Cuelga solo del carnet; copia la asociación porque va impresa |
@@ -183,10 +184,10 @@ Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 - **Nada del dominio se borra de verdad**: todas las tablas tienen
   `softDeletes()`. Un índice único que la baja deba liberar es parcial; uno de
   papel entregado queda quemado. Tabulado en [MER.md](MER.md).
-- **No hay columnas de saldo.** Lo pagado está en SIREB (y en el recibo); el
-  saldo de kilos es una resta sobre las faenas. Una columna así hay
-  que mantenerla al día en cada alta y cada corrección, y el día que alguien se
-  olvide el sistema cobra o autoriza mal sin avisar.
+- **Las faenas no descuentan de la autorización** (12/10/2026). Ventanilla
+  escribe `volumen_total_kg` y `kilos_disponibles` al otorgar, y cada faena sale
+  con `kilos_disponibles` copiado en `kilos_extraidos`, fijo. No hay saldo,
+  reserva, estado `agotado` ni modo estricto (`APROVECHAMIENTO_ESTRICTO` se quitó).
 - **La faena y la guía cuelgan solo del carnet.** Una segunda clave hacia la
   persona abriría la puerta a que el papel y el carnet apunten a gente distinta.
 - **El código de un documento no es una columna suya**: vive en `codigos`. Se

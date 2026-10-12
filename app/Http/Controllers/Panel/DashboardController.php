@@ -186,15 +186,9 @@ class DashboardController extends Controller
                 ->whereDate('fecha_vencimiento', '<=', $limite)
                 ->count(),
 
-            // Sin kilos aunque la fecha no haya llegado: el pescador necesita una autorización nueva.
-            'autorizaciones_agotadas' => AprovechamientoPesq::query()
-                ->where('estado', EstadoAprovechamiento::Agotado)
-                ->count(),
-
             'urls' => [
                 'carnets' => $this->siPuedeVer('carnets', ['estado' => EstadoCarnet::Aprobado->value]),
                 'autorizaciones' => $this->siPuedeVer('aprovechamientos', ['estado' => EstadoAprovechamiento::Aprobado->value]),
-                'agotadas' => $this->siPuedeVer('aprovechamientos', ['estado' => EstadoAprovechamiento::Agotado->value]),
             ],
         ];
     }

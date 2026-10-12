@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BadgeCheck, BellRing, CalendarClock, CheckCircle2, PackageX } from 'lucide-react';
+import { BadgeCheck, BellRing, CalendarClock, CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -22,15 +22,8 @@ export function PanelAvisos({ avisos }: { avisos: Avisos }) {
             icono: CalendarClock,
             cantidad: avisos.autorizaciones_por_vencer,
             texto: `autorización(es) de pesca vencen en ${avisos.dias_aviso} días`,
-            accion: 'Los kilos sin usar no pasan a la gestión siguiente',
+            accion: 'Avisar para que renueven',
             href: avisos.urls.autorizaciones,
-        },
-        {
-            icono: PackageX,
-            cantidad: avisos.autorizaciones_agotadas,
-            texto: 'autorización(es) de pesca sin kilos',
-            accion: 'El pescador necesita una nueva para seguir pescando',
-            href: avisos.urls.agotadas,
         },
     ].filter((a) => a.cantidad > 0);
 

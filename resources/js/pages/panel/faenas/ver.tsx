@@ -3,7 +3,6 @@ import { BadgeCheck, Ban, CalendarX, CheckCheck, Clock, IdCard, Pencil, Printer,
 import { useState, type ReactNode } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
-import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -261,31 +260,10 @@ export default function VerFaena({
                                 <p className="text-muted-foreground">Sin cupo asociado.</p>
                             ) : (
                                 <>
-                                    <BarraSaldo cupo={faena.cupo} />
-
                                     <Renglon etiqueta="Otorgado" valor={`${faena.cupo.volumen_total_kg} kg`} />
-                                    <Renglon etiqueta="Disponible hoy" valor={`${faena.cupo.saldo_kg} kg`} />
                                     <Renglon etiqueta="Esta faena" valor={`${faena.kilos_extraidos} kg`} />
-                                    {/* Sin firmar todavía: cuánto quedaría si se aprueba. */}
-                                    {faena.estado === 'pendiente' && (
-                                        <Renglon
-                                            etiqueta="Queda al aprobar"
-                                            valor={`${Math.max(0, Math.round((faena.cupo.saldo_kg - faena.kilos_extraidos) * 100) / 100)} kg`}
-                                        />
-                                    )}
-
-                                    {/*
-                                        Se dice explícitamente si ESTA faena está
-                                        pesando sobre ese saldo: una vencida no, y sin
-                                        la aclaración el número de arriba parece no
-                                        cuadrar con la lista de faenas.
-                                    */}
                                     <p className="text-xs text-muted-foreground">
-                                        {faena.estado === 'revocado'
-                                            ? 'Esta faena fue revocada: ya no vale, pero sus kilos siguen descontados del saldo.'
-                                            : faena.consume_cupo
-                                              ? 'Esta faena está descontando sus kilos del saldo.'
-                                              : 'Todavía no descuenta: la bolsa se mueve recién cuando se aprueba.'}
+                                        Sale con los kilos disponibles de la autorización. Las faenas no descuentan.
                                     </p>
                                 </>
                             )}
@@ -367,8 +345,7 @@ export default function VerFaena({
                     <div className="space-y-2">
                         <p>
                             La faena <strong>N° {faena.numero_legible}</strong> deja de autorizar la salida al
-                            instante. Sus {faena.kilos_extraidos} kg <strong>siguen descontados</strong> del cupo: no
-                            vuelven a la autorización.
+                            instante.
                         </p>
                         <p>Queda en el historial como revocada y no vuelve atrás. Si hace falta, se emite otra.</p>
                     </div>
@@ -427,7 +404,7 @@ function Situacion({ faena }: { faena: FaenaFicha }) {
                 clase="bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
                 icono={<CalendarX className="mt-0.5 size-5 shrink-0" />}
                 titulo="Venció sin cerrarse"
-                texto="El pescador se llevó el papel y nadie registró la vuelta. Sus kilos siguen descontados del cupo; el número del talonario queda ocupado igual."
+                texto="El pescador se llevó el papel y nadie registró la vuelta. El número del talonario queda ocupado igual."
             />
         );
     }
@@ -438,7 +415,7 @@ function Situacion({ faena }: { faena: FaenaFicha }) {
                 clase="bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200"
                 icono={<BadgeCheck className="mt-0.5 size-5 shrink-0" />}
                 titulo="En curso"
-                texto={`Autoriza a pescar hasta el ${fecha(faena.fecha_desembarque)}. Sus kilos ya están descontados del cupo.`}
+                texto={`Autoriza a pescar hasta el ${fecha(faena.fecha_desembarque)}.`}
             />
         );
     }

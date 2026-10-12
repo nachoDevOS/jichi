@@ -51,12 +51,9 @@ class TramitesDisponibles
             return self::item('faena', 'Permiso de Faena', false, (string) $pescador->motivoSinPermisos());
         }
 
-        // En modo flexible (`jichi.aprovechamiento.estricto`) se emite aun sin kilos libres.
-        $saldo = $pescador->aprovechamiento?->saldoKg() ?? 0;
-
-        return self::item('faena', 'Permiso de Faena', true, $saldo > 0
-            ? 'Le quedan '.self::kg($saldo).' en su autorización.'
-            : 'Su autorización ya no tiene kilos libres: consulte en ventanilla.');
+        // Cada faena sale con los kilos de la autorización, fijos: no descuenta.
+        return self::item('faena', 'Permiso de Faena', true,
+            'Cada permiso sale por '.self::kg((float) $pescador->aprovechamiento?->kilos_disponibles).'.');
     }
 
     /** @return array{clase: string, titulo: string, disponible: bool, detalle: string}|null */

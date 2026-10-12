@@ -22,11 +22,11 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Autoriza | UNA salida de pesca | UN traslado de carga |
 | Dice | Embarcación, propietario, comandante, matrícula, kardex, región y kilos | Origen y destino, medio y vehículo, y la carga especie por especie |
 | Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
-| Además exige | Autorización de pesca **aprobada**, en fecha y con kilos libres | Nada más que el carnet vigente |
+| Además exige | Autorización de pesca **aprobada** y en fecha | Nada más que el carnet vigente |
 | Arancel | La tarifa que elige ventanilla del servicio de la fila `faena` de Catálogos › Aranceles, copiada en `permisos_faena.monto` | **El total del cuadro D** (kilos × precio por kilo de SIREB de cada producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
 | Número | `permisos_faena.nro`, correlativo continuo del sistema | `guias_movimiento.nro`, correlativo continuo del sistema |
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
-| Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |
+| Kilos contra la autorización | Sale con `kilos_disponibles`, fijo; **no descuenta** | No toca ningún cupo |
 | Vale | 30 días desde la aprobación | 5 días desde la aprobación (se cuentan con hora) |
 | Termina en | `aprobado` (no se registra la vuelta), o `revocado` | `aprobado` (no se registra la llegada), o `revocado` |
 | Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
@@ -41,7 +41,7 @@ es a propósito: el operador aprende uno solo.
 ```
             ┌─(pagada en SIREB)──▶ APROBADO ──▶ (guía: anulada)
 PENDIENTE ──┤                         └── al aprobar sale el RECIBO
-(borrador)  └─(vencida en SIREB)──▶ sigue PENDIENTE: los kilos quedan reservados hasta eliminarla (08/10/2026)
+(borrador)  └─(vencida en SIREB)──▶ sigue PENDIENTE hasta eliminarla (08/10/2026)
    └──[eliminar, con motivo]──▶ baja lógica (consulta SIREB y anula la liquidación)
 ```
 
@@ -108,59 +108,15 @@ carnet sin reemplazo).
 
 ## 2. Los kilos de la faena contra la autorización
 
-**Descuenta** solo la faena APROBADA (y la completada): recién aprobada autoriza
-a pescar, y recién ahí sus kilos pasan a «consumido». Lo dice
-`EstadoFaena::consumeCupo()`.
+**Fijos, y no descuentan** *(12/10/2026)*. Al emitirse, la faena copia los
+`kilos_disponibles` de la autorización en `kilos_extraidos`
+(`EmitirFaenaService::emitir()`). Ventanilla no los tipea ni los corrige, y
+ninguna faena baja nada de la autorización: no hay saldo, reserva, estado
+`agotado` ni modo estricto (`APROVECHAMIENTO_ESTRICTO` se quitó).
 
-**Reserva** la faena PENDIENTE: no resta del saldo ni agota la
-autorización, pero aparta sus kilos. Lo dice `EstadoFaena::reservaCupo()`.
-
-```
-libre para una faena nueva = otorgado − consumido − reservado
-                             └── saldoKg() ──┘
-                             └────────── libreKg() ─────────┘
-```
-
-**En modo estricto una faena nueva solo puede pedir lo libre.** Con 150 kg de
-saldo y una pendiente de 150, lo libre es 0 y la siguiente no se registra hasta
-que se elimine la pendiente. El mensaje dice cuántos kilos están reservados:
-`PermisoOperativoException::excedeLibre()`. En modo flexible la reserva se
-muestra y no frena. El ejemplo completo está en
-[REGLAS-NEGOCIO.md](../REGLAS-NEGOCIO.md), paso 4.
-
-Una reserva **no agota** la autorización —todavía se puede eliminar—: `agotado`
-lo decide solo lo consumido, en `sincronizarEstadoPorSaldo()`.
-
-**Dónde se aplica** —los tres con la fila de la autorización bloqueada—:
-
-| Momento | Qué se mide |
-| --- | --- |
-| `EmitirFaenaService::emitir()` | kilos ≤ libre |
-| `EmitirFaenaService::editar()` | kilos ≤ libre + lo que esta misma faena reservaba |
-| `RevisarFaenaService::aprobar()` | kilos ≤ saldo. Con la reserva no puede fallar en estricto; queda por las faenas nacidas en flexible |
-
-**La pantalla recibe los números resueltos**: `saldo_kg`, `reservado_kg` y
-`libre_kg` en `Carnet::resumenParaEmitir()` (formulario de faena), `libre_kg` en
-`FaenaController::edit()`, y `kilos_reservados` / `libre_kg` en la ficha de la
-autorización, que muestra «Reservado» y «Libre para faena» cuando hay reservas.
-El formulario usa `libre_kg` en estricto y `saldo_kg` en flexible, y propone
-como kilos todo lo disponible.
-
-Los lugares que enumeran los estados, y que tienen que decir lo mismo:
-
-| Dónde | Para qué |
-| --- | --- |
-| `EstadoFaena::consumeCupo()` / `reservaCupo()` | El filtro en memoria, cuando las faenas ya están cargadas |
-| `AprovechamientoPesq::faenasQueConsumen()` / `faenasQueReservan()` | El mismo filtro en SQL, para el `withSum` de los listados |
-
-⚠️ **Toda consulta que precarga `withSum('faenasQueConsumen', …)` lleva también
-`withSum('faenasQueReservan', …)`**, o `kilosReservados()` hace una consulta por
-fila en silencio.
-
-**Historia:** hasta el 21/09/2026 la pendiente descontaba; entre el 21 y el 27
-no reservaba nada, y tres solicitudes por el volumen entero pasaban las tres y
-chocaban al aprobar la segunda, con el arancel ya cobrado. Desde el 27/09/2026
-reserva sin descontar.
+**Historia:** hasta el 12/10/2026 la faena reservaba sus kilos al registrarse y
+los descontaba al aprobarse, con un modo estricto que frenaba lo que no
+entraba. Está en el historial de git.
 
 ---
 
@@ -308,9 +264,9 @@ de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitida
 
 | Archivo | Qué hace |
 | --- | --- |
-| `app/Enums/EstadoFaena.php` / `EstadoGuia.php` | El circuito, y qué descuenta o reserva |
+| `app/Enums/EstadoFaena.php` / `EstadoGuia.php` | El circuito |
 | `app/Enums/CondicionProducto.php`, `MedioTransporte.php`, `TipoTransporte.php` | Las casillas del talonario de la guía |
-| `app/Services/EmitirFaenaService.php` | Emitir, corregir y eliminar la faena; controla los kilos libres |
+| `app/Services/EmitirFaenaService.php` | Emitir, corregir y eliminar la faena; copia los kilos de la autorización |
 | `app/Services/RevisarFaenaService.php` | Aprobar la faena cuando SIREB la da por pagada (fechas, kilos libres) |
 | `app/Services/EmitirGuiaService.php` | Emitir, corregir, eliminar y revocar la guía |
 | `app/Services/RevisarGuiaService.php` | Aprobar la guía cuando SIREB la da por pagada (vigencia de 5 días) |

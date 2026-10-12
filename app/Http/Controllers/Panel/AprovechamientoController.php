@@ -57,10 +57,6 @@ class AprovechamientoController extends Controller
             ->with([
                 'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             ])
-            // Los DOS withSum evitan dos agregados POR FILA: con 30 cupos en
-            // pantalla son 61 consultas sin ellos, y el listado se ve igual.
-            ->withSum('faenasQueConsumen', 'kilos_extraidos')
-            ->withSum('faenasQueReservan', 'kilos_extraidos')
             ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
             ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
                 'beneficiario',
@@ -85,10 +81,6 @@ class AprovechamientoController extends Controller
             'estados' => EstadoAprovechamiento::opciones(),
             'opcionesPorPagina' => Paginacion::OPCIONES,
 
-            /*
-             * El modo se manda a la pantalla, y no es un detalle informativo.
-             */
-            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
         ]);
     }
 
@@ -241,8 +233,6 @@ class AprovechamientoController extends Controller
                         ->exists(),
             ],
 
-            'modoEstricto' => AprovechamientoPesq::modoEstricto(),
-
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,
@@ -280,7 +270,7 @@ class AprovechamientoController extends Controller
                 ])
                 ->all(),
 
-            // El carnet con el que se emite la próxima faena: aprobado, vigente y con saldo.
+            // El carnet con el que se emite la próxima faena: aprobado y vigente.
             'carnetParaFaena' => $aprovechamiento->carnets()
                 ->vigentes()
                 ->with('aprovechamiento')
@@ -288,8 +278,7 @@ class AprovechamientoController extends Controller
                 ->get()
                 ->first(fn (Carnet $c): bool => $c->puedeEmitirFaenas())?->id,
 
-            // Las faenas de este cupo: es el detalle que explica el saldo. Sin
-            // él, «le quedan 20 kg» es un número que hay que creer.
+            // Las faenas de este cupo, cada una con sus kilos fijos.
             'faenas' => $aprovechamiento->faenas()
                 // Con `nro` y `fecha_emision`: de esas dos columnas
                 // salen los accesores del número del carnet, y sin ellas
@@ -305,17 +294,13 @@ class AprovechamientoController extends Controller
                     // la pantalla, o cada tabla elige su propio relleno.
                     'numero_legible' => $f->numero_legible,
 
-                    // De qué carnet cuelga: un cupo puede respaldar más de una
-                    // credencial, y hay que saber cuál gastó esos kilos.
+                    // De qué carnet cuelga: una autorización puede respaldar más de una credencial.
                     'carnet_id' => $f->carnet_id,
                     'carnet_registro' => $f->carnet?->registro_legible,
                     'kilos_extraidos' => (float) $f->kilos_extraidos,
                     'estado' => $f->estado->value,
                     'estado_etiqueta' => $f->etiquetaEstado(),
                     'estado_color' => $f->colorEstado(),
-                    // Una faena vencida LIBERA su volumen: la pantalla lo marca
-                    // para que el saldo cuadre a la vista.
-                    'consume_cupo' => $f->consumeCupo(),
                     'puede_imprimirse' => $f->puedeImprimirse(),
                     'fecha_salida' => $f->fecha_salida?->toDateString(),
                     'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
@@ -446,12 +431,8 @@ class AprovechamientoController extends Controller
             // NULL y no cadena vacía: así la pantalla dice «no declarada» en vez
             // de imprimir un renglón en blanco.
             'tipo_embarcacion' => $cupo->tipo_embarcacion,
-            'kilos_consumidos' => $cupo->kilosConsumidos(),
-            'saldo_kg' => $cupo->saldoKg(),
-            // Apartado por faenas pendientes: no descuenta, pero no está libre.
-            'kilos_reservados' => $cupo->kilosReservados(),
-            'libre_kg' => $cupo->libreKg(),
-            'porcentaje_usado' => $cupo->porcentajeUsado(),
+            // Lo que sale fijo en cada faena: las faenas no descuentan de acá.
+            'kilos_disponibles' => (float) $cupo->kilos_disponibles,
 
             // Cuándo se cargó, que no es la fecha de solicitud. Es un MOMENTO:
             // va con toIso8601String().
@@ -462,11 +443,7 @@ class AprovechamientoController extends Controller
             'estado_color' => $cupo->estado->color(),
             'vigente' => $cupo->estaVigente(),
 
-            // Los kilos que se pasaron del cupo. En modo estricto siempre es cero.
-            // `saldoKg()` no puede decirlo: se corta en cero.
-            'kilos_excedidos' => $cupo->kilosExcedidos(),
-            'excedido' => $cupo->estaExcedido(),
-            // Se puede colgar una faena HOY: vigente, con saldo y sin agotar.
+            // Se puede colgar una faena HOY: aprobada y en fecha.
             'puede_emitir_faena' => $cupo->puedeEmitirFaena(),
             // Y si no se puede, POR QUÉ: un cupo pendiente no es uno vencido.
             'motivo_sin_faena' => $cupo->motivoSinFaena(),

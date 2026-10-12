@@ -133,13 +133,11 @@ export interface CarnetFicha extends CarnetFila {
         id: number;
         descripcion: string | null;
         volumen_total_kg: number;
-        kilos_consumidos: number;
-        saldo_kg: number;
-        porcentaje_usado: number;
+        kilos_disponibles: number;
         vigente: boolean;
         estado_etiqueta: string;
         estado_color: string;
-        /** Sin firma no hay saldo que mostrar: es un volumen pedido. */
+        /** Sin firma es un volumen pedido. */
         ya_fue_aprobado: boolean;
         fecha_solicitud: string | null;
         fecha_emision: string | null;
@@ -197,7 +195,7 @@ export interface CupoVigente {
     /** El tramo: «201 Kg Hasta 300 Kg». */
     descripcion: string | null;
     volumen_total_kg: number;
-    saldo_kg: number;
+    kilos_disponibles: number;
     fecha_vencimiento: string | null;
     estado_etiqueta: string;
     estado_color: string;

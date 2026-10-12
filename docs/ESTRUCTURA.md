@@ -30,7 +30,7 @@ Si sabés de qué mitad es lo que estás escribiendo, ya sabés dónde ponerlo.
 ```
 app/
 ├── Enums/                  Los valores fijos del negocio y sus TRANSICIONES
-│   ├── EstadoAprovechamiento.php  pendiente · aprobado · agotado · revocado
+│   ├── EstadoAprovechamiento.php  pendiente · aprobado · revocado
 │   ├── EstadoCarnet.php           pendiente · aprobado · revocado
 │   ├── EstadoFaena.php            pendiente · aprobado · revocado
 │   ├── EstadoGuia.php             pendiente · aprobado · revocado
@@ -243,8 +243,8 @@ antes en una SQLite descartable. Ver la regla 12 de CLAUDE.md.
 
 ## Configuración (`config/`)
 
-- **`config/jichi.php`** — los ajustes del sistema: SIREB, Ibare, el modo
-  estricto de la autorización, la semilla de departamentos. Todo valor que venga
+- **`config/jichi.php`** — los ajustes del sistema: SIREB, Ibare,
+  la semilla de departamentos. Todo valor que venga
   del `.env` pasa por acá.
 
   > **Regla que no se rompe nunca:** `env()` solo dentro de `config/`. En el

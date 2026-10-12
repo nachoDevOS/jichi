@@ -227,7 +227,8 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `beneficiario_id` | FK RESTRICT | |
 | `nro` | unsigned, único **global** | El N° impreso: correlativo **continuo** (`AUTORIZACION-PESCA`), `000001`. Lo pone el sistema al otorgar; antes del 03/10/2026 se imprimía el `id` |
 | `tramo` | string(160) | **Copiada**: la etiqueta de la tarifa de SIREB al otorgar («101 kg Hasta 200 kg»). Va impresa y en las fichas (12/10/2026) |
-| `volumen_total_kg` | decimal(12,2) | Los kilos autorizados: **los escribe ventanilla** al otorgar (12/10/2026). Cada faena reserva y descuenta de acá |
+| `volumen_total_kg` | decimal(12,2) | Los kilos autorizados: **los escribe ventanilla** al otorgar (12/10/2026) |
+| `kilos_disponibles` | decimal(12,2) | Los kilos con que sale **cada** faena. Los escribe ventanilla al otorgar y **no cambian**: las faenas no descuentan (12/10/2026) |
 | `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar. Corregir no lo toca: solo cambia la embarcación (03/10/2026) |
 | `sireb_tarifa_id` | uuid **null** | La tarifa de SIREB de ese monto: **es el tramo**. «Generar nueva liquidación» vuelve a pedir esta misma (12/10/2026) |
 | `sireb_idempotency_key` | uuid **null**, único global | La `Idempotency-Key` de la venta en SIREB. Se guarda ANTES de llamar; corregir con otra tarifa genera otra (02/10/2026) |
@@ -309,11 +310,10 @@ de 500 kg no puede pasar a valer 800 en agosto porque Recaudaciones renombró o
 dio de baja la tarifa. Leerlos de SIREB al mostrar sería además una llamada por
 fila, que con SIREB caído deja la ficha vacía.
 
-**El saldo NO se guarda en ninguna columna.** Es
-`volumen_total_kg − suma de las faenas que consumen cupo`, y se calcula al leer
-con `AprovechamientoPesq::saldoKg()`. Una columna `saldo` hay que actualizarla en
-cada alta, cada anulación y cada corrección, y se olvida una sola vez para que el
-número quede mintiendo para siempre sin ningún error que lo delate.
+**`kilos_disponibles` es fijo** *(12/10/2026)*: lo escribe ventanilla al otorgar
+y cada faena lo copia en su `kilos_extraidos`. Las faenas **no descuentan**: no
+hay saldo, reserva, `agotado` ni modo estricto. Antes de esa fecha la faena
+reservaba al registrarse y descontaba al aprobarse; está en el historial de git.
 
 **`tipo_embarcacion` es texto libre y nullable.** Es el renglón «Tipo de
 Embarcación» del talonario verde. No hay padrón de embarcaciones ni nomenclatura
@@ -475,30 +475,9 @@ quedó alguna fila así.
 `faena` de `aranceles_sireb`; sin tarifa o sin SIREB no se emite) y el recibo se
 emite al aprobarse. La aprobación vive en `RevisarFaenaService::aprobar()`.
 
-**Los kilos se DESCUENTAN desde la aprobación y se RESERVAN desde el registro.**
-`EstadoFaena::consumeCupo()` deja pasar solo a la **aprobada** y a la
-**completada**: es lo que se resta del saldo y lo único que lleva el cupo a
-`agotado`. `EstadoFaena::reservaCupo()` deja pasar a la **pendiente**: no resta
-del saldo, pero apartan sus kilos, y en modo estricto
-una faena nueva solo puede pedir lo libre —`AprovechamientoPesq::libreKg()` =
-saldo − reservado—. El ejemplo está en
-[REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md#paso-4--la-operativa-del-pescador-permisos-de-faena).
-
-Historia: hasta el 21/09/2026 la pendiente descontaba; ese día se pasó a
-descontar desde la aprobación, y el cupo se podía sobrecomprometer —tres solicitudes
-por el volumen entero pasaban las tres y chocaban al aprobar la segunda—. El
-27/09/2026 volvió la reserva, pero separada del descuento: el saldo sigue siendo
-el volumen realmente aprobado y el sobrecompromiso deja de ser posible en modo
-estricto. `RevisarFaenaService::aprobar()` vuelve a medir igual, por si la faena
-nació en modo flexible.
-
-No hay columna nueva: la reserva se calcula con `withSum('faenasQueReservan', …)`,
-igual que el consumo.
-
-⚠️ Cada lista de estados está escrita **dos veces** —`EstadoFaena::consumeCupo()`
-/ `reservaCupo()` para el filtro en memoria y `AprovechamientoPesq::faenasQueConsumen()`
-/ `faenasQueReservan()` para el filtro en SQL—. Si se separan, la ficha y el
-listado muestran saldos distintos.
+**Los kilos de la faena son fijos** *(12/10/2026)*: al emitirse copia
+`kilos_disponibles` de la autorización en `kilos_extraidos`, y no descuenta nada
+del cupo —ni al registrarse ni al aprobarse—. Ventanilla no los tipea.
 
 **El titular llega por un accesor.** El recibo sale a nombre de
 `$tramite->beneficiario_id`, que la faena no guarda: lo resuelve
@@ -513,8 +492,7 @@ respalda su propio carnet, y ninguna restricción lo impedía.
 
 Hoy la bolsa se alcanza por el camino que ya existe —`carnets.aprovechamiento_id`—
 y por eso `AprovechamientoPesq::faenas()` es un **`hasManyThrough`** por
-`carnets`. `withSum` y `withMax` siguen funcionando igual, así que el saldo se
-sigue calculando con una sola consulta.
+`carnets`.
 
 **EL NÚMERO ES UN CORRELATIVO GLOBAL Y CONTINUO, y lo pone el SISTEMA**
 —cambiado el 21/09/2026—. Arranca en `000001`, no reinicia por gestión y su
@@ -855,7 +833,7 @@ sin poder recibir otro nunca más.
 | **RESTRICT por defecto**, CASCADE solo en `guia_detalles → guias_movimiento` | Borrar no puede llevarse por delante un historial que respalda papeles entregados |
 | **El orden del `Schema::create()` es siempre el mismo**: `id` → claves foráneas → datos → estado → fechas del negocio → índices → `timestamps()` → `softDeletes()` | Las diez tablas terminan iguales. No cambia el esquema: es convención de lectura |
 | **Lo copiado se congela** (`tramo`, `volumen_total_kg`, `monto`, `monto_total`, `concepto`, la boleta del recibo) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
-| **Lo calculable NO se guarda** (saldo en kg, saldo en Bs) | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
+| **Lo calculable NO se guarda** (saldo en Bs). `kilos_disponibles` es un dato que escribe ventanilla, no un saldo | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
 
 **Tablas de soporte**, fuera del dominio: `users`, `correlativos`,
 `configuraciones`, `auditorias`, `accesos`. Más las de Laravel y las de

@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
 
 /**
  * Lo que el portal /mi-cuenta muestra de cada documento. Sin ids ni banderas de
- * funcionario: el beneficiario solo consulta. Estado, vigencia y saldo salen de
+ * funcionario: el beneficiario solo consulta. Estado, vigencia y kilos salen de
  * los mismos métodos del modelo que usa el panel.
  */
 class ResumenPortal
@@ -38,11 +38,8 @@ class ResumenPortal
             'descargar' => self::urlDescargar($a),
             'escala' => $a->tramo,
             'volumen_total_kg' => (float) $a->volumen_total_kg,
-            // Antes de la firma no se consumió nada: el saldo recién vale aprobado.
+            'kilos_disponibles' => (float) $a->kilos_disponibles,
             'ya_fue_aprobado' => $a->yaFueAprobado(),
-            'kilos_consumidos' => $a->kilosConsumidos(),
-            'saldo_kg' => $a->saldoKg(),
-            'porcentaje_usado' => $a->porcentajeUsado(),
             'estado_etiqueta' => $a->estado->etiqueta(),
             'estado_color' => $a->estado->color(),
             'vigente' => $a->estaVigente(),
@@ -200,8 +197,8 @@ class ResumenPortal
     private const DE_BAJA = [EstadoAprovechamiento::Revocado, EstadoCarnet::Revocado, EstadoFaena::Revocado, EstadoGuia::Revocada];
 
     /**
-     * Dónde va en «Mis papeles»: `vigente`, `vencido` (incluye la autorización
-     * agotada) o `revocado` (incluye lo que quedó sin efecto). Null
+     * Dónde va en «Mis papeles»: `vigente`, `vencido`
+     * o `revocado` (incluye lo que quedó sin efecto). Null
      * si todavía está abierto: eso va en «En curso».
      */
     private static function situacion(Model $documento): ?string
@@ -234,10 +231,6 @@ class ResumenPortal
     /** Por qué ya no vale, dicho para el titular. Null si vale o si solo venció. */
     private static function motivoBaja(Model $documento): ?string
     {
-        if ($documento->estado === EstadoAprovechamiento::Agotado) {
-            return 'Se usaron todos los kilos autorizados.';
-        }
-
         if (in_array($documento->estado, self::DE_BAJA, true)) {
             return $documento instanceof GuiaMovimiento ? 'Revocada por la Unidad de Pesca.' : 'Revocado por la Unidad de Pesca.';
         }

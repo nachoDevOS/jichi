@@ -53,7 +53,6 @@ export interface FaenaFila {
     estado_etiqueta: string;
     estado_color: string;
     vigente: boolean;
-    consume_cupo: boolean;
     /** Se pasó de fecha y sigue activa: trabajo sin cerrar, no una previsión. */
     caducada: boolean;
     puede_editarse: boolean;
@@ -103,8 +102,7 @@ export interface FaenaFicha extends FaenaFila {
         id: number;
         descripcion: string | null;
         volumen_total_kg: number;
-        saldo_kg: number;
-        porcentaje_usado: number;
+        kilos_disponibles: number;
     } | null;
 }
 
@@ -121,10 +119,7 @@ export type FaenaEnCorreccion = {
     carnet_codigo: string | null;
     /** El número del libro, con cinco dígitos: «00001». */
     carnet_registro: string | null;
-    /** Con los kilos propios sumados de vuelta solo si esta faena descontaba. */
-    saldo_kg: number | null;
-    /** Lo libre más lo que esta faena ya reservaba: lo que puede pedir en modo estricto. */
-    libre_kg: number | null;
+    /** Fijos: copiados de la autorización al emitir. No se corrigen. */
     kilos_extraidos: number;
     embarcacion: string | null;
     propietario: string | null;

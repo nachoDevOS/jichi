@@ -3,7 +3,8 @@
 namespace App\Enums;
 
 /**
- * En qué situación está la BOLSA MADRE de un pescador.
+ * En qué situación está la autorización de pesca. No hay «agotado»: las faenas
+ * no descuentan kilos (12/10/2026).
  */
 enum EstadoAprovechamiento: string
 {
@@ -12,7 +13,6 @@ enum EstadoAprovechamiento: string
 
     /** SIREB confirmó el pago. Recién acá autoriza a pescar. */
     case Aprobado = 'aprobado';
-    case Agotado = 'agotado';
 
     /**
      * Dado de baja por la unidad, con motivo, aunque siga en fecha. No autoriza
@@ -25,7 +25,6 @@ enum EstadoAprovechamiento: string
         return match ($this) {
             self::Pendiente => 'Pendiente',
             self::Aprobado => 'Aprobado',
-            self::Agotado => 'Agotado',
             self::Revocado => 'Revocado',
         };
     }
@@ -35,7 +34,6 @@ enum EstadoAprovechamiento: string
         return match ($this) {
             self::Pendiente => 'sky',
             self::Aprobado => 'emerald',
-            self::Agotado => 'amber',
             self::Revocado => 'rose',
         };
     }
@@ -48,13 +46,10 @@ enum EstadoAprovechamiento: string
         return $this === self::Aprobado;
     }
 
-    /**
-     * ¿Se puede revocar? Solo lo firmado que todavía cuenta: aprobado o agotado.
-     * El borrador se elimina.
-     */
+    /** ¿Se puede revocar? Solo lo aprobado: el borrador se elimina. */
     public function permiteRevocacion(): bool
     {
-        return $this === self::Aprobado || $this === self::Agotado;
+        return $this === self::Aprobado;
     }
 
     /**

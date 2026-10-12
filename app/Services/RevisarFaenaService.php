@@ -26,16 +26,9 @@ class RevisarFaenaService
                 throw PermisoOperativoException::faenaNoSePuedeRevisar($bloqueada->estado->etiqueta());
             }
 
-            // ACÁ se consume el cupo, y por eso acá está el control de saldo: la
-            // pendiente no descuenta, así que la firma es el único momento en que
-            // el volumen sale de la bolsa. Se bloquea la fila del CUPO, que es la
-            // que contiene el recurso escaso.
+            // La faena no descuenta kilos: solo se mira que la autorización siga valiendo.
             $bloqueada->loadMissing('carnet');
-
-            $cupo = AprovechamientoPesq::query()
-                ->whereKey($bloqueada->carnet?->aprovechamiento_id)
-                ->lockForUpdate()
-                ->first();
+            $cupo = AprovechamientoPesq::query()->find($bloqueada->carnet?->aprovechamiento_id);
 
             // La salida es HOY: un cupo que ya venció no puede respaldarla.
             if ($cupo !== null && ! $cupo->estaEnFecha()) {
@@ -47,17 +40,6 @@ class RevisarFaenaService
                 throw PermisoOperativoException::cupoRevocado();
             }
 
-            if ($cupo !== null && AprovechamientoPesq::modoEstricto()) {
-                $saldo = $cupo->saldoKg();
-
-                if ((float) $bloqueada->kilos_extraidos > $saldo) {
-                    throw PermisoOperativoException::excedeCupo(
-                        (float) $bloqueada->kilos_extraidos,
-                        $saldo,
-                    );
-                }
-            }
-
             // La aprobación fija las dos fechas del papel: sale hoy y desembarca al techo.
             $bloqueada->motivoAuditoria = 'Pago confirmado en SIREB: el permiso queda habilitado.';
             $bloqueada->update([
@@ -65,9 +47,6 @@ class RevisarFaenaService
                 'fecha_salida' => now()->toDateString(),
                 'fecha_desembarque' => PermisoFaena::desembarqueDesde(now())->toDateString(),
             ]);
-
-            // Si esta aprobación dejó la bolsa en cero, el cupo pasa a `agotado`.
-            $cupo?->fresh()->sincronizarEstadoPorSaldo();
 
             return $faena->refresh();
         });

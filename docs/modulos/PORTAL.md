@@ -88,7 +88,7 @@ ventanilla ──[Resetear]──▶ clave temporal nueva (también reactiva)
 | --- | --- | --- |
 | Inicio | `InicioController` | Lo vigente hoy, la vitrina de trámites con requisitos (marca lo que puede pedir con `App\Support\TramitesDisponibles`), si debe algo y cuántos trámites tiene en curso |
 | En curso | `EnCursoController` | Lista de trámites abiertos —todos esperan el pago en SIREB— y, en cada fila (`fila-tramite.tsx`), la línea de avance Solicitado → Pago en Recaudaciones → Aprobado y el **código de pago** de SIREB. El paso lo da `etapa` y el texto `siguiente_paso`, los dos de `ResumenPortal` a partir del enum: React no decide. **Muestra en qué está el pago** (`pago`: sin pago / en revisión / validado / caída, de `ResumenPortal::estadoPago()`; con la liquidación vencida o anulada oculta el código de pago y manda a ventanilla por uno nuevo). **Se refresca sola cada minuto** (`usePoll`, solo la prop `tramites`, pausado con la pestaña oculta; 08/10/2026). No es «tiempo real»: el estado lo mueve la verificación con SIREB, cada 10 min |
-| Mis papeles | `PapelesController` | Todo lo que se aprobó alguna vez, con filtros **Vigentes** (abre acá) / **Vencidos** (incluye la autorización agotada) / **Revocados** (dados de baja: incluye anulado, «sin efecto» y **no pagado** —venció el plazo de pago en SIREB, con su motivo—) / Todos. **Vencidos** es por fecha: un aprobado fuera de vigencia sigue `aprobado`. `situacion`, `dias_restantes` y `motivo_baja` los calcula `ResumenPortal` desde el enum y `estaVigente()`; «vence pronto» a 30 días. Lo abierto va en «En curso» |
+| Mis papeles | `PapelesController` | Todo lo que se aprobó alguna vez, con filtros **Vigentes** (abre acá) / **Vencidos** / **Revocados** (dados de baja: incluye anulado, «sin efecto» y **no pagado** —venció el plazo de pago en SIREB, con su motivo—) / Todos. **Vencidos** es por fecha: un aprobado fuera de vigencia sigue `aprobado`. `situacion`, `dias_restantes` y `motivo_baja` los calcula `ResumenPortal` desde el enum y `estaVigente()`; «vence pronto» a 30 días. Lo abierto va en «En curso» |
 | Mis pagos | `PagosController` | Por **gestión** (`?gestion=`, informe de aportes del **Art. 13**): sus **recibos**, cada uno con el pago tal como lo validó SIREB (N° de transacción, banco, fecha). Cada recibo se **descarga** (`/mi-cuenta/recibos/{codigo}/descargar`, `DescargarReciboController`, el mismo PDF del panel como `attachment`); lo ajeno da 404. El pago se hace en SIREB (02/10/2026) |
 | Mis datos | `PerfilController` | Sus datos, **solo para leer**: se corrigen en ventanilla |
 
@@ -190,9 +190,6 @@ métodos que usa el panel para dejar emitir —`puedeEmitirFaenas()`,
 `puedeEmitirGuias()`, `motivoSinPermisos()`, el scope `enCurso()`—.
 
 - Faena y guía aparecen solo con el carnet vigente de la actividad.
-- La autorización, solo si no hay otra en curso (una agotada libera el lugar).
+- La autorización, solo si no hay otra en curso.
 - Un carnet, solo si no tiene uno vigente ni en trámite; el de pescador pide
   la autorización.
-- **En modo flexible** (`APROVECHAMIENTO_ESTRICTO=false`) la faena sale
-  disponible aun sin kilos libres, porque el panel la emite igual; el detalle
-  lo dice («ya no tiene kilos libres: consulte en ventanilla»).

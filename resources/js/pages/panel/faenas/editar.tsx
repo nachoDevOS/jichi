@@ -19,16 +19,12 @@ import type { FaenaEnCorreccion } from '@/types/faenas';
 export default function EditarFaena({
     faena,
     diasVigencia,
-    modoEstricto,
 }: {
     faena: FaenaEnCorreccion;
     /** El plazo de la resolución. Llega del servidor para que no haya dos copias. */
     diasVigencia: number;
-    /** Lo que dice APROVECHAMIENTO_ESTRICTO: es lo que decide si el botón frena. */
-    modoEstricto: boolean;
 }) {
     const form = useForm({
-        kilos_extraidos: String(faena.kilos_extraidos ?? ''),
         embarcacion: faena.embarcacion ?? '',
         propietario: faena.propietario ?? '',
         comandante_barco: faena.comandante_barco ?? '',
@@ -42,18 +38,6 @@ export default function EditarFaena({
         e.preventDefault();
         form.patch(route('faenas.update', faena.id));
     }
-
-    const kilos = Number(form.data.kilos_extraidos || 0);
-
-    /*
-     * Llega resuelto del servidor. En estricto manda lo LIBRE —con lo que esta
-     * faena ya reservaba sumado de vuelta—; en flexible, el saldo.
-     */
-    const saldo = modoEstricto ? faena.libre_kg : faena.saldo_kg;
-
-    /* El HECHO y la CONSECUENCIA, separados: ver faenas/crear.tsx. */
-    const excede = saldo !== null && kilos > saldo;
-    const bloquea = excede && modoEstricto;
 
     return (
         <LayoutPanel
@@ -190,24 +174,6 @@ export default function EditarFaena({
                                 </Campo>
                             </div>
 
-                            <Campo
-                                etiqueta="Cantidad autorizada de pescado extraído (kg)"
-                                htmlFor="kilos_extraidos"
-                                error={form.errors.kilos_extraidos}
-                                ayuda={saldo !== null ? `Quedan ${saldo} kg en la bolsa madre.` : undefined}
-                                obligatorio
-                            >
-                                <Input
-                                    id="kilos_extraidos"
-                                    type="number"
-                                    step="0.01"
-                                    min={0}
-                                    value={form.data.kilos_extraidos}
-                                    onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
-                                    aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
-                                    className="sm:max-w-xs"
-                                />
-                            </Campo>
                         </div>
                     </CardContent>
                 </Card>
@@ -221,50 +187,16 @@ export default function EditarFaena({
                     <CardContent className="space-y-4">
                         <div>
                             <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                Cupo disponible
+                                Kilos del permiso
                             </p>
                             <p className="text-3xl font-semibold tabular-nums">
-                                {saldo ?? '—'}
+                                {faena.kilos_extraidos}
                                 <span className="ml-1 text-base font-normal text-muted-foreground">kg</span>
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                Una faena pendiente todavía no descuenta: la bolsa recién se
-                                mueve cuando se aprueba.
+                                Fijos: los puso la autorización al emitir. No se corrigen.
                             </p>
                         </div>
-
-                        {kilos > 0 && (
-                            <div>
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                    Quedaría
-                                </p>
-                                <p
-                                    className={
-                                        bloquea
-                                            ? 'text-2xl font-semibold tabular-nums text-destructive'
-                                            : excede
-                                              ? 'text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400'
-                                              : 'text-2xl font-semibold tabular-nums'
-                                    }
-                                >
-                                    {saldo !== null ? Math.round((saldo - kilos) * 100) / 100 : '—'} kg
-                                </p>
-
-                                {excede &&
-                                    (modoEstricto ? (
-                                        <p className="mt-1 text-sm text-destructive">
-                                            No entra en el cupo. Baje los kilos o tramite otro
-                                            aprovechamiento.
-                                        </p>
-                                    ) : (
-                                        <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
-                                            Va a quedar por encima del cupo otorgado. El control de
-                                            saldo está desactivado, así que se guarda igual y el
-                                            exceso queda registrado.
-                                        </p>
-                                    ))}
-                            </div>
-                        )}
 
                         <p className="flex items-start gap-2 text-xs text-muted-foreground">
                             <Info className="mt-0.5 size-4 shrink-0" />
@@ -274,11 +206,7 @@ export default function EditarFaena({
 
                         <Button
                             type="submit"
-                            disabled={
-                                form.processing ||
-                                kilos <= 0 ||
-                                bloquea
-                            }
+                            disabled={form.processing}
                             className="w-full"
                         >
                             Guardar corrección

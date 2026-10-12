@@ -26,14 +26,8 @@ export interface CupoFila {
     /** Lo que el pescador declaró que navega: «canoa», «peque-peque», «bote». */
     tipo_embarcacion: string;
 
-    /** Lo comprometido por las faenas que consumen cupo (todas menos las vencidas). */
-    kilos_consumidos: number;
-    saldo_kg: number;
-    /** Apartado por faenas pendientes o en revisión: no descuenta, pero no está libre. */
-    kilos_reservados: number;
-    /** Lo que una faena nueva puede pedir: saldo menos reservado. */
-    libre_kg: number;
-    porcentaje_usado: number;
+    /** Los kilos que sale cada faena, fijos: las faenas no descuentan. */
+    kilos_disponibles: number;
 
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
     registrado_en: string | null;
@@ -43,12 +37,7 @@ export interface CupoFila {
     estado_color: string;
     vigente: boolean;
 
-    /**
-     * Los kilos que se PASARON del volumen otorgado.
-     */
-    kilos_excedidos: number;
-    excedido: boolean;
-    /** Vigente, con saldo y sin agotar: las tres condiciones juntas. */
+    /** Aprobada y en fecha. */
     puede_emitir_faena: boolean;
     /** Por qué no puede emitir faenas. `null` cuando sí puede. */
     motivo_sin_faena: string | null;
@@ -62,7 +51,7 @@ export interface CupoFila {
     ya_fue_aprobado: boolean;
     /** Firmada y no revocada: el mismo corte que la impresión del carnet. */
     puede_imprimirse: boolean;
-    /** Aprobada o agotada: lo único que se revoca. */
+    /** Aprobada: lo único que se revoca. */
     puede_revocarse: boolean;
 
     /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
@@ -192,10 +181,6 @@ export interface FaenaDelCupo {
     estado: EstadoFaena;
     estado_etiqueta: string;
     estado_color: string;
-    /**
-     * Si sus kilos pesan contra el saldo.
-     */
-    consume_cupo: boolean;
     /** Solo la que pasó por la firma. */
     puede_imprimirse: boolean;
     fecha_salida: string | null;

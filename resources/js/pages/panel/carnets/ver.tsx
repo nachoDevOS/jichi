@@ -3,7 +3,6 @@ import { Ban, ExternalLink, Paperclip, Pencil, Printer, Receipt, Ship, Trash2, T
 import { useState } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
-import { BarraSaldo } from '@/components/panel/aprovechamientos/barra-saldo';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -228,8 +227,6 @@ export default function VerCarnet({
                                     {carnet.cupo.descripcion ?? '—'}
                                 </p>
 
-                                <BarraSaldo cupo={carnet.cupo} />
-
                                 {/*
                                     LA CAPACIDAD Y LAS FECHAS, que es lo que un
                                     control pregunta: cuánto autoriza y hasta
@@ -245,12 +242,10 @@ export default function VerCarnet({
                                         valor={`${carnet.cupo.volumen_total_kg} kg`}
                                     />
 
-                                    {carnet.cupo.ya_fue_aprobado && carnet.cupo.kilos_consumidos > 0 && (
-                                        <DatoApilado
-                                            etiqueta="Disponible"
-                                            valor={`${carnet.cupo.saldo_kg} kg`}
-                                        />
-                                    )}
+                                    <DatoApilado
+                                        etiqueta="Kilos por faena"
+                                        valor={`${carnet.cupo.kilos_disponibles} kg`}
+                                    />
 
                                     <DatoApilado
                                         etiqueta="Solicitado el"
@@ -426,7 +421,7 @@ export default function VerCarnet({
                     <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
                         <CardTitle>Faenas emitidas</CardTitle>
 
-                        {/* `puede_emitir_faenas` exige carnet vigente y cupo con saldo:
+                        {/* `puede_emitir_faenas` exige carnet vigente y autorización vigente:
                             sin eso el formulario lo rechazaría. */}
                         {puede('faenas.crear') && carnet.puede_emitir_faenas && (
                             <Button

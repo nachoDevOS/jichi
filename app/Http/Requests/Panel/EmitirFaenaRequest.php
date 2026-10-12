@@ -22,14 +22,11 @@ class EmitirFaenaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Que exista. Que HABILITE lo decide el servicio: son tres condiciones
-            // que dependen de la fecha de hoy y del saldo.
+            // Que exista. Que HABILITE lo decide el servicio: depende de la fecha de hoy.
+            // Los kilos NO vienen del formulario: son los de la autorización.
             'carnet_id' => ['required', 'integer', Rule::exists('carnets', 'id')],
 
             // El número NO viene del formulario: lo genera el correlativo.
-
-            // `gt:0`: una faena de cero kilos no autoriza nada y gastaría una hoja.
-            'kilos_extraidos' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
 
             // Una tarifa del servicio de la faena en SIREB: si se puede cobrar lo decide el servicio.
             'tarifa_sireb' => ['required', 'uuid'],
@@ -61,9 +58,6 @@ class EmitirFaenaRequest extends FormRequest
             'tarifa_sireb.required' => 'Elija la tarifa del permiso.',
             'tarifa_sireb.uuid' => 'Esa tarifa no es de SIREB.',
             'carnet_id.exists' => 'Ese carnet no existe.',
-            'kilos_extraidos.required' => 'Indique cuántos kilos autoriza la faena.',
-            'kilos_extraidos.gt' => 'La faena tiene que autorizar kilos: escriba un número mayor que cero.',
-            'kilos_extraidos.decimal' => 'Los kilos llevan como máximo dos decimales.',
         ];
     }
 

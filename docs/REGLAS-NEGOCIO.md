@@ -32,8 +32,9 @@
   **`aprovechamientos_pesq`** que **copia** el tramo elegido (su etiqueta) y el
   precio. **Los kilos autorizados los escribe ventanilla** (12/10/2026): la
   tarifa de SIREB solo trae el precio, y Jichi no los deduce del tramo.
-- Su ciclo de vida pasa por los estados `pendiente`, `aprobado`, `agotado`,
-  `revocado` (`no_pagado` se quitó el 08/10/2026).
+- Su ciclo de vida pasa por los estados `pendiente`, `aprobado` y `revocado`
+  (`no_pagado` se quitó el 08/10/2026; `agotado`, el 12/10/2026: las faenas ya
+  no descuentan).
   Pasa de `pendiente` a `aprobado` cuando SIREB confirma el pago; si la
   liquidación vence sin pago, **sigue `pendiente`** (ver Paso 6). **La vigencia no es un estado**: pasada su fecha sigue
   `aprobado`, y si vale hoy lo dicen las fechas.
@@ -60,11 +61,10 @@ anterior está:
 | `pendiente` en fecha | ✘ | Es un trámite en curso: se corrige o se elimina, no se duplica |
 | `aprobado` en fecha | ✘ | Está vigente |
 | `aprobado` con la fecha pasada | ✔ | Ya no está vigente, aunque siga diciendo «aprobado» |
-| `agotado` (pescó todos los kilos) | ✔ | No le queda nada que autorizar |
 | `revocado` (aunque siga en fecha) | ✔ | La unidad la dio de baja |
 
 **Regla 3 — Revocar.** La unidad puede **revocar** una autorización `aprobado`
-o `agotado` antes de su vencimiento. Pide permiso `aprovechamientos.revocar`
+antes de su vencimiento. Pide permiso `aprovechamientos.revocar`
 (supervisión), motivo escrito de al menos 10 caracteres y la casilla de
 confirmación; el motivo queda en `auditorias`. **No se revierte.** Una
 `pendiente` se elimina y una no pagada nunca autorizó nada: ninguna de las dos se
@@ -75,9 +75,8 @@ revoca.
 - **No se emiten carnets con ella.** Deja de aparecer para elegir en el
   formulario del carnet, y si la revocan mientras un carnet espera el pago,
   ese carnet ya no se aprueba.
-- **No se emiten faenas** con ella, ni siquiera en modo flexible
-  (`APROVECHAMIENTO_ESTRICTO=false`): ese modo afloja el tope de kilos, no una
-  baja. Si una faena esperaba el pago, ya no se aprueba.
+- **No se emiten faenas** con ella. Si una faena esperaba el pago, ya no se
+  aprueba.
 - **No se imprime** la autorización (mismo criterio que el carnet revocado).
 - La verificación pública la muestra como **no vigente: revocada**.
 
@@ -202,43 +201,12 @@ dentro de una transacción deshecha con `rollBack()`.
   *(25/09/2026)*
 - **Los kilos proponen todo lo LIBRE** de la autorización de pesca; ventanilla
   los baja si la salida autoriza menos. *(25/09/2026; «libre» desde el 27/09/2026)*
-- **Los kilos se DESCUENTAN desde la aprobación, pero se RESERVAN desde el registro**
-  *(27/09/2026)*. Son dos cosas distintas:
-
-  | Estado de la faena | ¿Descuenta? | ¿Reserva? |
-  | --- | :-: | :-: |
-  | `pendiente` | ✘ | ✔ |
-  | `aprobado` | ✔ | — |
-  | `revocado` | ✔ (sanción: no le devuelve los kilos) | ✘ |
-
-  - **Descontar** mueve los kilos a «consumido». Solo la aprobada descuenta, y
-    solo lo consumido puede dejar la autorización `agotado`.
-  - **Reservar** aparta los kilos: nadie más puede pedirlos para otra faena,
-    pero no cuentan como consumidos ni agotan la autorización, porque la
-    solicitud todavía puede eliminarse.
-  - **Libre para una faena nueva = otorgado − consumido − reservado.**
-
-  Con `APROVECHAMIENTO_ESTRICTO=true` una faena que pide más que lo LIBRE **no
-  se registra** —el mensaje dice cuántos kilos están reservados— y se vuelve a
-  medir al aprobarla. Para pedir kilos reservados hay que **eliminar** la faena
-  que los aparta. Al corregir una pendiente, sus propios kilos
-  cuentan como libres: puede quedarse igual o bajar, pero no pasar lo libre.
-
-  **Ejemplo** — autorización de 750 kg con 600 aprobados:
-
-  | Paso | Consumido | Reservado | Libre | Resultado |
-  | --- | --: | --: | --: | --- |
-  | Situación inicial | 600 | 0 | 150 | — |
-  | Registrar faena A de 150 kg | 600 | 150 | 0 | ✔ queda pendiente y reserva |
-  | Registrar faena B de 100 kg | 600 | 150 | 0 | ✘ «150 kg reservados por faenas pendientes» |
-  | Eliminar A | 600 | 0 | 150 | ✔ se liberan los 150 |
-  | Registrar B de 100 kg | 600 | 100 | 50 | ✔ solo quedan 50 para reservar |
-  | Aprobar B | 700 | 0 | 50 | ✔ recién ahí descuenta |
-
-  Con `false` la reserva se calcula y se muestra, pero **no frena**: la faena se
-  emite igual, se sigue sumando al aprobarse y el exceso queda registrado.
-- **No se registra la vuelta.** La faena termina en `aprobado`: los kilos
-  autorizados cuentan como consumidos. *(25/09/2026)*
+- **Los kilos de la faena son fijos y NO descuentan** *(12/10/2026)*. Cada
+  faena sale con los `kilos_disponibles` de la autorización —los escribe
+  ventanilla al otorgarla— copiados en `kilos_extraidos`. Ventanilla no los
+  tipea al emitir la faena, y ninguna faena —pendiente, aprobada ni revocada—
+  baja nada de la autorización: no hay saldo, reserva ni estado `agotado`.
+- **No se registra la vuelta.** La faena termina en `aprobado`. *(25/09/2026)*
 - **Circuito:** pendiente → se paga el arancel en SIREB → aprobado. Se imprime
   recién aprobada. Se puede emitir desde la ficha de la
   autorización de pesca, que ya trae el carnet aprobado del pescador.
@@ -308,7 +276,7 @@ boletas en Jichi y la firma de supervisión.)*
   *(08/10/2026)* Si al verificar SIREB dice `vencida`, **el trámite NO cambia de
   estado: sigue `pendiente`**. (Una vencida nunca tiene pago: en SIREB vence
   justamente porque no se pagó.) Ocupa el lugar de la
-  persona y los kilos reservados hasta que se lo elimine (se puede: SIREB no
+  persona hasta que se lo elimine (se puede: SIREB no
   cobra una vencida). Lo decidió el responsable; antes pasaba a `no_pagado`.
   **Para seguir cobrándolo, «Generar nueva liquidación»**: la vencida queda en el
   historial del trámite y se pide otra con la tarifa que el catálogo tiene HOY
@@ -436,9 +404,9 @@ el formulario solo si ese carnet ya está revocado.
                           ▼
                   PERMISO DE FAENA
               (máx. 30 días, por salida;
-               reserva kilos del cupo al
-               registrarse y los descuenta
-               al aprobarse, a través del carnet)
+               sale con los kilos_disponibles
+               de la autorización, fijos;
+               no descuenta nada)
 
    Los cuatro documentos —autorización, carnet, faena y guía— se pagan en SIREB;
    al confirmarse el pago quedan aprobados y se entrega el RECIBO.
@@ -465,8 +433,7 @@ el formulario solo si ese carnet ya está revocado.
 | Los dos adjuntos del carnet, 3 MB | `EmitirCarnetRequest` + `StorageController` |
 | Comercializador NUNCA lleva cupo | `EmitirCarnetService` + `EmitirCarnetRequest` (`prohibitedIf`) |
 | La faena solo cuelga del carnet | `permisos_faena.carnet_id` es la única FK; el cupo llega por `hasManyThrough` |
-| Los kilos descuentan del cupo raíz | `AprovechamientoPesq::kilosConsumidos()` / `saldoKg()` |
-| La faena pendiente reserva sus kilos | `EstadoFaena::reservaCupo()`, `AprovechamientoPesq::libreKg()`, `EmitirFaenaService` |
+| La faena sale con los `kilos_disponibles` de la autorización y no descuenta | `EmitirFaenaService::emitir()` |
 | Faena: máximo 30 días | `PermisoFaena::DIAS_VIGENCIA` + `EmitirFaenaRequest` |
 | La guía solo cuelga del carnet | `guias_movimiento.carnet_id` es la única FK hacia la persona |
 | Guía: máximo 5 días | `GuiaMovimiento::DIAS_VIGENCIA` + `EmitirGuiaRequest` |
@@ -474,7 +441,7 @@ el formulario solo si ese carnet ya está revocado.
 | Fechas de la faena al aprobar | `RevisarFaenaService::aprobar()` + `PermisoFaena::desembarqueDesde()` |
 | Solo se revoca un carnet aprobado | `EstadoCarnet::permiteRevocacion()` + `EmitirCarnetService::revocar()` |
 | Una autorización vigente por persona | `OtorgarCupoService` con el scope `enCurso()` (pendiente o aprobada, en fecha) |
-| Solo se revoca una autorización aprobada o agotada | `EstadoAprovechamiento::permiteRevocacion()` + `RevisarCupoService::revocar()` |
+| Solo se revoca una autorización aprobada | `EstadoAprovechamiento::permiteRevocacion()` + `RevisarCupoService::revocar()` |
 | Autorización revocada: ni carnets ni faenas | `enCurso()` / `habilita()`, `EmitirFaenaService`, `RevisarFaenaService::aprobar()`, `RevisarCarnetService::aprobar()`, `puedeEmitirFaena()` |
 | Revocar la autorización deja sin efecto sus carnets y faenas, sin reescribirlos | `Carnet::estaVigente()`, `PermisoFaena::estaVigente()` y sus `scopeVigentes()`, que miran la autorización |
 | Revocar el carnet no reescribe faenas ni guías; valen si el titular tiene un carnet vigente de la actividad | `Carnet::amparaSusPapeles()`, usado por `estaVigente()` y `scopeVigentes()` de `PermisoFaena` y `GuiaMovimiento` |

@@ -22,7 +22,6 @@ export default function CrearFaena({
     diasVigencia,
     tarifas,
     servicioConfigurado,
-    modoEstricto,
 }: {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
     /** `?carnet=`: llega desde la ficha del cupo con el carnet ya elegido. */
@@ -33,22 +32,15 @@ export default function CrearFaena({
     tarifas: TarifaSireb[] | null;
     /** false = falta elegir el servicio en Catálogos › Aranceles. */
     servicioConfigurado: boolean;
-    /**
-     * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor, y ES LO QUE DECIDE
-     * si el botón se bloquea.
-     */
-    modoEstricto: boolean;
 }) {
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
     // Solo si está entre los vigentes y puede emitir: si no, se elige a mano.
     const inicial =
         beneficiario?.carnets_vigentes.find((c) => c.id === carnetElegido && c.puede_emitir_faenas) ?? null;
     const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(inicial);
-    const disponibleInicial = inicial ? disponibleDe(inicial, modoEstricto) : null;
 
     const form = useForm({
         carnet_id: inicial?.id ?? (null as number | null),
-        kilos_extraidos: disponibleInicial ? String(disponibleInicial) : '',
         // Si el servicio tiene una sola tarifa que se cobra, va elegida.
         tarifa_sireb: tarifas?.filter((t) => t.activa).length === 1 ? tarifas.find((t) => t.activa)!.id : '',
         embarcacion: '',
@@ -63,19 +55,13 @@ export default function CrearFaena({
     function elegirPersona(elegida: BeneficiarioSugerido | null) {
         setPersona(elegida);
         setCarnet(null);
-        form.setData((d) => ({ ...d, carnet_id: null, kilos_extraidos: '' }));
+        form.setData('carnet_id', null);
         form.clearErrors('carnet_id');
     }
 
-    // Arranca con todo el saldo del cupo: es lo que casi siempre se pide, y se baja a mano.
     function elegirCarnet(c: CarnetVigenteSugerido) {
-        const disponible = disponibleDe(c, modoEstricto);
         setCarnet(c);
-        form.setData((d) => ({
-            ...d,
-            carnet_id: c.id,
-            kilos_extraidos: disponible !== null && disponible > 0 ? String(disponible) : '',
-        }));
+        form.setData('carnet_id', c.id);
         form.clearErrors('carnet_id');
     }
 
@@ -84,19 +70,7 @@ export default function CrearFaena({
         form.post(route('faenas.store'));
     }
 
-    const saldo = carnet ? disponibleDe(carnet, modoEstricto) : null;
     const tarifaElegida = tarifas?.find((t) => t.id === form.data.tarifa_sireb) ?? null;
-    const reservado = carnet?.reservado_kg ?? 0;
-    const kilos = Number(form.data.kilos_extraidos || 0);
-
-    /*
-     * `excede` es el HECHO —no entra en el saldo— y `bloquea` es la
-     * CONSECUENCIA, que depende del modo. Separarlos es lo que deja avisar sin
-     * frenar: en modo flexible el exceso se sigue mostrando, en ámbar, porque
-     * es un dato que el operador tiene que ver aunque nadie lo detenga.
-     */
-    const excede = saldo !== null && kilos > saldo;
-    const bloquea = excede && modoEstricto;
 
     return (
         <LayoutPanel
@@ -116,7 +90,7 @@ export default function CrearFaena({
                             <BuscadorBeneficiario
                                 seleccionado={persona}
                                 onSeleccionar={elegirPersona}
-                                ayuda="Tiene que tener carnet de pescador vigente y cupo con saldo."
+                                ayuda="Tiene que tener carnet de pescador vigente y su autorización aprobada."
                             />
                         </Campo>
 
@@ -126,7 +100,6 @@ export default function CrearFaena({
                                     carnets={persona.carnets_vigentes}
                                     elegido={carnet}
                                     onElegir={elegirCarnet}
-                                    modoEstricto={modoEstricto}
                                 />
                             </Campo>
                         )}
@@ -255,25 +228,6 @@ export default function CrearFaena({
                                         </Campo>
                                     </div>
 
-                                    <Campo
-                                        etiqueta="Cantidad autorizada de pescado extraído (kg)"
-                                        htmlFor="kilos_extraidos"
-                                        error={form.errors.kilos_extraidos}
-                                        ayuda={saldo !== null ? `Quedan ${saldo} kg en la bolsa madre.` : undefined}
-                                        obligatorio
-                                    >
-                                        <Input
-                                            id="kilos_extraidos"
-                                            type="number"
-                                            step="0.01"
-                                            min={0}
-                                            value={form.data.kilos_extraidos}
-                                            onChange={(e) => form.setData('kilos_extraidos', e.target.value)}
-                                            aria-invalid={Boolean(form.errors.kilos_extraidos) || bloquea}
-                                            className="sm:max-w-xs"
-                                        />
-                                    </Campo>
-
                                     {/* Las fechas no se tipean: las fija la aprobación. */}
                                     <p className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                                         <Info className="mt-0.5 size-4 shrink-0" />
@@ -296,74 +250,23 @@ export default function CrearFaena({
                         {carnet === null ? (
                             <p className="flex items-start gap-2 text-sm text-muted-foreground">
                                 <Info className="mt-0.5 size-4 shrink-0" />
-                                Elija a la persona y su carnet de pescador para ver cuánto le queda de
-                                cupo.
+                                Elija a la persona y su carnet de pescador para ver con cuántos kilos
+                                sale el permiso.
                             </p>
                         ) : (
                             <>
                                 <div>
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                        Cupo disponible
+                                        Kilos del permiso
                                     </p>
+                                    {/* Fijos: los kilos disponibles de la autorización. La faena no descuenta. */}
                                     <p className="text-3xl font-semibold tabular-nums">
-                                        {saldo ?? '—'}
+                                        {carnet.kilos_disponibles ?? '—'}
                                         <span className="ml-1 text-base font-normal text-muted-foreground">
                                             kg
                                         </span>
                                     </p>
-                                    {modoEstricto && reservado > 0 && (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {reservado} kg reservados por faenas pendientes o en revisión.
-                                        </p>
-                                    )}
                                 </div>
-
-                                {kilos > 0 && (
-                                    <div>
-                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                            Quedaría
-                                        </p>
-                                        <p
-                                            className={
-                                                bloquea
-                                                    ? 'text-2xl font-semibold tabular-nums text-destructive'
-                                                    : excede
-                                                      ? 'text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400'
-                                                      : 'text-2xl font-semibold tabular-nums'
-                                            }
-                                        >
-                                            {saldo !== null ? Math.round((saldo - kilos) * 100) / 100 : '—'} kg
-                                        </p>
-
-                                        {/*
-                                            El aviso es local y adelanta lo que el servidor va a
-                                            decir: la comprobación de verdad corre DENTRO de la
-                                            transacción, con la fila del cupo bloqueada, porque otra
-                                            ventanilla puede mover el saldo en el mismo segundo.
-                                        */}
-                                        {/*
-                                            EL MISMO EXCESO SE DICE DE DOS MANERAS, y no es
-                                            cosmética: en modo estricto el servidor RECHAZA la
-                                            faena, y en modo flexible la acepta. Un aviso que
-                                            dijera «no entra» donde sí entra enseñaría al operador
-                                            a ignorarlo.
-                                        */}
-                                        {excede &&
-                                            (modoEstricto ? (
-                                                <p className="mt-1 text-sm text-destructive">
-                                                    No entra en el cupo. Baje los kilos o tramite
-                                                    otro aprovechamiento.
-                                                </p>
-                                            ) : (
-                                                <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
-                                                    Va a quedar por encima del cupo otorgado. El
-                                                    control de saldo está desactivado, así que la
-                                                    faena se emite igual y el exceso queda
-                                                    registrado.
-                                                </p>
-                                            ))}
-                                    </div>
-                                )}
 
                                 <div>
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -379,8 +282,7 @@ export default function CrearFaena({
                                 </div>
 
                                 <p className="text-xs text-muted-foreground">
-                                    Sale el día que se aprueba y vale {diasVigencia} días. Si no se
-                                    cierra antes, vence y su volumen vuelve al cupo.
+                                    Sale el día que se aprueba y vale {diasVigencia} días.
                                 </p>
                             </>
                         )}
@@ -390,9 +292,7 @@ export default function CrearFaena({
                             disabled={
                                 form.processing ||
                                 carnet === null ||
-                                form.data.tarifa_sireb === '' ||
-                                kilos <= 0 ||
-                                bloquea
+                                form.data.tarifa_sireb === ''
                             }
                             className="w-full"
                         >
@@ -408,24 +308,14 @@ export default function CrearFaena({
 /**
  * Los carnets vigentes de la persona, con el que no sirve deshabilitado.
  */
-/**
- * En modo estricto una faena nueva solo puede pedir lo LIBRE: lo reservado por
- * otra solicitud abierta no está. En flexible la reserva no frena nada.
- */
-function disponibleDe(c: CarnetVigenteSugerido, modoEstricto: boolean): number | null {
-    return modoEstricto ? c.libre_kg : c.saldo_kg;
-}
-
 function ListaDeCarnets({
     carnets,
     elegido,
     onElegir,
-    modoEstricto,
 }: {
     carnets: CarnetVigenteSugerido[];
     elegido: CarnetVigenteSugerido | null;
     onElegir: (c: CarnetVigenteSugerido) => void;
-    modoEstricto: boolean;
 }) {
     if (carnets.length === 0) {
         return (
@@ -441,9 +331,6 @@ function ListaDeCarnets({
         <ul className="space-y-2">
             {carnets.map((c) => {
                 const activo = elegido?.id === c.id;
-                const disponible = disponibleDe(c, modoEstricto);
-                // Hay saldo pero está todo apartado: el motivo es otro que «sin cupo».
-                const todoReservado = modoEstricto && (c.saldo_kg ?? 0) > 0 && (c.libre_kg ?? 0) <= 0;
 
                 return (
                     <li key={c.id}>
@@ -475,21 +362,18 @@ function ListaDeCarnets({
                                 {c.volumen_total_kg !== null && (
                                     <span className="block text-xs text-muted-foreground">
                                         Capacidad {c.capacidad ?? '—'} · otorgado{' '}
-                                        <span className="tabular-nums">{c.volumen_total_kg} kg</span> · disponible{' '}
-                                        <span className="font-medium tabular-nums text-foreground">{disponible} kg</span>
+                                        <span className="tabular-nums">{c.volumen_total_kg} kg</span>
                                     </span>
                                 )}
                             </span>
 
                             {c.puede_emitir_faenas ? (
-                                <Badge color="emerald">{disponible} kg disponibles</Badge>
+                                <Badge color="emerald">{c.kilos_disponibles} kg por faena</Badge>
                             ) : (
                                 <span className="text-xs text-muted-foreground">
                                     {c.tipo_actor === 'comercializador'
                                         ? 'no emite faenas'
-                                        : todoReservado
-                                          ? `${c.reservado_kg} kg reservados`
-                                          : 'sin cupo con saldo'}
+                                        : 'sin autorización vigente'}
                                 </span>
                             )}
                         </button>
