@@ -38,7 +38,7 @@ class TarifarioSireb
     /**
      * Las tarifas del servicio del trámite: etiqueta, precio y si está activa.
      * null si SIREB no responde, [] sin servicio. El precio es de referencia:
-     * el que vale lo pide precio().
+     * el que vale lo pide precio(). El rango va tal cual, solo para mostrar.
      */
     public function tarifas(ConceptoArancel $concepto): ?array
     {
@@ -57,6 +57,9 @@ class TarifarioSireb
                 'etiqueta' => $t['etiqueta'] ?? '',
                 'monto' => (float) ($t['monto'] ?? 0),
                 'activa' => ($t['estado'] ?? null) === self::TARIFA_ACTIVA,
+                // Como lo manda SIREB (hoy, null). No se calcula nada con esto.
+                'rango_desde' => $t['rango_desde'] ?? null,
+                'rango_hasta' => $t['rango_hasta'] ?? null,
             ])
             ->all();
     }

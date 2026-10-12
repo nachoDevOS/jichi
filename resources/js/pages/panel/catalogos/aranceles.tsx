@@ -207,6 +207,7 @@ function TablaTarifas({ arancel, moneda }: { arancel: ArancelFila; moneda: strin
                 <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                         <th className="py-1.5 pr-4 font-medium">Tarifa</th>
+                        <th className="py-1.5 pr-4 font-medium">Rango</th>
                         <th className="py-1.5 pr-4 text-right font-medium">Precio</th>
                         <th className="py-1.5 font-medium">Estado</th>
                     </tr>
@@ -215,6 +216,12 @@ function TablaTarifas({ arancel, moneda }: { arancel: ArancelFila; moneda: strin
                     {arancel.tarifas.map((t) => (
                         <tr key={t.id} title={t.id}>
                             <td className="py-1.5 pr-4">{t.etiqueta || 'Sin etiqueta'}</td>
+                            {/* Tal como lo manda SIREB: hoy llega vacío. */}
+                            <td className="py-1.5 pr-4 tabular-nums text-muted-foreground">
+                                {t.rango_desde === null && t.rango_hasta === null
+                                    ? '—'
+                                    : `${t.rango_desde ?? '…'} – ${t.rango_hasta ?? '…'}`}
+                            </td>
                             <td className="py-1.5 pr-4 text-right tabular-nums">{bs(t.monto, moneda)}</td>
                             <td className="py-1.5">
                                 {t.activa ? (

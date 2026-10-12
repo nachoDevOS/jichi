@@ -155,6 +155,9 @@ export interface TarifaSireb {
     monto: number;
     /** false = dada de baja en SIREB: se ve, pero no se elige. */
     activa: boolean;
+    /** El rango tal como lo manda SIREB (hoy, null). Solo se muestra. */
+    rango_desde: string | number | null;
+    rango_hasta: string | number | null;
 }
 
 // Declaraciones globales.
