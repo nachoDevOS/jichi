@@ -142,7 +142,7 @@ class RenovarLiquidacionService
     }
 
     /**
-     * La tarifa que el catálogo tiene HOY, con su precio de SIREB. Cada servicio la
+     * La tarifa que el catálogo tiene HOY (la autorización, la suya), con su precio de SIREB. Cada servicio la
      * busca como al emitir; si está de baja, su excepción dice dónde corregirla.
      *
      * @return array{monto: float, tarifa_id?: string, renglones?: array<int, array{monto: float, tarifa_id: string}>}
@@ -150,9 +150,10 @@ class RenovarLiquidacionService
     private function precioVigente(Model $documento): array
     {
         return match (true) {
-            $documento instanceof AprovechamientoPesq => $this->cupos->precioDe($documento->categoria()->withTrashed()->firstOrFail()),
-            $documento instanceof Carnet => $this->carnets->precioDe($documento->tipoCarnet()->withTrashed()->firstOrFail()),
-            $documento instanceof PermisoFaena => $this->faenas->precioDeLaFaena(),
+            // La autorización renueva con SU tarifa: el tramo no se cambia nunca.
+            $documento instanceof AprovechamientoPesq => $this->cupos->precioDe((string) $documento->sireb_tarifa_id, $documento->tramo),
+            $documento instanceof Carnet => $this->carnets->precioDe((string) $documento->sireb_tarifa_id),
+            $documento instanceof PermisoFaena => $this->faenas->precioDeLaFaena((string) $documento->sireb_tarifa_id),
             $documento instanceof GuiaMovimiento => $this->precioDeLaGuia($documento),
         };
     }
@@ -163,8 +164,8 @@ class RenovarLiquidacionService
         $renglones = [];
         $importe = 0.0;
 
-        foreach ($guia->detalles()->with(['producto' => fn ($q) => $q->withTrashed()])->get() as $detalle) {
-            $renglones[$detalle->id] = $this->guias->precioDelProducto($detalle->producto);
+        foreach ($guia->detalles as $detalle) {
+            $renglones[$detalle->id] = $this->guias->precioDelProducto($detalle->sireb_tarifa_id, $detalle->especie);
             $importe += GuiaDetalle::importeDe((float) $detalle->cantidad_kg, round($renglones[$detalle->id]['monto'], 2));
         }
 
@@ -176,8 +177,8 @@ class RenovarLiquidacionService
     {
         // El aviso de otorgar dice «elija otra escala», y el tramo de una autorización no se cambia nunca.
         if ($e instanceof CupoInvalidoException && ! str_contains($e->getMessage(), 'no responde')) {
-            return 'la tarifa de SIREB de la escala «'.$documento->categoria?->descripcion_kg.'» está dada de baja o no se '
-                .'puede cobrar hoy. Actualícela en Catálogos › Escala y vuelva a intentarlo.';
+            return 'la tarifa de SIREB de la escala «'.$documento->tramo.'» está dada de baja o no se '
+                .'puede cobrar hoy. Elimine esta autorización y registre otra con un tramo vigente.';
         }
 
         return $e->getMessage();

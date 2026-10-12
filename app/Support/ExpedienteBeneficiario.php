@@ -27,9 +27,7 @@ class ExpedienteBeneficiario
             ->with([
                 'codigo',
                 'asociacion:id,nombre,sigla',
-                'tipoCarnet',
                 'aprovechamiento' => fn ($a) => $a
-                    ->with('categoria')
                     ->withSum('faenasQueConsumen', 'kilos_extraidos')
                     ->withSum('faenasQueReservan', 'kilos_extraidos'),
             ])
@@ -69,7 +67,6 @@ class ExpedienteBeneficiario
     public static function aprovechamientos(Beneficiario $beneficiario): Collection
     {
         return $beneficiario->aprovechamientos()
-            ->with('categoria')
             ->withSum('faenasQueConsumen', 'kilos_extraidos')
             ->withSum('faenasQueReservan', 'kilos_extraidos')
             // Por la SOLICITUD: la emisión está en NULL hasta la firma.

@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
-use App\Enums\ModalidadAprovechamiento;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
@@ -25,9 +24,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 #[Fillable([
     'beneficiario_id',
-    'categoria_aprov_id',
     'nro',
-    'modalidad',
+    'tramo',
     'volumen_total_kg',
     'monto',
     'sireb_tarifa_id',
@@ -58,7 +56,6 @@ class AprovechamientoPesq extends Model
     protected $attributes = [
         // Nace pendiente: se aprueba cuando SIREB confirma el pago. Ver ConfirmarPagoService.
         'estado' => EstadoAprovechamiento::Pendiente->value,
-        'modalidad' => ModalidadAprovechamiento::EscalaGeneral->value,
     ];
 
     protected function casts(): array
@@ -67,7 +64,6 @@ class AprovechamientoPesq extends Model
             'volumen_total_kg' => 'decimal:2',
             'monto' => 'decimal:2',
             'estado' => EstadoAprovechamiento::class,
-            'modalidad' => ModalidadAprovechamiento::class,
             'fecha_solicitud' => 'date',
             'fecha_emision' => 'date',
             'fecha_vencimiento' => 'date',
@@ -79,12 +75,6 @@ class AprovechamientoPesq extends Model
     public function beneficiario(): BelongsTo
     {
         return $this->belongsTo(Beneficiario::class);
-    }
-
-    /** La escala bajo la que se otorgó. Solo referencia: el volumen ya está copiado. */
-    public function categoria(): BelongsTo
-    {
-        return $this->belongsTo(CategoriaAprovechamiento::class, 'categoria_aprov_id');
     }
 
     /**

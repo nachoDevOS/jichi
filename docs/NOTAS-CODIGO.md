@@ -142,41 +142,6 @@
    de baja con motivo. La diferencia importa en un control de ruta: una guía
    cerrada amparó un traslado real, una anulada nunca amparó nada.
 
-## `app/Enums/ModalidadAprovechamiento.php`
-
-### LAS DOS VERTIENTES DEL APROVECHAMIENTO PESQUERO
-
-   No son dos tablas ni dos flujos: son la MISMA bolsa madre con dos reglas de
-   recarga distintas. Lo que cambia entre una y otra es qué se puede hacer
-   cuando el cupo se agota.
-   POR QUÉ ES UN ENUM Y NO UNA COLUMNA BOOLEANA `es_paiche`
-   Porque el criterio no es la especie sino el RÉGIMEN. Hoy la única especie
-   especial es el paiche; mañana la resolución puede sumar otra, y con un
-   booleano llamado por la especie habría que renombrar la columna —o peor,
-   dejarla mintiendo—. Con el enum, agregar una especie es marcar su tramo de la
-   escala con la modalidad que ya existe.
-   Y POR QUÉ VIVE EN EL TRAMO DE LA ESCALA
-   La modalidad la fija la resolución al definir el tramo —«1001 kg Hasta 2000 Kg
-   PAICHE» ES el régimen especial—, no el operador al otorgar. Puesta en el
-   formulario de otorgamiento sería una decisión de ventanilla, y entonces dos
-   cupos del mismo tramo podrían tener reglas distintas.
-   Se COPIA al aprovechamiento al otorgarlo, por lo mismo que el volumen: si
-   alguien reclasifica el tramo en el catálogo, los cupos ya otorgados no pueden
-   cambiar de régimen retroactivamente.
-
-### ESPECIES ESPECIALES — el cupo de gran porte, con tasación fija.
-
-   Paiche y lo que la resolución sume después. Es una autorización específica
-   sobre la cuota de la especie, con TASACIÓN FIJA: el valor no sale de una
-   progresión por kilos como en los tramos menores, lo fija la resolución
-   para esa especie.
-
-### Nombre del color del badge.
-
-   Devuelve el NOMBRE y no las clases armadas con texto: Tailwind solo
-   incluye en el CSS final las que puede leer literalmente. Un color nuevo
-   acá va también al mapa de resources/js/components/ui/badge.tsx.
-
 ## `app/Enums/RolSistema.php`
 
 ### Los roles del sistema y qué puede hacer cada uno.
@@ -338,12 +303,6 @@
    El mensaje dice el saldo y la fecha porque son los dos datos con los que
    el operador decide qué hacer: esperar a que venza, o —si el cupo todavía
    es un borrador— corregirlo al tramo que corresponde.
-
-### Se eligió un tramo de la escala que ya no está vigente.
-
-   Puede pasar entre que el operador abre el formulario y aprieta guardar:
-   la lista se armó con los tramos de ese momento y en el medio alguien
-   derogó uno desde el catálogo.
 
 ### No se amplía un cupo que ya no corre.
 
@@ -1057,40 +1016,6 @@
    cargó, y el título impreso no puede depender de eso. `tipo_actor` es
    la regla, y no cambia.
 
-## `app/Http/Controllers/Panel/CategoriaAprovechamientoController.php`
-
-### LA ESCALA OFICIAL DE APROVECHAMIENTO — paso 2 del flujo del pescador
-
-   Es la tabla que convierte una decisión administrativa —«a esta persona le
-   corresponde la escala 3»— en los dos números con los que trabaja el sistema:
-   el volumen en kilos y lo que se cobra por él.
-   LA PANTALLA MUESTRA LOS HUECOS, Y ESO ES LO MÁS ÚTIL QUE HACE
-   Un hueco entre dos tramos no rompe nada visible: simplemente hay volúmenes
-   que no caen en ninguna escala, `CategoriaAprovechamiento::paraVolumen()`
-   devuelve null y el formulario de cupo no ofrece nada, sin ningún error que lo
-   explique. Es el tipo de falla que se descubre en ventanilla con alguien
-   enfrente.
-   El SOLAPE lo rechaza el Request —es plata mal cobrada y no tiene lectura
-   válida—. El HUECO no se puede rechazar ahí, porque cargar la escala de a un
-   tramo por vez deja huecos transitorios: al guardar el primero todavía no
-   existe el segundo. Así que se detecta acá, mirando la escala ENTERA, y se
-   muestra como aviso.
-   Igual que los otros dos catálogos, NO hay `destroy()`: los aprovechamientos
-   otorgados apuntan acá para dejar constancia de bajo qué tramo se autorizaron.
-   Una escala derogada se pone en `estado = false`.
-
-### Los rangos de kilos que no caen en ningún tramo.
-
-   SE RECORRE ORDENADO POR KILOS, NO POR NÚMERO DE ESCALA
-   Los dos órdenes casi siempre coinciden, pero no tienen por qué: nada
-   impide cargar la escala 7 con el rango más bajo. Recorriendo por
-   `nro_escala` un catálogo así daría huecos y solapes inventados, y el
-   aviso perdería toda credibilidad.
-   El criterio de contigüidad es que cada tramo empiece donde termina el
-   anterior MÁS UNO: el texto oficial dice «1 Kg Hasta 100 Kg» y el
-   siguiente arranca en 101, no en 100,01. Por eso la comparación usa 1 y no
-   un épsilon.
-
 ## `app/Http/Controllers/Panel/DashboardController.php`
 
 ### El tablero: qué espera trabajo, cuánto hay vigente, cuánto se cobró y qué vence
@@ -1240,27 +1165,6 @@
    está en `views/documentos/recibo-oficial.blade.php` y se adapta con
    App\Support\ReciboImpreso, que expone lo que ese Blade pide sin obligar a
    reescribirlo: es una maqueta de coordenadas fijas, medida contra el papel.
-
-## `app/Http/Controllers/Panel/TipoCarnetController.php`
-
-### CATÁLOGO DE TIPOS DE CARNET — cómo se llama cada credencial y cuánto sale
-
-   ES EL CATÁLOGO, NO LA REGLA
-   Qué habilita un carnet —si emite faenas o guías, si lleva cupo en kilos— lo
-   dice `carnets.tipo_actor`, que es un enum de PHP. De ESTE nombre no cuelga
-   ninguna decisión, y por eso se puede editar libremente desde acá: el mismo
-   documento figura como «Carnet de Pescador» o «Pescador Artesanal» según quién
-   lo cargó, y un `match` sobre ese texto se rompería en silencio.
-   EL PRECIO LO PONE SIREB (30/09/2026): el tipo guarda `tarifa_sireb` y cada
-   carnet congela su `monto` al emitirse, así que un carnet emitido en marzo a
-   80 Bs sigue diciendo 80 Bs en agosto aunque la tarifa haya subido.
-   (Lo que sigue describe el `precio_bs` que había antes.)
-   Lo que SÍ cambia al subir el precio es el saldo pendiente de los carnets que
-   no estén cubiertos: `Carnet::montoACobrar()` lee esta columna. Es lo correcto
-   —lo que se debe se debe a la tarifa vigente— pero conviene saberlo antes de
-   tocar el número.
-   Igual que en asociaciones, NO hay `destroy()`: los carnets emitidos apuntan
-   acá. Un tipo que se deja de usar se pone en `estado = false`.
 
 ## `app/Http/Controllers/Publico/VerificacionController.php`
 
@@ -1548,60 +1452,6 @@
    sola vez para que la base guarde siempre el mismo formato. Un espacio al
    final no se ve en pantalla pero viaja a `nombreCompleto` y ensucia el
    nombre impreso en el carnet.
-
-## `app/Http/Requests/Panel/GuardarCategoriaAprovechamientoRequest.php`
-
-### Reglas para crear y editar un tramo de la ESCALA OFICIAL.
-
-   LA VALIDACIÓN QUE IMPORTA NO ES LA DE LOS CAMPOS: ES LA DE LOS TRAMOS
-   Cada campo por separado puede estar perfecto y la escala quedar rota igual.
-   Dos formas de romperla, y las dos son silenciosas:
-   - SOLAPE. Si el tramo 3 llega a 500 y el 4 arranca en 400, un cupo de 450
-   cae en los dos. `CategoriaAprovechamiento::paraVolumen()` devuelve el de
-   `nro_escala` más bajo, así que el sistema cobraría siempre el más barato
-   —y nadie lo notaría hasta un arqueo—.
-   - HUECO. Si el 3 llega a 500 y el 4 arranca en 502, un cupo de 501 no cae
-   en ninguno: `paraVolumen()` devuelve null y el formulario no ofrece
-   ninguna escala, sin ningún error que lo explique.
-   El SOLAPE se RECHAZA acá: es plata mal cobrada y no tiene lectura válida.
-   El HUECO no se rechaza, y es deliberado: cargar la escala de a un tramo por
-   vez deja huecos TRANSITORIOS —al guardar el tramo 1 todavía no existe el 2—
-   y bloquearlos haría imposible cargarla. Se avisa desde la pantalla, que ve
-   la escala entera de una vez. Ver el índice de la escala.
-
-### NO lleva `max:7` aunque hoy la escala tenga siete tramos.
-
-   El número de tramos lo fija una resolución y puede cambiar; un
-   tope escrito en código convertiría ese cambio en un despliegue,
-   que es exactamente lo que esta tabla vino a evitar.
-
-### El TEXTO OFICIAL, y no se deduce de los kilos.
-
-   El tramo más alto dice «1001 kg Hasta 2000 Kg PAICHE», y ese
-   «PAICHE» no está en ningún número. El documento impreso tiene que
-   decir lo que dice la resolución.
-
-### El control que mira la escala ENTERA, no el tramo suelto.
-
-   Corre después de las reglas de campo —si los kilos ni siquiera son
-   números, no tiene sentido buscar solapes— y por eso va en `after()` y no
-   dentro de `rules()`.
-
-## `app/Http/Requests/Panel/GuardarTipoCarnetRequest.php`
-
-### Reglas para crear y editar un tipo de carnet.
-
-   EL PRECIO SE VALIDA COMO PLATA, NO COMO UN NÚMERO CUALQUIERA
-   `decimal:0,2` rechaza «80.999», que en la base se guardaría redondeado a
-   81.00 sin decirle nada a nadie. En un arancel esa diferencia se arrastra a
-   cada carnet emitido.
-   Se acepta el 0 —un carnet gratuito por resolución es posible— pero no un
-   negativo, que no significa nada.
-
-### Dos tipos no pueden llamarse igual: en un desplegable serían
-
-   Esta tabla NO tiene borrado lógico, así que el unique va simple
-   —sin el whereNull de las asociaciones—.
 
 ## `app/Http/Requests/Panel/OtorgarCupoRequest.php`
 
@@ -1920,35 +1770,6 @@
    valga hoy, y que tenga una bolsa madre con saldo. Sin la tercera se
    emitirían faenas sin cupo del que descontarlas.
 
-## `app/Models/CategoriaAprovechamiento.php`
-
-### Un tramo de la ESCALA OFICIAL de aprovechamiento pesquero.
-
-   Convierte una decisión administrativa —«a esta persona le corresponde la
-   escala 3»— en los dos números con los que trabaja el sistema: el volumen en
-   kilos y lo que se cobra por él.
-   NO SE BORRA UNA ESCALA. Los aprovechamientos otorgados apuntan acá para
-   dejar constancia de bajo qué tramo se autorizaron; una escala derogada se
-   pone en `estado = false` y desaparece del formulario sin tocar lo histórico.
-
-### Cómo se lee en un desplegable: «3 · 201 kg Hasta 500 Kg — 110,00 Bs».
-
-   Se usa `descripcion_kg` y no los dos decimales, porque el texto oficial
-   no siempre es la lectura literal del rango: el tramo más alto dice
-   «PAICHE» y eso no está en ningún número.
-
-### ¿Este volumen cae dentro del tramo?
-
-   Los dos extremos entran. Es lo que dice el texto oficial —«1 Kg Hasta 100
-   Kg»— y además, con uno de los dos abierto, un cupo de exactamente 100 kg
-   no caería en ninguna escala.
-
-### El tramo que corresponde a este volumen, o null si se pasa de la escala.
-
-   Devuelve null en vez de caer al tramo más alto a propósito: un pedido de
-   5000 kg cuando la escala llega a 2000 no es «el tramo 7», es un pedido
-   que necesita resolución aparte. Silenciarlo cobraría de menos.
-
 ## `app/Models/GuiaMovimiento.php`
 
 ### El amparo de UN traslado de producto pesquero.
@@ -2051,16 +1872,6 @@
    Se llama al CERRAR el recibo, antes de imprimirlo — nunca al leerlo. Una
    vez que el papel salió, este método no se vuelve a tocar: para eso está
    `cuadra()`, que informa la diferencia en vez de taparla.
-
-## `app/Models/TipoCarnet.php`
-
-### Una clase de credencial y su arancel: «Carnet de Pescador», 80 Bs.
-
-   ES EL CATÁLOGO, NO LA REGLA. Qué habilita el documento —si emite faenas o
-   guías, si lleva cupo— lo dice `carnets.tipo_actor`, que es un enum de PHP.
-   De este nombre no cuelga NINGUNA decisión: el mismo documento figura como
-   «Carnet de Pescador» o como «Pescador Artesanal» según quién lo cargó, y un
-   match sobre el texto rompería en silencio el día que alguien lo edite.
 
 ## `app/Models/User.php`
 
@@ -2895,14 +2706,6 @@
    Con `firstOrCreate`, el seeder solo llena lo que falta. Para forzar la
    recarga de un valor hay que decidirlo a mano, que es lo correcto para un dato
    que sale de una resolución.
-
-### La escala de aprovechamiento. REVISAR TODO: kilos, textos y precios.
-
-   Los tramos tienen que ser CONTIGUOS y SIN HUECOS: el `kilos_min` de cada
-   uno es el `kilos_max` del anterior más 1. Si queda un hueco,
-   `CategoriaAprovechamiento::paraVolumen()` devuelve null para los
-   volúmenes que caen adentro y el formulario no ofrece ninguna escala, sin
-   ningún error que lo explique.
 
 ## `database/seeders/DatabaseSeeder.php`
 
@@ -4250,52 +4053,6 @@
    las reglas: escrito dos veces, alcanza con tocar uno para que crear y editar
    acepten cosas distintas.
 
-## `resources/js/pages/panel/catalogos/escala.tsx`
-
-### LA ESCALA OFICIAL DE APROVECHAMIENTO
-
-   De esta tabla salen los dos números con los que trabaja el módulo de pesca:
-   cuántos kilos se autorizan y cuánto se cobra por ellos.
-   El patrón de la pantalla —tabla a ancho completo, formulario arriba, un solo
-   estado `editando`, sin botón de borrar— está explicado en `asociaciones.tsx`.
-   LO PROPIO DE ESTA PANTALLA: EL AVISO DE HUECOS
-   Un hueco entre dos tramos no rompe nada visible. Simplemente hay volúmenes
-   que no caen en ninguna escala: el servidor devuelve null al buscar el tramo y
-   el formulario de cupo no ofrece nada, sin ningún error que lo explique. Es el
-   tipo de falla que se descubre en ventanilla, con alguien enfrente.
-   El SOLAPE, en cambio, lo rechaza el servidor al guardar: es plata mal cobrada
-   —un cupo que cae en dos tramos se cobra con el más barato— y no tiene lectura
-   válida.
-   Los huecos los calcula el SERVIDOR y llegan en `huecos`. La pantalla no los
-   deduce recorriendo la tabla: ordenar por kilos y comparar extremos es la misma
-   regla, y escrita en los dos lados se desincroniza.
-
-### El aviso de rangos sin cubrir.
-
-   Va ARRIBA DE TODO y en ámbar porque es lo único de esta pantalla que puede
-   romper el trabajo de mañana, y porque no se deduce mirando la tabla: los
-   tramos se ven correctos uno por uno.
-
-## `resources/js/pages/panel/catalogos/tipos-carnet.tsx`
-
-### CATÁLOGO DE TIPOS DE CARNET
-
-   Cómo se llama cada credencial y cuánto sale.
-   El patrón de la pantalla —tabla a ancho completo, formulario arriba, un solo
-   estado `editando`, sin botón de borrar— está explicado en `asociaciones.tsx`.
-   ES EL CATÁLOGO, NO LA REGLA — y por eso el nombre se puede editar tranquilo
-   Qué habilita un carnet —si emite faenas o guías, si lleva cupo en kilos— lo
-   dice `carnets.tipo_actor`, que es un enum del servidor. De este nombre no
-   cuelga ninguna decisión: el mismo documento puede figurar como «Carnet de
-   Pescador» o «Pescador Artesanal» y el sistema se comporta igual.
-   CAMBIAR EL PRECIO NO TOCA LO YA COBRADO, PERO SÍ LO QUE SE DEBE
-   Lo cobrado vive en `pagos` y no se recalcula nunca: un carnet emitido a 80 Bs
-   sigue diciendo 80 aunque el arancel suba. Lo que SÍ se mueve es el saldo
-   pendiente de los carnets que todavía no están cubiertos, porque ese saldo se
-   calcula contra esta columna.
-   Es lo correcto —lo que se debe se debe a la tarifa vigente— pero conviene
-   saberlo antes de tocar el número, y por eso está escrito bajo el campo.
-
 ## `resources/js/pages/panel/dashboard.tsx`
 
 ### El tablero
@@ -4672,7 +4429,7 @@
 ### Tipos de los tres CATÁLOGOS: asociaciones, escala de aprovechamiento y tipos
 
    Cada interfaz describe, campo por campo, lo que arman
-   App\Http\Controllers\Panel\{Asociacion,CategoriaAprovechamiento,TipoCarnet}Controller.
+   App\Http\Controllers\Panel\{Asociacion,ArancelSireb}Controller.
    Si allá se renombra una clave y acá no, el editor lo marca en rojo al
    instante en vez de descubrirlo con una pantalla en blanco.
    LOS TRES TRAEN UN CONTADOR DE USO, Y NO ES DECORACIÓN
@@ -4792,15 +4549,6 @@
    `pendiente` es el BORRADOR, esperando el pago en SIREB. `aprobado` autoriza;
    `agotado` y `revocado` dejan de hacerlo; `no_pagado` venció su plazo de pago
    sin pago. No hay `vencido`: fuera de fecha se calcula con las fechas.
-
-### Espejo de App\Enums\ModalidadAprovechamiento.
-
-   El RÉGIMEN bajo el que se autoriza el cupo:
-   - `escala_general`   — tramo de la escala progresiva: a más kilos, más valor.
-   - `especie_especial` — paiche y lo que la resolución sume, con tasación fija.
-   Vive en el TRAMO de la escala —la fija la resolución, no el operador— y se
-   COPIA al cupo al otorgarlo, por lo mismo que el volumen: reclasificar el
-   tramo no puede cambiarle la clasificación a lo ya otorgado.
 
 ### Espejo de App\Enums\EstadoAsociacion.
 
@@ -5377,26 +5125,6 @@
    Índice PARCIAL y no `unique()` con `deleted_at` adentro: en SQL
    NULL != NULL, así que ese unique no bloquearía nada. Con el WHERE, el
    nombre queda libre recién al dar la fila de baja.
-
-## `database/migrations/2026_09_18_100100_create_categorias_aprovechamiento_table.php`
-
-### Categorías de aprovechamiento — la ESCALA OFICIAL del SEDAG.
-
-   Los tramos con los que se cobra el cupo de pesca: a tantos kilos autorizados,
-   tantos bolivianos. Es una tabla y no un match() en código porque la fija una
-   resolución: así actualizarla es una pantalla y no un despliegue.
-   Ver docs/MER.md.
-
-## `database/migrations/2026_09_18_100200_create_tipos_carnet_table.php`
-
-### Tipos de carnet — el catálogo de credenciales y su arancel.
-
-   Ya no tiene `precio_bs` (30/09/2026): guarda `servicio_sireb`/`tarifa_sireb`
-   y cada carnet congela el precio de SIREB en `carnets.monto` al emitirse.
-   NO confundir con `carnets.tipo_actor`: eso es la REGLA —qué habilita el
-   documento— y vive en un enum. Esto es el CATÁLOGO —cómo se llama y cuánto
-   sale— y nunca se decide nada con un match sobre este nombre.
-   Ver docs/MER.md.
 
 ## `database/migrations/2026_09_18_100400_create_aprovechamientos_pesq_table.php`
 

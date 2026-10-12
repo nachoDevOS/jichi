@@ -24,10 +24,9 @@ return new class extends Migration
              */
             $table->foreignId('guia_movimiento_id')->index()->constrained('guias_movimiento')->cascadeOnDelete();
 
-            // Del catálogo, y además COPIADOS: el papel entregado no cambia si
-            // mañana se corrige el nombre o el precio del producto.
-            $table->foreignId('producto_id')->index()->constrained('productos_hidrobiologicos')->restrictOnDelete();
-            $table->string('especie', 120);
+            // El producto es una tarifa del servicio de la guía en SIREB: su etiqueta se COPIA,
+            // porque el papel entregado no cambia si mañana Recaudaciones la renombra.
+            $table->string('especie', 120)->comment('Etiqueta de la tarifa de SIREB al emitir');
 
             // Las DIEZ columnas de tilde del cuadro, en una sola. Ver el enum.
             $table->string('condicion', 30)->comment('CondicionProducto');
@@ -36,7 +35,7 @@ return new class extends Migration
 
             // El precio de SIREB al emitir, congelado; la suma de importes es `guias_movimiento.monto`.
             $table->decimal('precio_kg', 12, 2)->default(0)->comment('Copia del precio de SIREB');
-            $table->uuid('sireb_tarifa_id')->nullable()->comment('Tarifa de SIREB de ese precio');
+            $table->uuid('sireb_tarifa_id')->index()->comment('El producto: tarifa de SIREB de ese precio');
             $table->decimal('importe_total', 12, 2)->default(0)->comment('cantidad_kg × precio_kg');
 
             $table->timestamps();

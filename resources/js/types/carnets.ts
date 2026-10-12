@@ -131,7 +131,6 @@ export interface CarnetFicha extends CarnetFila {
      */
     cupo: {
         id: number;
-        escala: number | null;
         descripcion: string | null;
         volumen_total_kg: number;
         kilos_consumidos: number;
@@ -161,7 +160,8 @@ export interface CarnetEnCorreccion {
     tipo_actor_etiqueta: string;
 
     asociacion_id: number;
-    tipo_carnet_id: number;
+    /** Precio de hoy de SU tarifa en SIREB, de referencia. null si SIREB no responde o ya no la tiene. */
+    precio: number | null;
     aprovechamiento_id: number | null;
     fecha_solicitud: string | null;
 
@@ -178,7 +178,8 @@ export interface ReposicionDeCarnet {
     registro: string | null;
     codigo: string | null;
     asociacion_id: number;
-    tipo_carnet_id: number;
+    tipo_actor: TipoActor;
+    tarifa_sireb: string | null;
     aprovechamiento_id: number | null;
 }
 
@@ -188,24 +189,12 @@ export interface AsociacionElegible {
     sigla: string | null;
 }
 
-/** Un tipo de carnet elegible, con su precio de SIREB. */
-export interface TipoElegible {
-    id: number;
-    nombre: string;
-    /** Con qué actividad es coherente: la lista se filtra con esto. */
-    tipo_actor: TipoActor;
-    /** De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa. */
-    precio: number | null;
-}
-
 /**
  * El cupo vigente de la persona elegida, si lo tiene.
  */
 export interface CupoVigente {
     id: number;
-    /** El tramo: «3». */
-    escala: number | null;
-    /** El texto de la resolución: «201 Kg Hasta 300 Kg». */
+    /** El tramo: «201 Kg Hasta 300 Kg». */
     descripcion: string | null;
     volumen_total_kg: number;
     saldo_kg: number;

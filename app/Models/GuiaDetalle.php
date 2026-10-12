@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 #[Fillable([
     'guia_movimiento_id',
-    'producto_id',
     'especie',
     'condicion',
     'cantidad_kg',
@@ -48,12 +47,6 @@ class GuiaDetalle extends Model
     public function guia(): BelongsTo
     {
         return $this->belongsTo(GuiaMovimiento::class, 'guia_movimiento_id');
-    }
-
-    /** El producto del catálogo. Nombre y precio se leen de las COPIAS de la fila. */
-    public function producto(): BelongsTo
-    {
-        return $this->belongsTo(ProductoHidrobiologico::class, 'producto_id')->withTrashed();
     }
 
     /**

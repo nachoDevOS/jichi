@@ -7,11 +7,10 @@ use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
-use App\Models\ArancelSireb;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
-use App\Sireb\PrecioSireb;
 use App\Sireb\SinPrecioException;
+use App\Sireb\TarifarioSireb;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,7 +20,7 @@ class EmitirFaenaService
 {
     public function __construct(
         private readonly CorrelativoService $correlativos,
-        private readonly PrecioSireb $precios,
+        private readonly TarifarioSireb $tarifario,
         private readonly LiquidarSirebService $liquidaciones,
     ) {}
 
@@ -37,6 +36,8 @@ class EmitirFaenaService
     public function emitir(
         Carnet $carnet,
         float $kilos,
+        // La tarifa del servicio de la faena en SIREB que eligió ventanilla.
+        string $tarifaId,
         array $papel = [],
     ): PermisoFaena {
 
@@ -61,7 +62,7 @@ class EmitirFaenaService
         }
 
         // Fuera de la transacción: una llamada a SIREB no debe tener el cupo bloqueado.
-        $precio = $this->precioDeLaFaena();
+        $precio = $this->precioDeLaFaena($tarifaId);
 
         $faena = DB::transaction(function () use ($carnet, $kilos, $papel, $precio): PermisoFaena {
             // La fila del cupo es la que contiene el recurso escaso: es la que
@@ -264,17 +265,15 @@ class EmitirFaenaService
     }
 
     /**
-     * El precio de la salida según SIREB, de la fila `faena` de Aranceles. Sin
-     * él no se emite: ninguna tarifa se escribe a mano.
+     * El precio de una tarifa del servicio de la faena (Catálogos › Aranceles)
+     * según SIREB, el de ahora. Sin él no se emite: ninguna tarifa se escribe a mano.
      *
-     * @return array{monto: float, tarifa_id: string}
+     * @return array{monto: float, tarifa_id: string, tarifa: array}
      */
-    public function precioDeLaFaena(): array
+    public function precioDeLaFaena(string $tarifaId): array
     {
-        $arancel = ArancelSireb::de(ConceptoArancel::Faena);
-
         try {
-            return $this->precios->de($arancel?->servicio_sireb, $arancel?->tarifa_sireb);
+            return $this->tarifario->precio(ConceptoArancel::Faena, $tarifaId);
         } catch (SinPrecioException $e) {
             throw PermisoOperativoException::faenaSinPrecio($e->getMessage());
         }

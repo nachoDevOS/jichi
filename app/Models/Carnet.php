@@ -25,7 +25,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'beneficiario_id',
     'asociacion_id',
-    'tipo_carnet_id',
     'aprovechamiento_id',
     'archivo_ci',
     'archivo_asociacion',
@@ -79,11 +78,6 @@ class Carnet extends Model
     public function asociacion(): BelongsTo
     {
         return $this->belongsTo(Asociacion::class);
-    }
-
-    public function tipoCarnet(): BelongsTo
-    {
-        return $this->belongsTo(TipoCarnet::class);
     }
 
     /** La bolsa madre que respalda el cupo impreso. NULL en un comercializador. */
@@ -349,7 +343,7 @@ class Carnet extends Model
     /**
      * El carnet como lo muestran el buscador y los formularios de faena y guía.
      * Un solo lugar: con tres copias, una se queda vieja. Precargar `codigo`,
-     * `tipoCarnet` y `aprovechamiento.categoria` con el `withSum` del saldo.
+     * y `aprovechamiento` con el `withSum` del saldo.
      *
      * @return array<string, mixed>
      */
@@ -361,7 +355,7 @@ class Carnet extends Model
             'id' => $this->id,
             'codigo' => $this->codigo_legible,
             'registro' => $this->registro_legible,
-            'tipo' => $this->tipoCarnet?->nombre,
+            'tipo' => $this->tipo_actor->nombreCarnet(),
             'tipo_actor' => $this->tipo_actor->value,
             'tipo_actor_etiqueta' => $this->tipo_actor->etiqueta(),
             'puede_emitir_faenas' => $this->puedeEmitirFaenas(),
@@ -369,7 +363,7 @@ class Carnet extends Model
             'fecha_vencimiento' => $this->fecha_vencimiento?->toDateString(),
 
             // El cupo que respalda al pescador. Null en el comercializador.
-            'capacidad' => $cupo?->categoria?->descripcion_kg,
+            'capacidad' => $cupo?->tramo,
             'volumen_total_kg' => $cupo !== null ? (float) $cupo->volumen_total_kg : null,
             'saldo_kg' => $cupo?->saldoKg(),
             // Lo que una faena nueva puede pedir: el saldo menos lo reservado.
@@ -420,7 +414,7 @@ class Carnet extends Model
 
     /**
      * Los que valen hoy. La columna se califica porque `carnets`,
-     * `asociaciones`, `tipos_carnet` y `aprovechamientos_pesq` tienen todas una
+     * `asociaciones` y `aprovechamientos_pesq` tienen todas una
      * columna `estado`, y los listados las cruzan con join: sin calificar,
      * PostgreSQL responde «column reference is ambiguous».
      */

@@ -6,7 +6,6 @@ use App\Enums\RolSistema;
 use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -67,7 +66,7 @@ class User extends Authenticatable
     public const FOTO = '/image/user-default.png';
 
     /** Los módulos cuya pantalla de entrada no es `<modulo>.index`. */
-    private const PANTALLA = ['dashboard' => 'dashboard', 'catalogos' => 'tipos-carnet.index'];
+    private const PANTALLA = ['dashboard' => 'dashboard', 'catalogos' => 'aranceles.index'];
 
     /**
      * Su pantalla de inicio: el primer módulo del menú que puede ver y que ya tiene
@@ -91,11 +90,5 @@ class User extends Authenticatable
     public function esAdministrador(): bool
     {
         return $this->hasRole(RolSistema::Administrador->value);
-    }
-
-    /** El personal del SEDAG: toda lista de usuarios del panel parte de acá. */
-    public function scopeFuncionarios(Builder $query): Builder
-    {
-        return $query->whereNull($this->qualifyColumn('beneficiario_id'));
     }
 }

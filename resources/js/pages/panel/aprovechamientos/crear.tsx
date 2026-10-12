@@ -10,8 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fechaInput } from '@/lib/utils';
-import type { PageProps } from '@/types';
-import type { TramoElegible } from '@/types/aprovechamientos';
+import type { PageProps, TarifaSireb } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 
 /**
@@ -25,24 +24,31 @@ const TIPOS_DE_EMBARCACION = ['Canoa', 'Peque-peque', 'Bote', 'Chalana', 'Desliz
 export default function CrearCupo({
     beneficiario,
     escala,
+    servicioConfigurado,
 }: {
     /** Preseleccionado al llegar desde la ficha de una persona. */
     beneficiario: BeneficiarioSugerido | null;
-    escala: TramoElegible[];
+    /** Las tarifas del servicio de la escala en SIREB; null si SIREB no responde. */
+    escala: TarifaSireb[] | null;
+    /** false = falta elegir el servicio en Catálogos › Aranceles. */
+    servicioConfigurado: boolean;
 }) {
     const { institucion } = usePage<PageProps>().props;
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
 
     const form = useForm({
         beneficiario_id: beneficiario?.id ?? null,
-        categoria_aprov_id: '',
+        tarifa_sireb: '',
+        // Los escribe ventanilla: la tarifa de SIREB solo trae el precio.
+        volumen_total_kg: '',
         tipo_embarcacion: '',
         // Lo normal es otorgar hoy. El servidor rechaza fechas futuras: el cupo
         // vence con la gestión, así que una del año que viene arrancaría vencida.
         fecha_solicitud: fechaInput(new Date()),
     });
 
-    const tramo = escala.find((t) => String(t.id) === String(form.data.categoria_aprov_id)) ?? null;
+    const tramo = escala?.find((t) => t.id === form.data.tarifa_sireb) ?? null;
+    const kilos = Number(form.data.volumen_total_kg || 0);
 
     function elegirPersona(elegida: BeneficiarioSugerido | null) {
         setPersona(elegida);
@@ -58,19 +64,31 @@ export default function CrearCupo({
         form.post(route('aprovechamientos.store'), { preserveState: true });
     }
 
-    // Sin escala cargada no hay nada que otorgar, y el formulario en blanco no
-    // lo explicaría: mandaría al operador a buscar el error en otro lado.
-    if (escala.length === 0) {
+    // Sin escala no hay nada que otorgar: se dice por qué en vez de un formulario en blanco.
+    const sinEscala = !servicioConfigurado
+        ? {
+              titulo: 'Falta el servicio de la escala',
+              descripcion: 'Elija en Catálogos › Aranceles el servicio de SIREB cuyas tarifas son los tramos de la escala.',
+          }
+        : escala === null
+          ? {
+                titulo: 'Recaudaciones (SIREB) no responde',
+                descripcion: 'La escala sale de SIREB. Espere unos minutos y vuelva a abrir el formulario.',
+            }
+          : escala.length === 0
+            ? {
+                  titulo: 'La escala de aprovechamiento está vacía',
+                  descripcion: 'El servicio elegido en Catálogos › Aranceles no tiene tarifas en SIREB.',
+              }
+            : null;
+
+    if (sinEscala !== null || escala === null) {
         return (
             <LayoutPanel titulo="Registrar aprovechamiento" descripcion="La bolsa madre del pescador.">
                 <Head title="Registrar aprovechamiento" />
 
                 <Card>
-                    <EstadoVacio
-                        icono={Waves}
-                        titulo="La escala de aprovechamiento está vacía"
-                        descripcion="No hay ningún tramo vigente, así que no se puede otorgar un cupo. Cárguela desde Catálogos › Escala."
-                    />
+                    <EstadoVacio icono={Waves} titulo={sinEscala?.titulo ?? ''} descripcion={sinEscala?.descripcion ?? ''} />
                 </Card>
             </LayoutPanel>
         );
@@ -100,26 +118,47 @@ export default function CrearCupo({
 
                         <Campo
                             etiqueta="Tramo de la escala"
-                            htmlFor="categoria_aprov_id"
-                            error={form.errors.categoria_aprov_id}
-                            ayuda="Solo aparecen los tramos vigentes. De él salen los kilos; el monto lo da Recaudaciones (SIREB)."
+                            htmlFor="tarifa_sireb"
+                            error={form.errors.tarifa_sireb}
+                            ayuda="Las tarifas de Recaudaciones (SIREB): de cada una sale el monto."
                             obligatorio
                         >
                             <Select
-                                id="categoria_aprov_id"
-                                value={form.data.categoria_aprov_id}
-                                onChange={(e) => form.setData('categoria_aprov_id', e.target.value)}
-                                aria-invalid={Boolean(form.errors.categoria_aprov_id)}
+                                id="tarifa_sireb"
+                                value={form.data.tarifa_sireb}
+                                onChange={(e) => form.setData('tarifa_sireb', e.target.value)}
+                                aria-invalid={Boolean(form.errors.tarifa_sireb)}
                             >
                                 <option value="">Elija un tramo…</option>
                                 {escala.map((t) => (
-                                    <option key={t.id} value={t.id} disabled={t.liquidable === false}>
-                                        {t.descripcion_kg} —{' '}
-                                        {t.monto !== null ? bs(t.monto, institucion.moneda) : 'sin precio en SIREB'}
-                                        {t.liquidable === false ? ' (tarifa no disponible)' : ''}
+                                    <option key={t.id} value={t.id} disabled={!t.activa}>
+                                        {/* Solo el tramo: el precio se ve en «Lo que se va a registrar». */}
+                                        {t.etiqueta}
+                                        {!t.activa ? ' (tarifa no disponible)' : ''}
                                     </option>
                                 ))}
                             </Select>
+                        </Campo>
+
+                        <Campo
+                            etiqueta="Kilos autorizados"
+                            htmlFor="volumen_total_kg"
+                            error={form.errors.volumen_total_kg}
+                            ayuda="El cupo de la gestión: cada permiso de faena descuenta de estos kilos."
+                            obligatorio
+                            className="max-w-xs"
+                        >
+                            <Input
+                                id="volumen_total_kg"
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                inputMode="decimal"
+                                value={form.data.volumen_total_kg}
+                                onChange={(e) => form.setData('volumen_total_kg', e.target.value)}
+                                aria-invalid={Boolean(form.errors.volumen_total_kg)}
+                                placeholder="200"
+                            />
                         </Campo>
 
                         {/*
@@ -183,46 +222,26 @@ export default function CrearCupo({
                         {tramo === null ? (
                             <p className="flex items-start gap-2 text-sm text-muted-foreground">
                                 <Info className="mt-0.5 size-4 shrink-0" />
-                                Elija un tramo para ver cuántos kilos se autorizan y cuánto se cobra.
+                                Elija un tramo para ver cuánto se cobra.
                             </p>
                         ) : (
                             <>
                                 <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                        Volumen autorizado
-                                    </p>
-                                    <p className="text-3xl font-semibold tabular-nums">
-                                        {tramo.kilos_max}
-                                        <span className="ml-1 text-base font-normal text-muted-foreground">
-                                            kg
-                                        </span>
-                                    </p>
-                                    {/*
-                                        Se dice de dónde sale el número: es el TECHO
-                                        del rango, no un promedio ni algo elegible.
-                                        Sin esta línea, alguien va a preguntar por qué
-                                        no puede escribir 350.
-                                    */}
-                                    <p className="text-xs text-muted-foreground">
-                                        Es el techo del tramo ({tramo.kilos_min} – {tramo.kilos_max} kg).
-                                    </p>
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Tramo</p>
+                                    <p className="font-medium">{tramo.etiqueta}</p>
                                 </div>
 
-                                {/*
-                                    EL RÉGIMEN SE VE ANTES DE OTORGAR: dice de dónde
-                                    sale el valor —la progresión por kilos o una
-                                    tasación fija por resolución—, que es lo que el
-                                    pescador va a preguntar en el mostrador.
-                                */}
-                                <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                        Régimen
-                                    </p>
-                                    <p className="font-medium">{tramo.modalidad_etiqueta}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {tramo.modalidad_descripcion}
-                                    </p>
-                                </div>
+                                {kilos > 0 && (
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                            Volumen autorizado
+                                        </p>
+                                        <p className="text-3xl font-semibold tabular-nums">
+                                            {kilos}
+                                            <span className="ml-1 text-base font-normal text-muted-foreground">kg</span>
+                                        </p>
+                                    </div>
+                                )}
 
                                 {form.data.tipo_embarcacion.trim() !== '' && (
                                     <div>
@@ -238,14 +257,8 @@ export default function CrearCupo({
                                         A cobrar
                                     </p>
                                     <p className="text-3xl font-semibold tabular-nums">
-                                        {tramo.monto !== null ? bs(tramo.monto, institucion.moneda) : '—'}
+                                        {bs(tramo.monto, institucion.moneda)}
                                     </p>
-                                    {tramo.monto === null && (
-                                        <p className="text-xs text-rose-700 dark:text-rose-300">
-                                            Recaudaciones (SIREB) no dio el precio de este tramo: no se va a
-                                            poder otorgar hasta que responda.
-                                        </p>
-                                    )}
                                     {/*
                                         Se dice a dónde lleva el botón. Decía que
                                         abría la CAJA, y hace rato que termina en
@@ -263,7 +276,7 @@ export default function CrearCupo({
 
                         <Button
                             type="submit"
-                            disabled={form.processing || persona === null || tramo === null}
+                            disabled={form.processing || persona === null || tramo === null || kilos <= 0}
                             className="w-full"
                         >
                             {/* REGISTRAR y no «otorgar»: lo que se crea es un

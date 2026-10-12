@@ -5,8 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /*
-| Aranceles de SIREB — los cobros que no cuelgan de un catálogo (hoy, la faena):
-| una fila por concepto con su servicio y tarifa en Recaudaciones. Ver docs/MER.md.
+| Aranceles de SIREB — qué servicio cobra cada trámite: una fila por concepto,
+| SOLO con el servicio. La tarifa se elige al emitir. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -18,10 +18,9 @@ return new class extends Migration
             // Único a secas: las filas las pone el seeder y no se dan de baja.
             $table->string('concepto', 30)->unique()->comment('ConceptoArancel');
 
-            // Nullable: nacen sin tarifa hasta que alguien la elige.
+            // Nullable: nace sin servicio hasta que alguien lo elige.
             $table->uuid('servicio_sireb')->nullable()->comment('Id del servicio en SIREB');
-            $table->uuid('tarifa_sireb')->nullable()->comment('Id de la tarifa dentro del servicio');
-            $table->json('sireb_historial')->nullable()->comment('Servicio y tarifa que tuvo antes, con desde/hasta');
+            $table->json('sireb_historial')->nullable()->comment('Servicios que tuvo antes, con desde/hasta');
 
             $table->timestamps();
             $table->softDeletes();

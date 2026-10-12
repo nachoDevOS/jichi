@@ -42,15 +42,6 @@ class Configuracion extends Model
         return static::todas()[$clave] ?? $porDefecto;
     }
 
-    public static function guardar(string $clave, mixed $valor): void
-    {
-        static::query()->where('clave', $clave)->update([
-            'valor' => is_array($valor) ? json_encode($valor) : (string) $valor,
-        ]);
-
-        Cache::forget('configuraciones');
-    }
-
     public function valorTipado(): mixed
     {
         return match ($this->tipo) {

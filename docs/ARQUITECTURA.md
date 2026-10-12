@@ -22,7 +22,7 @@ Tailwind 4 · PostgreSQL 18** (corre también en SQLite).
 | Dato | Valor |
 | --- | --- |
 | Líneas de código | ~37.000 (`app/` + `resources/js/`) |
-| Pruebas | No hay: se retiraron el 27/09/2026 (ver §9) |
+| Pruebas | 92, con SIREB simulado: `php artisan test` (volvieron el 12/10/2026, ver §9) |
 | Idioma del código | Español, sin excepciones salvo `components/ui/` |
 | Pendiente | Reportes y Configuración (en gris en el menú) |
 
@@ -63,8 +63,9 @@ autoriza el trabajo de cada día son la faena y la guía, y se emiten muchas por
 gestión.
 
 Qué emite cada carnet lo dice **`carnets.tipo_actor`** (`TipoActor::emiteFaenas()`
-/ `emiteGuias()`), nunca el nombre del tipo de carnet: ese catálogo lo edita la
-unidad desde el panel.
+/ `emiteGuias()`) y el nombre impreso (`nombreCarnet()`). Ya no hay catálogo de
+tipos de carnet (12/10/2026): el precio es la tarifa del servicio «Carnet» de
+SIREB que elige ventanilla.
 
 ### Las reglas que ordenan todo
 
@@ -165,14 +166,14 @@ El esquema completo, con el porqué de cada columna e índice, está en
 | Tabla | Qué guarda | Lo que no es obvio |
 | --- | --- | --- |
 | `beneficiarios` | La persona | C.I. único con índice **parcial** (`WHERE deleted_at IS NULL`). Columnas en camelCase desde `primerNombre` |
-| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Hereda volumen y modalidad de la escala. Sin columna de saldo: consumido y reservado se calculan de las faenas. Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
+| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Copia el tramo (etiqueta de la tarifa de SIREB) y sus kilos. Sin columna de saldo: consumido y reservado se calculan de las faenas. Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
 | `carnets` | La credencial anual | `tipo_actor` decide qué emite. El de pescador lleva `aprovechamiento_id`; el de comercializador, NULL |
 | `permisos_faena` | Una salida de pesca | Cuelga **solo** del carnet; llega a la autorización por `hasManyThrough` |
 | `guias_movimiento` | Un traslado | Cuelga solo del carnet; copia la asociación porque va impresa |
-| `guia_detalles` | El cuadro D, una fila por especie | La única FK CASCADE del dominio |
+| `guia_detalles` | El cuadro D, una fila por especie | La única FK CASCADE del dominio. El producto es una tarifa de SIREB (`sireb_tarifa_id`) y su etiqueta se copia en `especie` |
 | `recibos` | El comprobante, uno por documento pagado | Polimórfico (`recibible`); correlativo continuo; monto, concepto y boleta de SIREB congelados |
 | `codigos` | La llave pública de los cinco documentos | Polimórfica; único completo, un código impreso queda quemado |
-| `asociaciones`, `categorias_aprovechamiento`, `tipos_carnet`, `productos_hidrobiologicos`, `departamentos` | Catálogos | Los edita la unidad desde el panel. Los productos llenan el cuadro D de la guía |
+| `asociaciones`, `aranceles_sireb`, `departamentos` | Catálogos | Los edita la unidad desde el panel. **`aranceles_sireb` es el único catálogo de precios** (12/10/2026): una fila por trámite con **solo el servicio de SIREB**; ventanilla elige la tarifa al emitir. La escala y los productos de la guía no son tablas: son las tarifas de esos servicios |
 
 Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 `correlativos` y las tablas de `spatie/laravel-permission`.
@@ -274,8 +275,8 @@ copia en vez de leerse por relación:
 | `guias_movimiento.monto`, `guia_detalles.precio_kg` | El total del cuadro D y la tasa de cada producto al emitir (con el descuento de piscicultura) |
 | `recibos.monto_total`, `concepto`, `numero_boleta` (N° de transacción), `entidad_bancaria`, `fecha_pago` | Lo que dice el papel entregado, con el pago tal como lo validó SIREB |
 | `guias_movimiento.asociacion_id` | El aval impreso en la guía |
-| `aprovechamientos_pesq.volumen_total_kg`, `modalidad` | Lo que se otorgó, aunque la escala cambie |
-| `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar, solo si la tarifa y el servicio están activos y la tarifa es liquidable (ver [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir)) |
+| `aprovechamientos_pesq.tramo`, `volumen_total_kg` | Lo que se otorgó, aunque la tarifa cambie en SIREB |
+| `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar, solo si la tarifa está activa (ver [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir)) |
 | `carnets.monto`, `permisos_faena.monto`, `guia_detalles.precio_kg` (+ `sireb_tarifa_id`) | El precio de SIREB al emitir (30/09/2026), solo si la tarifa y el servicio están activos (02/10/2026) |
 
 > **Lo que NO está congelado:** el titular del recibo se lee del padrón al
@@ -341,7 +342,7 @@ completa, los nombres y las secciones del formulario de roles. 62 permisos:
 | Ventanilla | Carnets | lo mismo (reponer va con `crear`) |
 | Pagos | Recibos | ver, imprimir |
 | Parámetros | Asociaciones | ver, crear, editar |
-| Catálogos | Catálogos (los cuatro) | ver, crear, editar |
+| Catálogos | Catálogos › Aranceles | ver, editar |
 | Administración | Reportes · Auditoría · Configuración | ver, exportar · ver · ver, editar |
 | Seguridad | Usuarios · Roles | ver, crear, editar · ver, crear, editar, eliminar |
 
@@ -431,15 +432,15 @@ permiso.
 | Carnets | ✅ | `CarnetController`, `EmitirCarnetService` | [modulos/CARNETS.md](modulos/CARNETS.md) |
 | Faenas y guías | ✅ | `FaenaController`, `GuiaController` | [modulos/PERMISOS-OPERATIVOS.md](modulos/PERMISOS-OPERATIVOS.md) |
 | Cobro en SIREB y recibos | ✅ | `ConfirmarPagoService`, `LiquidarSirebService`, `ReciboController` | [modulos/SIREB.md](modulos/SIREB.md), [modulos/RECIBOS.md](modulos/RECIBOS.md) |
-| Catálogos | ✅ | `AsociacionController`, `CategoriaAprovechamientoController`, `TipoCarnetController`, `ProductoHidrobiologicoController`, `ArancelSirebController` | [modulos/SIREB.md](modulos/SIREB.md) |
+| Catálogos | ✅ | `AsociacionController`, `ArancelSirebController`, `TarifarioSireb` | [modulos/SIREB.md](modulos/SIREB.md) |
 | Verificación pública | ✅ | `VerificacionController` | [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md), paso 7 |
 | Portal del beneficiario (`/mi-cuenta`) | ✅ | `Controllers/Portal/`, `CuentaPortalService` | [modulos/PORTAL.md](modulos/PORTAL.md) |
 | Reportes | ❌ No existe | — | [PENDIENTES.md](PENDIENTES.md) |
 | Configuración | ❌ No existe (la tabla sí) | — | [PENDIENTES.md](PENDIENTES.md) |
 
 El menú lateral agrupa: **Ventanilla** (Beneficiarios, Aprov. Pesquero, Carnets,
-Faenas, Guías), **Pagos** (Recibos), **Catálogos** (Asociaciones, Tipos de
-carnet, Productos, Escala, Aranceles) y **Administración** (Reportes, en gris).
+Faenas, Guías), **Pagos** (Recibos), **Catálogos** (Asociaciones,
+Aranceles) y **Administración** (Reportes, en gris).
 Vive en `components/panel/layout/navegacion.ts`.
 
 ### El patrón a copiar
@@ -456,15 +457,18 @@ verdad —no solo un CRUD—, copiar además el par `EmitirFaenaService` +
 ## 9. Verificar antes de dar algo por terminado
 
 ```sh
+php artisan test        # las pruebas (92, SIREB simulado: ninguna sale a la red)
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
 ```
 
-**No hay pruebas automáticas**: se retiraron el 27/09/2026 a pedido del
-responsable; están en el historial de git (commit `7dc0ac6`). Los tres comandos
-revisan tipos, formato y compilación, no reglas de negocio: **todo cambio se
-prueba abriendo la pantalla y recorriendo el caso a mano.**
+**Las pruebas volvieron el 12/10/2026**: unitarias (`tests/Unit`: enums y el
+lector de kilos) y de punta a punta (`tests/Feature`: otorgar, carnet, faena,
+guía, pago y renovación en SIREB, pantallas y formularios del panel por HTTP,
+portada). SIREB e Ibare van simulados en memoria (`tests/Concerns/SirebFalso.php`)
+y `Http::preventStrayRequests()` revienta cualquier llamada real. Las pruebas no
+ven el navegador: **la pantalla se sigue probando a mano.**
 
 Al agregar una migración, un permiso a `RolSistema` o una clave a
 `ConfiguracionSeeder`, hay que correr a mano `php artisan migrate` y

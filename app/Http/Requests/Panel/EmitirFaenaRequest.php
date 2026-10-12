@@ -31,6 +31,9 @@ class EmitirFaenaRequest extends FormRequest
             // `gt:0`: una faena de cero kilos no autoriza nada y gastaría una hoja.
             'kilos_extraidos' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
 
+            // Una tarifa del servicio de la faena en SIREB: si se puede cobrar lo decide el servicio.
+            'tarifa_sireb' => ['required', 'uuid'],
+
             // Las fechas NO vienen del formulario: las escribe la aprobación.
 
             /*
@@ -55,10 +58,20 @@ class EmitirFaenaRequest extends FormRequest
     {
         return [
             'carnet_id.required' => 'Elija el carnet del pescador.',
+            'tarifa_sireb.required' => 'Elija la tarifa del permiso.',
+            'tarifa_sireb.uuid' => 'Esa tarifa no es de SIREB.',
             'carnet_id.exists' => 'Ese carnet no existe.',
             'kilos_extraidos.required' => 'Indique cuántos kilos autoriza la faena.',
             'kilos_extraidos.gt' => 'La faena tiene que autorizar kilos: escriba un número mayor que cero.',
             'kilos_extraidos.decimal' => 'Los kilos llevan como máximo dos decimales.',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        // SIREB manda los ids en minúscula: así se comparan tal cual.
+        if ($this->has('tarifa_sireb')) {
+            $this->merge(['tarifa_sireb' => mb_strtolower(trim((string) $this->input('tarifa_sireb')))]);
+        }
     }
 }

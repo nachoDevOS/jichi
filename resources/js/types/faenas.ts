@@ -101,7 +101,7 @@ export interface FaenaFicha extends FaenaFila {
      */
     cupo: {
         id: number;
-        escala: number | null;
+        descripcion: string | null;
         volumen_total_kg: number;
         saldo_kg: number;
         porcentaje_usado: number;

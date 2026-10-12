@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Panel;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Exceptions\CupoInvalidoException;
@@ -13,7 +14,6 @@ use App\Http\Requests\Panel\OtorgarCupoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
-use App\Models\CategoriaAprovechamiento;
 use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
@@ -21,7 +21,7 @@ use App\Services\OtorgarCupoService;
 use App\Services\RenovarLiquidacionService;
 use App\Services\RevisarCupoService;
 use App\Sireb\SirebException;
-use App\Sireb\VistaSireb;
+use App\Sireb\TarifarioSireb;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -56,7 +56,6 @@ class AprovechamientoController extends Controller
             // el accesor contesta cualquier cosa, sin error.
             ->with([
                 'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
-                'categoria',
             ])
             // Los DOS withSum evitan dos agregados POR FILA: con 30 cupos en
             // pantalla son 61 consultas sin ellos, y el listado se ve igual.
@@ -96,7 +95,7 @@ class AprovechamientoController extends Controller
     /**
      * Formulario — GET /panel/aprovechamientos/crear
      */
-    public function create(Request $request): Response
+    public function create(Request $request, TarifarioSireb $tarifario): Response
     {
         $beneficiario = $request->integer('beneficiario')
             ? Beneficiario::query()->find($request->integer('beneficiario'))
@@ -110,7 +109,9 @@ class AprovechamientoController extends Controller
                 'foto_url' => $beneficiario->foto_url,
             ] : null,
 
-            'escala' => $this->tramosElegibles(),
+            // Las tarifas del servicio de la escala: null si SIREB no responde.
+            'escala' => $tarifario->tarifas(ConceptoArancel::Autorizacion),
+            'servicioConfigurado' => $tarifario->servicioId(ConceptoArancel::Autorizacion) !== null,
         ]);
     }
 
@@ -124,7 +125,8 @@ class AprovechamientoController extends Controller
         try {
             $cupo = $this->servicio->otorgar(
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
-                CategoriaAprovechamiento::query()->findOrFail($datos['categoria_aprov_id']),
+                $datos['tarifa_sireb'],
+                (float) $datos['volumen_total_kg'],
                 $datos['tipo_embarcacion'],
                 now()->parse($datos['fecha_solicitud']),
             );
@@ -151,8 +153,8 @@ class AprovechamientoController extends Controller
         return redirect()
             ->route('aprovechamientos.show', $cupo)
             ->with('exito', sprintf(
-                'Aprovechamiento registrado, PENDIENTE de cobro: %s kg por %s Bs. Cargue los '.
-                'depósitos para poder enviarlo a revisión.',
+                'Aprovechamiento registrado, PENDIENTE de cobro: %s kg por %s Bs. '.
+                'Al pagarse en Recaudaciones queda aprobado solo.',
                 number_format((float) $cupo->volumen_total_kg, 2, ',', '.'),
                 number_format($cupo->montoACobrar(), 2, ',', '.'),
             ));
@@ -214,7 +216,6 @@ class AprovechamientoController extends Controller
     {
         $aprovechamiento->load([
             'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
-            'categoria',
             'codigo',
         ]);
 
@@ -229,13 +230,6 @@ class AprovechamientoController extends Controller
 
                 // La llave del QR de la autorización impresa.
                 'codigo' => $aprovechamiento->codigo_legible,
-
-                // La ficha sí muestra el detalle del tramo: es donde alguien va
-                // a mirar bajo qué resolución se otorgó.
-                'escala_descripcion' => $aprovechamiento->categoria?->descripcion_kg,
-                'escala_rango' => $aprovechamiento->categoria
-                    ? [(float) $aprovechamiento->categoria->kilos_min, (float) $aprovechamiento->categoria->kilos_max]
-                    : null,
 
                 // Firmado, en fecha y sin cédula viva: una vigente o en trámite ya lo cubre.
                 // Revocada o vencida no cuenta, así se puede emitir la que la reemplaza.
@@ -262,7 +256,6 @@ class AprovechamientoController extends Controller
             // Las cédulas que se apoyan en este cupo. Son varias en teoría: el
             // carnet se renueva a mitad de un cupo vigente, o se repone uno perdido.
             'carnets' => $aprovechamiento->carnets()
-                ->with('tipoCarnet:id,nombre')
                 ->latest('created_at')
                 ->get()
                 // El padre ya está en memoria: sin esto, «sin efecto» consulta por fila.
@@ -271,7 +264,7 @@ class AprovechamientoController extends Controller
                     'id' => $c->id,
                     'codigo' => $c->codigo_legible,
                     'registro' => $c->registro_legible,
-                    'tipo' => $c->tipoCarnet?->nombre,
+                    'tipo' => $c->tipo_actor->nombreCarnet(),
                     'tipo_actor_etiqueta' => $c->tipo_actor->etiqueta(),
                     'tipo_actor_color' => $c->tipo_actor->color(),
                     'estado_etiqueta' => $c->etiquetaEstado(),
@@ -344,10 +337,9 @@ class AprovechamientoController extends Controller
                 )->getMessage()]);
         }
 
-        $aprovechamiento->load([
+        $aprovechamiento->load(
             'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
-            'categoria',
-        ]);
+        );
 
         // Titular, tramo, kilos, monto y fechas llegan FIJOS: solo se corrige la embarcación.
         return Inertia::render('panel/aprovechamientos/editar', [
@@ -356,9 +348,8 @@ class AprovechamientoController extends Controller
                 'beneficiario' => $aprovechamiento->beneficiario?->nombreCompleto,
                 'documento' => $aprovechamiento->beneficiario?->documento_identidad,
                 'foto_url' => $aprovechamiento->beneficiario?->foto_url,
-                'tramo' => $aprovechamiento->categoria?->descripcion_kg,
+                'tramo' => $aprovechamiento->tramo,
                 'volumen_total_kg' => (float) $aprovechamiento->volumen_total_kg,
-                'modalidad_etiqueta' => $aprovechamiento->modalidad?->etiqueta(),
                 'monto' => $aprovechamiento->montoACobrar(),
                 'tipo_embarcacion' => $aprovechamiento->tipo_embarcacion,
                 'fecha_solicitud' => $aprovechamiento->fecha_solicitud?->toDateString(),
@@ -428,44 +419,6 @@ class AprovechamientoController extends Controller
     //  Auxiliares
 
     /**
-     * Los tramos que el operador puede elegir, con sus consecuencias.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function tramosElegibles(): array
-    {
-        $tarifas = app(VistaSireb::class)->tarifasPorId();
-
-        return CategoriaAprovechamiento::query()
-            ->vigentes()
-            ->enOrdenDeEscala()
-            ->get()
-            ->map(function (CategoriaAprovechamiento $c) use ($tarifas): array {
-                $sireb = VistaSireb::describir($tarifas, $c->tarifa_sireb);
-
-                return [
-                    'id' => $c->id,
-                    'nro_escala' => $c->nro_escala,
-                    'descripcion_kg' => $c->descripcion_kg,
-                    'kilos_min' => (float) $c->kilos_min,
-                    'kilos_max' => (float) $c->kilos_max,
-                    'servicio_sireb' => $c->servicio_sireb,
-                    'tarifa_sireb' => $c->tarifa_sireb,
-                    // De referencia, el de la caché: el que vale lo pide el servicio al guardar.
-                    'monto' => $sireb['precio'],
-                    // false = SIREB la tiene inactiva: se ve con su precio pero no se elige.
-                    'liquidable' => $tarifas === null ? null : ($sireb['sireb_liquidable'] ?? false),
-                    // El régimen del tramo: la escala progresiva o la cuota de una
-                    // especie con tasación fija. Se muestra ANTES de otorgarlo.
-                    'modalidad' => $c->modalidad->value,
-                    'modalidad_etiqueta' => $c->modalidad->etiqueta(),
-                    'modalidad_descripcion' => $c->modalidad->descripcion(),
-                ];
-            })
-            ->all();
-    }
-
-    /**
      * Los datos de un cupo que pintan el listado y la ficha.
      *
      * @return array<string, mixed>
@@ -486,8 +439,8 @@ class AprovechamientoController extends Controller
             // columna TIENE que estar en el select de arriba.
             'foto_url' => $cupo->beneficiario?->foto_url,
 
-            'escala' => $cupo->categoria?->nro_escala,
-            'descripcion' => $cupo->categoria?->descripcion_kg,
+            // La etiqueta de la tarifa de SIREB, copiada al otorgar.
+            'descripcion' => $cupo->tramo,
 
             'volumen_total_kg' => (float) $cupo->volumen_total_kg,
             // NULL y no cadena vacía: así la pantalla dice «no declarada» en vez
@@ -499,10 +452,6 @@ class AprovechamientoController extends Controller
             'kilos_reservados' => $cupo->kilosReservados(),
             'libre_kg' => $cupo->libreKg(),
             'porcentaje_usado' => $cupo->porcentajeUsado(),
-
-            'modalidad' => $cupo->modalidad->value,
-            'modalidad_etiqueta' => $cupo->modalidad->etiqueta(),
-            'modalidad_color' => $cupo->modalidad->color(),
 
             // Cuándo se cargó, que no es la fecha de solicitud. Es un MOMENTO:
             // va con toIso8601String().

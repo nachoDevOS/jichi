@@ -22,8 +22,9 @@ export interface OpcionCondicion extends OpcionGuia {
 /** Un renglón del cuadro D, como lo devuelve el servidor. */
 export interface DetalleGuia {
     id: number;
-    producto_id: number;
-    /** Copia del nombre del producto al emitir. */
+    /** El producto: la tarifa de SIREB del servicio de la guía. */
+    tarifa_sireb: string;
+    /** Copia de la etiqueta de la tarifa al emitir. */
     especie: string;
     condicion: string;
     condicion_etiqueta: string;
@@ -36,19 +37,20 @@ export interface DetalleGuia {
 export interface FilaDetalle {
     /** `key` estable de React: sin ella, quitar la del medio remonta las de abajo. */
     key: string;
-    /** Del catálogo: nombre y precio los pone el servidor. */
-    producto_id: string;
+    /** La tarifa de SIREB elegida: nombre y precio los pone el servidor. */
+    tarifa_sireb: string;
     condicion: string;
     cantidad_kg: string;
 }
 
-/** Un producto elegible en el cuadro D. */
+/** Un producto elegible en el cuadro D: una tarifa del servicio de la guía en SIREB. */
 export interface ProductoGuia {
-    id: number;
+    /** El id de la tarifa. */
+    id: string;
     nombre: string;
-    /** Precio de SIREB de referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa. */
+    /** Precio de SIREB de referencia: el que vale lo congela la emisión. null si SIREB ya no la manda. */
     precio_kg: number | null;
-    /** false: fuera de uso, solo aparece porque la guía ya lo tenía. */
+    /** false: SIREB no la deja cobrar hoy, o ya no la manda (la guía la tenía). */
     estado: boolean;
 }
 
@@ -175,6 +177,10 @@ export type CampoGuia = Exclude<keyof FormularioGuia, 'detalles'>;
 /** Los catálogos que los dos formularios reciben del servidor. */
 export interface CatalogosGuia {
     productos: ProductoGuia[];
+    /** false = SIREB no respondió: la lista de productos llega vacía. */
+    sirebDisponible: boolean;
+    /** false = falta elegir el servicio de los productos en Catálogos › Aranceles. */
+    servicioConfigurado: boolean;
     medios: OpcionGuia[];
     tiposTransporte: OpcionGuia[];
     condiciones: OpcionCondicion[];

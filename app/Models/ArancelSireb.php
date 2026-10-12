@@ -10,10 +10,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * La tarifa de SIREB de un cobro que no cuelga de un catálogo (hoy, la faena).
- * Se busca por su concepto, nunca por id. Ver docs/modulos/SIREB.md.
+ * El servicio de SIREB que cobra un trámite. Solo el servicio: la tarifa se elige
+ * al emitir. Se busca por su concepto, nunca por id. Ver docs/modulos/SIREB.md.
  */
-#[Fillable(['concepto', 'servicio_sireb', 'tarifa_sireb'])]
+#[Fillable(['concepto', 'servicio_sireb'])]
 class ArancelSireb extends Model
 {
     use Auditable, HistorialSireb, SoftDeletes;

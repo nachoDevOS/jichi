@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Panel;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
 use App\Enums\MedioTransporte;
@@ -16,13 +17,12 @@ use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
-use App\Models\ProductoHidrobiologico;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirGuiaService;
 use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
-use App\Sireb\VistaSireb;
+use App\Sireb\TarifarioSireb;
 use App\Support\Paginacion;
 use App\Support\Sql;
 use Illuminate\Http\JsonResponse;
@@ -132,7 +132,7 @@ class GuiaController extends Controller
                 // se busca a mano.
                 'carnets_vigentes' => $beneficiario->carnets()
                     ->vigentes()
-                    ->with(['codigo', 'tipoCarnet:id,nombre'])
+                    ->with('codigo')
                     ->get()
                     ->map(fn (Carnet $c): array => $c->resumenParaEmitir())
                     ->values()
@@ -170,8 +170,8 @@ class GuiaController extends Controller
 
         return redirect()
             ->route('guias.show', $guia)
-            ->with('exito', "Guía N° {$guia->numero_legible} registrada. Cargue los depósitos y ".
-                'envíela a revisión: recién con la firma ampara el traslado.');
+            ->with('exito', "Guía N° {$guia->numero_legible} registrada, PENDIENTE de cobro. ".
+                'Al pagarse en Recaudaciones queda aprobada y recién ahí ampara el traslado.');
     }
 
     /**
@@ -211,8 +211,8 @@ class GuiaController extends Controller
                 'detalles' => $this->resumirDetalle($guia),
             ],
 
-            // Los que la guía ya usa siguen en la lista aunque hoy estén fuera de uso.
-            ...$this->catalogosDelFormulario($guia->detalles->pluck('producto_id')->all()),
+            // Los que la guía ya usa siguen en la lista aunque SIREB ya no los mande.
+            ...$this->catalogosDelFormulario($guia->detalles->pluck('especie', 'sireb_tarifa_id')->all()),
         ]);
     }
 
@@ -378,21 +378,29 @@ class GuiaController extends Controller
      */
     private function catalogosDelFormulario(array $ademas = []): array
     {
-        $precios = app(VistaSireb::class)->preciosPorTarifa() ?? [];
+        // Los productos son las tarifas del servicio de la guía en SIREB. null = SIREB no responde.
+        $tarifas = app(TarifarioSireb::class)->tarifas(ConceptoArancel::Guia);
+
+        $productos = collect($tarifas ?? [])
+            ->map(fn (array $t): array => [
+                'id' => $t['id'],
+                'nombre' => $t['etiqueta'],
+                // De referencia: el que vale lo congela la emisión.
+                'precio_kg' => $t['monto'],
+                'estado' => $t['activa'],
+            ])
+            ->sortBy('nombre');
+
+        foreach ($ademas as $tarifaId => $especie) {
+            if (! $productos->contains('id', $tarifaId)) {
+                $productos->push(['id' => $tarifaId, 'nombre' => $especie, 'precio_kg' => null, 'estado' => false]);
+            }
+        }
 
         return [
-            'productos' => ProductoHidrobiologico::query()
-                ->where(fn ($q) => $q->where('estado', true)->orWhereIn('id', $ademas))
-                ->orderBy('nombre')
-                ->get(['id', 'nombre', 'tarifa_sireb', 'estado'])
-                ->map(fn (ProductoHidrobiologico $p): array => [
-                    'id' => $p->id,
-                    'nombre' => $p->nombre,
-                    // De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa.
-                    'precio_kg' => $precios[$p->tarifa_sireb] ?? null,
-                    'estado' => (bool) $p->estado,
-                ])
-                ->all(),
+            'productos' => $productos->values()->all(),
+            'sirebDisponible' => $tarifas !== null,
+            'servicioConfigurado' => app(TarifarioSireb::class)->servicioId(ConceptoArancel::Guia) !== null,
             'medios' => MedioTransporte::opciones(),
             'tiposTransporte' => TipoTransporte::opciones(),
             'condiciones' => CondicionProducto::opciones(),
@@ -444,7 +452,7 @@ class GuiaController extends Controller
         return $guia->detalles
             ->map(fn (GuiaDetalle $d): array => [
                 'id' => $d->id,
-                'producto_id' => $d->producto_id,
+                'tarifa_sireb' => $d->sireb_tarifa_id,
                 'especie' => $d->especie,
                 'condicion' => $d->condicion->value,
                 'condicion_etiqueta' => $d->condicion->etiqueta(),

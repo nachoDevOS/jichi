@@ -24,15 +24,14 @@
 ## Paso 2 — La extracción y la «Bolsa Madre» (Aprovechamiento Pesquero)
 
 - Este módulo aplica **exclusivamente para pescadores**.
-- Está regulado por escalas predefinidas en **`categorias_aprovechamiento`**, que
-  establecen un número de escala, un rango de kilos mínimos y un **techo máximo
-  de extracción** (`kilos_max`), y el **código del servicio en Recaudaciones**
-  (`servicio_sireb`). *(29/09/2026)* El precio no lo guarda Jichi: lo da SIREB
-  al otorgar y queda congelado en la autorización. Sin respuesta de SIREB no se
-  otorga.
+- Está regulado por la **escala del reglamento**, que vive en Recaudaciones
+  (SIREB): *(12/10/2026)* **cada tarifa del servicio «Autorización de Pesca» es
+  un tramo**, con su precio. El servicio se elige en Catálogos › Aranceles;
+  Jichi no guarda la escala. Sin respuesta de SIREB no se otorga.
 - Cuando un pescador solicita un cupo se genera un registro en
-  **`aprovechamientos_pesq`** que **hereda** la modalidad y el volumen total de
-  kilos de la escala elegida.
+  **`aprovechamientos_pesq`** que **copia** el tramo elegido (su etiqueta) y el
+  precio. **Los kilos autorizados los escribe ventanilla** (12/10/2026): la
+  tarifa de SIREB solo trae el precio, y Jichi no los deduce del tramo.
 - Su ciclo de vida pasa por los estados `pendiente`, `aprobado`, `agotado`,
   `revocado` (`no_pagado` se quitó el 08/10/2026).
   Pasa de `pendiente` a `aprobado` cuando SIREB confirma el pago; si la
@@ -153,7 +152,8 @@ dentro de una transacción deshecha con `rollBack()`.
   Madre» el sistema permite gestionar y emitir los carnets necesarios.
 - **Regla para el comercializador:** su `aprovechamiento_id` se registra en
   **NULL**, porque no realiza actividades extractivas.
-- Todo carnet se clasifica según su `tipo_carnet_id` y cuenta con el **aval
+- Todo carnet se clasifica según su **actividad** (`tipo_actor`: pescador o
+  comercializador, que decide también su precio) y cuenta con el **aval
   obligatorio** de una asociación (`asociacion_id`), un **número de registro**
   (`nro`, seis dígitos, por gestión, asignado al aprobar) y un **código de
   verificación** único global (tabla `codigos`, ver Paso 7).
@@ -263,9 +263,9 @@ dentro de una transacción deshecha con `rollBack()`.
   registra la llegada de la carga** *(28/09/2026)*: la guía aprobada vale hasta
   que vence.
 - **Productos hidrobiológicos parametrizados** *(27/09/2026)*. El cuadro D ya no
-  se escribe a mano: cada renglón elige un producto del catálogo
-  `productos_hidrobiologicos` —**nombre, precio por kilo y estado**—, que la
-  unidad administra en Catálogos → Productos. El precio es la **tasa por kilo**
+  se escribe a mano: cada renglón elige un producto, que *(12/10/2026)* es una
+  **tarifa del servicio de la guía en SIREB** —su etiqueta es el nombre, su monto
+  el precio por kilo—; el servicio se elige en Catálogos › Aranceles. El precio es la **tasa por kilo**
   —de **0,20 Bs en adelante**— y el importe de cada renglón es kilos × precio.
 - **Lo que se cobra por la guía es el TOTAL del importe del cuadro D**
   *(27/09/2026; antes era una tarifa fija de 50 Bs)*. Si es de **piscicultura**,
@@ -407,9 +407,9 @@ el formulario solo si ese carnet ya está revocado.
 **Tres decisiones tomadas por defecto, a confirmar con el responsable:**
 
 - [ ] **Precio:** hoy se cobra lo mismo que una emisión (la tarifa de SIREB del
-      tipo de carnet). Si la reposición lleva tarifa propia —el sistema anterior tenía
-      «reposición por pérdida, Bs 50»—, hace falta un precio de reposición en
-      `tipos_carnet`.
+      carnet de su actividad, en Catálogos › Aranceles). Si la reposición lleva
+      tarifa propia —el sistema anterior tenía «reposición por pérdida, Bs 50»—,
+      hace falta un concepto de reposición en `ConceptoArancel`.
 - [ ] **Adjuntos:** hoy se vuelven a subir la cédula y el documento de la
       asociación, como en cualquier emisión.
 - [ ] **Vínculo entre los dos carnets:** hoy queda solo en el motivo de la
@@ -453,7 +453,7 @@ el formulario solo si ese carnet ya está revocado.
 
 | Regla | Dónde se hace cumplir |
 | --- | --- |
-| El tipo de carnet y la actividad coinciden | `tipos_carnet.tipo_actor` + `EmitirCarnetService`; el formulario filtra la lista |
+| El precio del carnet es una tarifa del servicio «Carnet» | `EmitirCarnetService::precioDe($tarifaId)`; el servicio sale de Catálogos › Aranceles |
 | Pescador SIN cupo no saca carnet | `EmitirCarnetService::emitir()` → `pescadorSinCupo()` |
 | Nada vale antes de pagarse en SIREB | `ConfirmarPagoService` (aprueba solo con la liquidación `pagada`) + los `Revisar*Service::aprobar()`; imprimir exige `yaFueAprobado()` |
 | Cada documento registra su cobro en SIREB y no lo duplica | `LiquidarSirebService` (clave guardada antes de llamar) + el trait `LiquidableSireb` |

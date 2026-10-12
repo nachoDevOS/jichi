@@ -24,6 +24,8 @@ export default function EditarGuia({
     medios,
     tiposTransporte,
     productos,
+    sirebDisponible,
+    servicioConfigurado,
     condiciones,
     diasVigencia,
     descuentoPiscicultura,
@@ -61,7 +63,7 @@ export default function EditarGuia({
                 ? guia.detalles.map(
                       (d): FilaDetalle => ({
                           key: `d-${d.id}`,
-                          producto_id: String(d.producto_id),
+                          tarifa_sireb: d.tarifa_sireb,
                           condicion: d.condicion,
                           cantidad_kg: String(d.cantidad_kg),
                       }),
@@ -78,7 +80,7 @@ export default function EditarGuia({
     const importe = form.data.detalles.reduce(
         (suma, f) =>
             suma +
-            Number(f.cantidad_kg || 0) * (productos.find((p) => String(p.id) === f.producto_id)?.precio_kg ?? 0),
+            Number(f.cantidad_kg || 0) * (productos.find((p) => String(p.id) === f.tarifa_sireb)?.precio_kg ?? 0),
         0,
     );
     const monto = form.data.es_piscicultura ? importe * (1 - descuentoPiscicultura) : importe;
@@ -88,7 +90,7 @@ export default function EditarGuia({
         form.data.origen.trim() !== '' &&
         form.data.destino.trim() !== '' &&
         form.data.detalles.some(
-            (f) => f.producto_id !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
+            (f) => f.tarifa_sireb !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
         );
 
     return (
@@ -155,6 +157,8 @@ export default function EditarGuia({
                             <TablaDetalle
                                 filas={form.data.detalles}
                                 productos={productos}
+                                sirebDisponible={sirebDisponible}
+                                servicioConfigurado={servicioConfigurado}
                                 condiciones={condiciones}
                                 errores={form.errors}
                                 onCambiar={(filas) => form.setData('detalles', filas)}

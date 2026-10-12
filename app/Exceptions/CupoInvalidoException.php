@@ -20,33 +20,28 @@ class CupoInvalidoException extends RuntimeException
         return new self(sprintf(
             '%s ya tiene un aprovechamiento vigente hasta el %s, con %s kg sin usar. '.
             'No se otorga un segundo cupo. Si el que tiene todavía está pendiente de pago, '.
-            'corríjalo al tramo que corresponda; si ya se pagó, hay que esperar a que venza o revocarlo.',
+            'elimínelo y registre el que corresponde; si ya se pagó, hay que esperar a que venza o revocarlo.',
             $persona,
             $vence,
             number_format($saldo, 2, ',', '.'),
         ));
     }
 
-    /**
-     * Se eligió un tramo de la escala que ya no está vigente.
-     */
-    public static function escalaDerogada(int $nroEscala): self
+    /** Nadie eligió el servicio de SIREB de la escala en Catálogos › Aranceles. */
+    public static function sinServicio(): self
     {
-        $e = new self(
-            "La escala {$nroEscala} fue derogada y ya no se puede otorgar. ".
-            'Vuelva a abrir el formulario para ver los tramos vigentes.',
-        );
+        $e = new self('No está configurado el servicio de SIREB de la escala. Elíjalo en Catálogos › Aranceles.');
         $e->avisoGeneral = true;
 
         return $e;
     }
 
     /** SIREB no dio el precio o no aceptó la venta. Texto para ventanilla: el detalle va al log. */
-    public static function sireb(string $tramo, bool $noResponde): self
+    public static function sireb(?string $tramo, bool $noResponde): self
     {
         $e = new self($noResponde
             ? 'Recaudaciones no responde en este momento. Espere unos minutos y vuelva a intentarlo.'
-            : "La escala de la autorización «{$tramo}» no está habilitada para cobrar en este momento. ".
+            : 'La escala '.($tramo === null ? 'elegida' : "«{$tramo}»").' no está habilitada para cobrar en este momento. '.
               'Elija otra escala o consulte con el encargado del sistema.');
         $e->avisoGeneral = true;
 

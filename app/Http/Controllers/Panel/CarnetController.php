@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Panel;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Exceptions\CarnetInvalidoException;
@@ -17,13 +18,12 @@ use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
-use App\Models\TipoCarnet;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
 use App\Services\EmitirCarnetService;
 use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
-use App\Sireb\VistaSireb;
+use App\Sireb\TarifarioSireb;
 use App\Support\Archivos;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
@@ -60,7 +60,6 @@ class CarnetController extends Controller
                 'codigo',
                 'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
                 'asociacion:id,nombre,sigla',
-                'tipoCarnet',
                 'aprovechamiento',
             ])
             // Los dos conteos de `puedeEliminarse()`: sin ellos son dos consultas
@@ -103,9 +102,8 @@ class CarnetController extends Controller
      * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
      * buscador ya resuelto.
      */
-    public function create(Request $request, VistaSireb $vista): Response
+    public function create(Request $request, TarifarioSireb $tarifario): Response
     {
-        $precios = $vista->preciosPorTarifa() ?? [];
 
         // `?reemplaza=` llega de «Reponer»: solo vale sobre un carnet ya revocado.
         $reemplaza = $request->integer('reemplaza')
@@ -140,7 +138,8 @@ class CarnetController extends Controller
                 'registro' => $reemplaza->registro_legible,
                 'codigo' => $reemplaza->codigo_legible,
                 'asociacion_id' => $reemplaza->asociacion_id,
-                'tipo_carnet_id' => $reemplaza->tipo_carnet_id,
+                'tipo_actor' => $reemplaza->tipo_actor->value,
+                'tarifa_sireb' => $reemplaza->sireb_tarifa_id,
                 'aprovechamiento_id' => $reemplaza->aprovechamiento_id,
             ] : null,
 
@@ -157,20 +156,10 @@ class CarnetController extends Controller
                 ])
                 ->all(),
 
-            'tipos' => TipoCarnet::query()
-                ->vigentes()
-                ->orderBy('nombre')
-                ->get()
-                ->map(fn (TipoCarnet $t): array => [
-                    'id' => $t->id,
-                    'nombre' => $t->nombre,
-                    // Con qué actividad es coherente. La pantalla filtra la
-                    // lista con esto, y el servidor lo exige igual.
-                    'tipo_actor' => $t->tipo_actor->value,
-                    // De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa.
-                    'precio' => $precios[$t->tarifa_sireb] ?? null,
-                ])
-                ->all(),
+            'actividades' => TipoActor::opciones(),
+            // Las tarifas del servicio «Carnet» de SIREB: null si no responde.
+            'tarifas' => $tarifario->tarifas(ConceptoArancel::Carnet),
+            'servicioConfigurado' => $tarifario->servicioId(ConceptoArancel::Carnet) !== null,
         ]);
     }
 
@@ -180,8 +169,6 @@ class CarnetController extends Controller
     public function store(EmitirCarnetRequest $request): RedirectResponse
     {
         $datos = $request->validated();
-
-        $tipo = TipoCarnet::query()->findOrFail($datos['tipo_carnet_id']);
 
         // ANTES de abrir la transacción, y el `catch` los borra: una transacción
         // deshace filas, no escrituras en disco. Van por StorageController.
@@ -194,10 +181,8 @@ class CarnetController extends Controller
             $carnet = $this->servicio->emitir(
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
                 Asociacion::query()->findOrFail($datos['asociacion_id']),
-                $tipo,
-                // La actividad sale del TIPO: eran dos preguntas con una sola
-                // respuesta. Se sigue guardando: es la copia congelada de la regla.
-                $tipo->tipo_actor,
+                TipoActor::from($datos['tipo_actor']),
+                $datos['tarifa_sireb'],
                 now()->parse($datos['fecha_solicitud']),
                 // `?? null`: `validated()` devuelve SOLO las claves que vinieron,
                 // así que un nullable ausente revienta si se lee directo.
@@ -222,8 +207,8 @@ class CarnetController extends Controller
         return redirect()
             ->route('carnets.show', $carnet)
             ->with('exito', sprintf(
-                'Carnet %s registrado, PENDIENTE de cobro. Cargue los depósitos para poder enviarlo '.
-                'a revisión: el plástico se imprime recién cuando esté aprobado.',
+                'Carnet %s registrado, PENDIENTE de cobro. Al pagarse en Recaudaciones queda '.
+                'aprobado, y recién ahí se imprime el plástico.',
                 $carnet->codigo_legible,
             ));
     }
@@ -239,8 +224,7 @@ class CarnetController extends Controller
             // null y la foto no aparece, sin ningún error.
             'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'asociacion:id,nombre,sigla',
-            'tipoCarnet',
-            'aprovechamiento.categoria',
+            'aprovechamiento',
         ]);
 
         // El recibo del trámite —uno solo— y cuántas boletas faltan controlar.
@@ -263,8 +247,7 @@ class CarnetController extends Controller
                 // una faena.
                 'cupo' => $carnet->aprovechamiento ? [
                     'id' => $carnet->aprovechamiento->id,
-                    'escala' => $carnet->aprovechamiento->categoria?->nro_escala,
-                    'descripcion' => $carnet->aprovechamiento->categoria?->descripcion_kg,
+                    'descripcion' => $carnet->aprovechamiento->tramo,
                     'volumen_total_kg' => (float) $carnet->aprovechamiento->volumen_total_kg,
                     'kilos_consumidos' => $carnet->aprovechamiento->kilosConsumidos(),
                     'saldo_kg' => $carnet->aprovechamiento->saldoKg(),
@@ -374,10 +357,9 @@ class CarnetController extends Controller
     /**
      * Formulario de corrección — GET /panel/carnets/{carnet}/editar
      */
-    public function edit(Carnet $carnet, VistaSireb $vista): Response
+    public function edit(Carnet $carnet, TarifarioSireb $tarifario): Response
     {
-        $carnet->load(['codigo', 'beneficiario', 'asociacion', 'tipoCarnet', 'aprovechamiento.categoria']);
-        $precios = $vista->preciosPorTarifa() ?? [];
+        $carnet->load(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
 
         return Inertia::render('panel/carnets/editar', [
             'carnet' => [
@@ -392,7 +374,9 @@ class CarnetController extends Controller
                 'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
 
                 'asociacion_id' => $carnet->asociacion_id,
-                'tipo_carnet_id' => $carnet->tipo_carnet_id,
+                // De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa.
+                // El de hoy de SU tarifa, de referencia: la tarifa no se cambia al corregir.
+                'precio' => collect($tarifario->tarifas(ConceptoArancel::Carnet) ?? [])->firstWhere('id', $carnet->sireb_tarifa_id)['monto'] ?? null,
                 'aprovechamiento_id' => $carnet->aprovechamiento_id,
                 'fecha_solicitud' => $carnet->fecha_solicitud?->toDateString(),
 
@@ -416,17 +400,6 @@ class CarnetController extends Controller
                 ])
                 ->all(),
 
-            'tipos' => TipoCarnet::query()
-                ->vigentes()
-                ->orderBy('nombre')
-                ->get()
-                ->map(fn (TipoCarnet $t): array => [
-                    'id' => $t->id,
-                    'nombre' => $t->nombre,
-                    'tipo_actor' => $t->tipo_actor->value,
-                    'precio' => $precios[$t->tarifa_sireb] ?? null,
-                ])
-                ->all(),
         ]);
     }
 
@@ -451,7 +424,6 @@ class CarnetController extends Controller
             $this->servicio->editar(
                 $carnet,
                 Asociacion::query()->findOrFail($datos['asociacion_id']),
-                TipoCarnet::query()->findOrFail($datos['tipo_carnet_id']),
                 now()->parse($datos['fecha_solicitud']),
                 isset($datos['aprovechamiento_id'])
                     ? AprovechamientoPesq::query()->find($datos['aprovechamiento_id'])
@@ -464,7 +436,7 @@ class CarnetController extends Controller
                 Archivos::borrar($ruta);
             }
 
-            return back()->withInput()->withErrors(['tipo_carnet_id' => $e->getMessage()]);
+            return back()->withInput()->withErrors(['asociacion_id' => $e->getMessage()]);
         }
 
         return redirect()
@@ -566,7 +538,7 @@ class CarnetController extends Controller
             'registro' => $carnet->registro_legible,
             'gestion' => $carnet->gestion,
 
-            'tipo' => $carnet->tipoCarnet?->nombre,
+            'tipo' => $carnet->tipo_actor->nombreCarnet(),
             'tipo_actor' => $carnet->tipo_actor->value,
             'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
             'tipo_actor_color' => $carnet->tipo_actor->color(),

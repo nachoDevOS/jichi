@@ -2,6 +2,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { Info, ShieldAlert, Ship } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
+import { SelectorTarifa } from '@/components/panel/comunes/selector-tarifa';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
 import { fecha } from '@/lib/utils';
+import type { TarifaSireb } from '@/types';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 
 /**
@@ -18,7 +20,8 @@ export default function CrearFaena({
     beneficiario,
     carnetElegido,
     diasVigencia,
-    tarifa,
+    tarifas,
+    servicioConfigurado,
     modoEstricto,
 }: {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
@@ -26,8 +29,10 @@ export default function CrearFaena({
     carnetElegido: number | null;
     /** El plazo de la resolución. Llega del servidor para que no haya dos copias. */
     diasVigencia: number;
-    /** El precio de hoy en SIREB, de referencia: el que vale lo congela la emisión. null sin tarifa o sin SIREB. */
-    tarifa: number | null;
+    /** Las tarifas del servicio de la faena en SIREB; null si no responde. */
+    tarifas: TarifaSireb[] | null;
+    /** false = falta elegir el servicio en Catálogos › Aranceles. */
+    servicioConfigurado: boolean;
     /**
      * Lo que dice APROVECHAMIENTO_ESTRICTO en el servidor, y ES LO QUE DECIDE
      * si el botón se bloquea.
@@ -44,6 +49,8 @@ export default function CrearFaena({
     const form = useForm({
         carnet_id: inicial?.id ?? (null as number | null),
         kilos_extraidos: disponibleInicial ? String(disponibleInicial) : '',
+        // Si el servicio tiene una sola tarifa que se cobra, va elegida.
+        tarifa_sireb: tarifas?.filter((t) => t.activa).length === 1 ? tarifas.find((t) => t.activa)!.id : '',
         embarcacion: '',
         propietario: '',
         comandante_barco: '',
@@ -78,6 +85,7 @@ export default function CrearFaena({
     }
 
     const saldo = carnet ? disponibleDe(carnet, modoEstricto) : null;
+    const tarifaElegida = tarifas?.find((t) => t.id === form.data.tarifa_sireb) ?? null;
     const reservado = carnet?.reservado_kg ?? 0;
     const kilos = Number(form.data.kilos_extraidos || 0);
 
@@ -125,6 +133,15 @@ export default function CrearFaena({
 
                         {carnet && (
                             <>
+                                <SelectorTarifa
+                                    tarifas={tarifas}
+                                    servicioConfigurado={servicioConfigurado}
+                                    valor={form.data.tarifa_sireb}
+                                    onElegir={(t) => form.setData('tarifa_sireb', t)}
+                                    etiqueta="Tarifa del permiso"
+                                    error={form.errors.tarifa_sireb}
+                                />
+
                                 {/*
                                     LOS RENGLONES DEL TALONARIO. Ninguno es obligatorio: el
                                     papel se llena a mano y llega incompleto, y frenar por
@@ -352,10 +369,10 @@ export default function CrearFaena({
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                         Arancel
                                     </p>
-                                    {/* Sin precio: sin tarifa en Aranceles o SIREB caído. Al emitir, el servidor dice cuál. */}
+                                    {/* De referencia: el que vale lo pide el servidor al guardar. */}
                                     <p className="text-xl font-semibold tabular-nums">
-                                        {tarifa !== null ? tarifa.toFixed(2) : '—'}
-                                        {tarifa !== null && (
+                                        {tarifaElegida ? tarifaElegida.monto.toFixed(2) : '—'}
+                                        {tarifaElegida && (
                                             <span className="ml-1 text-sm font-normal text-muted-foreground">Bs</span>
                                         )}
                                     </p>
@@ -373,6 +390,7 @@ export default function CrearFaena({
                             disabled={
                                 form.processing ||
                                 carnet === null ||
+                                form.data.tarifa_sireb === '' ||
                                 kilos <= 0 ||
                                 bloquea
                             }

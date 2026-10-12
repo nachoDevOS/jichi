@@ -36,7 +36,7 @@ class ResumenPortal
             'puede_pagar_qr' => self::puedePagarQr($a),
             'pago' => self::estadoPago($a),
             'descargar' => self::urlDescargar($a),
-            'escala' => $a->categoria?->descripcion_kg,
+            'escala' => $a->tramo,
             'volumen_total_kg' => (float) $a->volumen_total_kg,
             // Antes de la firma no se consumió nada: el saldo recién vale aprobado.
             'ya_fue_aprobado' => $a->yaFueAprobado(),

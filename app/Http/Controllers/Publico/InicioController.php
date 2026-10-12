@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Publico;
 
+use App\Enums\ConceptoArancel;
 use App\Http\Controllers\Controller;
 use App\Models\Configuracion;
-use App\Models\ProductoHidrobiologico;
+use App\Sireb\SirebService;
+use App\Sireb\TarifarioSireb;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,8 +29,11 @@ class InicioController extends Controller
              */
             'portada' => fn (): array => $this->institucion(),
 
-            // Solo nombres del catálogo: ni precios ni nada del trabajo interno.
-            'especies' => fn () => ProductoHidrobiologico::vigentes()->orderBy('nombre')->pluck('nombre'),
+            // Solo los nombres de los productos de la guía. En caché propia, también
+            // vacía: con SIREB o Ibare caídos, la portada no pregunta en cada visita.
+            'especies' => fn () => Cache::remember('portada.especies', now()->addMinutes(10), fn (): array => SirebService::sinRespuestaReciente()
+                ? []
+                : collect(app(TarifarioSireb::class)->tarifas(ConceptoArancel::Guia) ?? [])->pluck('etiqueta')->filter()->sort()->values()->all()),
             'provincias' => config('jichi.provincias', []),
         ]);
     }

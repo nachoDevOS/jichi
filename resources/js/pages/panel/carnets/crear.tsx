@@ -2,6 +2,7 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { Info, TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
+import { SelectorTarifa } from '@/components/panel/comunes/selector-tarifa';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Campo } from '@/components/ui/campo';
@@ -11,9 +12,9 @@ import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fecha, fechaInput } from '@/lib/utils';
-import type { PageProps, TipoActor } from '@/types';
+import type { OpcionEnum, PageProps, TarifaSireb, TipoActor } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
-import type { AsociacionElegible, CupoVigente, ReposicionDeCarnet, TipoElegible } from '@/types/carnets';
+import type { AsociacionElegible, CupoVigente, ReposicionDeCarnet } from '@/types/carnets';
 
 /**
  *  Emitir una credencial — paso 3 del flujo
@@ -23,7 +24,9 @@ export default function CrearCarnet({
     reposicion,
     aprovechamientoId,
     asociaciones,
-    tipos,
+    actividades,
+    tarifas,
+    servicioConfigurado,
 }: {
     beneficiario: BeneficiarioSugerido | null;
     /** Llega de «Reponer»: los datos del carnet revocado, para no volver a elegirlos. */
@@ -31,7 +34,11 @@ export default function CrearCarnet({
     /** Llega de la ficha del cupo: la bolsa que se preselecciona. */
     aprovechamientoId: number | null;
     asociaciones: AsociacionElegible[];
-    tipos: TipoElegible[];
+    actividades: OpcionEnum[];
+    /** Las tarifas del servicio «Carnet» de SIREB; null si no responde. */
+    tarifas: TarifaSireb[] | null;
+    /** false = falta elegir el servicio en Catálogos › Aranceles. */
+    servicioConfigurado: boolean;
 }) {
     const { institucion } = usePage<PageProps>().props;
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
@@ -39,7 +46,8 @@ export default function CrearCarnet({
     const form = useForm({
         beneficiario_id: beneficiario?.id ?? null,
         asociacion_id: reposicion ? String(reposicion.asociacion_id) : '',
-        tipo_carnet_id: reposicion ? String(reposicion.tipo_carnet_id) : '',
+        tipo_actor: (reposicion?.tipo_actor ?? '') as TipoActor | '',
+        tarifa_sireb: reposicion?.tarifa_sireb ?? '',
         // De qué bolsa madre cuelga. Se manda explícito en vez de dejar que el
         // servidor adivine: así la pantalla y lo guardado dicen lo mismo.
         aprovechamiento_id: (reposicion?.aprovechamiento_id ??
@@ -54,17 +62,15 @@ export default function CrearCarnet({
         archivo_asociacion: null as File | null,
     });
 
-    const tipo = tipos.find((t) => String(t.id) === String(form.data.tipo_carnet_id)) ?? null;
+    const actor = form.data.tipo_actor;
+    const tarifa = tarifas?.find((t) => t.id === form.data.tarifa_sireb) ?? null;
 
-    /*
-     * La actividad no se pregunta: la dice el tipo elegido.
-     *
-     * Eran dos campos y decían lo mismo —cada tipo del catálogo ya declara para
-     * qué actividad sirve—, así que el operador tenía que acertar dos veces la
-     * misma respuesta. El `tipo_actor` se sigue guardando en el carnet: es la
-     * regla congelada, y no se vuelve a leer del catálogo.
-     */
-    const actor: TipoActor | '' = tipo?.tipo_actor ?? '';
+    // La tarifa cuyo nombre menciona la actividad («Carnet Pescador»), si hay una sola: es una sugerencia.
+    const tarifaDe = (a: TipoActor | '') => {
+        const candidatas = (tarifas ?? []).filter((t) => t.activa && a !== '' && t.etiqueta.toLowerCase().includes(a));
+
+        return candidatas.length === 1 ? candidatas[0].id : '';
+    };
     const esPescador = actor === 'pescador';
 
     /*
@@ -147,71 +153,53 @@ export default function CrearCarnet({
                             />
                         </Campo>
 
-                        {/*
-                            UN SOLO CAMPO, no dos. El tipo del catálogo ya
-                            declara su actividad, así que preguntarla aparte era
-                            pedir dos veces la misma respuesta. Van agrupados
-                            para que se vea qué habilita cada uno.
-                        */}
                         <Campo
-                            etiqueta="Tipo de carnet"
-                            htmlFor="tipo_carnet_id"
-                            error={form.errors.tipo_carnet_id}
-                            ayuda="Decide qué habilita el documento y cuánto sale: el de pescador saca faenas y lleva volumen autorizado; el de comercializador saca guías."
+                            etiqueta="Actividad"
+                            htmlFor="tipo_actor"
+                            error={form.errors.tipo_actor}
+                            ayuda="Decide qué habilita el documento: el de pescador saca faenas y lleva volumen autorizado; el de comercializador saca guías."
                             obligatorio
                         >
                             <Select
-                                id="tipo_carnet_id"
-                                value={form.data.tipo_carnet_id}
+                                id="tipo_actor"
+                                value={form.data.tipo_actor}
                                 onChange={(e) => {
-                                    /*
-                                     * El cupo se limpia al pasar a comercializador.
-                                     * Se proponía solo, del cupo de la persona,
-                                     * y seguía viajando aunque el tipo elegido
-                                     * no llevara volumen: el servidor lo
-                                     * rechazaba —«no lleva cupo de pesca»— y el
-                                     * error caía en un campo que en ese caso no
-                                     * se dibuja, así que el formulario no
-                                     * guardaba y no decía por qué.
-                                     */
-                                    const elegido = tipos.find(
-                                        (t) => String(t.id) === String(e.target.value),
-                                    );
+                                    // El cupo se limpia al pasar a comercializador: el servidor lo
+                                    // rechaza, y el error caería en un campo que ahí no se dibuja.
+                                    const elegido = e.target.value as TipoActor | '';
 
                                     form.setData((datos) => ({
                                         ...datos,
-                                        tipo_carnet_id: e.target.value,
+                                        tipo_actor: elegido,
+                                        tarifa_sireb: tarifaDe(elegido) || datos.tarifa_sireb,
                                         aprovechamiento_id:
-                                            elegido?.tipo_actor === 'comercializador'
+                                            elegido === 'comercializador'
                                                 ? null
                                                 : (datos.aprovechamiento_id ??
                                                   persona?.cupos_elegibles?.[0]?.id ??
                                                   null),
                                     }));
                                 }}
-                                aria-invalid={Boolean(form.errors.tipo_carnet_id)}
+                                aria-invalid={Boolean(form.errors.tipo_actor)}
                             >
-                                <option value="">Elija un tipo…</option>
+                                <option value="">Elija una actividad…</option>
 
-                                {(['pescador', 'comercializador'] as const).map((act) => {
-                                    const delActor = tipos.filter((t) => t.tipo_actor === act);
-
-                                    return delActor.length === 0 ? null : (
-                                        <optgroup
-                                            key={act}
-                                            label={act === 'pescador' ? 'Pescador' : 'Comercializador'}
-                                        >
-                                            {delActor.map((t) => (
-                                                <option key={t.id} value={t.id}>
-                                                    {t.nombre}
-                                                    {t.precio !== null && ` — ${bs(t.precio, institucion.moneda)}`}
-                                                </option>
-                                            ))}
-                                        </optgroup>
-                                    );
-                                })}
+                                {actividades.map((a) => (
+                                    <option key={a.value} value={a.value}>
+                                        {a.label}
+                                    </option>
+                                ))}
                             </Select>
                         </Campo>
+
+                        <SelectorTarifa
+                            tarifas={tarifas}
+                            servicioConfigurado={servicioConfigurado}
+                            valor={form.data.tarifa_sireb}
+                            onElegir={(t) => form.setData('tarifa_sireb', t)}
+                            etiqueta="Tarifa del carnet"
+                            error={form.errors.tarifa_sireb}
+                        />
 
                         {/*
                             DE QUÉ BOLSA MADRE CUELGA. El operador tiene que
@@ -430,14 +418,14 @@ export default function CrearCarnet({
                             </div>
                         )}
 
-                        {tipo && (
+                        {tarifa && (
                             <div>
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                     A cobrar
                                 </p>
-                                {/* Sin precio: sin tarifa elegida o SIREB caído. Al emitir, el servidor dice cuál. */}
+                                {/* De referencia: el que vale lo pide el servidor al guardar. */}
                                 <p className="text-3xl font-semibold tabular-nums">
-                                    {tipo.precio !== null ? bs(tipo.precio, institucion.moneda) : '—'}
+                                    {bs(tarifa.monto, institucion.moneda)}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                     Se paga en Recaudaciones: el carnet queda PENDIENTE hasta que
@@ -451,7 +439,8 @@ export default function CrearCarnet({
                             disabled={
                                 form.processing ||
                                 persona === null ||
-                                form.data.tipo_carnet_id === '' ||
+                                form.data.tipo_actor === '' ||
+                                form.data.tarifa_sireb === '' ||
                                 form.data.archivo_ci === null ||
                                 form.data.archivo_asociacion === null ||
                                 form.data.asociacion_id === ''

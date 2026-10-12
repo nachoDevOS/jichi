@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Panel;
 
 use App\Enums\TipoActor;
-use App\Models\TipoCarnet;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,17 +39,17 @@ class EmitirCarnetRequest extends FormRequest
                     ->whereNull('deleted_at'),
             ],
 
-            // El TIPO decide la actividad: cada uno declara su `tipo_actor`.
-            'tipo_carnet_id' => [
-                'required', 'integer',
-                Rule::exists('tipos_carnet', 'id')->where('estado', true),
-            ],
+            // La actividad decide qué emite el carnet y qué fila de Aranceles cobra.
+            'tipo_actor' => ['required', Rule::enum(TipoActor::class)],
+
+            // Una tarifa del servicio «Carnet» de SIREB: si se puede cobrar lo decide el servicio.
+            'tarifa_sireb' => ['required', 'uuid'],
 
             // Opcional: sin ella el servicio toma el cupo vigente de la persona.
             // En un comercializador está PROHIBIDA: no extrae, no lleva cupo.
             'aprovechamiento_id' => [
                 'nullable', 'integer',
-                Rule::prohibitedIf(fn (): bool => $this->tipoElegido()?->tipo_actor === TipoActor::Comercializador),
+                Rule::prohibitedIf(fn (): bool => $this->input('tipo_actor') === TipoActor::Comercializador->value),
                 Rule::exists('aprovechamientos_pesq', 'id')->whereNull('deleted_at'),
             ],
 
@@ -75,8 +74,10 @@ class EmitirCarnetRequest extends FormRequest
             'beneficiario_id.exists' => 'Esa persona no está en el padrón o fue dada de baja.',
             'asociacion_id.required' => 'Elija la asociación que la certifica.',
             'asociacion_id.exists' => 'Esa asociación no existe o está inactiva.',
-            'tipo_carnet_id.required' => 'Elija el tipo de carnet.',
-            'tipo_carnet_id.exists' => 'Ese tipo de carnet no existe o está fuera de uso.',
+            'tipo_actor.required' => 'Elija la actividad del carnet.',
+            'tipo_actor.enum' => 'Esa actividad no existe.',
+            'tarifa_sireb.required' => 'Elija la tarifa del carnet.',
+            'tarifa_sireb.uuid' => 'Esa tarifa no es de SIREB.',
             'aprovechamiento_id.prohibited' => 'Un carnet de comercializador no lleva cupo de pesca.',
             'aprovechamiento_id.exists' => 'Ese aprovechamiento no existe o fue dado de baja.',
             'fecha_solicitud.required' => 'Indique la fecha de la solicitud.',
@@ -91,18 +92,14 @@ class EmitirCarnetRequest extends FormRequest
         ];
     }
 
-    /** El tipo que se eligió, o null si no vino o no existe. */
-    private function tipoElegido(): ?TipoCarnet
-    {
-        return TipoCarnet::query()->find($this->input('tipo_carnet_id'));
-    }
-
     protected function prepareForValidation(): void
     {
         // Lo normal es emitir hoy; sin este valor por defecto la validación
         // rechazaría un campo que no hace falta preguntar.
         $this->merge([
             'fecha_solicitud' => $this->input('fecha_solicitud') ?: now()->toDateString(),
+            // SIREB manda los ids en minúscula: así se comparan tal cual.
+            'tarifa_sireb' => mb_strtolower(trim((string) $this->input('tarifa_sireb'))),
         ]);
     }
 }

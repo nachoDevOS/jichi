@@ -142,7 +142,6 @@ class DashboardController extends Controller
                 'codigo',
                 'beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
                 'asociacion:id,nombre,sigla',
-                'tipoCarnet',
                 'aprovechamiento:id,estado',
             ])
             ->latest('fecha_emision')

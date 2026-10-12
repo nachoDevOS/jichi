@@ -27,8 +27,8 @@ enum RolSistema: string
         'recibos' => ['Recibos', 'Pagos', ['ver', 'imprimir']],
 
         'asociaciones' => ['Asociaciones', 'Parámetros', ['ver', 'crear', 'editar']],
-        // Tipos de carnet, productos, escala y aranceles: cambian por la misma vía, una resolución.
-        'catalogos' => ['Catálogos', 'Catálogos', ['ver', 'crear', 'editar']],
+        // Aranceles: lo que cobra cada trámite en SIREB. Cambian por resolución; no se crean.
+        'catalogos' => ['Catálogos', 'Catálogos', ['ver', 'editar']],
 
         // Sin pantalla todavía: se declaran para que el rol ya los pueda llevar.
         'reportes' => ['Reportes', 'Administración', ['ver', 'exportar']],

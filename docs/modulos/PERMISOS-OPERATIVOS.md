@@ -23,7 +23,7 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Dice | Embarcación, propietario, comandante, matrícula, kardex, región y kilos | Origen y destino, medio y vehículo, y la carga especie por especie |
 | Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
 | Además exige | Autorización de pesca **aprobada**, en fecha y con kilos libres | Nada más que el carnet vigente |
-| Arancel | Precio de SIREB (fila `faena` de Catálogos › Aranceles), copiado en `permisos_faena.monto` | **El total del cuadro D** (kilos × precio por kilo de SIREB de cada producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
+| Arancel | La tarifa que elige ventanilla del servicio de la fila `faena` de Catálogos › Aranceles, copiada en `permisos_faena.monto` | **El total del cuadro D** (kilos × precio por kilo de SIREB de cada producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
 | Número | `permisos_faena.nro`, correlativo continuo del sistema | `guias_movimiento.nro`, correlativo continuo del sistema |
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
 | Kilos contra la autorización | **Reserva** al registrarse, **descuenta** al aprobarse | No toca ningún cupo |
@@ -213,12 +213,14 @@ Vive en `guia_detalles`, una fila por especie, y calca el **cuadro D** del
 talonario: producto, condición (`CondicionProducto`, las diez columnas de tilde
 del papel), kilos, precio e importe.
 
-**El producto sale del catálogo** `productos_hidrobiologicos` —nombre, precio
-por kilo y estado, en Catálogos → Productos— desde el 27/09/2026. El formulario
-manda solo `producto_id`, condición y kilos; `EmitirGuiaService::normalizarDetalle()`
-copia el nombre y el precio del producto y calcula el importe. Lo que llegue del
-formulario como precio se ignora. Un producto inactivo no se elige en una guía
-nueva, pero al corregir una guía que ya lo tenía se conserva.
+**El producto es una tarifa de SIREB** *(12/10/2026; antes el catálogo
+`productos_hidrobiologicos`)*: las del servicio que guarda la fila `guia` de
+Catálogos › Aranceles. El formulario manda solo `tarifa_sireb`, condición y
+kilos; `EmitirGuiaService::normalizarDetalle()` pide cada tarifa a SIREB, copia
+su etiqueta (`especie`) y su precio y calcula el importe. Lo que llegue del
+formulario como precio se ignora. Una tarifa que SIREB no deja cobrar se ve
+deshabilitada; al corregir, la que la guía ya tenía aparece aunque SIREB ya no
+la mande. Ver [SIREB.md](SIREB.md).
 
 **El precio ES lo que se cobra** (27/09/2026): la guía cobra la suma de los
 importes de su cuadro D, con el descuento de piscicultura, y la guarda en
@@ -314,7 +316,7 @@ de pescador muestra «Faenas emitidas» y el de comercializador «Guías emitida
 | `app/Services/RevisarGuiaService.php` | Aprobar la guía cuando SIREB la da por pagada (vigencia de 5 días) |
 | `app/Http/Controllers/Panel/FaenaController.php` / `GuiaController.php` | Listado, formulario, ficha y circuito |
 | `resources/js/pages/panel/faenas/`, `resources/js/pages/panel/guias/` | Las pantallas |
-| `app/Models/ProductoHidrobiologico.php`, `ProductoHidrobiologicoController.php` | El catálogo del cuadro D |
+| `app/Sireb/TarifarioSireb.php` | Las tarifas del servicio de la guía: los productos del cuadro D |
 
 ---
 

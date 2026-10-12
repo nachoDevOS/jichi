@@ -36,7 +36,7 @@ app/
 │   ├── EstadoGuia.php             pendiente · aprobado · revocado
 │   ├── EstadoLiquidacionSireb.php por_enviar · registrada · anulada
 │   ├── TipoActor.php              pescador · comercializador (qué emite cada carnet)
-│   ├── ModalidadAprovechamiento.php, ConceptoArancel.php, ConceptoRecibo.php,
+│   ├── ConceptoArancel.php, ConceptoRecibo.php,
 │   │   CondicionProducto.php, MedioTransporte.php, TipoTransporte.php, EstadoAsociacion.php
 │   └── RolSistema.php             los roles y TODOS sus permisos
 │
@@ -48,8 +48,7 @@ app/
 │   │   │   ├── AprovechamientoController.php  Carnet, Faena, GuiaController.php
 │   │   │   ├── *ImpresionController.php, AutorizacionPescaController.php  los PDF
 │   │   │   ├── ReciboController.php, DashboardController.php, CuentaPortalController.php
-│   │   │   └── Asociacion, CategoriaAprovechamiento, TipoCarnet,
-│   │   │       ProductoHidrobiologico, ArancelSirebController.php   catálogos
+│   │   │   └── Asociacion, ArancelSirebController.php   catálogos
 │   │   ├── Publico/               ← SIN SESIÓN: portada y verificación
 │   │   ├── Portal/                ← BENEFICIARIO: solo lectura
 │   │   └── StorageController.php  el ÚNICO que escribe archivos
@@ -67,7 +66,7 @@ app/
 │   ├── ConfirmarPagoService.php    pregunta a SIREB: si está pagada, aprueba
 │   ├── CargarPagoService.php       carga el pago en SIREB
 │   ├── CorrelativoService.php, CodigoService.php, CuentaPortalService.php
-├── Sireb/                  El cliente de Recaudaciones (SirebService, PrecioSireb, VistaSireb)
+├── Sireb/                  El cliente de Recaudaciones (SirebService: la conexión; TarifarioSireb: tarifas y precios)
 ├── AuthIbare/              El login con Ibare, módulo cerrado
 ├── Support/                Piezas sin estado: Sql, Archivos, CodigoQr, ResumenPortal…
 ├── Traits/                 Auditable, Codificable, LiquidableSireb, HistorialSireb
@@ -130,8 +129,7 @@ resources/js/
 │   │   ├── aprovechamientos/       index · crear · editar · ver
 │   │   ├── carnets/  faenas/  guias/   index · crear · editar · ver
 │   │   ├── recibos/                index · ver
-│   │   └── catalogos/              asociaciones, escala, tipos-carnet, productos,
-│   │                               aranceles (cada uno con -formulario e -historial)
+│   │   └── catalogos/              asociaciones, aranceles (con -formulario e -historial)
 │   ├── publico/                ← SIN SESIÓN: inicio (portada), verificar
 │   └── portal/                 ← BENEFICIARIO: ingresar, inicio, en-curso,
 │                                 papeles, pagos, perfil, clave
@@ -231,8 +229,8 @@ database/
 │   ├── RolPermisoSeeder.php    el rol administrador con TODOS los permisos
 │   ├── ConfiguracionSeeder.php datos de la institución (updateOrCreate: pisa)
 │   ├── UsuarioSeeder.php       la cuenta admin@admin.com
-│   ├── CatalogoSeeder.php      asociaciones, escala, tipos de carnet, productos y
-│   │                           aranceles, con sus tarifas de SIREB (firstOrCreate)
+│   ├── CatalogoSeeder.php      asociaciones y aranceles, con sus servicios y
+│   │                           tarifas de SIREB (firstOrCreate)
 │   └── BeneficiarioSeeder.php  datos de prueba: NO corre en producción
 └── factories/BeneficiarioFactory.php
 ```
@@ -260,18 +258,25 @@ antes en una SQLite descartable. Ver la regla 12 de CLAUDE.md.
 
 ## Verificación
 
-No hay carpeta `tests/`: las pruebas automáticas se retiraron el 27/09/2026 a
-pedido del responsable (commit `7dc0ac6`).
+```
+tests/
+├── TestCase.php                 prohíbe llamadas HTTP reales y silencia el log de SIREB
+├── Concerns/
+│   ├── SirebFalso.php           SIREB e Ibare en memoria: catálogo, liquidaciones, pagos
+│   └── ArmaEscenarios.php       el camino de ventanilla con los servicios reales
+├── Unit/                        reglas puras: enums, lector de kilos
+└── Feature/                     un archivo por trámite, más Panel/, Pagos/, Publico/, Sireb/
+```
 
 ```sh
+php artisan test        # las pruebas
 npx tsc --noEmit        # tipos
 ./vendor/bin/pint       # formato
 npm run build           # que compile
 ```
 
-> ⚠️ Los tres revisan **tipos y formato**, no las reglas de negocio. Todo cambio
-> se verifica **abriendo la pantalla y probando el caso a mano**, incluidos los
-> bordes. `tsc` tampoco revisa los nombres de ruta: al quitar una, cruzar contra
+> ⚠️ Las pruebas no ven el navegador: la pantalla se verifica **abriéndola y
+> probando el caso a mano**, incluidos los bordes. `tsc` tampoco revisa los nombres de ruta: al quitar una, cruzar contra
 > `php artisan route:list --json`.
 
 ---

@@ -84,7 +84,7 @@ class AutorizacionPescaController extends Controller
      */
     public function documento(AprovechamientoPesq $aprovechamiento, ?string $marcaAgua = null): ArchivoPdf
     {
-        $aprovechamiento->loadMissing(['codigo', 'beneficiario', 'categoria']);
+        $aprovechamiento->loadMissing(['codigo', 'beneficiario']);
 
         $pdf = Pdf::loadView('documentos.autorizacion-pesca', [
             ...$this->datos($aprovechamiento),

@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\EstadoAprovechamiento;
 use App\Exceptions\CupoInvalidoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
-use App\Models\CategoriaAprovechamiento;
-use App\Sireb\PrecioSireb;
 use App\Sireb\SinPrecioException;
+use App\Sireb\TarifarioSireb;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,23 +19,25 @@ use Illuminate\Support\Facades\Log;
 class OtorgarCupoService
 {
     public function __construct(
-        private readonly PrecioSireb $precios,
+        private readonly TarifarioSireb $tarifario,
         private readonly LiquidarSirebService $liquidaciones,
         private readonly CorrelativoService $correlativos,
     ) {}
 
     /**
-     * Otorga la bolsa madre a una persona.
+     * Otorga la bolsa madre a una persona. `$tarifaId` es el tramo (una tarifa
+     * del servicio de la escala en SIREB) y `$kilos`, lo que escribe ventanilla.
      */
     public function otorgar(
         Beneficiario $beneficiario,
-        CategoriaAprovechamiento $categoria,
+        string $tarifaId,
+        float $kilos,
         string $tipoEmbarcacion,
         ?Carbon $solicitud = null,
     ): AprovechamientoPesq {
         $solicitud ??= now();
 
-        $cupo = DB::transaction(function () use ($beneficiario, $categoria, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
+        $cupo = DB::transaction(function () use ($beneficiario, $tarifaId, $kilos, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
             // `lockForUpdate()` devuelve OTRA instancia: acá solo toma el candado,
             // todo lo demás se lee del modelo que llegó.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
@@ -50,28 +52,22 @@ class OtorgarCupoService
                 );
             }
 
-            ['tramo' => $tramo, 'precio' => $precio] = $this->verificarPrecio($categoria);
+            $tramo = $this->verificarTramo($tarifaId);
 
             $cupo = AprovechamientoPesq::create([
                 'beneficiario_id' => $beneficiario->id,
-                'categoria_aprov_id' => $tramo->id,
                 // Correlativo propio, no el id: el talonario no puede tener huecos de filas ajenas.
                 'nro' => $this->correlativos->siguienteContinuo(AprovechamientoPesq::SERIE),
-                'monto' => $precio['monto'],
-                'sireb_tarifa_id' => $precio['tarifa_id'],
-
-                /*
-                 * El volumen sale del techo del tramo.
-                 */
-                'volumen_total_kg' => $tramo->kilos_max,
+                'monto' => $tramo['monto'],
+                'sireb_tarifa_id' => $tramo['tarifa_id'],
+                // Copia: Recaudaciones puede renombrar o dar de baja la tarifa después.
+                'tramo' => $tramo['etiqueta'],
+                // Los escribe ventanilla: la tarifa de SIREB solo trae el precio.
+                'volumen_total_kg' => $kilos,
 
                 // Obligatorio: va impreso en la autorización. Texto libre porque no
                 // hay padrón de embarcaciones.
                 'tipo_embarcacion' => $tipoEmbarcacion,
-
-                // Se copia, por lo mismo que el volumen: reclasificar el tramo en el
-                // catálogo no puede cambiarle el régimen a lo ya otorgado.
-                'modalidad' => $tramo->modalidad,
 
                 /*
                  * Nace pendiente, y de ahí sale solo al cobrarse.
@@ -189,43 +185,41 @@ class OtorgarCupoService
     }
 
     /**
-     * Lo que otorgar() revisa del tramo antes de escribir: vigente en Jichi y con
-     * tarifa cobrable en SIREB. No escribe nada, así que sirve también para probar.
+     * Lo que otorgar() revisa del tramo antes de escribir: la tarifa activa en
+     * SIREB. No escribe nada, así que sirve también para probar.
      *
-     * @return array{tramo: CategoriaAprovechamiento, precio: array{monto: float, tarifa_id: string}}
+     * @return array{monto: float, tarifa_id: string, etiqueta: string}
      *
      * @throws CupoInvalidoException
      */
-    public function verificarPrecio(CategoriaAprovechamiento $categoria): array
+    public function verificarTramo(string $tarifaId): array
     {
-        // Se relee DESDE LA BASE: entre abrir el formulario y guardar pueden pasar
-        // minutos, y alguien pudo derogar la escala.
-        $tramo = CategoriaAprovechamiento::query()->whereKey($categoria->id)->firstOrFail();
+        $precio = $this->precioDe($tarifaId);
 
-        if (! $tramo->estado) {
-            throw CupoInvalidoException::escalaDerogada($tramo->nro_escala);
-        }
-
-        return ['tramo' => $tramo, 'precio' => $this->precioDe($tramo)];
+        return ['monto' => $precio['monto'], 'tarifa_id' => $precio['tarifa_id'], 'etiqueta' => $precio['tarifa']['etiqueta'] ?? ''];
     }
 
     /**
-     * El precio del tramo según SIREB, el de ahora: tarifa y servicio activos y
-     * la tarifa liquidable. Sin eso no se otorga; ninguna tarifa se escribe a mano.
+     * El precio de un tramo según SIREB, el de ahora, con la tarifa activa. Sin
+     * eso no se otorga; ninguna tarifa se escribe a mano.
      *
-     * @return array{monto: float, tarifa_id: string}
+     * @return array{monto: float, tarifa_id: string, tarifa: array}
      */
-    public function precioDe(CategoriaAprovechamiento $tramo): array
+    public function precioDe(string $tarifaId, ?string $tramo = null): array
     {
+        if ($this->tarifario->servicioId(ConceptoArancel::Autorizacion) === null) {
+            throw CupoInvalidoException::sinServicio();
+        }
+
         try {
-            return $this->precios->de($tramo->servicio_sireb, $tramo->tarifa_sireb, exigirLiquidable: true);
+            return $this->tarifario->precio(ConceptoArancel::Autorizacion, $tarifaId);
         } catch (SinPrecioException $e) {
             // El motivo exacto (tarifa de baja, servicio de baja…) es para quien administra SIREB.
-            Log::channel('sireb')->warning('SIN PRECIO para el tramo '.$tramo->id, [
-                'tramo' => $tramo->id, 'tarifa' => $tramo->tarifa_sireb, 'motivo' => $e->getMessage(),
+            Log::channel('sireb')->warning('SIN PRECIO para la tarifa de la escala '.$tarifaId, [
+                'tarifa' => $tarifaId, 'motivo' => $e->getMessage(),
             ]);
 
-            throw CupoInvalidoException::sireb($tramo->descripcion_kg, $e->sinRespuesta);
+            throw CupoInvalidoException::sireb($tramo, $e->sinRespuesta);
         }
     }
 }

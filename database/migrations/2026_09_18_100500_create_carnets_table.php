@@ -22,7 +22,6 @@ return new class extends Migration
             // `index()` ANTES de `constrained()`: después se lo queda el
             // ForeignKeyDefinition y no se crea. PostgreSQL no indexa solo las FK.
             $table->foreignId('asociacion_id')->index()->constrained('asociaciones')->restrictOnDelete();
-            $table->foreignId('tipo_carnet_id')->constrained('tipos_carnet')->restrictOnDelete();
 
             // Nullable porque solo el pescador lleva cupo, y eso lo dice
             // TipoActor::requiereAprovechamiento(), nunca el nombre del tipo.

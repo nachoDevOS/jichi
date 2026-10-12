@@ -1,4 +1,4 @@
-import type { EstadoAprovechamiento, EstadoFaena, ModalidadAprovechamiento } from '@/types';
+import type { EstadoAprovechamiento, EstadoFaena } from '@/types';
 
 /**
  * Tipos del módulo Aprovechamientos — la BOLSA MADRE del pescador.
@@ -15,9 +15,7 @@ export interface CupoFila {
     /** Puede faltar: mucha gente del padrón todavía no tiene foto cargada. */
     foto_url: string | null;
 
-    /** El tramo de la escala bajo el que se otorgó: 1 a 7. */
-    escala: number | null;
-    /** El texto literal de la resolución: «201 Kg Hasta 500 Kg». */
+    /** El tramo: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
     descripcion: string | null;
 
     /**
@@ -36,16 +34,6 @@ export interface CupoFila {
     /** Lo que una faena nueva puede pedir: saldo menos reservado. */
     libre_kg: number;
     porcentaje_usado: number;
-
-    /**
-     * El régimen, COPIADO del tramo al otorgar.
-     *
-     * No se lee de la escala en vivo a propósito: reclasificar un tramo en el
-     * catálogo no puede cambiarle la clasificación a un cupo ya otorgado.
-     */
-    modalidad: ModalidadAprovechamiento;
-    modalidad_etiqueta: string;
-    modalidad_color: string;
 
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
     registrado_en: string | null;
@@ -151,9 +139,6 @@ export interface PagoSireb {
 export interface CupoFicha extends CupoFila {
     /** El código de verificación, en grupos de cuatro. */
     codigo: string | null;
-    escala_descripcion: string | null;
-    /** [piso, techo] del tramo, para contrastarlo con lo otorgado. */
-    escala_rango: [number, number] | null;
 
     /** Firmado y en fecha: puede respaldar una cédula nueva. */
     puede_emitir_carnet: boolean;
@@ -215,27 +200,5 @@ export interface FaenaDelCupo {
     puede_imprimirse: boolean;
     fecha_salida: string | null;
     fecha_desembarque: string | null;
-}
-
-/** Un tramo elegible en el formulario de otorgamiento. */
-export interface TramoElegible {
-    id: number;
-    nro_escala: number;
-    descripcion_kg: string;
-    kilos_min: number;
-    /**
-     * El techo del rango, que es EL VOLUMEN QUE SE VA A OTORGAR.
-     */
-    kilos_max: number;
-    servicio_sireb: string;
-    tarifa_sireb: string;
-    /** Precio de referencia de SIREB; null si no respondió. El que vale se congela al guardar. */
-    monto: number | null;
-    /** false = tarifa inactiva en SIREB: se muestra deshabilitada. null = SIREB no respondió. */
-    liquidable: boolean | null;
-    /** El régimen del tramo, visible antes de otorgar. */
-    modalidad: ModalidadAprovechamiento;
-    modalidad_etiqueta: string;
-    modalidad_descripcion: string;
 }
 

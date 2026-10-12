@@ -126,11 +126,6 @@ export type EstadoAprovechamiento =
     | 'agotado'
     | 'revocado';
 
-/**
- * Espejo de App\Enums\ModalidadAprovechamiento.
- */
-export type ModalidadAprovechamiento = 'escala_general' | 'especie_especial';
-
 /** Espejo de App\Enums\EstadoFaena. */
 export type EstadoFaena = 'pendiente' | 'aprobado' | 'revocado';
 
@@ -150,6 +145,16 @@ export interface OpcionEnum {
     value: string;
     label: string;
     color: string;
+}
+
+/** Una tarifa del servicio de SIREB de un trámite (TarifarioSireb::tarifas()). */
+export interface TarifaSireb {
+    id: string;
+    etiqueta: string;
+    /** De referencia: el que vale lo congela la emisión. */
+    monto: number;
+    /** false = dada de baja en SIREB: se ve, pero no se elige. */
+    activa: boolean;
 }
 
 // Declaraciones globales.

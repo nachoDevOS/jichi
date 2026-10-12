@@ -228,8 +228,7 @@ class BeneficiarioController extends Controller
             'cupos' => ExpedienteBeneficiario::aprovechamientos($beneficiario)
                 ->map(fn (AprovechamientoPesq $a): array => [
                     'id' => $a->id,
-                    'escala' => $a->categoria?->nro_escala,
-                    'descripcion' => $a->categoria?->descripcion_kg,
+                    'descripcion' => $a->tramo,
                     'volumen_total_kg' => (float) $a->volumen_total_kg,
                     'kilos_consumidos' => $a->kilosConsumidos(),
                     'saldo_kg' => $a->saldoKg(),
@@ -332,11 +331,10 @@ class BeneficiarioController extends Controller
             /*
              * Su bolsa madre, para el formulario de carnet: es de dónde va a
              * salir el cupo impreso, y la pantalla tiene que poder decir cuál.
-             * Va con la categoría y el agregado de kilos, o cada fila del
+             * Va con el agregado de kilos, o cada fila del
              * autocompletado dispararía dos consultas más.
              */
             ->with(['aprovechamientos' => fn ($a) => $a
-                ->with('categoria')
                 ->withSum('faenasQueConsumen', 'kilos_extraidos')
                 ->withSum('faenasQueReservan', 'kilos_extraidos'),
             ])
@@ -344,9 +342,7 @@ class BeneficiarioController extends Controller
                 ->vigentes()
                 ->with([
                     'codigo',
-                    'tipoCarnet:id,nombre',
                     'aprovechamiento' => fn ($a) => $a
-                        ->with('categoria')
                         ->withSum('faenasQueConsumen', 'kilos_extraidos')
                         ->withSum('faenasQueReservan', 'kilos_extraidos'),
                 ]),
@@ -392,14 +388,13 @@ class BeneficiarioController extends Controller
             ? $beneficiario->aprovechamientos->filter(
                 fn (AprovechamientoPesq $a): bool => $a->estado->estaAbierto() || $a->estado->habilita(),
             )->filter(fn (AprovechamientoPesq $a): bool => $a->estaEnFecha())
-            : $beneficiario->aprovechamientos()->with('categoria')->enCurso()->get();
+            : $beneficiario->aprovechamientos()->enCurso()->get();
 
         return $cupos
             ->sortByDesc('fecha_solicitud')
             ->map(fn (AprovechamientoPesq $a): array => [
                 'id' => $a->id,
-                'escala' => $a->categoria?->nro_escala,
-                'descripcion' => $a->categoria?->descripcion_kg,
+                'descripcion' => $a->tramo,
                 'volumen_total_kg' => (float) $a->volumen_total_kg,
                 'saldo_kg' => $a->saldoKg(),
                 'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
@@ -427,7 +422,7 @@ class BeneficiarioController extends Controller
             'id' => $carnet->id,
             // En grupos de cuatro, con guion: «EFGT-96R4-CJ42-AHYJ». Se guarda sin separadores.
             'codigo' => $carnet->codigo_legible,
-            'tipo' => $carnet->tipoCarnet?->nombre,
+            'tipo' => $carnet->tipo_actor->nombreCarnet(),
             'tipo_actor' => $carnet->tipo_actor->value,
             'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
             'tipo_actor_color' => $carnet->tipo_actor->color(),

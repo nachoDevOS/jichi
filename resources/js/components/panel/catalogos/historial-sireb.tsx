@@ -1,24 +1,21 @@
-import { usePage } from '@inertiajs/react';
 import { TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { bs, fechaHora } from '@/lib/utils';
-import type { PageProps } from '@/types';
-import type { TarifaAnterior, TarifaHistorial } from '@/types/catalogos';
+import { fechaHora } from '@/lib/utils';
+import type { ServicioAnterior, ServicioHistorial } from '@/types/catalogos';
 
 /**
- * La tarifa de SIREB actual y las anteriores de un registro de catálogo. Lo
- * usan la escala y los tipos de carnet.
+ * El servicio de SIREB actual y los anteriores de una fila de Aranceles.
  */
 export function HistorialSireb({
     actual,
     anteriores,
     sirebDisponible,
 }: {
-    actual: TarifaHistorial;
-    anteriores: TarifaAnterior[];
-    /** false = SIREB no respondió: no se sabe qué es cada tarifa hoy. */
+    actual: ServicioHistorial;
+    anteriores: ServicioAnterior[];
+    /** false = SIREB no respondió: no se sabe cómo se llama hoy cada servicio. */
     sirebDisponible: boolean;
 }) {
     return (
@@ -28,8 +25,8 @@ export function HistorialSireb({
                     <CardContent className="flex items-start gap-3 pt-5 text-sm">
                         <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-700 dark:text-amber-300" />
                         <p className="text-amber-900 dark:text-amber-200">
-                            Recaudaciones (SIREB) no responde: se ven los ids y las fechas, pero no qué es cada tarifa
-                            hoy.
+                            Recaudaciones (SIREB) no responde: se ven los ids y las fechas, pero no el nombre de cada
+                            servicio.
                         </p>
                     </CardContent>
                 </Card>
@@ -37,7 +34,7 @@ export function HistorialSireb({
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Tarifa actual</CardTitle>
+                    <CardTitle>Servicio actual</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <Entrada entrada={actual} sirebDisponible={sirebDisponible}>
@@ -48,18 +45,18 @@ export function HistorialSireb({
 
             <Card className="min-w-0">
                 <CardHeader>
-                    <CardTitle>Tarifas anteriores</CardTitle>
+                    <CardTitle>Servicios anteriores</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {anteriores.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Nunca cambió de tarifa: siempre tuvo la actual.</p>
+                        <p className="text-sm text-muted-foreground">Nunca cambió de servicio: siempre tuvo el actual.</p>
                     ) : (
                         <ol className="space-y-3">
                             {anteriores.map((h, i) => (
                                 <li key={i}>
                                     <Entrada entrada={h} sirebDisponible={sirebDisponible}>
                                         {fechaHora(h.desde)} → {fechaHora(h.hasta)}
-                                        {h.cambiado_por && ` · la cambió ${h.cambiado_por}`}
+                                        {h.cambiado_por && ` · lo cambió ${h.cambiado_por}`}
                                     </Entrada>
                                 </li>
                             ))}
@@ -71,36 +68,29 @@ export function HistorialSireb({
     );
 }
 
-/** Una tarifa: qué es hoy en SIREB, sus dos ids y el renglón de fechas. */
+/** Un servicio: cómo se llama hoy en SIREB, su id y el renglón de fechas. */
 function Entrada({
     entrada,
     sirebDisponible,
     children,
 }: {
-    entrada: TarifaHistorial;
+    entrada: ServicioHistorial;
     sirebDisponible: boolean;
     children: ReactNode;
 }) {
-    const { institucion } = usePage<PageProps>().props;
-
     return (
         <div className="min-w-0 rounded-md border border-border p-3 text-sm">
-            {/* Un período sin tarifa es real: un tipo de carnet nace sin ella hasta que alguien la elige. */}
-            {entrada.tarifa_sireb === null ? (
-                <Badge color="slate">Sin tarifa asignada</Badge>
-            ) : entrada.tarifa_etiqueta !== null && entrada.tarifa_monto !== null ? (
-                <p className="font-medium">
-                    {entrada.tarifa_etiqueta || 'Sin etiqueta'} — {bs(entrada.tarifa_monto, institucion.moneda)}
-                </p>
+            {/* Un período sin servicio es real: la fila nace así hasta que alguien lo elige. */}
+            {entrada.servicio_sireb === null ? (
+                <Badge color="slate">Sin servicio asignado</Badge>
+            ) : entrada.servicio_nombre !== null ? (
+                <p className="font-medium">{entrada.servicio_nombre}</p>
             ) : (
                 sirebDisponible && <Badge color="rose">Ya no está en SIREB</Badge>
             )}
 
-            {entrada.tarifa_sireb !== null && (
-                <>
-                    <p className="mt-1 break-all font-mono text-xs text-muted-foreground">Tarifa {entrada.tarifa_sireb}</p>
-                    <p className="break-all font-mono text-xs text-muted-foreground">Servicio {entrada.servicio_sireb}</p>
-                </>
+            {entrada.servicio_sireb !== null && (
+                <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{entrada.servicio_sireb}</p>
             )}
             <p className="mt-1 text-xs text-muted-foreground">{children}</p>
         </div>

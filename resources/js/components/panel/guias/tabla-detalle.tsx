@@ -10,7 +10,7 @@ export function filaVacia(): FilaDetalle {
         // Sin `key` estable, quitar la del medio remonta las de abajo y React
         // les mezcla los valores. Misma razón que en la tarjeta de pagos.
         key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        producto_id: '',
+        tarifa_sireb: '',
         condicion: '',
         cantidad_kg: '',
     };
@@ -19,19 +19,23 @@ export function filaVacia(): FilaDetalle {
 /**
  *  El cuadro D — una fila por especie.
  *
- * El talonario trae cinco renglones y acá no hay tope. El producto se elige del
- * catálogo y su precio por kilo NO se escribe: lo copia el servidor al guardar.
+ * El talonario trae cinco renglones y acá no hay tope. El producto es una tarifa
+ * de SIREB y su precio por kilo NO se escribe: lo copia el servidor al guardar.
  * El importe sale de kilos × precio.
  */
 export function TablaDetalle({
     filas,
     productos,
+    sirebDisponible,
+    servicioConfigurado,
     condiciones,
     errores,
     onCambiar,
 }: {
     filas: FilaDetalle[];
     productos: ProductoGuia[];
+    sirebDisponible: boolean;
+    servicioConfigurado: boolean;
     condiciones: CatalogosGuia['condiciones'];
     errores: Partial<Record<string, string>>;
     onCambiar: (filas: FilaDetalle[]) => void;
@@ -54,7 +58,7 @@ export function TablaDetalle({
     const grupoDe = (valor: string) => condiciones.find((c) => c.value === valor)?.grupo ?? '';
 
     // null = el producto no tiene tarifa o SIREB no responde: al guardar, el servidor dice cuál.
-    const precioSireb = (f: FilaDetalle) => productos.find((p) => String(p.id) === f.producto_id)?.precio_kg ?? null;
+    const precioSireb = (f: FilaDetalle) => productos.find((p) => String(p.id) === f.tarifa_sireb)?.precio_kg ?? null;
     const precioDe = (f: FilaDetalle) => precioSireb(f) ?? 0;
 
     const totalKg = filas.reduce((suma, f) => suma + Number(f.cantidad_kg || 0), 0);
@@ -62,6 +66,14 @@ export function TablaDetalle({
 
     return (
         <div className="space-y-3">
+            {(!servicioConfigurado || !sirebDisponible) && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+                    {!servicioConfigurado
+                        ? 'Falta elegir el servicio de SIREB de los productos en Catálogos › Aranceles.'
+                        : 'Recaudaciones (SIREB) no responde: la lista de productos no se puede cargar ahora.'}
+                </p>
+            )}
+
             {/* `min-w-0` en el contenedor: sin él la tabla estira la tarjeta a su
                 ancho natural y el que termina con barra de desplazamiento es el
                 documento entero. Ver CLAUDE.md. */}
@@ -83,16 +95,16 @@ export function TablaDetalle({
                             <tr key={fila.key} className="border-b border-border/60 align-top last:border-0">
                                 <td className="py-2 pr-2">
                                     <Select
-                                        value={fila.producto_id}
-                                        onChange={(e) => editar(i, 'producto_id', e.target.value)}
-                                        aria-invalid={Boolean(errores[`detalles.${i}.producto_id`])}
+                                        value={fila.tarifa_sireb}
+                                        onChange={(e) => editar(i, 'tarifa_sireb', e.target.value)}
+                                        aria-invalid={Boolean(errores[`detalles.${i}.tarifa_sireb`])}
                                         aria-label={`Producto del renglón ${i + 1}`}
                                     >
                                         <option value="">— elegir —</option>
                                         {productos.map((p) => (
-                                            <option key={p.id} value={p.id}>
+                                            <option key={p.id} value={p.id} disabled={!p.estado && p.id !== fila.tarifa_sireb}>
                                                 {p.nombre}
-                                                {!p.estado && ' (fuera de uso)'}
+                                                {!p.estado && ' (no disponible)'}
                                             </option>
                                         ))}
                                     </Select>

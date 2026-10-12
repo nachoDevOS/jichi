@@ -81,7 +81,8 @@ class EmitirGuiaRequest extends FormRequest
             'detalles' => ['required', 'array', 'min:1', 'max:20'],
             // Nombre y precio NO vienen del formulario: los copia el servicio del
             // catálogo. Que esté activo lo decide EmitirGuiaService.
-            'detalles.*.producto_id' => ['required', 'integer', Rule::exists('productos_hidrobiologicos', 'id')->whereNull('deleted_at')],
+            // El producto es una tarifa de SIREB: si se puede cobrar lo decide el servicio.
+            'detalles.*.tarifa_sireb' => ['required', 'uuid'],
             'detalles.*.condicion' => ['required', Rule::enum(CondicionProducto::class)],
             'detalles.*.cantidad_kg' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
         ];
@@ -101,8 +102,8 @@ class EmitirGuiaRequest extends FormRequest
             'fecha_solicitud.before_or_equal' => 'La fecha de solicitud no puede ser futura.',
             'detalles.required' => 'Cargue al menos una especie en el detalle.',
             'detalles.min' => 'Cargue al menos una especie en el detalle.',
-            'detalles.*.producto_id.required' => 'Elija el producto de este renglón.',
-            'detalles.*.producto_id.exists' => 'Ese producto no está en el catálogo.',
+            'detalles.*.tarifa_sireb.required' => 'Elija el producto de este renglón.',
+            'detalles.*.tarifa_sireb.uuid' => 'Ese producto no es una tarifa de SIREB.',
             'detalles.*.condicion.required' => 'Indique cómo viaja esta especie.',
             'detalles.*.cantidad_kg.required' => 'Indique los kilos de este renglón.',
             'detalles.*.cantidad_kg.gt' => 'Los kilos tienen que ser mayores que cero.',
@@ -119,7 +120,7 @@ class EmitirGuiaRequest extends FormRequest
          * nadie quiso elegir.
          */
         $detalles = collect((array) $this->input('detalles', []))
-            ->filter(fn ($fila): bool => is_array($fila) && ! empty($fila['producto_id']))
+            ->filter(fn ($fila): bool => is_array($fila) && ! empty($fila['tarifa_sireb']))
             ->values()
             ->all();
 

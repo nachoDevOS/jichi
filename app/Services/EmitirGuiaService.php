@@ -2,15 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
-use App\Models\ProductoHidrobiologico;
-use App\Sireb\PrecioSireb;
 use App\Sireb\SinPrecioException;
+use App\Sireb\TarifarioSireb;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -30,8 +30,8 @@ class EmitirGuiaService
 
     public function __construct(
         private readonly CorrelativoService $correlativos,
-        private readonly PrecioSireb $precios,
         private readonly LiquidarSirebService $liquidaciones,
+        private readonly TarifarioSireb $tarifario,
     ) {}
 
     /**
@@ -118,8 +118,7 @@ class EmitirGuiaService
      */
     public function editar(GuiaMovimiento $guia, array $datos, array $detalles): GuiaMovimiento
     {
-        // Un producto que la guía ya tenía se conserva aunque hoy esté fuera de uso.
-        $renglones = $this->normalizarDetalle($detalles, array_map('intval', $guia->detalles()->pluck('producto_id')->all()));
+        $renglones = $this->normalizarDetalle($detalles);
 
         if ($renglones === []) {
             throw PermisoOperativoException::guiaSinDetalle();
@@ -268,39 +267,25 @@ class EmitirGuiaService
     }
 
     /**
-     * El cuadro D con el nombre del CATÁLOGO y el precio de SIREB, no del
-     * formulario: el operador elige el producto y el sistema copia lo de hoy.
-     * Corre fuera de la transacción: la llamada a SIREB no debe tener filas
-     * bloqueadas. Se descartan los renglones sin producto.
+     * El cuadro D con el nombre y el precio de SIREB, no del formulario: el
+     * operador elige la tarifa y el sistema copia lo de hoy. Corre fuera de la
+     * transacción: la llamada a SIREB no debe tener filas bloqueadas. Se
+     * descartan los renglones sin producto.
      *
      * @param  array<int, array<string, mixed>>  $detalles
-     * @param  array<int, int>  $yaUsados  Productos que la guía ya tenía (al corregir)
      * @return array<int, array<string, mixed>>
      */
-    private function normalizarDetalle(array $detalles, array $yaUsados = []): array
+    private function normalizarDetalle(array $detalles): array
     {
-        $filas = collect($detalles)->filter(fn (array $d): bool => ! empty($d['producto_id']));
-
-        $productos = ProductoHidrobiologico::query()
-            ->whereKey($filas->pluck('producto_id')->unique()->all())
-            ->get()
-            ->keyBy('id');
-
-        return $filas
-            ->map(function (array $d) use ($productos, $yaUsados): array {
-                $producto = $productos->get((int) $d['producto_id']);
-
-                if ($producto === null || (! $producto->estado && ! in_array($producto->id, $yaUsados, true))) {
-                    throw PermisoOperativoException::productoNoDisponible($producto?->nombre ?? '#'.$d['producto_id']);
-                }
-
-                $sireb = $this->precioDelProducto($producto);
+        return collect($detalles)
+            ->filter(fn (array $d): bool => ! empty($d['tarifa_sireb']))
+            ->map(function (array $d): array {
+                $sireb = $this->precioDelProducto(mb_strtolower((string) $d['tarifa_sireb']));
                 $cantidad = round((float) ($d['cantidad_kg'] ?? 0), 2);
                 $precio = round($sireb['monto'], 2);
 
                 return [
-                    'producto_id' => $producto->id,
-                    'especie' => $producto->nombre,
+                    'especie' => $sireb['tarifa']['etiqueta'] ?? '',
                     'condicion' => $d['condicion'] instanceof CondicionProducto
                         ? $d['condicion']
                         : CondicionProducto::from((string) $d['condicion']),
@@ -315,16 +300,22 @@ class EmitirGuiaService
     }
 
     /**
-     * El precio por kilo del producto según SIREB, el de ahora.
+     * El precio por kilo de un producto —una tarifa del servicio de la guía—
+     * según SIREB, el de ahora. `$especie` solo nombra el renglón en el error.
      *
-     * @return array{monto: float, tarifa_id: string}
+     * @return array{monto: float, tarifa_id: string, tarifa: array}
      */
-    public function precioDelProducto(ProductoHidrobiologico $producto): array
+    public function precioDelProducto(string $tarifaId, ?string $especie = null): array
     {
+        // Sin servicio, el aviso propio de la guía: el genérico no diría «del detalle».
+        if ($this->tarifario->servicioId(ConceptoArancel::Guia) === null) {
+            throw PermisoOperativoException::guiaSinServicio();
+        }
+
         try {
-            return $this->precios->de($producto->servicio_sireb, $producto->tarifa_sireb);
+            return $this->tarifario->precio(ConceptoArancel::Guia, $tarifaId);
         } catch (SinPrecioException $e) {
-            throw PermisoOperativoException::productoSinPrecio($producto->nombre, $e->getMessage());
+            throw PermisoOperativoException::productoSinPrecio($especie ?? 'elegido', $e->getMessage());
         }
     }
 

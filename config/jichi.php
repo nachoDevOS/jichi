@@ -98,7 +98,8 @@ return [
         'client_id' => env('SIREB_CLIENT_ID', 'sedag'),
         'client_secret' => env('SIREB_CLIENT_SECRET'),
         'timeout' => (int) env('SIREB_TIMEOUT', 10),
-        'cache_minutos' => (int) env('SIREB_CACHE_MINUTOS', 10),
+        // Solo las listas de los formularios: el precio que se cobra se pide sin caché.
+        'cache_minutos' => (int) env('SIREB_CACHE_MINUTOS', 2),
     ],
 
 ];

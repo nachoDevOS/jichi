@@ -179,23 +179,22 @@ class PermisoOperativoException extends RuntimeException
     /** Sin precio de SIREB para la salida no se emite la faena. */
     public static function faenaSinPrecio(string $motivo): self
     {
-        return new self("No se puede emitir el permiso de faena: el arancel {$motivo} Revíselo en Catálogos › Aranceles.");
+        return new self("No se puede emitir el permiso de faena: {$motivo}");
     }
 
     /** Sin precio de SIREB para un producto no se emite la guía. */
     public static function productoSinPrecio(string $nombre, string $motivo): self
     {
-        return new self("El producto «{$nombre}» {$motivo} Revíselo en Catálogos › Productos.");
+        return new self("El producto «{$nombre}» del detalle no se puede cobrar: {$motivo}");
     }
 
-    /** El producto elegido no está en el catálogo, o está fuera de uso. */
-    public static function productoNoDisponible(string $nombre): self
+    /** Nadie eligió el servicio de SIREB de los productos en Catálogos › Aranceles. */
+    public static function guiaSinServicio(): self
     {
-        return new self(sprintf(
-            'El producto «%s» del detalle no está disponible en el catálogo de productos '.
-            'hidrobiológicos. Elija otro o actívelo en Catálogos.',
-            $nombre,
-        ));
+        return new self(
+            'No está configurado el servicio de SIREB de los productos de la guía (detalle). '.
+            'Elíjalo en Catálogos › Aranceles.',
+        );
     }
 
     /** Una guía sin renglones no ampara nada: el cuadro D es el traslado. */

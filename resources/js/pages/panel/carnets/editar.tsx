@@ -11,8 +11,8 @@ import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fecha, fechaInput } from '@/lib/utils';
-import type { PageProps, TipoActor } from '@/types';
-import type { AsociacionElegible, CarnetEnCorreccion, CupoVigente, TipoElegible } from '@/types/carnets';
+import type { PageProps } from '@/types';
+import type { AsociacionElegible, CarnetEnCorreccion, CupoVigente } from '@/types/carnets';
 
 /**
  *  Corregir un carnet pendiente
@@ -25,17 +25,14 @@ import type { AsociacionElegible, CarnetEnCorreccion, CupoVigente, TipoElegible 
 export default function EditarCarnet({
     carnet,
     asociaciones,
-    tipos,
 }: {
     carnet: CarnetEnCorreccion;
     asociaciones: AsociacionElegible[];
-    tipos: TipoElegible[];
 }) {
     const { institucion } = usePage<PageProps>().props;
 
     const form = useForm({
         asociacion_id: String(carnet.asociacion_id),
-        tipo_carnet_id: String(carnet.tipo_carnet_id),
         aprovechamiento_id: carnet.aprovechamiento_id,
         fecha_solicitud: carnet.fecha_solicitud ?? fechaInput(new Date()),
 
@@ -44,10 +41,6 @@ export default function EditarCarnet({
         archivo_asociacion: null as File | null,
     });
 
-    const tipo = tipos.find((t) => String(t.id) === String(form.data.tipo_carnet_id)) ?? null;
-
-    // La actividad no se toca: solo se ofrecen los tipos de la que ya tiene.
-    const tiposDelActor = tipos.filter((t) => t.tipo_actor === (carnet.tipo_actor as TipoActor));
     const esPescador = carnet.tipo_actor === 'pescador';
 
     const cupos: CupoVigente[] = carnet.cupos_elegibles;
@@ -97,28 +90,6 @@ export default function EditarCarnet({
                                 </p>
                             </div>
                         </div>
-
-                        <Campo
-                            etiqueta="Tipo de carnet"
-                            htmlFor="tipo_carnet_id"
-                            error={form.errors.tipo_carnet_id}
-                            ayuda="Solo los de la misma actividad: el código impreso lleva su prefijo."
-                            obligatorio
-                        >
-                            <Select
-                                id="tipo_carnet_id"
-                                value={form.data.tipo_carnet_id}
-                                onChange={(e) => form.setData('tipo_carnet_id', e.target.value)}
-                                aria-invalid={Boolean(form.errors.tipo_carnet_id)}
-                            >
-                                {tiposDelActor.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.nombre}
-                                        {t.precio !== null && ` — ${bs(t.precio, institucion.moneda)}`}
-                                    </option>
-                                ))}
-                            </Select>
-                        </Campo>
 
                         {esPescador && cupos.length > 0 && (
                             <Campo
@@ -297,20 +268,17 @@ export default function EditarCarnet({
                             por teléfono.
                         </p>
 
-                        {tipo && (
-                            <div>
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                    A cobrar
-                                </p>
-                                <p className="text-3xl font-semibold tabular-nums">
-                                    {tipo.precio !== null ? bs(tipo.precio, institucion.moneda) : '—'}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Cambiar el tipo cambia el arancel. Se puede porque todavía no
-                                    entró ningún depósito.
-                                </p>
-                            </div>
-                        )}
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                A cobrar
+                            </p>
+                            <p className="text-3xl font-semibold tabular-nums">
+                                {carnet.precio !== null ? bs(carnet.precio, institucion.moneda) : '—'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                El de hoy de su tarifa en SIREB. La tarifa no se cambia al corregir.
+                            </p>
+                        </div>
 
                         <Button type="submit" disabled={form.processing} className="w-full">
                             Guardar cambios

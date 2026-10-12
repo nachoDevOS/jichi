@@ -5,8 +5,8 @@ namespace App\Http\Requests\Panel;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Reglas para elegir la tarifa de SIREB de un arancel. El concepto no se edita:
- * lo fija el seeder.
+ * Reglas para elegir el servicio de SIREB de un arancel. El concepto no se
+ * edita: lo fija el seeder. La tarifa no se guarda: se elige al emitir.
  */
 class GuardarArancelSirebRequest extends FormRequest
 {
@@ -23,7 +23,6 @@ class GuardarArancelSirebRequest extends FormRequest
     {
         return [
             'servicio_sireb' => ['required', 'uuid'],
-            'tarifa_sireb' => ['required', 'uuid'],
         ];
     }
 
@@ -33,10 +32,8 @@ class GuardarArancelSirebRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'servicio_sireb.required' => 'Elija la tarifa de SIREB del arancel.',
+            'servicio_sireb.required' => 'Elija el servicio de SIREB.',
             'servicio_sireb.uuid' => 'El id del servicio no tiene el formato de SIREB.',
-            'tarifa_sireb.required' => 'Elija la tarifa de SIREB del arancel.',
-            'tarifa_sireb.uuid' => 'El id de la tarifa no tiene el formato de SIREB.',
         ];
     }
 
@@ -45,7 +42,6 @@ class GuardarArancelSirebRequest extends FormRequest
         // SIREB manda los ids en minúscula: así se comparan tal cual.
         $this->merge([
             'servicio_sireb' => mb_strtolower(trim((string) $this->input('servicio_sireb'))),
-            'tarifa_sireb' => mb_strtolower(trim((string) $this->input('tarifa_sireb'))),
         ]);
     }
 }

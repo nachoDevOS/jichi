@@ -11,7 +11,6 @@ use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EmitirFaenaRequest;
 use App\Http\Requests\Panel\MotivoRequest;
 use App\Models\AprovechamientoPesq;
-use App\Models\ArancelSireb;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
@@ -20,7 +19,7 @@ use App\Services\ConfirmarPagoService;
 use App\Services\EmitirFaenaService;
 use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
-use App\Sireb\VistaSireb;
+use App\Sireb\TarifarioSireb;
 use App\Support\Paginacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -88,7 +87,7 @@ class FaenaController extends Controller
      * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
      * buscador ya resuelto.
      */
-    public function create(Request $request): Response
+    public function create(Request $request, TarifarioSireb $tarifario): Response
     {
         // `?carnet=` llega desde la ficha del cupo: resuelve también a la persona.
         $carnetElegido = $request->integer('carnet')
@@ -114,9 +113,7 @@ class FaenaController extends Controller
                     ->vigentes()
                     ->with([
                         'codigo',
-                        'tipoCarnet:id,nombre',
                         'aprovechamiento' => fn ($a) => $a
-                            ->with('categoria')
                             ->withSum('faenasQueConsumen', 'kilos_extraidos')
                             ->withSum('faenasQueReservan', 'kilos_extraidos'),
                     ])
@@ -131,8 +128,10 @@ class FaenaController extends Controller
 
             'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
 
-            // De referencia: el que vale lo congela la emisión. null sin tarifa o sin SIREB.
-            'tarifa' => $this->tarifaDeReferencia(),
+            // Las tarifas del servicio de la faena en SIREB: null si no responde.
+            // El precio es de referencia: el que vale lo congela la emisión.
+            'tarifas' => $tarifario->tarifas(ConceptoArancel::Faena),
+            'servicioConfigurado' => $tarifario->servicioId(ConceptoArancel::Faena) !== null,
 
             // En modo FLEXIBLE el formulario no frena, así que tampoco puede decir
             // que va a frenar: el aviso pasa a «va a quedar por encima».
@@ -151,6 +150,7 @@ class FaenaController extends Controller
             $faena = $this->servicio->emitir(
                 Carnet::query()->findOrFail($datos['carnet_id']),
                 (float) $datos['kilos_extraidos'],
+                $datos['tarifa_sireb'],
                 // `validated()` devuelve SOLO lo que vino: un nullable que el
                 // formulario no mandó no existe en el arreglo.
                 $datos,
@@ -166,8 +166,8 @@ class FaenaController extends Controller
         return redirect()
             ->route('faenas.show', $faena)
             ->with('exito', sprintf(
-                'Faena N° %s registrada, PENDIENTE de pago. Cargue los depósitos —%s Bs— y envíela '.
-                'a revisión; autoriza la salida recién cuando la aprueben.',
+                'Faena N° %s registrada, PENDIENTE de pago (%s Bs). Al pagarse en Recaudaciones '.
+                'queda aprobada, y recién ahí autoriza la salida.',
                 $faena->numero_legible,
                 number_format($faena->montoACobrar(), 2, ',', '.'),
             ));
@@ -314,7 +314,7 @@ class FaenaController extends Controller
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'carnet.asociacion:id,nombre,sigla',
             // El cupo cuelga del CARNET: la faena ya no guarda su id.
-            'carnet.aprovechamiento.categoria',
+            'carnet.aprovechamiento',
         ]);
 
         // El recibo del trámite —uno solo— y cuántas boletas faltan controlar.
@@ -332,7 +332,7 @@ class FaenaController extends Controller
                  */
                 'cupo' => $faena->cupo() ? [
                     'id' => $faena->cupo()->id,
-                    'escala' => $faena->cupo()->categoria?->nro_escala,
+                    'descripcion' => $faena->cupo()->tramo,
                     'volumen_total_kg' => (float) $faena->cupo()->volumen_total_kg,
                     'saldo_kg' => $faena->cupo()->saldoKg(),
                     'porcentaje_usado' => $faena->cupo()->porcentajeUsado(),
@@ -355,7 +355,6 @@ class FaenaController extends Controller
 
     //  Auxiliares
 
-    /** El precio de hoy de la fila `faena` de Aranceles, o null sin tarifa o sin SIREB. */
     /**
      * Verificar pago — POST /panel/faenas/{faena}/verificar-pago
      *
@@ -397,13 +396,6 @@ class FaenaController extends Controller
     public function consultarQr(PermisoFaena $faena, ConfirmarPagoService $pagos): JsonResponse
     {
         return response()->json($pagos->puedePagarPorQr($faena, desdeElPanel: true));
-    }
-
-    private function tarifaDeReferencia(): ?float
-    {
-        $tarifa = ArancelSireb::de(ConceptoArancel::Faena)?->tarifa_sireb;
-
-        return $tarifa === null ? null : (app(VistaSireb::class)->preciosPorTarifa()[$tarifa] ?? null);
     }
 
     /**

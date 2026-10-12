@@ -191,28 +191,12 @@ export default function VerCupo({
                 <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Volumen</CardTitle>
-                        {/* El TRAMO sin su número: el rango en kilos es lo que dice cuánto se autorizó. */}
-                        <p className="text-sm text-muted-foreground">Capacidad: {cupo.descripcion ?? '—'}</p>
+                                        <p className="text-sm text-muted-foreground">Capacidad: {cupo.descripcion ?? '—'}</p>
                     </CardHeader>
 
                     <CardContent className="space-y-5">
                         {/* Antes de la firma dice «kg solicitados» y no dibuja saldo. */}
                         <BarraSaldo cupo={cupo} />
-
-                        {/*
-                            EL RÉGIMEN VA JUNTO AL VOLUMEN porque explica de dónde
-                            salió el monto: de la progresión por kilos, o de una
-                            tasación fija que la resolución puso para esa especie.
-                        */}
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge color={cupo.modalidad_color}>{cupo.modalidad_etiqueta}</Badge>
-
-                            <span className="text-sm text-muted-foreground">
-                                {cupo.modalidad === 'especie_especial'
-                                    ? 'Cuota específica de la especie, con tasación fija por resolución.'
-                                    : 'Tramo de la escala progresiva: a más kilos, más valor.'}
-                            </span>
-                        </div>
 
                         {/*
                             EL DESGLOSE APARECE CUANDO HAY ALGO QUE DESGLOSAR.

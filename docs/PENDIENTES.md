@@ -6,18 +6,38 @@
 
 ---
 
-## 🔴 Ibare rechaza la credencial de Jichi para SIREB — 09/10/2026
+## 🔴 Hay que volver a migrar: escala, tipos de carnet y productos ya no son tablas — 12/10/2026
 
-`POST /oauth/token` de `test.ibare.beni.gob.bo` contesta **401 `invalid_client`
-(«Client authentication failed»)** con el `client_id` `sedag` del `.env` de
-desarrollo. Sin token no se habla con SIREB: no se otorga, no se liquida y no se
-verifica ningún pago. Lo destapó el log nuevo (`storage/logs/sireb-*.log`).
-Revisar `SIREB_CLIENT_SECRET` con quien administra Ibare.
+Se quitaron `categorias_aprovechamiento`, `tipos_carnet` y
+`productos_hidrobiologicos`. `aprovechamientos_pesq` perdió `categoria_aprov_id`
+y `modalidad` y ganó `tramo`; `carnets` perdió `tipo_carnet_id`; `guia_detalles`
+perdió `producto_id` (el producto es `sireb_tarifa_id`). Hasta rearmar la base,
+las pantallas responden `column "tramo" does not exist`. Hay que correr también
+`php artisan db:seed --class=RolPermisoSeeder`: salió el permiso `catalogos.crear`.
+Las filas de Aranceles (escala, carnet, faena, guía), **solo con su servicio**,
+las trae el seeder; `aranceles_sireb` perdió `tarifa_sireb`.
+Verificado sobre SQLite descartable (mismos 60 índices).
+
+**Un carnet pendiente no frena a otro de la misma actividad.** «Un carnet vigente
+por actividad» cuenta solo los `vigentes()`: se pueden registrar dos pendientes
+para la misma persona. Ya pasaba antes del 12/10/2026; decidir si el pendiente
+ocupa el lugar, como en la autorización (`enCurso()`).
+
+**Los kilos de la autorización los escribe ventanilla** (12/10/2026). Nada controla
+que coincidan con el tramo elegido: si la unidad lo quiere, es una regla a definir.
+
+## ✅ Ibare ya entrega el token a Jichi — 12/10/2026
+
+El 09/10/2026 `POST /oauth/token` contestaba **401 `invalid_client`**. El
+12/10/2026 el secreto del `.env` es el mismo que funciona en Postman, y Jichi
+saca el token y lee el catálogo (4 servicios: Aranceles, Autorización, Carnet,
+Productos Guia). Si el 401 vuelve a salir desde el panel con el `.env` correcto,
+mirar la trampa de `php artisan serve`, que congela el `.env` (CLAUDE.md).
 
 ## ✅ Precios de SIREB conectados — 30/09/2026
 
 La autorización, el carnet, la faena y la guía piden el precio a SIREB al
-emitirse (`PrecioSireb`) y lo congelan. La escala es un servicio con una tarifa
+emitirse (`TarifarioSireb::precio()`) y lo congelan. La escala es un servicio con una tarifa
 por tramo, y `CatalogoSeeder` siembra las tarifas de los cuatro catálogos. Lo
 que sigue abierto está en [modulos/SIREB.md](modulos/SIREB.md#lo-que-falta).
 
@@ -87,9 +107,9 @@ sale en el aviso rojo de arriba.
 
 ## ✅ El precio al emitir: endpoint definitivo de SIREB — 02/10/2026
 
-`PrecioSireb::de()` pide la tarifa con `SirebService::tarifa($servicio, $tarifa)`
-(`GET /api/v1/catalogo/servicios/{s}/tarifas/{t}`, sin caché) y exige tarifa y
-servicio `activo`; la autorización exige además `liquidable`. Flujo completo en
+`TarifarioSireb::precio()` pide la tarifa con `SirebService::tarifa($servicio, $tarifa)`
+(`GET /api/v1/catalogo/servicios/{s}/tarifas/{t}`, sin caché) y exige solo la
+tarifa `activo` (12/10/2026). Flujo completo en
 [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir).
 Probado contra `test.sireb` y el tramo real; **falta probar desde las pantallas
 los cuatro documentos**, incluido el caso de una tarifa dada de baja.
@@ -98,8 +118,9 @@ los cuatro documentos**, incluido el caso de una tarifa dada de baja.
 
 Antes era una por servicio. Con SIREB de prueba cada llamada tardó ~3 s, así que
 una guía con cinco productos de tarifas distintas puede tardar ~15 s en
-registrarse. Medirlo en la pantalla; si molesta, la guía puede volver a pedir el
-servicio entero (`servicio($id)`, que trae todas sus tarifas con su `estado`).
+registrarse. Medirlo en la pantalla; si molesta, se puede volver a agregar a
+`SirebService` el pedido del servicio entero (`GET /catalogo/servicios/{id}`, se
+quitó el 12/10/2026 por no usarse), que trae todas sus tarifas de una vez.
 
 ## 🟠 Portal del beneficiario: lo que quedó afuera a propósito — 28/09/2026
 
@@ -160,13 +181,14 @@ se reescribieron las de los estados. Puede quedar alguna palabra del modelo
 anterior (trámite, rubro) dentro de una nota que vale en lo demás. Ante una
 contradicción, mandan REGLAS-NEGOCIO.md y MER.md.
 
-## 🟠 No hay pruebas automáticas
+## ✅ Volvieron las pruebas automáticas — 12/10/2026
 
-Se retiraron el 27/09/2026 a pedido del responsable (204 de PHP y 13 de React;
-están en el commit `7dc0ac6`). Todo cambio se verifica a mano en el navegador.
-Si se retoman, lo que más daño evita es, en este orden: la liquidación en
-SIREB y la aprobación por pago (con `Http::fake`), la reserva de kilos de la faena y que todo archivo pase por
-`StorageController`.
+92 pruebas (`php artisan test`), con SIREB e Ibare simulados: la escala, los
+cuatro trámites, el pago y la renovación en SIREB, las pantallas del panel y la
+portada. **Lo que todavía no cubren:** revocar y eliminar, la impresión de PDF,
+el portal del beneficiario, la verificación pública, Seguridad (usuarios, roles)
+y la pantalla en el navegador (React). Las 204 viejas eran del modelo anterior y
+no se recuperaron (commit `7dc0ac6`).
 
 ## 🟠 El recibo no se puede anular
 
@@ -187,8 +209,9 @@ a carnets y faenas, ver REGLAS-NEGOCIO, Regla 5). La especificación está en
 
 Quedan dos observaciones que **no bloquean** el trabajo de ventanilla:
 
-- **Paiche:** la especie especial se comporta igual que la escala general. Si la
-  unidad quiere otra dinámica, es un cambio en `ModalidadAprovechamiento`.
+- **Paiche:** es un tramo más de la escala de SIREB. La modalidad
+  (`especie_especial`) se quitó el 12/10/2026 porque no cambiaba nada; si la
+  unidad quiere otra dinámica, hay que volver a modelarla.
 - **Reposición de carnet:** precio, adjuntos y vínculo entre carnets quedaron
   con decisiones por defecto; ver [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md).
 
@@ -198,12 +221,11 @@ Quedan dos observaciones que **no bloquean** el trabajo de ventanilla:
 
 Revisado de punta a punta el 27/09/2026.
 
-### ✅ La escala ya es la del reglamento — 28/09/2026
+### ✅ La escala es la de SIREB — 12/10/2026
 
-`CatalogoSeeder` siembra los 7 tramos del Art. 20 del Reglamento de Pesca del
-SEDAG-BENI (25/11/2016), con el paiche a 500 Bs. Se aplica **al volver a
-migrar** con `--seed`: sobre la base de trabajo actual el seeder no pisa nada,
-porque usa `firstOrCreate`.
+Los 7 tramos del Art. 20 del Reglamento son las tarifas del servicio
+«Autorización de Pesca» en SIREB. `CatalogoSeeder` solo siembra el id del
+servicio en la fila `autorizacion` de `aranceles_sireb`.
 
 ### 🟠 Piscicultura: la casilla está OCULTA — 28/09/2026
 
@@ -218,36 +240,32 @@ importe es la mitad.
 
 ### 🟠 Falta el reporte por especie y por período
 
-Es para lo que `guia_detalles` es una tabla aparte. Desde el 27/09/2026 la
-especie sale del catálogo `productos_hidrobiologicos` (`producto_id`), así que
-el reporte ya puede agrupar sin pelear con «Surubí» / «surubi» / «SURUBI».
+Es para lo que `guia_detalles` es una tabla aparte. La especie es una tarifa de
+SIREB (`sireb_tarifa_id`, con índice), así que el reporte puede agrupar por ella
+sin pelear con «Surubí» / «surubi» / «SURUBI».
 
 ### 🟠 Los precios por kilo de los productos son de PLANTILLA
 
 Desde el 27/09/2026 la guía cobra el total de su cuadro D, así que el precio de
-cada producto es plata. El catálogo se sembró con los 13 nombres del talonario y
-precios de ejemplo entre 0,20 y 0,50 Bs/kg; hay que confirmarlos contra la
-resolución en Catálogos → Productos.
+cada producto es plata. Desde el 12/10/2026 los productos y sus precios son las
+tarifas del servicio de la guía en SIREB: se confirman allá, con Recaudaciones.
 
 ### 🟠 Los catálogos están sembrados con valores de PLANTILLA (afecta a los dos módulos)
 
-`CatalogoSeeder` llena `asociaciones` (4) y `tipos_carnet` (2) con valores de
-ejemplo, para que el circuito se pueda recorrer en desarrollo. La escala
-(`categorias_aprovechamiento`) ya es la oficial: ver arriba.
+`CatalogoSeeder` llena `asociaciones` (4) con valores de ejemplo, para que el
+circuito se pueda recorrer en desarrollo. Los precios (escala, carnets, faena y
+productos) viven en SIREB; el seeder solo pone los ids en `aranceles_sireb`.
 
 Qué se supuso, para que se sepa qué hay que confirmar:
 
-- Los NOMBRES de los dos tipos de carnet sí son los oficiales; sus precios no.
 - Las asociaciones son nombres verosímiles, no el registro real del SEDAG.
+- Los ids de servicio de `aranceles_sireb` son los de test.sireb.
 
 Dos cosas al reemplazarlos:
 
 1. El seeder usa `firstOrCreate` a propósito —para no pisar lo que la unidad
    ajuste desde el panel—, así que volver a correrlo **no** actualiza los
    valores. Hay que editarlos en la base o vaciar las tablas primero.
-2. Los tramos de la escala tienen que quedar **contiguos y sin huecos**: el
-   `kilos_min` de cada uno es el `kilos_max` del anterior más 1. Con un hueco,
-   los volúmenes que caen adentro no encuentran escala.
 
 Mientras sigan siendo plantilla, `CatalogoSeeder` corre **solo fuera de
 producción**. En cuanto sean los de la resolución, sube al bloque de siempre de

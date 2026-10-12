@@ -40,8 +40,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `EstadoGuia.php` | 101 | `pendiente`, `aprobado` (`Aprobada`), `revocado` (`Revocada`) | Los casos van en femenino; los valores, iguales a los otros tres |
 | `EstadoLiquidacionSireb.php` | 36 | `por_enviar`, `registrada`, `anulada` | Dónde está la liquidación respecto de SIREB, no si se pagó: eso se pregunta |
 | `TipoActor.php` | 60 | `pescador`, `comercializador` | **Qué emite cada carnet**: `emiteFaenas()`, `emiteGuias()`, `requiereAprovechamiento()`. Nunca por el nombre del tipo de carnet |
-| `ModalidadAprovechamiento.php` | 62 | `escala_general`, `especie_especial` | Se copia al otorgar: reclasificar el tramo no cambia lo otorgado |
-| `ConceptoArancel.php` | 28 | `faena` | Cobros sin catálogo: una fila de `aranceles_sireb` por caso |
+| `ConceptoArancel.php` | 38 | `autorizacion`, `carnet`, `faena`, `guia` | Una fila de `aranceles_sireb` por caso, con **solo el servicio**: la tarifa se elige al emitir |
 | `ConceptoRecibo.php` | 50 | Las seis casillas del recibo | `desdeDocumento()` elige la casilla por el tipo de documento pagado |
 | `CondicionProducto.php` | 75 | Las diez columnas del cuadro D | Un solo enum: el talonario no cruza estado × presentación |
 | `MedioTransporte.php` / `TipoTransporte.php` | 33 / 37 | Por dónde / en qué viaja la guía | Separados porque el papel los pregunta por separado |
@@ -52,14 +51,14 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 
 | Archivo | Ln | Qué hace | No obvio |
 | --- | --- | --- | --- |
-| `OtorgarCupoService.php` | 231 | Otorgar, corregir y eliminar la autorización | Una autorización en curso por persona (`enCurso()`). El precio sale de SIREB (`verificarPrecio()`). **Corregir cambia solo la embarcación**: el tramo no se toca nunca. El N° (`nro`) es correlativo continuo |
-| `EmitirCarnetService.php` | 383 | Emitir, corregir, eliminar, revocar y reponer el carnet | Un carnet vigente por actividad. Pescador exige autorización; comercializador la prohíbe. Adjuntos SUBIDOS antes de la transacción |
+| `OtorgarCupoService.php` | 231 | Otorgar, corregir y eliminar la autorización | Una autorización en curso por persona (`enCurso()`). Recibe la tarifa de SIREB elegida: `verificarTramo()` saca de ella precio, etiqueta y kilos. **Corregir cambia solo la embarcación**: el tramo no se toca nunca. El N° (`nro`) es correlativo continuo |
+| `EmitirCarnetService.php` | 383 | Emitir, corregir, eliminar, revocar y reponer el carnet | Un carnet vigente por actividad. Pescador exige autorización; comercializador la prohíbe. El precio es la tarifa del servicio «Carnet» elegida (`precioDe($tarifaId)`); al corregir, la suya. Adjuntos SUBIDOS antes de la transacción |
 | `EmitirFaenaService.php` | 295 | Emitir, corregir y eliminar la faena | Reserva kilos al registrarse; en modo estricto no deja pasar lo libre. Ver `PermisoFaena::cupo` |
-| `EmitirGuiaService.php` | 356 | Emitir, corregir, eliminar y revocar la guía | Cabecera y detalle en la misma transacción. `eliminar()` baja el detalle a mano: CASCADE no corre con baja lógica |
+| `EmitirGuiaService.php` | 356 | Emitir, corregir, eliminar y revocar la guía | Cabecera y detalle en la misma transacción. Cada renglón es una tarifa de SIREB (fila `guia`): copia etiqueta y precio. `eliminar()` baja el detalle a mano: CASCADE no corre con baja lógica |
 | `Revisar*Service.php` (Cupo, Carnet, Faena, Guia) | 41–76 | `aprobar()` de cada documento | **Los llama solo `ConfirmarPagoService`.** Conservan las reglas propias (autorización revocada, kilos libres, fechas, número de registro). `RevisarCupoService` además revoca |
 | `LiquidarSirebService.php` | 145 | La liquidación de un documento en SIREB | Dos tiempos: `preparar()` guarda la `Idempotency-Key` DENTRO de la transacción, `enviar()` llama DESPUÉS. `anular()` **consulta antes**: con pago cargado o validado frena (`SirebException::pagoEnRevision()` / `liquidacionPagada()`); vencida sin pago no pide anular |
 | `ConfirmarPagoService.php` | 206 | Pregunta a SIREB y actúa | `pagada` + pago `confirmado` → aprueba y emite el recibo (y marca la liquidación `pagada` en el historial); `vencida` → solo avisa, el trámite sigue pendiente. Guarda en `sireb_envio.consulta` lo que dijo SIREB. Guarda el pago informado en `sireb_envio.pago` (solo si cambió: el comando corre cada 10 min y audita). `alNoPoderEliminar()`: al eliminar algo con pago, verifica y arma el aviso |
-| `RenovarLiquidacionService.php` | 180 | «Generar nueva liquidación» (08/10/2026) | Solo con la vencida sin pago. **Relee la tarifa del catálogo**, no la del trámite. Escribe con la fila bloqueada y envía después del commit. No cambia el estado |
+| `RenovarLiquidacionService.php` | 180 | «Generar nueva liquidación» (08/10/2026) | Solo con la vencida sin pago. Pide el precio de HOY de **la misma tarifa** del trámite (la guía, renglón por renglón). Escribe con la fila bloqueada y envía después del commit. No cambia el estado |
 | `CargarPagoService.php` | 77 | Carga en SIREB el pago de un trámite | **Solo carga.** Antes consulta: liquidación `pendiente` y sin pago, o no carga y corre `verificar()` para poner la ficha al día |
 | `CorrelativoService.php` | 78 | Números correlativos con la fila bloqueada | `siguienteContinuo()` (año 0, no reinicia) para lo impreso: recibo, autorización, faena, guía. `siguienteNumero()` por gestión: el registro del carnet. `rellenar()` → seis dígitos |
 | `CodigoService.php` | 88 | El código de verificación de 16 caracteres | `asignar()` es idempotente: un reenvío no gasta otro código |
@@ -70,10 +69,9 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `SirebService.php` | 277 | Token de Ibare (client_credentials) en caché. `servicios()` en caché `SIREB_CACHE_MINUTOS`; `tarifa()` sin caché. Liquidaciones: `registrarLiquidacion()`, `liquidacion()`, `registrarPagoManual()`, `anularLiquidacion()`. Las escrituras reintentan ante red o 5xx, nunca ante 4xx. `registrar()` anota cada pedido y el token en `storage/logs/sireb-*.log`, secretos tapados |
+| `SirebService.php` | 277 | Token de Ibare (client_credentials) en caché. `servicios()` en caché `SIREB_CACHE_MINUTOS` (2 min; «Actualizar desde SIREB» la borra); `tarifa()` sin caché. Liquidaciones: `registrarLiquidacion()`, `liquidacion()`, `registrarPagoManual()`, `anularLiquidacion()`. Las escrituras reintentan ante red o 5xx, nunca ante 4xx. `registrar()` anota cada pedido y el token en `storage/logs/sireb-*.log`, secretos tapados |
 | `RegistroSireb.php` | 140 | Lee los `sireb-*.log` para la pantalla Registro SIREB. El día se valida con patrón: no sale de `storage/logs` |
-| `PrecioSireb.php` | 60 | El precio al emitir, para congelarlo. Tarifa y servicio `activo` o no se emite (`liquidable` para la autorización) |
-| `VistaSireb.php` | 162 | Lo que las pantallas de catálogo necesitan ya armado: select, precios, historial. Abre con SIREB caído |
+| `TarifarioSireb.php` | 210 | **Todo lo de tarifas en un archivo** (12/10/2026; absorbió `PrecioSireb` y `VistaSireb`): `servicioId()` y `tarifas()` del trámite, `precio()` sin caché al emitir (solo la tarifa `activo`; de cada tarifa usa etiqueta, precio y si está activa), y `servicios()` / `historial()` para Aranceles |
 | `SirebException.php` | 75 | Códigos propios de Jichi `LIQUIDACION_PAGADA` y `PAGO_EN_REVISION` (`frenaPorPago()`). `paraVentanilla()` es lo que muestra el manejador de `bootstrap/app.php` |
 | `SinPrecioException.php` | 15 | SIREB no dio un precio cobrable |
 
@@ -90,9 +88,9 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Beneficiario.php` | 273 | **camelCase** de `primerNombre` en adelante: en SQL a mano va entrecomillado (`SQL_NOMBRE`). `documento_identidad` lee `ci`, `complemento` y `departamento_id`: los tres van en el select |
 | `Recibo.php` | 65 | Copia congelada: monto, concepto, N° de transacción, banco y fecha de pago de SIREB. `recibible` es polimórfica: se precarga con `morphWith` |
 | `Codigo.php` | 31 | El código de verificación de los cinco documentos, en una tabla aparte. Ver trait `Codificable` |
-| `CategoriaAprovechamiento.php`, `TipoCarnet.php`, `ProductoHidrobiologico.php`, `ArancelSireb.php` | 39–90 | Catálogos con `servicio_sireb` + `tarifa_sireb` (uuid). El precio lo da SIREB |
+| `ArancelSireb.php` | 39 | El único catálogo de precios: una fila por `ConceptoArancel`, con **solo** `servicio_sireb` (uuid). Se busca con `de($concepto)` |
 | `Asociacion.php`, `Departamento.php` | 150 / 83 | Departamento es catálogo cerrado, sembrado en su migración |
-| `User.php` | 75 | Con `beneficiario_id` = cuenta del portal, nunca entra al panel. `scopeFuncionarios()` para el módulo Usuarios |
+| `User.php` | 75 | Con `beneficiario_id` = cuenta del portal, nunca entra al panel |
 | `Auditoria.php`, `Acceso.php`, `Configuracion.php`, `Correlativo.php` | 18–63 | Soporte |
 
 ## `app/Traits/`
@@ -118,7 +116,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Panel/DashboardController.php` | 202 | El tablero |
 | `Panel/UsuarioController.php` | 125 | Seguridad › Usuarios: todas las cuentas, funcionarios y beneficiarios. Solo lista; las acciones del beneficiario siguen en `CuentaPortalController` (la ficha) |
 | `Panel/RolController.php` | 175 | Seguridad › Roles: lista y CRUD de roles. Lee la base (lo que hace cumplir el middleware); los módulos, nombres y secciones salen de `RolSistema::CATALOGO`. Las reglas, en `GestionarRolService` |
-| Catálogos: `Asociacion`, `CategoriaAprovechamiento`, `TipoCarnet`, `ProductoHidrobiologico`, `ArancelSireb` | 85–198 | Eligen la tarifa de SIREB con `VistaSireb` |
+| Catálogos: `Asociacion`, `ArancelSireb` | 85–198 | Aranceles elige el servicio de SIREB de cada trámite con `TarifarioSireb` |
 | `Panel/CuentaPortalController.php` | 68 | La clave temporal vuelve por flash una sola vez |
 | `Portal/*` | 25–80 | Solo lectura; nada recibe un id: todo sale de la cuenta con sesión. `VistaPreviaController` dibuja «NO VÁLIDO» sobre lo abierto |
 | `Publico/VerificacionController.php` | 335 | La única pantalla sin sesión. `datosPublicos()` decide qué se muestra: nada de datos personales completos |
@@ -210,5 +208,6 @@ ni `object-fit`. Las trampas están en `CLAUDE.md`.
 
 `rubros`, `tramites`, `faenas` (la tabla vieja), `guias`, tabla `pagos`, Caja,
 `en_revision`, firma de supervisión, depósitos cargados en Jichi, el estado
-`vencido`, `maatwebsite/excel`, `simple-qrcode` y las pruebas automáticas. Todo
+`vencido`, `maatwebsite/excel`, `simple-qrcode`, `tipos_carnet`, `productos_hidrobiologicos`
+y `categorias_aprovechamiento`. Todo
 está en el historial de git.

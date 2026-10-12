@@ -4,10 +4,10 @@ import { HistorialSireb } from '@/components/panel/catalogos/historial-sireb';
 import { buttonVariants } from '@/components/ui/button';
 import LayoutPanel from '@/layouts/layout-panel';
 import { cn } from '@/lib/utils';
-import type { TarifaAnterior, TarifaHistorial } from '@/types/catalogos';
+import type { ServicioAnterior, ServicioHistorial } from '@/types/catalogos';
 
 /**
- *  Qué servicio y tarifa de SIREB tuvo un arancel, la actual arriba
+ *  Qué servicio de SIREB tuvo un arancel, el actual arriba
  */
 export default function ArancelesHistorial({
     arancel,
@@ -16,8 +16,8 @@ export default function ArancelesHistorial({
     sirebDisponible,
 }: {
     arancel: { etiqueta: string };
-    actual: TarifaHistorial;
-    anteriores: TarifaAnterior[];
+    actual: ServicioHistorial;
+    anteriores: ServicioAnterior[];
     sirebDisponible: boolean;
 }) {
     return (

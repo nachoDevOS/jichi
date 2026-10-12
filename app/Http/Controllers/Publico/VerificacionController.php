@@ -286,7 +286,6 @@ class VerificacionController extends Controller
 
             $documento instanceof AprovechamientoPesq => array_values(array_filter([
                 $this->renglon('Volumen autorizado', $documento->volumen_total_kg.' kg'),
-                $this->renglon('Modalidad', $documento->modalidad?->etiqueta()),
             ])),
 
             $documento instanceof PermisoFaena => array_values(array_filter([

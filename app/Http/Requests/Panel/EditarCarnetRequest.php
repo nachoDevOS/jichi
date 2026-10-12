@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Panel;
 
 use App\Enums\TipoActor;
-use App\Models\TipoCarnet;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -37,17 +36,11 @@ class EditarCarnetRequest extends FormRequest
                     ->whereNull('deleted_at'),
             ],
 
-            // El TIPO decide la actividad: cada uno declara su `tipo_actor`.
-            'tipo_carnet_id' => [
-                'required', 'integer',
-                Rule::exists('tipos_carnet', 'id')->where('estado', true),
-            ],
-
             // Opcional: sin ella el servicio toma el cupo vigente de la persona.
             // En un comercializador está PROHIBIDA: no extrae, no lleva cupo.
             'aprovechamiento_id' => [
                 'nullable', 'integer',
-                Rule::prohibitedIf(fn (): bool => $this->tipoElegido()?->tipo_actor === TipoActor::Comercializador),
+                Rule::prohibitedIf(fn (): bool => $this->route('carnet')?->tipo_actor === TipoActor::Comercializador),
                 Rule::exists('aprovechamientos_pesq', 'id')->whereNull('deleted_at'),
             ],
 
@@ -70,8 +63,6 @@ class EditarCarnetRequest extends FormRequest
         return [
             'asociacion_id.required' => 'Elija la asociación que la certifica.',
             'asociacion_id.exists' => 'Esa asociación no existe o está inactiva.',
-            'tipo_carnet_id.required' => 'Elija el tipo de carnet.',
-            'tipo_carnet_id.exists' => 'Ese tipo de carnet no existe o está fuera de uso.',
             'aprovechamiento_id.prohibited' => 'Un carnet de comercializador no lleva cupo de pesca.',
             'aprovechamiento_id.exists' => 'Ese aprovechamiento no existe o fue dado de baja.',
             'fecha_solicitud.required' => 'Indique la fecha de la solicitud.',
@@ -82,12 +73,6 @@ class EditarCarnetRequest extends FormRequest
                 '(JPG, PNG, WEBP) o un PDF.',
             'archivo_asociacion.max' => 'El documento de la asociación no puede pasar de 3 MB.',
         ];
-    }
-
-    /** El tipo que se eligió, o null si no vino o no existe. */
-    private function tipoElegido(): ?TipoCarnet
-    {
-        return TipoCarnet::query()->find($this->input('tipo_carnet_id'));
     }
 
     protected function prepareForValidation(): void

@@ -81,7 +81,7 @@ class SirebService
 
     /**
      * Todos los servicios del SEDAG con sus tarifas, juntando las páginas.
-     * En caché 10 minutos: un precio recién cambiado en SIREB tarda eso en llegar.
+     * En caché `SIREB_CACHE_MINUTOS` (2): solo para mostrar; lo que se cobra va sin caché.
      */
     public function servicios(bool $refrescar = false): array
     {
@@ -114,15 +114,6 @@ class SirebService
         } catch (SirebException) {
             return null;
         }
-    }
-
-    /**
-     * Un servicio con sus tarifas, pedido directo a SIREB y sin caché: el precio
-     * que devuelve es el de ahora. Null si SIREB no tiene ese id.
-     */
-    public function servicio(string $servicioId): ?array
-    {
-        return $this->get(self::RUTA_SERVICIOS.'/'.$this->id($servicioId))['data'] ?? null;
     }
 
     /**

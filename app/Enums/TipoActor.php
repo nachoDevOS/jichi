@@ -18,6 +18,15 @@ enum TipoActor: string
         };
     }
 
+    /** El nombre oficial de su credencial, como va en el plástico y en los listados. */
+    public function nombreCarnet(): string
+    {
+        return match ($this) {
+            self::Pescador => 'Carnet de Pescador',
+            self::Comercializador => 'Carnet Comercializador',
+        };
+    }
+
     public function color(): string
     {
         return match ($this) {

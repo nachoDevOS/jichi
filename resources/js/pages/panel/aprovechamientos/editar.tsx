@@ -25,7 +25,6 @@ export default function EditarCupo({
         foto_url: string | null;
         tramo: string | null;
         volumen_total_kg: number;
-        modalidad_etiqueta: string | null;
         /** Lo que se congeló de SIREB al otorgar. */
         monto: number;
         tipo_embarcacion: string | null;
@@ -102,7 +101,6 @@ export default function EditarCupo({
                     <CardContent className="space-y-4 text-sm">
                         <Fijo etiqueta="Tramo de la escala" valor={cupo.tramo ?? '—'} />
                         <Fijo etiqueta="Volumen autorizado" valor={`${cupo.volumen_total_kg} kg`} />
-                        <Fijo etiqueta="Régimen" valor={cupo.modalidad_etiqueta ?? '—'} />
                         <Fijo etiqueta="Monto" valor={bs(cupo.monto, institucion.moneda)} />
                         <Fijo etiqueta="Solicitado el" valor={cupo.fecha_solicitud ? fecha(cupo.fecha_solicitud) : '—'} />
                         <Fijo etiqueta="Vence el" valor={cupo.fecha_vencimiento ? fecha(cupo.fecha_vencimiento) : '—'} />

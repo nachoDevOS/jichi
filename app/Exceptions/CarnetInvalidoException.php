@@ -29,9 +29,9 @@ class CarnetInvalidoException extends RuntimeException
     /**
      * Sin precio de SIREB no se emite: ninguna tarifa se escribe a mano.
      */
-    public static function sinPrecio(string $tipo, string $motivo): self
+    public static function sinPrecio(string $motivo): self
     {
-        return new self("No se puede emitir un «{$tipo}»: {$motivo}");
+        return new self("No se puede emitir el carnet: {$motivo}");
     }
 
     /**
@@ -43,20 +43,6 @@ class CarnetInvalidoException extends RuntimeException
             "{$persona} no tiene un cupo de pesca vigente. El carnet de pescador imprime el volumen ".
             'autorizado, así que hay que otorgarle el aprovechamiento antes de emitirlo.',
         );
-    }
-
-    /**
-     * El tipo elegido es de la otra actividad.
-     */
-    public static function tipoNoCorresponde(string $tipo, TipoActor $delTipo, TipoActor $delCarnet): self
-    {
-        return new self(sprintf(
-            'El tipo «%s» es de %s y el carnet se está emitiendo como %s. Elija un tipo de %s.',
-            $tipo,
-            mb_strtolower($delTipo->etiqueta()),
-            mb_strtolower($delCarnet->etiqueta()),
-            mb_strtolower($delCarnet->etiqueta()),
-        ));
     }
 
     /**

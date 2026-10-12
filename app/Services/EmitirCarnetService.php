@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ConceptoArancel;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Exceptions\CarnetInvalidoException;
@@ -9,9 +10,8 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
-use App\Models\TipoCarnet;
-use App\Sireb\PrecioSireb;
 use App\Sireb\SinPrecioException;
+use App\Sireb\TarifarioSireb;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
 class EmitirCarnetService
 {
     public function __construct(
-        private readonly PrecioSireb $precios,
+        private readonly TarifarioSireb $tarifario,
         private readonly LiquidarSirebService $liquidaciones,
     ) {}
 
@@ -31,8 +31,9 @@ class EmitirCarnetService
     public function emitir(
         Beneficiario $beneficiario,
         Asociacion $asociacion,
-        TipoCarnet $tipo,
         TipoActor $actor,
+        // La tarifa del servicio «Carnet» de SIREB que eligió ventanilla.
+        string $tarifaId,
         ?Carbon $emision = null,
         ?AprovechamientoPesq $cupoElegido = null,
         // Llegan como RUTA, ya escritos ANTES de la transacción: un rollback
@@ -42,21 +43,14 @@ class EmitirCarnetService
     ): Carnet {
         $emision ??= now();
         // Fuera de la transacción: una llamada a SIREB no debe tener filas bloqueadas.
-        $precio = $this->precioDe($tipo);
+        $precio = $this->precioDe($tarifaId);
 
-        $carnet = DB::transaction(function () use ($beneficiario, $asociacion, $tipo, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
+        $carnet = DB::transaction(function () use ($beneficiario, $asociacion, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
             // Releer con lockForUpdate() devuelve OTRA instancia: acá solo sirve
             // para tomar el candado, no se escribe sobre ella.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
 
-            $this->comprobarCatalogos($asociacion, $tipo);
-
-            // Contra `tipos_carnet.tipo_actor` y NUNCA contra el nombre, que la
-            // unidad edita: así se emitía un «Carnet Comercializador» marcado
-            // como pescador.
-            if ($tipo->tipo_actor !== $actor) {
-                throw CarnetInvalidoException::tipoNoCorresponde($tipo->nombre, $tipo->tipo_actor, $actor);
-            }
+            $this->comprobarAsociacion($asociacion);
 
             // Va ANTES del control de duplicados: es un error de forma de la
             // petición, y decirlo primero evita mandar al operador a revocar un
@@ -77,8 +71,7 @@ class EmitirCarnetService
                 );
             }
 
-            // Quién lleva cupo lo dice el ENUM, nunca el nombre del tipo: el
-            // mismo documento figura como «Carnet de Pescador» o «Pescador Artesanal».
+            // Quién lleva cupo lo dice el ENUM.
             $cupo = null;
 
             if ($actor->requiereAprovechamiento()) {
@@ -97,7 +90,6 @@ class EmitirCarnetService
             $carnet = Carnet::create([
                 'beneficiario_id' => $beneficiario->id,
                 'asociacion_id' => $asociacion->id,
-                'tipo_carnet_id' => $tipo->id,
                 // NULL en un comercializador, y es la regla: la comercialización
                 // no se autoriza por volumen.
                 'aprovechamiento_id' => $cupo?->id,
@@ -142,7 +134,6 @@ class EmitirCarnetService
     public function editar(
         Carnet $carnet,
         Asociacion $asociacion,
-        TipoCarnet $tipo,
         Carbon $emision,
         ?AprovechamientoPesq $cupoElegido = null,
         ?string $archivoCi = null,
@@ -153,14 +144,15 @@ class EmitirCarnetService
         }
 
         // Corregir el borrador vuelve a pedir el precio; si cambia, la liquidación vieja se anula antes.
-        $precio = $this->precioDe($tipo);
+        // Con SU tarifa: la actividad no cambia al corregir, y la tarifa tampoco.
+        $precio = $this->precioDe((string) $carnet->sireb_tarifa_id);
         $otraLiquidacion = $this->liquidaciones->anularSiCambia(
             $carnet,
             [['tarifa_id' => $precio['tarifa_id'], 'cantidad' => 1]],
             $precio['monto'],
         );
 
-        $carnet = DB::transaction(function () use ($carnet, $asociacion, $tipo, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio, $otraLiquidacion): Carnet {
+        $carnet = DB::transaction(function () use ($carnet, $asociacion, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio, $otraLiquidacion): Carnet {
             $bloqueado = Carnet::query()->whereKey($carnet->id)->lockForUpdate()->firstOrFail();
 
             // Con la copia BLOQUEADA: entre abrir el formulario y guardar, el pago pudo aprobarlo.
@@ -168,17 +160,7 @@ class EmitirCarnetService
                 throw CarnetInvalidoException::noSePuedeEditar($bloqueado->estado->etiqueta());
             }
 
-            $this->comprobarCatalogos($asociacion, $tipo);
-
-            // El tipo tiene que seguir siendo de la MISMA actividad: el código
-            // impreso lleva su prefijo, y cambiarla lo dejaría mintiendo.
-            if ($tipo->tipo_actor !== $bloqueado->tipo_actor) {
-                throw CarnetInvalidoException::tipoNoCorresponde(
-                    $tipo->nombre,
-                    $tipo->tipo_actor,
-                    $bloqueado->tipo_actor,
-                );
-            }
+            $this->comprobarAsociacion($asociacion);
 
             $cupo = null;
 
@@ -198,7 +180,6 @@ class EmitirCarnetService
 
             $bloqueado->update([
                 'asociacion_id' => $asociacion->id,
-                'tipo_carnet_id' => $tipo->id,
                 'aprovechamiento_id' => $cupo?->id,
                 'monto' => $precio['monto'],
                 'sireb_tarifa_id' => $precio['tarifa_id'],
@@ -314,31 +295,25 @@ class EmitirCarnetService
     //  Auxiliares
 
     /**
-     * El precio del tipo según SIREB. Sin él no se emite: ninguna tarifa se
-     * escribe a mano. Ver docs/modulos/SIREB.md.
+     * El precio de una tarifa del servicio «Carnet» (Catálogos › Aranceles) según
+     * SIREB, el de ahora. Sin él no se emite. Ver docs/modulos/SIREB.md.
      *
-     * @return array{monto: float, tarifa_id: string}
+     * @return array{monto: float, tarifa_id: string, tarifa: array}
      */
-    public function precioDe(TipoCarnet $tipo): array
+    public function precioDe(string $tarifaId): array
     {
         try {
-            return $this->precios->de($tipo->servicio_sireb, $tipo->tarifa_sireb);
+            return $this->tarifario->precio(ConceptoArancel::Carnet, $tarifaId);
         } catch (SinPrecioException $e) {
-            throw CarnetInvalidoException::sinPrecio($tipo->nombre, $e->getMessage().' Revíselo en Catálogos › Tipos de carnet.');
+            throw CarnetInvalidoException::sinPrecio($e->getMessage());
         }
     }
 
-    /**
-     * Los catálogos se releen DENTRO de la transacción.
-     */
-    private function comprobarCatalogos(Asociacion $asociacion, TipoCarnet $tipo): void
+    /** La asociación se relee DENTRO de la transacción: pudo desactivarse recién. */
+    private function comprobarAsociacion(Asociacion $asociacion): void
     {
         if (! Asociacion::query()->whereKey($asociacion->id)->firstOrFail()->estaActiva()) {
             throw CarnetInvalidoException::catalogoInactivo('La asociación', $asociacion->nombre);
-        }
-
-        if (! TipoCarnet::query()->whereKey($tipo->id)->firstOrFail()->estado) {
-            throw CarnetInvalidoException::catalogoInactivo('El tipo de carnet', $tipo->nombre);
         }
     }
 

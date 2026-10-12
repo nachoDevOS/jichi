@@ -101,7 +101,7 @@ previa «NO VÁLIDO» mientras está pendiente.
 | Elemento | De dónde sale |
 | --- | --- |
 | Encabezado | Escudo + «GOBERNACIÓN / GOBIERNO AUTÓNOMO DEPARTAMENTAL DEL / BENI», filete, y el bloque de la Secretaría con «SEDAG - BENI» |
-| Título | «CÉDULA DE PESCADOR» / «CÉDULA DE COMERCIALIZADOR»: `carnets.tipo_actor`, nunca el nombre del tipo de carnet |
+| Título | «CÉDULA DE PESCADOR» / «CÉDULA DE COMERCIALIZADOR»: `carnets.tipo_actor` |
 | C.I. (debajo de la foto, en su propia tira) | `Beneficiario::documento_identidad` |
 | Foto | `beneficiarios.foto`, recortada y reducida, embebida en base64 |
 | NOMBRE | `Beneficiario::nombreCompleto` |
@@ -338,8 +338,9 @@ pesar más que el encabezado.
 ### El título dice «CÉDULA DE <ACTIVIDAD>»
 
 Hoy dice «CÉDULA DE PESCADOR» o «CÉDULA DE COMERCIALIZADOR», igual que el
-plástico de papel. Sale de `carnets.tipo_actor` (`TipoActor::etiqueta()`), nunca
-del nombre del tipo de carnet, que es un catálogo que edita la unidad.
+plástico de papel. Sale de `carnets.tipo_actor` (`TipoActor::etiqueta()`). Desde
+el 12/10/2026 no hay catálogo de tipos de carnet: el precio es la tarifa del
+servicio «Carnet» de SIREB que elige ventanilla (Catálogos › Aranceles).
 
 Decía «CÉDULA» a secas mientras el carnet era UNO para todas las actividades de
 una persona. Con un carnet por actividad, el título es lo que se lee de lejos

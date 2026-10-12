@@ -224,7 +224,7 @@ class ConfirmarPagoService
             $documento instanceof Carnet => 'Cédula de '.$documento->tipo_actor->etiqueta()
                 .($documento->aprovechamiento ? ' - '.$kilos($documento->aprovechamiento->volumen_total_kg).' Kg' : ''),
             $documento instanceof AprovechamientoPesq => 'Autorización de Pesca para Aprovechamiento Pesquero'
-                .($documento->categoria?->descripcion_kg ? ' - '.$documento->categoria->descripcion_kg : ''),
+                .($documento->tramo ? ' - '.$documento->tramo : ''),
             $documento instanceof PermisoFaena => $documento->etiqueta.' - '.$kilos($documento->kilos_extraidos).' kg',
             $documento instanceof GuiaMovimiento => $documento->etiqueta,
         };

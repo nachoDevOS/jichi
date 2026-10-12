@@ -7,18 +7,15 @@ use App\Http\Controllers\Panel\AutorizacionPescaController;
 use App\Http\Controllers\Panel\BeneficiarioController;
 use App\Http\Controllers\Panel\CarnetController;
 use App\Http\Controllers\Panel\CarnetImpresionController;
-use App\Http\Controllers\Panel\CategoriaAprovechamientoController;
 use App\Http\Controllers\Panel\CuentaPortalController;
 use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\FaenaController;
 use App\Http\Controllers\Panel\GuiaController;
 use App\Http\Controllers\Panel\GuiaImpresionController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
-use App\Http\Controllers\Panel\ProductoHidrobiologicoController;
 use App\Http\Controllers\Panel\ReciboController;
 use App\Http\Controllers\Panel\RegistroSirebController;
 use App\Http\Controllers\Panel\RolController;
-use App\Http\Controllers\Panel\TipoCarnetController;
 use App\Http\Controllers\Panel\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
@@ -395,81 +392,15 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:asociaciones.editar')
             ->name('asociaciones.update');
 
-        // --- Escala de aprovechamiento
-        Route::get('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'index'])
-            ->middleware('permiso:catalogos.ver')
-            ->name('categorias-aprovechamiento.index');
-
-        // ANTES de /{categoria}: si no, «crear» se toma como id.
-        Route::get('/categorias-aprovechamiento/crear', [CategoriaAprovechamientoController::class, 'create'])
-            ->middleware('permiso:catalogos.crear')
-            ->name('categorias-aprovechamiento.create');
-
-        Route::get('/categorias-aprovechamiento/{categoria}/editar', [CategoriaAprovechamientoController::class, 'edit'])
-            ->middleware('permiso:catalogos.editar')
-            ->name('categorias-aprovechamiento.edit');
-
-        Route::get('/categorias-aprovechamiento/{categoria}', [CategoriaAprovechamientoController::class, 'show'])
-            ->middleware('permiso:catalogos.ver')
-            ->name('categorias-aprovechamiento.show');
-
-        Route::post('/categorias-aprovechamiento', [CategoriaAprovechamientoController::class, 'store'])
-            ->middleware('permiso:catalogos.crear')
-            ->name('categorias-aprovechamiento.store');
-
-        Route::put('/categorias-aprovechamiento/{categoria}', [CategoriaAprovechamientoController::class, 'update'])
-            ->middleware('permiso:catalogos.editar')
-            ->name('categorias-aprovechamiento.update');
-
-        // --- Tipos de carnet
-        Route::get('/tipos-carnet', [TipoCarnetController::class, 'index'])
-            ->middleware('permiso:catalogos.ver')
-            ->name('tipos-carnet.index');
-
-        Route::get('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'show'])
-            ->middleware('permiso:catalogos.ver')
-            ->name('tipos-carnet.show');
-
-        Route::get('/tipos-carnet/{tipo_carnet}/editar', [TipoCarnetController::class, 'edit'])
-            ->middleware('permiso:catalogos.editar')
-            ->name('tipos-carnet.edit');
-
-        // SIN alta: la lista sale de la resolución. Sacar el botón no alcanza,
-        // la ruta seguía aceptando un POST armado a mano.
-        Route::put('/tipos-carnet/{tipo_carnet}', [TipoCarnetController::class, 'update'])
-            ->middleware('permiso:catalogos.editar')
-            ->name('tipos-carnet.update');
-
-        // --- Productos hidrobiológicos (cuadro D de la guía)
-        Route::get('/productos', [ProductoHidrobiologicoController::class, 'index'])
-            ->middleware('permiso:catalogos.ver')
-            ->name('productos.index');
-
-        // ANTES de /{producto}: si no, «crear» se toma como id.
-        Route::get('/productos/crear', [ProductoHidrobiologicoController::class, 'create'])
-            ->middleware('permiso:catalogos.crear')
-            ->name('productos.create');
-
-        Route::get('/productos/{producto}/editar', [ProductoHidrobiologicoController::class, 'edit'])
-            ->middleware('permiso:catalogos.editar')
-            ->name('productos.edit');
-
-        Route::get('/productos/{producto}', [ProductoHidrobiologicoController::class, 'show'])
-            ->middleware('permiso:catalogos.ver')
-            ->name('productos.show');
-
-        Route::post('/productos', [ProductoHidrobiologicoController::class, 'store'])
-            ->middleware('permiso:catalogos.crear')
-            ->name('productos.store');
-
-        Route::put('/productos/{producto}', [ProductoHidrobiologicoController::class, 'update'])
-            ->middleware('permiso:catalogos.editar')
-            ->name('productos.update');
-
-        // --- Aranceles de SIREB (hoy, la faena). SIN alta ni baja: una fila por concepto.
+        // --- Aranceles de SIREB: lo que cobra cada trámite. SIN alta ni baja: una fila por concepto.
         Route::get('/aranceles', [ArancelSirebController::class, 'index'])
             ->middleware('permiso:catalogos.ver')
             ->name('aranceles.index');
+
+        // Borra la caché del catálogo: lo cambiado en SIREB se ve sin esperar.
+        Route::post('/aranceles/refrescar', [ArancelSirebController::class, 'refrescar'])
+            ->middleware(['permiso:catalogos.ver', 'throttle:6,1'])
+            ->name('aranceles.refrescar');
 
         Route::get('/aranceles/{arancel}', [ArancelSirebController::class, 'show'])
             ->middleware('permiso:catalogos.ver')

@@ -17,7 +17,8 @@ class ActualizarFaenaRequest extends EmitirFaenaRequest
     {
         $reglas = parent::rules();
 
-        unset($reglas['carnet_id']);
+        // Ni el carnet ni la tarifa se corrigen: cambiarlos es otra faena, otro cobro.
+        unset($reglas['carnet_id'], $reglas['tarifa_sireb']);
 
         return $reglas;
     }

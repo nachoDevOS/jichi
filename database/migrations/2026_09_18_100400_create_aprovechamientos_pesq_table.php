@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\EstadoAprovechamiento;
-use App\Enums\ModalidadAprovechamiento;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -19,16 +18,13 @@ return new class extends Migration
             // RESTRICT: borrar a una persona no puede llevarse el historial que
             // respalda cuánto se pescó bajo su nombre.
             $table->foreignId('beneficiario_id')->constrained('beneficiarios')->restrictOnDelete();
-            $table->foreignId('categoria_aprov_id')->constrained('categorias_aprovechamiento')->restrictOnDelete();
 
             $table->unsignedInteger('nro')->unique()->comment('Del talonario: 000001');
 
-            // Los dos son COPIA CONGELADA del tramo: editar el catálogo en
-            // agosto no puede mover un cupo otorgado en marzo.
-            $table->string('modalidad', 30)
-                ->default(ModalidadAprovechamiento::EscalaGeneral->value)
-                ->comment('Copiada del tramo al otorgar');
-            $table->decimal('volumen_total_kg', 12, 2)->comment('Kilos, copiados de la escala');
+            // La escala es el tarifario de SIREB: el tramo elegido se COPIA, porque
+            // Recaudaciones puede renombrar o dar de baja la tarifa después.
+            $table->string('tramo', 160)->comment('Etiqueta de la tarifa de SIREB al otorgar');
+            $table->decimal('volumen_total_kg', 12, 2)->comment('Techo del tramo, copiado al otorgar');
 
             // Congelado de SIREB al otorgar o corregir: un cambio de arancel no
             // mueve lo que ya se está cobrando.

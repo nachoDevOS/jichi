@@ -62,8 +62,9 @@ para no equivocarse:
 - **El carnet es la llave anual; con él solo no se sale a trabajar.** Lo que
   autoriza el trabajo de cada día son la faena y la guía.
 - **Qué emite cada carnet lo dice `carnets.tipo_actor`** (`TipoActor::emiteFaenas()`
-  / `emiteGuias()`), NUNCA el nombre del tipo de carnet: ese catálogo lo edita la
-  unidad desde el panel.
+  / `emiteGuias()`) y el nombre impreso (`nombreCarnet()`). Ya no hay catálogo
+  de tipos de carnet (12/10/2026): el precio es la tarifa del servicio «Carnet»
+  de SIREB que elige ventanilla.
 - **Una autorización vigente por persona y un carnet vigente por actividad.** El
   pescador no saca carnet sin autorización; el comercializador nunca lleva una.
 - **El circuito es el mismo para los cuatro documentos**, y lo dictan los enums
@@ -312,17 +313,20 @@ El procedimiento detallado está en
 ## Verificar antes de dar algo por terminado
 
 ```sh
+php artisan test        # las pruebas (92, SIREB simulado: ninguna sale a la red)
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
 ```
 
-> **No hay pruebas automáticas**: se retiraron el 27/09/2026 a pedido del
-> responsable (están en el historial de git, commit `7dc0ac6`). Los tres
-> comandos revisan tipos, formato y compilación; de las reglas de negocio no
-> dicen nada. **Todo cambio se verifica abriendo la pantalla y probando el caso
-> a mano**, incluidos los bordes: aprobar sin cobrar, pasarse del cupo, una
-> fecha en el límite.
+> **Las pruebas volvieron el 12/10/2026** (se habían retirado el 27/09/2026).
+> Corren sobre SQLite en memoria con **SIREB e Ibare simulados**
+> (`tests/Concerns/SirebFalso.php`, `Http::preventStrayRequests()`): ninguna
+> llama al SIREB real ni escribe en el log de SIREB. `ArmaEscenarios` arma el
+> camino de ventanilla con los servicios reales y aprueba por la vía de verdad
+> (pagar en SIREB → `ConfirmarPagoService`). **Un cambio en una regla va con su
+> prueba.** Las pruebas no ven el navegador: la pantalla se sigue probando a
+> mano, incluidos los bordes.
 
 Los tres tienen que pasar.
 
@@ -644,15 +648,18 @@ Los tres tienen que pasar.
   preguntando de verdad**: hay `estaEnFecha()`, `puedeEditarse()`,
   `puedeEliminarse()` y `puedeEmitirFaena()`, y cada una mira cosas distintas.
 - **EL PRECIO DE LA AUTORIZACIÓN NO LO PONE JICHI: LO PONE SIREB** (29/09/2026).
-  La escala guarda `servicio_sireb` y `tarifa_sireb` (uuid completos), no un
-  precio; al otorgar o corregir, `OtorgarCupoService` pide el monto a
-  Recaudaciones y lo congela en `aprovechamientos_pesq.monto`. **Sin SIREB no se
+  La escala ni siquiera es una tabla (12/10/2026): son las tarifas del servicio
+  que guarda la fila `autorizacion` de `aranceles_sireb` (`TarifarioSireb`). Al
+  otorgar, `OtorgarCupoService` pide la tarifa elegida a Recaudaciones y congela
+  monto y etiqueta (`tramo`). **Los kilos los escribe ventanilla**: de cada
+  tarifa se usan solo etiqueta, precio y si está activa. **Sin SIREB no se
   otorga**: es a propósito, ninguna tarifa se escribe a mano. Las pantallas que
   solo MUESTRAN precio usan `SirebService::serviciosSiResponde()` y abren igual
-  con SIREB caído. **`servicios()` va en caché 10 minutos**: un precio recién
-  cambiado en SIREB tarda eso en llegar; `tarifa($servicio, $tarifa)` no, da el
-  de ahora. Al emitir, la tarifa y su servicio tienen que estar `activo` (la
-  autorización exige además `liquidable`), o no se emite.
+  con SIREB caído. **`servicios()` va en caché 2 minutos** (`SIREB_CACHE_MINUTOS`,
+  12/10/2026; antes 10) y solo para lo que se MUESTRA; «Actualizar desde SIREB»
+  en Aranceles la borra. `tarifa($servicio, $tarifa)` no tiene caché: lo que se
+  cobra es siempre el precio de ahora. Al emitir, la tarifa tiene que estar
+  `activo`, o no se emite.
   Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
 - **Un id de SIREB cortado no falla: deja de coincidir.** `servicio_sireb` era
   `string(30)` y los ids de SIREB miden 36; se guardaban recortados y en

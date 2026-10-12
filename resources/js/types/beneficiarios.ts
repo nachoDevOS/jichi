@@ -143,9 +143,7 @@ export interface CarnetResumen {
  */
 export interface CupoResumen {
     id: number;
-    /** El tramo de la escala oficial: 1 a 7. */
-    escala: number | null;
-    /** El texto literal de la resolución: «201 Kg Hasta 500 Kg». */
+    /** El tramo: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
     descripcion: string | null;
     volumen_total_kg: number;
     /** Lo comprometido por las faenas que consumen cupo (todas menos las vencidas). */
