@@ -27,7 +27,7 @@ export default function EditarGuia({
     sirebDisponible,
     servicioConfigurado,
     condiciones,
-    diasVigencia,
+    vigencia,
     descuentoPiscicultura,
 }: CatalogosGuia & { guia: GuiaEditable }) {
     // `general` no es un campo del formulario, así que no está en form.errors:
@@ -197,8 +197,7 @@ export default function EditarGuia({
                         </div>
 
                         <p className="text-xs text-muted-foreground">
-                            Sigue <strong>PENDIENTE</strong>. Vale {diasVigencia} días desde que la
-                            aprueben, no desde hoy.
+                            Sigue <strong>PENDIENTE</strong>. Vale {vigencia}, no desde hoy.
                         </p>
 
                         <Button type="submit" disabled={form.processing || !completo} className="w-full">

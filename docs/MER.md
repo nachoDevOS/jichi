@@ -427,7 +427,7 @@ tarifa elegida en su `sireb_tarifa_id`.
 | `region_desde` / `region_hasta` | string(150), **null** | La región amparada |
 | `fecha_solicitud` | date | El día que se pidió |
 | `fecha_salida` | date, null | La escribe la APROBACIÓN: el día en que se aprobó |
-| `fecha_desembarque` | date, null, index | La escribe la APROBACIÓN: salida + 30 días. Es el techo |
+| `fecha_desembarque` | date, null, index | La escribe la APROBACIÓN: salida + la vigencia configurada (`App\Support\Vigencia`). Es el techo |
 | `estado` | string(20) | `EstadoFaena`; nace `pendiente` |
 
 **LA TABLA CALCA EL TALONARIO «PERMISO POR FAENA»** —completado el 21/09/2026—.
@@ -440,7 +440,7 @@ pescador esperando en la ventanilla—.
 
 **LAS FECHAS NO SE TIPEAN: LAS ESCRIBE LA APROBACIÓN** —25/09/2026, a pedido
 del responsable—. La salida es el día de la aprobación y el desembarque, salida +
-`PermisoFaena::DIAS_VIGENCIA` (30). Antes el operador tipeaba salida y
+la vigencia de Administración › Vigencias (de inicio 30 días). Antes el operador tipeaba salida y
 desembarque, y había además `fecha_limite` (el techo) y `fecha_emision` (la
 firma): con las fechas fijadas por la aprobación, esas dos eran copias de las
 otras y se sacaron. El desembarque ES el techo, y de él leen `estaVigente()`,
@@ -550,7 +550,7 @@ salida no ocurrió.
 | `observaciones` | text, nullable | El recuadro del papel |
 | `estado` | string(20) | `EstadoGuia`, nace `pendiente` |
 | `fecha_solicitud` | date | El día que la persona vino al mostrador |
-| `fecha_emision` / `fecha_vencimiento` | **dateTime**, nullable | Máximo **5 días**, los escribe la APROBACIÓN |
+| `fecha_emision` / `fecha_vencimiento` | **dateTime**, nullable | Vigencia configurable (de inicio **5 días**), los escribe la APROBACIÓN |
 
 **LA GUÍA CALCA EL TALONARIO, BLOQUE POR BLOQUE** —rehecha el 22/09/2026—. Antes
 guardaba cuatro datos sueltos: código tipeado, origen, destino y un peso. El

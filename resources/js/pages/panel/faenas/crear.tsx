@@ -19,15 +19,15 @@ import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/benefi
 export default function CrearFaena({
     beneficiario,
     carnetElegido,
-    diasVigencia,
+    vigencia,
     tarifas,
     servicioConfigurado,
 }: {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
     /** `?carnet=`: llega desde la ficha del cupo con el carnet ya elegido. */
     carnetElegido: number | null;
-    /** El plazo de la resolución. Llega del servidor para que no haya dos copias. */
-    diasVigencia: number;
+    /** «30 días desde la aprobación» o «hasta el 31 de diciembre»: lo configura la unidad. */
+    vigencia: string;
     /** Las tarifas del servicio de la faena en SIREB; null si no responde. */
     tarifas: TarifaSireb[] | null;
     /** false = falta elegir el servicio en Catálogos › Aranceles. */
@@ -75,7 +75,7 @@ export default function CrearFaena({
     return (
         <LayoutPanel
             titulo="Registrar faena"
-            descripcion={`Autoriza UNA salida de ${diasVigencia} días. Nace PENDIENTE: autoriza recién cuando se pague en Recaudaciones.`}
+            descripcion={`Autoriza UNA salida; vale ${vigencia}. Nace PENDIENTE: autoriza recién cuando se pague en Recaudaciones.`}
         >
             <Head title="Registrar faena" />
 
@@ -232,7 +232,7 @@ export default function CrearFaena({
                                     <p className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                                         <Info className="mt-0.5 size-4 shrink-0" />
                                         La fecha de salida es el día en que se aprueba el permiso, y la de
-                                        desembarque, {diasVigencia} días después. Las pone el sistema.
+                                        desembarque, al cumplirse la vigencia ({vigencia}). Las pone el sistema.
                                     </p>
                                 </div>
                             </>
@@ -282,7 +282,7 @@ export default function CrearFaena({
                                 </div>
 
                                 <p className="text-xs text-muted-foreground">
-                                    Sale el día que se aprueba y vale {diasVigencia} días.
+                                    Sale el día que se aprueba y vale {vigencia}.
                                 </p>
                             </>
                         )}

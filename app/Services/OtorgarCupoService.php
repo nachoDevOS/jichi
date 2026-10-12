@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoAprovechamiento;
+use App\Enums\TramiteConVigencia;
 use App\Exceptions\CupoInvalidoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Sireb\SinPrecioException;
 use App\Sireb\TarifarioSireb;
+use App\Support\Vigencia;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -175,12 +177,10 @@ class OtorgarCupoService
             ->first();
     }
 
-    /**
-     * Hasta cuándo vale un cupo de esta fecha: el cupo es de la GESTIÓN.
-     */
+    /** Hasta cuándo vale un cupo de esta fecha: lo configura la unidad. */
     private function vencimientoDe(Carbon $fecha): string
     {
-        return $fecha->copy()->endOfYear()->toDateString();
+        return Vigencia::hasta(TramiteConVigencia::Autorizacion, $fecha)->toDateString();
     }
 
     /**

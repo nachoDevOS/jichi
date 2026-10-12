@@ -17,6 +17,7 @@ use App\Http\Controllers\Panel\ReciboController;
 use App\Http\Controllers\Panel\RegistroSirebController;
 use App\Http\Controllers\Panel\RolController;
 use App\Http\Controllers\Panel\UsuarioController;
+use App\Http\Controllers\Panel\VigenciaController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -414,6 +415,18 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
                 ->name('aranceles.update');
         });
     });
+
+    /*
+    | Configuración — hasta cuándo vale cada trámite
+    */
+
+    Route::get('/configuracion/vigencias', [VigenciaController::class, 'index'])
+        ->middleware('permiso:configuracion.ver')
+        ->name('vigencias.index');
+
+    Route::put('/configuracion/vigencias', [VigenciaController::class, 'update'])
+        ->middleware('permiso:configuracion.editar')
+        ->name('vigencias.update');
 
     /*
     | Seguridad — roles y, más adelante, usuarios

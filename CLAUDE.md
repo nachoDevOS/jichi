@@ -80,7 +80,8 @@ para no equivocarse:
   **Dos plazos que no se mezclan** (03/10/2026): el de PAGO lo pone SIREB
   (`plazo_pago_dias`, 5 días) y si vence el trámite **sigue `pendiente`** (08/10/2026:
   el estado `no_pagado` se quitó de los enums);
-  la VIGENCIA del trámite (31/12, 30 días, 5 días) NO es un estado: un aprobado
+  la VIGENCIA del trámite —la de autorización, faena y guía se configura en
+  Administración › Vigencias (`App\Support\Vigencia`, 12/10/2026)— NO es un estado: un aprobado
   sigue `aprobado` y si vale hoy lo dicen sus fechas (`estaVigente()`).
 
   Al crearse registra su liquidación en SIREB; el pago se carga y se valida

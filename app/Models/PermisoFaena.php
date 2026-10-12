@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
 use App\Enums\TipoActor;
+use App\Enums\TramiteConVigencia;
 use App\Services\CorrelativoService;
+use App\Support\Vigencia;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
 use App\Traits\LiquidableSireb;
@@ -47,11 +49,6 @@ class PermisoFaena extends Model
 
     /** «PermisoFaena» pluraliza a «permiso_faenas», que no es la tabla. */
     protected $table = 'permisos_faena';
-
-    /**
-     * Vigencia máxima de una faena, en días.
-     */
-    public const DIAS_VIGENCIA = 30;
 
     /** La serie del correlativo global del talonario. Ver CorrelativoService. */
     public const SERIE = 'PERMISO-FAENA';
@@ -248,10 +245,10 @@ class PermisoFaena extends Model
 
     //  Reglas de negocio
 
-    /** El desembarque que corresponde a una salida: el techo de la resolución. */
+    /** El desembarque que corresponde a una salida: lo configura la unidad. */
     public static function desembarqueDesde(Carbon|string $salida): Carbon
     {
-        return Carbon::parse($salida)->addDays(self::DIAS_VIGENCIA)->startOfDay();
+        return Vigencia::hasta(TramiteConVigencia::Faena, $salida)->startOfDay();
     }
 
     /**

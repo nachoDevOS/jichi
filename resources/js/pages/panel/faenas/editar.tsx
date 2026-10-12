@@ -18,11 +18,11 @@ import type { FaenaEnCorreccion } from '@/types/faenas';
  */
 export default function EditarFaena({
     faena,
-    diasVigencia,
+    vigencia,
 }: {
     faena: FaenaEnCorreccion;
-    /** El plazo de la resolución. Llega del servidor para que no haya dos copias. */
-    diasVigencia: number;
+    /** «30 días desde la aprobación» o «hasta el 31 de diciembre»: lo configura la unidad. */
+    vigencia: string;
 }) {
     const form = useForm({
         embarcacion: faena.embarcacion ?? '',
@@ -201,7 +201,7 @@ export default function EditarFaena({
                         <p className="flex items-start gap-2 text-xs text-muted-foreground">
                             <Info className="mt-0.5 size-4 shrink-0" />
                             El número del talonario no cambia. La salida y el desembarque los fija
-                            la aprobación: sale ese día y vale {diasVigencia} días.
+                            la aprobación: sale ese día y vale {vigencia}.
                         </p>
 
                         <Button

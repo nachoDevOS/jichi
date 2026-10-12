@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Enums\EstadoAprovechamiento;
+use App\Enums\TramiteConVigencia;
 use App\Exceptions\CupoInvalidoException;
 use App\Models\AprovechamientoPesq;
+use App\Support\Vigencia;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -26,14 +28,14 @@ class RevisarCupoService
             }
 
             // La emisión se escribe ACÁ: hasta el pago había una solicitud. El
-            // vencimiento se recalcula sobre ella porque el cupo vale por GESTIÓN.
+            // vencimiento se recalcula sobre ella (lo configura la unidad).
             $emision = now();
 
             $bloqueado->motivoAuditoria = 'Pago confirmado en SIREB: el aprovechamiento queda habilitado.';
             $bloqueado->update([
                 'estado' => EstadoAprovechamiento::Aprobado,
                 'fecha_emision' => $emision->toDateString(),
-                'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
+                'fecha_vencimiento' => Vigencia::hasta(TramiteConVigencia::Autorizacion, $emision)->toDateString(),
             ]);
 
             return $cupo->refresh();

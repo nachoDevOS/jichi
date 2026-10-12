@@ -27,7 +27,7 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Número | `permisos_faena.nro`, correlativo continuo del sistema | `guias_movimiento.nro`, correlativo continuo del sistema |
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
 | Kilos contra la autorización | Sale con `kilos_disponibles`, fijo; **no descuenta** | No toca ningún cupo |
-| Vale | 30 días desde la aprobación | 5 días desde la aprobación (se cuentan con hora) |
+| Vale | Configurable: N días o hasta el 31/12 (de inicio 30 días) | Configurable: N días con hora o hasta el 31/12 (de inicio 5 días) |
 | Termina en | `aprobado` (no se registra la vuelta), o `revocado` | `aprobado` (no se registra la llegada), o `revocado` |
 | Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
 
@@ -74,8 +74,8 @@ los campos `puede_*` de la ficha.
   con el motivo. Ver [PAGOS.md](PAGOS.md) y [RECIBOS.md](RECIBOS.md).
 - **LAS FECHAS DE VIGENCIA LAS ESCRIBE LA APROBACIÓN.** Mientras es borrador
   están en NULL: el plazo corre desde la aprobación, no desde que se cargó. La faena
-  sale ese día y desembarca 30 días después (`PermisoFaena::desembarqueDesde()`);
-  la guía vale 5 días contados con hora (`dateTime`).
+  sale ese día y desembarca al cumplirse su vigencia (`PermisoFaena::desembarqueDesde()`);
+  la guía vence contada con hora (`dateTime`). Las dos las da `App\Support\Vigencia`.
 - **Eliminar no devuelve el número.** La baja es lógica y el correlativo sigue
   donde estaba: la serie queda con un hueco, y eso es lo que el motivo
   obligatorio explica.

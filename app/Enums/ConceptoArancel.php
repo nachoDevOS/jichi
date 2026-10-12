@@ -28,7 +28,7 @@ enum ConceptoArancel: string
     public function descripcion(): string
     {
         return match ($this) {
-            self::Autorizacion => 'Sus tarifas son los tramos de la escala: de cada una salen los kilos y el monto.',
+            self::Autorizacion => 'Sus tarifas son los tramos de la escala, con su monto. Los kilos los escribe ventanilla.',
             self::Carnet => 'Sus tarifas son los carnets de pescador y de comercializador.',
             self::Faena => 'Ventanilla elige la tarifa de la salida al emitir el permiso.',
             self::Guia => 'Sus tarifas son los productos del cuadro D, con su precio por kilo.',

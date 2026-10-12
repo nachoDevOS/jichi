@@ -6,7 +6,9 @@ use App\Enums\EstadoGuia;
 use App\Enums\MedioTransporte;
 use App\Enums\TipoActor;
 use App\Enums\TipoTransporte;
+use App\Enums\TramiteConVigencia;
 use App\Services\CorrelativoService;
+use App\Support\Vigencia;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
 use App\Traits\LiquidableSireb;
@@ -56,9 +58,6 @@ class GuiaMovimiento extends Model
     protected $noAuditable = ['sireb_historial'];
 
     protected $table = 'guias_movimiento';
-
-    /** Vigencia máxima de una guía, en días. Regla de la resolución, no del formulario. */
-    public const DIAS_VIGENCIA = 5;
 
     /** Lo que se descuenta al producto de criadero. 0.50 = la mitad del arancel. */
     public const DESCUENTO_PISCICULTURA = 0.50;
@@ -261,7 +260,7 @@ class GuiaMovimiento extends Model
      */
     public static function vencimientoDesde(Carbon|string $emision): Carbon
     {
-        return Carbon::parse($emision)->addDays(self::DIAS_VIGENCIA);
+        return Vigencia::hasta(TramiteConVigencia::Guia, $emision);
     }
 
     /**

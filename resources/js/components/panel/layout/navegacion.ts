@@ -2,6 +2,7 @@ import {
     BadgeCheck,
     BarChart3,
     Building2,
+    CalendarClock,
     Coins,
     LayoutDashboard,
     ReceiptText,
@@ -122,6 +123,14 @@ export const NAVEGACION: ItemNavegacion[] = [
         ruta: "reportes.index",
         icono: BarChart3,
         permiso: "reportes.ver",
+        grupo: "Administración",
+    },
+    {
+        titulo: "Vigencias",
+        tituloCompleto: "Vigencia de los trámites",
+        ruta: "vigencias.index",
+        icono: CalendarClock,
+        permiso: "configuracion.ver",
         grupo: "Administración",
     },
 

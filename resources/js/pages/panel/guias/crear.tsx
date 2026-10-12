@@ -29,7 +29,7 @@ export default function CrearGuia({
     sirebDisponible,
     servicioConfigurado,
     condiciones,
-    diasVigencia,
+    vigencia,
     descuentoPiscicultura,
 }: CatalogosGuia & {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
@@ -108,7 +108,7 @@ export default function CrearGuia({
     return (
         <LayoutPanel
             titulo="Registrar guía"
-            descripcion={`Ampara UN traslado. Vale ${diasVigencia} días desde que la aprueban.`}
+            descripcion={`Ampara UN traslado. Vale ${vigencia}.`}
         >
             <Head title="Registrar guía" />
 
@@ -247,7 +247,7 @@ export default function CrearGuia({
                                 <p className="text-xs text-muted-foreground">
                                     La guía queda <strong>PENDIENTE</strong>: todavía no ampara
                                     nada. Se paga en Recaudaciones; cuando el pago se valida allá
-                                    queda aprobada, vale {diasVigencia} días y se puede imprimir.
+                                    queda aprobada, vale {vigencia} y se puede imprimir.
                                 </p>
                             </>
                         )}

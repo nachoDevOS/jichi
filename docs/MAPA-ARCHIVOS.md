@@ -40,6 +40,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `EstadoGuia.php` | 101 | `pendiente`, `aprobado` (`Aprobada`), `revocado` (`Revocada`) | Los casos van en femenino; los valores, iguales a los otros tres |
 | `EstadoLiquidacionSireb.php` | 36 | `por_enviar`, `registrada`, `anulada` | Dónde está la liquidación respecto de SIREB, no si se pagó: eso se pregunta |
 | `TipoActor.php` | 60 | `pescador`, `comercializador` | **Qué emite cada carnet**: `emiteFaenas()`, `emiteGuias()`, `requiereAprovechamiento()`. Nunca por el nombre del tipo de carnet |
+| `ModoVigencia.php`, `TramiteConVigencia.php` | 30 / 45 | `fin_de_anio`, `dias`; `autorizacion`, `faena`, `guia` | Los valores iniciales (31/12, 30 y 5 días) viven en el enum: el seeder no los escribe, así re-sembrar no pisa lo configurado |
 | `ConceptoArancel.php` | 38 | `autorizacion`, `carnet`, `faena`, `guia` | Una fila de `aranceles_sireb` por caso, con **solo el servicio**: la tarifa se elige al emitir |
 | `ConceptoRecibo.php` | 50 | Las seis casillas del recibo | `desdeDocumento()` elige la casilla por el tipo de documento pagado |
 | `CondicionProducto.php` | 75 | Las diez columnas del cuadro D | Un solo enum: el talonario no cruza estado × presentación |
@@ -82,8 +83,8 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Rol.php` | 39 | Hereda el `Role` de Spatie para llevar `Auditable`; registrado en `config/permission.php`. `esDelSistema()` = está en `RolSistema` |
 | `AprovechamientoPesq.php` | 451 | La bolsa madre. `volumen_total_kg` y `kilos_disponibles` los escribe ventanilla; las faenas no descuentan (12/10/2026). `puedeEmitirFaena()` = `estaVigente()`. `numeroLegible()` lee `nro` |
 | `Carnet.php` | 425 | `estaVigente()`, `sinEfecto()` y `etiquetaEstado()` **miran a su autorización**: la consulta tiene que precargarla. `amparaSusPapeles()`: faenas y guías valen si el titular tiene carnet vigente de la actividad. `registro_legible` = `nro` con seis dígitos |
-| `PermisoFaena.php` | 305 | Vigencia de 30 días (`fecha_desembarque`). Vale si su carnet y su autorización valen. `$attributes` lleva los defaults que lee el código |
-| `GuiaMovimiento.php` | 330 | Vigencia de 5 días. `factorArancel()`: piscicultura al 50%. `numero_legible` lee `nro` |
+| `PermisoFaena.php` | 305 | Vigencia configurable (`fecha_desembarque`, ver `Support\Vigencia`). Vale si su carnet y su autorización valen. `$attributes` lleva los defaults que lee el código |
+| `GuiaMovimiento.php` | 330 | Vigencia configurable (`Support\Vigencia`). `factorArancel()`: piscicultura al 50%. `numero_legible` lee `nro` |
 | `GuiaDetalle.php` | 67 | Un renglón del cuadro D; copia el precio por kilo |
 | `Beneficiario.php` | 273 | **camelCase** de `primerNombre` en adelante: en SQL a mano va entrecomillado (`SQL_NOMBRE`). `documento_identidad` lee `ci`, `complemento` y `departamento_id`: los tres van en el select |
 | `Recibo.php` | 65 | Copia congelada: monto, concepto, N° de transacción, banco y fecha de pago de SIREB. `recibible` es polimórfica: se precarga con `morphWith` |
@@ -142,6 +143,7 @@ funcionario; el controlador lo pone en el campo o en el aviso.
 | `../Jobs/VerificarPagoJob.php` | Consulta en SIREB el pago de un trámite, después de mandar la página | Lo dispara el portal (inicio y «En curso») con `dispatchAfterResponse()`: sin trabajador de cola. `encolarDe()` usa la reserva de 2 min por trámite. Saltea lo vencido o anulado, como el comando |
 | `TramitesDisponibles.php` | Qué puede pedir la persona (el sello «Usted puede pedirlo» de la vitrina del portal): pregunta a los mismos métodos del modelo |
 | `DocumentoDelPortal.php` | Busca por código público, solo lo propio: lo ajeno da 404 igual que lo inexistente |
+| `Vigencia.php` | 60 | Hasta cuándo vale autorización, faena y guía | Lee `configuraciones` (`vigencia.{tramite}.modo/dias`); `hasta()` conserva la hora (la guía se cuenta con hora). Pantalla: `VigenciaController` |
 | `QrVerificacion.php`, `CodigoQr.php` | URL **relativa + `APP_URL`** (nunca el host de la petición); QR pintado con `gd` |
 | `ReciboImpreso.php`, `TextoVertical.php`, `MarcaAgua.php` | Piezas de los PDF: lo que DomPDF no sabe hacer va horneado en PNG |
 | `Archivos.php`, `Paginacion.php`, `Sql.php` | `Sql` tiene lo que cambia entre PostgreSQL y SQLite |

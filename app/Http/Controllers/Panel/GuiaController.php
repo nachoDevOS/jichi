@@ -7,6 +7,7 @@ use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
 use App\Enums\MedioTransporte;
 use App\Enums\TipoTransporte;
+use App\Enums\TramiteConVigencia;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\ActualizarGuiaRequest;
@@ -25,6 +26,7 @@ use App\Sireb\SirebException;
 use App\Sireb\TarifarioSireb;
 use App\Support\Paginacion;
 use App\Support\Sql;
+use App\Support\Vigencia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -404,7 +406,7 @@ class GuiaController extends Controller
             'medios' => MedioTransporte::opciones(),
             'tiposTransporte' => TipoTransporte::opciones(),
             'condiciones' => CondicionProducto::opciones(),
-            'diasVigencia' => GuiaMovimiento::DIAS_VIGENCIA,
+            'vigencia' => Vigencia::texto(TramiteConVigencia::Guia),
             'descuentoPiscicultura' => GuiaMovimiento::DESCUENTO_PISCICULTURA,
         ];
     }

@@ -6,6 +6,14 @@
 
 ---
 
+## 🟠 Vigencias configurables: la faena y el carnet no se cortan a la autorización — 12/10/2026
+
+Desde Administración › Vigencias la autorización puede durar N días. Hoy nada
+corta a sus hijos: una faena aprobada cerca del final puede desembarcar después
+de que venza la autorización, y el carnet de pescador sigue venciendo el 31/12
+(su `estaVigente()` mira si la autorización fue revocada, no su fecha). Falta
+decidir si se cortan al vencimiento de la autorización.
+
 ## 🔴 Hay que volver a migrar: escala, tipos de carnet y productos ya no son tablas — 12/10/2026
 
 Se quitaron `categorias_aprovechamiento`, `tipos_carnet` y

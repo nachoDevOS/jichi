@@ -113,7 +113,8 @@ carnet, faena y guía no, si la corrección cambia lo que se cobra.
 - **Dos plazos que no se mezclan.** El de **pago** lo pone SIREB
   (`plazo_pago_dias`, 5 días): si la liquidación vence, el trámite **sigue
   pendiente** (08/10/2026) y se elimina a mano si ya no corresponde. La **vigencia** del trámite
-  (autorización y carnet al 31/12, faena 30 días, guía 5) **no es un estado**: un
+  (carnet al 31/12; autorización, faena y guía configurable en Administración › Vigencias (`App\Support\Vigencia`, 12/10/2026); de inicio
+  31/12, 30 y 5 días) **no es un estado**: un
   aprobado sigue `aprobado` y si vale hoy lo dicen sus fechas (`estaVigente()`).
 - **Revocar** (los cuatro trámites) es de supervisión, con motivo, y no se
   revierte. Revocar la autorización deja **sin efecto** a sus carnets y faenas

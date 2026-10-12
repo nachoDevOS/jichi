@@ -184,7 +184,8 @@ export interface CatalogosGuia {
     medios: OpcionGuia[];
     tiposTransporte: OpcionGuia[];
     condiciones: OpcionCondicion[];
-    diasVigencia: number;
+    /** «5 días desde la aprobación» o «hasta el 31 de diciembre»: lo configura la unidad. */
+    vigencia: string;
     descuentoPiscicultura: number;
 }
 

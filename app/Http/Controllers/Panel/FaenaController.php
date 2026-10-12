@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Panel;
 
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoFaena;
+use App\Enums\TramiteConVigencia;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\ActualizarFaenaRequest;
@@ -20,6 +21,7 @@ use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
 use App\Sireb\TarifarioSireb;
 use App\Support\Paginacion;
+use App\Support\Vigencia;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -123,7 +125,7 @@ class FaenaController extends Controller
             // Se preelige solo si figura entre los vigentes: el formulario no lo valida.
             'carnetElegido' => $carnetElegido?->id,
 
-            'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
+            'vigencia' => Vigencia::texto(TramiteConVigencia::Faena),
 
             // Las tarifas del servicio de la faena en SIREB: null si no responde.
             // El precio es de referencia: el que vale lo congela la emisión.
@@ -205,7 +207,7 @@ class FaenaController extends Controller
                 'region_hasta' => $faena->region_hasta,
             ],
 
-            'diasVigencia' => PermisoFaena::DIAS_VIGENCIA,
+            'vigencia' => Vigencia::texto(TramiteConVigencia::Faena),
         ]);
     }
 

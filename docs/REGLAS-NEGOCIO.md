@@ -184,8 +184,9 @@ dentro de una transacción deshecha con `rollBack()`.
   dígitos, continuo) y registra los `kilos_extraidos` de cada salida.
 - Esos kilos impactan **indirectamente** en el volumen total del aprovechamiento
   raíz al que está asociado el carnet.
-- Vigencia **máxima de 30 días** por salida: al aprobarla, `fecha_salida` es
-  ese día y `fecha_desembarque` salida + 30. Estados `pendiente`,
+- Vigencia por salida **configurable** (Administración › Vigencias, 12/10/2026):
+  N días o hasta el 31 de diciembre; de inicio, 30 días. Al aprobarla,
+  `fecha_salida` es ese día y `fecha_desembarque` el fin de esa vigencia. Estados `pendiente`,
   `aprobado` o `revocado` (este último
   es histórico: desde el 27/09/2026 revocar la autorización ya no lo escribe;
   la faena queda «sin efecto», ver Regla 5).
@@ -195,7 +196,7 @@ dentro de una transacción deshecha con `rollBack()`.
   la cantidad autorizada de pescado extraído en kg. Todos texto libre y
   opcionales menos los kilos. *(25/09/2026)*
 - **Las fechas NO las escribe ventanilla: las pone la aprobación.** La salida
-  es el día en que se aprueba el permiso y el desembarque, 30 días después. Así
+  es el día en que se aprueba el permiso y el desembarque, al cumplirse la vigencia configurada. Así
   el plazo empieza a correr cuando el permiso realmente vale, no cuando se
   cargó. Aprobar exige además que la autorización de pesca siga en fecha.
   *(25/09/2026)*
@@ -225,7 +226,8 @@ dentro de una transacción deshecha con `rollBack()`.
   guía queda «Sin efecto»; se registra y se **aprueba** el 00012 → la 000308
   vuelve a estar vigente. Si Juan no saca otro carnet, la guía no vale. Ver el
   paso 3.
-- Vigencia de transporte de **máximo 5 días**, con los estados `pendiente`,
+- Vigencia de transporte **configurable** (N días contados con hora, o hasta el
+  31 de diciembre; de inicio 5 días), con los estados `pendiente`,
   `aprobado` o `revocado`. **Revocar** es solo para la guía aprobada; un borrador
   se elimina *(hasta el 05/10/2026 se decía «anular»)*. **No se
   registra la llegada de la carga** *(28/09/2026)*: la guía aprobada vale hasta
@@ -284,8 +286,9 @@ boletas en Jichi y la firma de supervisión.)*
   Si la tarifa del catálogo está de baja, no se genera. Vale igual para una
   liquidación **anulada** en SIREB: decide solo el estado de la liquidación
   (08/10/2026). La **vigencia** del
-  trámite es otra cosa y empieza al aprobarse: autorización y carnet hasta el
-  31/12, faena 30 días, guía 5 días.
+  trámite es otra cosa y empieza al aprobarse: carnet hasta el 31/12;
+  autorización, faena y guía según Administración › Vigencias (de inicio 31/12,
+  30 días y 5 días).
 - *(03/10/2026)* **Antes de anular la liquidación —al eliminar, o al corregir
   cambiando lo que se cobra— Jichi la consulta en SIREB** (`GET /liquidaciones/{id}`).
   **Solo se elimina un trámite pendiente cuya liquidación no tiene ningún pago
@@ -434,9 +437,8 @@ el formulario solo si ese carnet ya está revocado.
 | Comercializador NUNCA lleva cupo | `EmitirCarnetService` + `EmitirCarnetRequest` (`prohibitedIf`) |
 | La faena solo cuelga del carnet | `permisos_faena.carnet_id` es la única FK; el cupo llega por `hasManyThrough` |
 | La faena sale con los `kilos_disponibles` de la autorización y no descuenta | `EmitirFaenaService::emitir()` |
-| Faena: máximo 30 días | `PermisoFaena::DIAS_VIGENCIA` + `EmitirFaenaRequest` |
+| Vigencia de autorización, faena y guía, configurable | `App\Support\Vigencia` + `TramiteConVigencia` / `ModoVigencia`, pantalla `VigenciaController` |
 | La guía solo cuelga del carnet | `guias_movimiento.carnet_id` es la única FK hacia la persona |
-| Guía: máximo 5 días | `GuiaMovimiento::DIAS_VIGENCIA` + `EmitirGuiaRequest` |
 | Cada actor emite solo lo suyo | `TipoActor::emiteFaenas()` / `emiteGuias()`, en los dos servicios |
 | Fechas de la faena al aprobar | `RevisarFaenaService::aprobar()` + `PermisoFaena::desembarqueDesde()` |
 | Solo se revoca un carnet aprobado | `EstadoCarnet::permiteRevocacion()` + `EmitirCarnetService::revocar()` |
