@@ -117,7 +117,7 @@ export default function EditarCarnet({
                                         {cupos.map((c) => (
                                             <option key={c.id} value={c.id}>
                                                 {c.volumen_total_kg} kg ·{' '}
-                                                {c.descripcion ?? 'sin tramo'} · {c.estado_etiqueta}
+                                                {c.descripcion ?? 'sin escala'} · {c.estado_etiqueta}
                                             </option>
                                         ))}
                                     </Select>
@@ -276,7 +276,7 @@ export default function EditarCarnet({
                                 {carnet.precio !== null ? bs(carnet.precio, institucion.moneda) : '—'}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                                El de hoy de su tarifa en SIREB. La tarifa no se cambia al corregir.
+                                El de hoy de su actividad en SIREB.
                             </p>
                         </div>
 

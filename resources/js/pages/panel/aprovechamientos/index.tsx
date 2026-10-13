@@ -229,7 +229,7 @@ export default function IndiceCupos({
                                                     </div>
                                                 </td>
 
-                                                {/* Solo el rango, sin el número del tramo: es
+                                                {/* Solo el rango, sin el número de la escala: es
                                                     un dato interno del catálogo y en la columna
                                                     se leía como un id. «201 Kg Hasta 300 Kg» dice
                                                     lo mismo y se entiende sin la tabla al lado. */}
@@ -404,7 +404,7 @@ export default function IndiceCupos({
                 }
                 etiquetaMotivo="Motivo de la eliminación"
                 ayuda="Queda en la auditoría con su nombre, y es lo que va a explicar la baja dentro de seis meses."
-                placeholder="Cargado por error: el tramo corresponde a otro pescador."
+                placeholder="Cargado por error: la escala corresponde a otro pescador."
                 textoConfirmar="Eliminar aprovechamiento"
                 confirmacion="Entiendo que el cupo desaparece del sistema y que esto no se deshace desde el panel."
                 valor={borrado.data.motivo}

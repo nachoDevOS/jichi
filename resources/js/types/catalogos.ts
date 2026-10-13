@@ -60,7 +60,8 @@ export interface ServicioAnterior extends ServicioHistorial {
 /** Una fila de Aranceles de SIREB: el servicio que cobra un trámite. */
 export interface ArancelFila {
     id: number;
-    concepto: string;
+    /** El trámite que lo usa; null si lo registró la unidad. */
+    concepto: string | null;
     etiqueta: string;
     descripcion: string;
     servicio_sireb: string | null;
@@ -68,6 +69,19 @@ export interface ArancelFila {
     servicio: ServicioSireb | null;
     /** Las tarifas del servicio, para «Ver tarifas». Vacío sin servicio o sin SIREB. */
     tarifas: TarifaSireb[];
+    /** Si lleva «Definir tarifas»: el carnet y los que registra la unidad. */
+    usa_tarifas_definidas: boolean;
+    tarifas_definidas: number;
+}
+
+/** Una tarifa definida de un arancel: su etiqueta y la tarifa de SIREB que la cobra. */
+export interface TarifaDefinida {
+    /** null = todavía no guardada. */
+    id: number | null;
+    /** Interna: solo en el carnet (pescador / comercializador). No se muestra. */
+    clave: string | null;
+    etiqueta: string;
+    sireb_tarifa_id: string | null;
 }
 
 /** Lo que la pantalla de alta/edición necesita de una asociación. */

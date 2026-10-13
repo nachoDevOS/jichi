@@ -10,7 +10,7 @@
 
 Desde Administración › Vigencias la autorización puede durar N días. Hoy nada
 corta a sus hijos: una faena aprobada cerca del final puede desembarcar después
-de que venza la autorización, y el carnet de pescador sigue venciendo el 31/12
+de que venza la autorización, y el carnet de pescador tiene su propia vigencia
 (su `estaVigente()` mira si la autorización fue revocada, no su fecha). Falta
 decidir si se cortan al vencimiento de la autorización.
 
@@ -18,7 +18,7 @@ decidir si se cortan al vencimiento de la autorización.
 
 Se quitaron `categorias_aprovechamiento`, `tipos_carnet` y
 `productos_hidrobiologicos`. `aprovechamientos_pesq` perdió `categoria_aprov_id`
-y `modalidad` y ganó `tramo`; `carnets` perdió `tipo_carnet_id`; `guia_detalles`
+y `modalidad` y ganó `escala` (columna que se llamó `tramo` hasta el 13/10/2026); `carnets` perdió `tipo_carnet_id`; `guia_detalles`
 perdió `producto_id` (el producto es `sireb_tarifa_id`). Hasta rearmar la base,
 las pantallas responden `column "tramo" does not exist`. Hay que correr también
 `php artisan db:seed --class=RolPermisoSeeder`: salió el permiso `catalogos.crear`.
@@ -31,8 +31,9 @@ por actividad» cuenta solo los `vigentes()`: se pueden registrar dos pendientes
 para la misma persona. Ya pasaba antes del 12/10/2026; decidir si el pendiente
 ocupa el lugar, como en la autorización (`enCurso()`).
 
-**Los kilos de la autorización los escribe ventanilla** (12/10/2026). Nada controla
-que coincidan con el tramo elegido: si la unidad lo quiere, es una regla a definir.
+**✅ Los kilos de la autorización salen de la escala** (13/10/2026): `rango_hasta`
+de la tarifa de SIREB. **A revisar con Recaudaciones:** la escala de 1001 a 2000 kg
+cobra 500 Bs, menos que la de 801 a 1000 (660 Bs), y la de 2001 a 3000 ya no está.
 
 ## ✅ Ibare ya entrega el token a Jichi — 12/10/2026
 

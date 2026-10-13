@@ -7,13 +7,14 @@ use App\Traits\Auditable;
 use App\Traits\HistorialSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * El servicio de SIREB que cobra un trámite. Solo el servicio: la tarifa se elige
- * al emitir. Se busca por su concepto, nunca por id. Ver docs/modulos/SIREB.md.
+ * Un arancel: nombre y servicio de SIREB. El que usa un trámite lleva `concepto`
+ * y se busca por él, nunca por id. Ver docs/modulos/SIREB.md.
  */
-#[Fillable(['concepto', 'servicio_sireb'])]
+#[Fillable(['nombre', 'concepto', 'servicio_sireb'])]
 class ArancelSireb extends Model
 {
     use Auditable, HistorialSireb, SoftDeletes;
@@ -29,6 +30,23 @@ class ArancelSireb extends Model
             'concepto' => ConceptoArancel::class,
             'sireb_historial' => 'array',
         ];
+    }
+
+    public function tarifasDefinidas(): HasMany
+    {
+        return $this->hasMany(ArancelTarifa::class, 'arancel_id');
+    }
+
+    /** Las claves que fija el código (el carnet); null si la unidad arma las suyas. */
+    public function clavesFijas(): ?array
+    {
+        return $this->concepto?->claves();
+    }
+
+    /** Si lleva tarifas definidas: el carnet y los que registra la unidad. */
+    public function usaTarifasDefinidas(): bool
+    {
+        return $this->concepto === null || $this->concepto->claves() !== [];
     }
 
     /** La fila de un concepto, o null si el seeder no la creó. */

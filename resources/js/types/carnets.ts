@@ -158,7 +158,7 @@ export interface CarnetEnCorreccion {
     tipo_actor_etiqueta: string;
 
     asociacion_id: number;
-    /** Precio de hoy de SU tarifa en SIREB, de referencia. null si SIREB no responde o ya no la tiene. */
+    /** Precio de hoy de su actividad en SIREB, de referencia. null si SIREB no responde o no hay una sola tarifa. */
     precio: number | null;
     aprovechamiento_id: number | null;
     fecha_solicitud: string | null;
@@ -177,7 +177,6 @@ export interface ReposicionDeCarnet {
     codigo: string | null;
     asociacion_id: number;
     tipo_actor: TipoActor;
-    tarifa_sireb: string | null;
     aprovechamiento_id: number | null;
 }
 
@@ -203,3 +202,6 @@ export interface CupoVigente {
     habilita_faenas: boolean;
 }
 
+
+/** El precio del carnet de cada actividad en SIREB; null si no tiene una sola tarifa activa. */
+export type PreciosCarnet = Record<TipoActor, { etiqueta: string; monto: number } | null>;

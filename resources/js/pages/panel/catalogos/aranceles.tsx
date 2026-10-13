@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ChevronDown, Coins, History, ListOrdered, Pencil, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ChevronDown, Coins, History, Link2, ListOrdered, Pencil, Plus, RefreshCw, TriangleAlert } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -45,12 +45,21 @@ export default function CatalogoAranceles({
     return (
         <LayoutPanel
             titulo="Aranceles de SIREB"
-            descripcion="Lo que cobra cada trámite en Recaudaciones (SIREB). Se corrigen; no se agregan."
+            descripcion="Lo que se cobra en Recaudaciones (SIREB): un nombre y su servicio."
             acciones={
-                <Button type="button" variant="outline" onClick={actualizar} disabled={actualizando}>
-                    <RefreshCw className={cn('size-4', actualizando && 'animate-spin')} />
-                    Actualizar desde SIREB
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={actualizar} disabled={actualizando}>
+                        <RefreshCw className={cn('size-4', actualizando && 'animate-spin')} />
+                        Actualizar desde SIREB
+                    </Button>
+
+                    {puede('catalogos.crear') && (
+                        <Link href={route('aranceles.create')} className={cn(buttonVariants())}>
+                            <Plus className="size-4" />
+                            Registrar
+                        </Link>
+                    )}
+                </div>
             }
         >
             <Head title="Aranceles de SIREB" />
@@ -98,6 +107,13 @@ export default function CatalogoAranceles({
                                                     <td className="px-5 py-2.5">
                                                         <p className="font-medium">{a.etiqueta}</p>
                                                         <p className="text-xs text-muted-foreground">{a.descripcion}</p>
+                                                        {a.usa_tarifas_definidas && (
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {a.tarifas_definidas === 0
+                                                                    ? 'Sin tarifas definidas'
+                                                                    : `${a.tarifas_definidas} tarifa(s) definida(s)`}
+                                                            </p>
+                                                        )}
                                                     </td>
 
                                                     <td className="px-5 py-2.5" title={a.servicio_sireb ?? undefined}>
@@ -156,6 +172,16 @@ export default function CatalogoAranceles({
                                                             >
                                                                 <History className="size-4" />
                                                             </Link>
+
+                                                            {puede('catalogos.editar') && a.usa_tarifas_definidas && (
+                                                                <Link
+                                                                    href={route('aranceles.tarifas', a.id)}
+                                                                    className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+                                                                    title="Definir tarifas"
+                                                                >
+                                                                    <Link2 className="size-4" />
+                                                                </Link>
+                                                            )}
 
                                                             {puede('catalogos.editar') && (
                                                                 <Link

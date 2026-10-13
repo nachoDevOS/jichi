@@ -143,7 +143,7 @@ export interface CarnetResumen {
  */
 export interface CupoResumen {
     id: number;
-    /** El tramo: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
+    /** La escala: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
     descripcion: string | null;
     volumen_total_kg: number;
     /** Los kilos que sale cada faena, fijos: las faenas no descuentan. */

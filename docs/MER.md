@@ -64,6 +64,7 @@ propósito y el porqué de cada decisión vive acá.**
     Catálogos que alimentan lo de arriba:
       asociaciones · aranceles_sireb (lo que cobra cada trámite en SIREB:
       la escala, los dos carnets, la faena y los productos de la guía)
+      └──< arancel_tarifas (etiqueta + tarifa de SIREB: el carnet de cada actividad…)
 ```
 
 **El orden de ventanilla, que es el que explica las dependencias:**
@@ -127,8 +128,8 @@ servicio de SIREB**: cada tarifa es un tramo. El servicio se elige en Catálogos
 Aranceles (fila `autorizacion` de `aranceles_sireb`, solo con `servicio_sireb`) y
 el formulario de otorgar lista sus tarifas.
 
-- **Los kilos** los escribe ventanilla al otorgar (campo «Kilos autorizados»):
-  la tarifa de SIREB solo trae etiqueta, precio y estado.
+- **Los kilos** salen del `rango_hasta` de la tarifa elegida *(13/10/2026)*:
+  ventanilla no los escribe. Una tarifa sin `rango_hasta` no se puede elegir.
 - **La modalidad** (`escala_general` / `especie_especial`) se fue con la tabla: no
   cambiaba ningún comportamiento desde el 19/09/2026.
 - **Lo que se perdió**: editar el texto o los kilos de un tramo desde Jichi y su
@@ -226,9 +227,9 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | --- | --- | --- |
 | `beneficiario_id` | FK RESTRICT | |
 | `nro` | unsigned, único **global** | El N° impreso: correlativo **continuo** (`AUTORIZACION-PESCA`), `000001`. Lo pone el sistema al otorgar; antes del 03/10/2026 se imprimía el `id` |
-| `tramo` | string(160) | **Copiada**: la etiqueta de la tarifa de SIREB al otorgar («101 kg Hasta 200 kg»). Va impresa y en las fichas (12/10/2026) |
-| `volumen_total_kg` | decimal(12,2) | Los kilos autorizados: **los escribe ventanilla** al otorgar (12/10/2026) |
-| `kilos_disponibles` | decimal(12,2) | Los kilos con que sale **cada** faena. Los escribe ventanilla al otorgar y **no cambian**: las faenas no descuentan (12/10/2026) |
+| `escala` | decimal(12,2) | **Copiado**: el `rango_hasta` de la tarifa de SIREB al otorgar (13/10/2026; antes `tramo`, con la etiqueta). Va impreso en «Volumen Establecido» y en las fichas como «Hasta 100 kg» (`escalaLegible()`) |
+| `volumen_total_kg` | decimal(12,2) | Los kilos autorizados: **los de la escala** (13/10/2026) |
+| `kilos_disponibles` | decimal(12,2) | Los kilos con que sale **cada** faena: los de la escala, y **no cambian**: las faenas no descuentan (12/10/2026) |
 | `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar. Corregir no lo toca: solo cambia la embarcación (03/10/2026) |
 | `sireb_tarifa_id` | uuid **null** | La tarifa de SIREB de ese monto: **es el tramo**. «Generar nueva liquidación» vuelve a pedir esta misma (12/10/2026) |
 | `sireb_idempotency_key` | uuid **null**, único global | La `Idempotency-Key` de la venta en SIREB. Se guarda ANTES de llamar; corregir con otra tarifa genera otra (02/10/2026) |
@@ -304,13 +305,13 @@ primero y actualizarlo después, y entre las dos operaciones existiría una
 credencial impresa sin cupo. Por eso la referencia va al revés, en
 `carnets.aprovechamiento_id`.
 
-**Por qué se copian `tramo` y `volumen_total_kg`.** Porque la escala cambia
+**Por qué se copian `escala` y `volumen_total_kg`.** Porque la escala cambia
 por resolución, y ahora vive en SIREB. Un cupo otorgado en marzo bajo una tarifa
 de 500 kg no puede pasar a valer 800 en agosto porque Recaudaciones renombró o
 dio de baja la tarifa. Leerlos de SIREB al mostrar sería además una llamada por
 fila, que con SIREB caído deja la ficha vacía.
 
-**`kilos_disponibles` es fijo** *(12/10/2026)*: lo escribe ventanilla al otorgar
+**`kilos_disponibles` es fijo** *(12/10/2026)*: sale de la escala al otorgar
 y cada faena lo copia en su `kilos_extraidos`. Las faenas **no descuentan**: no
 hay saldo, reserva, `agotado` ni modo estricto. Antes de esa fecha la faena
 reservaba al registrarse y descontaba al aprobarse; está en el historial de git.
@@ -342,7 +343,7 @@ bajo su nombre.
 | `estado` | string(20) | `EstadoCarnet`: `pendiente`, `aprobado`, `revocado` |
 | `fecha_solicitud` | date | El día que se pidió |
 | `fecha_emision` | date **null** | El día que se aprobó |
-| `fecha_vencimiento` | date, índice | El 31/12 de la gestión de la aprobación. **Es la vigencia: no hay estado `vencido`** |
+| `fecha_vencimiento` | date, índice | Desde la aprobación, según Administración › Vigencias para su actividad (de inicio el 31/12; configurable el 13/10/2026). **Es la vigencia: no hay estado `vencido`** |
 
 **EL CÓDIGO YA NO ES UNA COLUMNA DE ESTA TABLA.** Vivía en `codigo_carnet` y se
 mudó a **`codigos`** el 22/09/2026, cuando los otros cuatro documentos pasaron a
@@ -398,19 +399,41 @@ se tocan. Un pendiente se elimina — ver
 
 | Columna | Tipo | Nota |
 | --- | --- | --- |
-| `concepto` | string(30), **único** | `ConceptoArancel`: `autorizacion`, `carnet`, `faena` y `guia`. Una fila por concepto |
+| `nombre` | string(120) | Como se ve en la pantalla. No se repite (lo controla la validación) *(13/10/2026)* |
+| `concepto` | string(30), null, **único** | `ConceptoArancel`: `autorizacion`, `carnet`, `faena` y `guia`, una fila cada uno. **NULL** en los que registra la unidad: no los cobra ningún trámite todavía *(13/10/2026)* |
 | `servicio_sireb` | uuid, null | **Solo el servicio** de SIREB (12/10/2026: se quitó `tarifa_sireb`). La tarifa la elige ventanilla al emitir, entre las de este servicio. Nace en null hasta que alguien lo elige |
 | `sireb_historial` | json, null | Los servicios anteriores: trait `HistorialSireb` |
 
 Una tabla genérica y no `tarifa_faena`: un cobro fijo nuevo es un caso más del
 enum y una fila, sin migración. Las filas las pone `CatalogoSeeder` (una por
-caso del enum) y no se dan de baja, por eso el único es a secas y no parcial.
-Se editan en Catálogos › Aranceles. **Por qué solo el servicio:** el precio y
+caso del enum) y no se dan de baja, por eso el único es a secas y no parcial
+(los NULL no chocan entre sí). Desde el 13/10/2026 la unidad registra otros en
+Catálogos › Aranceles («Registrar», `catalogos.crear`), con nombre y servicio y
+sin `concepto`: quedan listos para el trámite que los cobre. **Por qué solo el servicio:** el precio y
 qué tarifa corresponde los define Recaudaciones; guardar también la tarifa era
 volver a cargar en Jichi lo que ya está en SIREB. Cada documento congela la
 tarifa elegida en su `sireb_tarifa_id`.
 
 ---
+
+
+### `arancel_tarifas` — las tarifas definidas de un arancel *(13/10/2026)*
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `arancel_id` | FK RESTRICT → `aranceles_sireb` | |
+| `etiqueta` | string(120) | El nombre que se ve y **se edita**: «Carnet de pescador», «Alevines de tambaquí». No se repite en el arancel (validación) |
+| `clave` | string(30), null | **Oculta**: solo en el carnet, `pescador` / `comercializador` (`ConceptoArancel::claves()`). El código busca por ella, nunca por la etiqueta, así que renombrar no rompe nada. NULL en los aranceles de la unidad |
+| `sireb_tarifa_id` | uuid | **El id**, no el nombre: un renombre en SIREB no rompe el vínculo. El precio se pide siempre en vivo |
+
+No hay columna «caso»: se quitó a pedido el mismo 13/10/2026; la etiqueta la
+reemplaza y la clave queda solo para lo que el código necesita encontrar.
+
+**Único parcial** `(arancel_id, clave) WHERE deleted_at IS NULL`: es catálogo, quitar
+un vínculo libera la clave; las NULL no chocan entre sí. Reemplaza a buscar la tarifa del carnet por la palabra
+de su nombre, que se rompía con un renombre en SIREB. La llena
+`DefinirTarifasService` desde Aranceles › Definir tarifas; `CatalogoSeeder` siembra
+las dos del carnet con los ids de test.sireb.
 
 ### `permisos_faena` — una salida
 
@@ -832,8 +855,8 @@ sin poder recibir otro nunca más.
 | **Índices únicos con borrado lógico: parciales en catálogos, globales en papeles** | Ver la sección 3 |
 | **RESTRICT por defecto**, CASCADE solo en `guia_detalles → guias_movimiento` | Borrar no puede llevarse por delante un historial que respalda papeles entregados |
 | **El orden del `Schema::create()` es siempre el mismo**: `id` → claves foráneas → datos → estado → fechas del negocio → índices → `timestamps()` → `softDeletes()` | Las diez tablas terminan iguales. No cambia el esquema: es convención de lectura |
-| **Lo copiado se congela** (`tramo`, `volumen_total_kg`, `monto`, `monto_total`, `concepto`, la boleta del recibo) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
-| **Lo calculable NO se guarda** (saldo en Bs). `kilos_disponibles` es un dato que escribe ventanilla, no un saldo | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
+| **Lo copiado se congela** (`escala`, `volumen_total_kg`, `monto`, `monto_total`, `concepto`, la boleta del recibo) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
+| **Lo calculable NO se guarda** (saldo en Bs). `kilos_disponibles` es un dato copiado de la escala, no un saldo | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
 
 **Tablas de soporte**, fuera del dominio: `users`, `correlativos`,
 `configuraciones`, `auditorias`, `accesos`. Más las de Laravel y las de

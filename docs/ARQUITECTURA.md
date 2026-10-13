@@ -65,8 +65,7 @@ gestión.
 
 Qué emite cada carnet lo dice **`carnets.tipo_actor`** (`TipoActor::emiteFaenas()`
 / `emiteGuias()`) y el nombre impreso (`nombreCarnet()`). Ya no hay catálogo de
-tipos de carnet (12/10/2026): el precio es la tarifa del servicio «Carnet» de
-SIREB que elige ventanilla.
+tipos de carnet (12/10/2026): el precio es la tarifa que la unidad definió para su actividad en Aranceles › Carnet › Definir tarifas (`arancel_tarifas`, por id de SIREB: un cambio de nombre allá no la afecta; 13/10/2026): ventanilla elige solo la actividad.
 
 ### Las reglas que ordenan todo
 
@@ -113,7 +112,7 @@ carnet, faena y guía no, si la corrección cambia lo que se cobra.
 - **Dos plazos que no se mezclan.** El de **pago** lo pone SIREB
   (`plazo_pago_dias`, 5 días): si la liquidación vence, el trámite **sigue
   pendiente** (08/10/2026) y se elimina a mano si ya no corresponde. La **vigencia** del trámite
-  (carnet al 31/12; autorización, faena y guía configurable en Administración › Vigencias (`App\Support\Vigencia`, 12/10/2026); de inicio
+  (autorización, carnets —pescador y comercializador por separado, 13/10/2026—, faena y guía configurable en Administración › Vigencias (`App\Support\Vigencia`, 12/10/2026); de inicio
   31/12, 30 y 5 días) **no es un estado**: un
   aprobado sigue `aprobado` y si vale hoy lo dicen sus fechas (`estaVigente()`).
 - **Revocar** (los cuatro trámites) es de supervisión, con motivo, y no se
@@ -168,14 +167,14 @@ El esquema completo, con el porqué de cada columna e índice, está en
 | Tabla | Qué guarda | Lo que no es obvio |
 | --- | --- | --- |
 | `beneficiarios` | La persona | C.I. único con índice **parcial** (`WHERE deleted_at IS NULL`). Columnas en camelCase desde `primerNombre` |
-| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Copia el tramo (etiqueta de la tarifa de SIREB) y sus kilos. `kilos_disponibles` fijo: con eso sale cada faena, que no descuenta (12/10/2026). Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
+| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Copia la escala (`rango_hasta` de la tarifa de SIREB), que son sus kilos. `kilos_disponibles` fijo: con eso sale cada faena, que no descuenta (12/10/2026). Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
 | `carnets` | La credencial anual | `tipo_actor` decide qué emite. El de pescador lleva `aprovechamiento_id`; el de comercializador, NULL |
 | `permisos_faena` | Una salida de pesca | Cuelga **solo** del carnet; llega a la autorización por `hasManyThrough` |
 | `guias_movimiento` | Un traslado | Cuelga solo del carnet; copia la asociación porque va impresa |
 | `guia_detalles` | El cuadro D, una fila por especie | La única FK CASCADE del dominio. El producto es una tarifa de SIREB (`sireb_tarifa_id`) y su etiqueta se copia en `especie` |
 | `recibos` | El comprobante, uno por documento pagado | Polimórfico (`recibible`); correlativo continuo; monto, concepto y boleta de SIREB congelados |
 | `codigos` | La llave pública de los cinco documentos | Polimórfica; único completo, un código impreso queda quemado |
-| `asociaciones`, `aranceles_sireb`, `departamentos` | Catálogos | Los edita la unidad desde el panel. **`aranceles_sireb` es el único catálogo de precios** (12/10/2026): una fila por trámite con **solo el servicio de SIREB**; ventanilla elige la tarifa al emitir. La escala y los productos de la guía no son tablas: son las tarifas de esos servicios |
+| `asociaciones`, `aranceles_sireb`, `arancel_tarifas`, `departamentos` | Catálogos | Los edita la unidad desde el panel. **`aranceles_sireb` es el único catálogo de precios** (12/10/2026): una fila por trámite con **solo el servicio de SIREB**; ventanilla elige la tarifa al emitir (el carnet no: su tarifa por actividad está definida en `arancel_tarifas`). La unidad registra aranceles propios, con nombre y sus tarifas definidas (etiqueta + tarifa de SIREB). La escala y los productos de la guía no son tablas: son las tarifas de esos servicios |
 
 Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 `correlativos` y las tablas de `spatie/laravel-permission`.
@@ -277,7 +276,7 @@ copia en vez de leerse por relación:
 | `guias_movimiento.monto`, `guia_detalles.precio_kg` | El total del cuadro D y la tasa de cada producto al emitir (con el descuento de piscicultura) |
 | `recibos.monto_total`, `concepto`, `numero_boleta` (N° de transacción), `entidad_bancaria`, `fecha_pago` | Lo que dice el papel entregado, con el pago tal como lo validó SIREB |
 | `guias_movimiento.asociacion_id` | El aval impreso en la guía |
-| `aprovechamientos_pesq.tramo`, `volumen_total_kg` | Lo que se otorgó, aunque la tarifa cambie en SIREB |
+| `aprovechamientos_pesq.escala`, `volumen_total_kg` | Lo que se otorgó, aunque la tarifa cambie en SIREB |
 | `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar, solo si la tarifa está activa (ver [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir)) |
 | `carnets.monto`, `permisos_faena.monto`, `guia_detalles.precio_kg` (+ `sireb_tarifa_id`) | El precio de SIREB al emitir (30/09/2026), solo si la tarifa y el servicio están activos (02/10/2026) |
 
@@ -344,7 +343,7 @@ completa, los nombres y las secciones del formulario de roles. 62 permisos:
 | Ventanilla | Carnets | lo mismo (reponer va con `crear`) |
 | Pagos | Recibos | ver, imprimir |
 | Parámetros | Asociaciones | ver, crear, editar |
-| Catálogos | Catálogos › Aranceles | ver, editar |
+| Catálogos | Catálogos › Aranceles | ver, crear, editar |
 | Administración | Reportes · Auditoría · Configuración | ver, exportar · ver · ver, editar |
 | Seguridad | Usuarios · Roles | ver, crear, editar · ver, crear, editar, eliminar |
 

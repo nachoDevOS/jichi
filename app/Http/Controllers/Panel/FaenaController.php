@@ -301,7 +301,7 @@ class FaenaController extends Controller
                 // La autorización de la que copió los kilos. No descuenta de ella.
                 'cupo' => $faena->cupo() ? [
                     'id' => $faena->cupo()->id,
-                    'descripcion' => $faena->cupo()->tramo,
+                    'descripcion' => $faena->cupo()->escalaLegible(),
                     'volumen_total_kg' => (float) $faena->cupo()->volumen_total_kg,
                     'kilos_disponibles' => (float) $faena->cupo()->kilos_disponibles,
                 ] : null,

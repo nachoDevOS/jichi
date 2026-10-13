@@ -53,7 +53,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | Archivo | Ln | Qué hace | No obvio |
 | --- | --- | --- | --- |
 | `OtorgarCupoService.php` | 231 | Otorgar, corregir y eliminar la autorización | Una autorización en curso por persona (`enCurso()`). Recibe la tarifa de SIREB elegida: `verificarTramo()` saca de ella precio, etiqueta y kilos. **Corregir cambia solo la embarcación**: el tramo no se toca nunca. El N° (`nro`) es correlativo continuo |
-| `EmitirCarnetService.php` | 383 | Emitir, corregir, eliminar, revocar y reponer el carnet | Un carnet vigente por actividad. Pescador exige autorización; comercializador la prohíbe. El precio es la tarifa del servicio «Carnet» elegida (`precioDe($tarifaId)`); al corregir, la suya. Adjuntos SUBIDOS antes de la transacción |
+| `EmitirCarnetService.php` | 383 | Emitir, corregir, eliminar, revocar y reponer el carnet | Un carnet vigente por actividad. Pescador exige autorización; comercializador la prohíbe. El precio sale de la actividad (`precioDeActividad()`: la tarifa definida en `arancel_tarifas`, `ArancelTarifa::idDe()`), al emitir, corregir y renovar. Adjuntos SUBIDOS antes de la transacción |
 | `EmitirFaenaService.php` | 295 | Emitir, corregir y eliminar la faena | Copia `kilos_disponibles` de la autorización en `kilos_extraidos`; no descuenta. Ver `PermisoFaena::cupo` |
 | `EmitirGuiaService.php` | 356 | Emitir, corregir, eliminar y revocar la guía | Cabecera y detalle en la misma transacción. Cada renglón es una tarifa de SIREB (fila `guia`): copia etiqueta y precio. `eliminar()` baja el detalle a mano: CASCADE no corre con baja lógica |
 | `Revisar*Service.php` (Cupo, Carnet, Faena, Guia) | 41–76 | `aprobar()` de cada documento | **Los llama solo `ConfirmarPagoService`.** Conservan las reglas propias (autorización revocada, kilos libres, fechas, número de registro). `RevisarCupoService` además revoca |
@@ -61,6 +61,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `ConfirmarPagoService.php` | 206 | Pregunta a SIREB y actúa | `pagada` + pago `confirmado` → aprueba y emite el recibo (y marca la liquidación `pagada` en el historial); `vencida` → solo avisa, el trámite sigue pendiente. Guarda en `sireb_envio.consulta` lo que dijo SIREB. Guarda el pago informado en `sireb_envio.pago` (solo si cambió: el comando corre cada 10 min y audita). `alNoPoderEliminar()`: al eliminar algo con pago, verifica y arma el aviso |
 | `RenovarLiquidacionService.php` | 180 | «Generar nueva liquidación» (08/10/2026) | Solo con la vencida sin pago. Pide el precio de HOY de **la misma tarifa** del trámite (la guía, renglón por renglón). Escribe con la fila bloqueada y envía después del commit. No cambia el estado |
 | `CargarPagoService.php` | 77 | Carga en SIREB el pago de un trámite | **Solo carga.** Antes consulta: liquidación `pendiente` y sin pago, o no carga y corre `verificar()` para poner la ficha al día |
+| `DefinirTarifasService.php` | 100 | Las tarifas definidas de un arancel: etiqueta y tarifa de SIREB | Solo tarifas del servicio que SIREB tiene hoy. Carnet: una fila por clave fija. Los de la unidad: por id, y lo que no viene se da de baja una por una (auditoría) |
 | `CorrelativoService.php` | 78 | Números correlativos con la fila bloqueada | `siguienteContinuo()` (año 0, no reinicia) para lo impreso: recibo, autorización, faena, guía. `siguienteNumero()` por gestión: el registro del carnet. `rellenar()` → seis dígitos |
 | `CodigoService.php` | 88 | El código de verificación de 16 caracteres | `asignar()` es idempotente: un reenvío no gasta otro código |
 | `CuentaPortalService.php` | 97 | Cuentas del portal | Clave temporal, obligatoria de cambiar. Esas cuentas nunca llevan roles |
@@ -81,7 +82,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
 | `Rol.php` | 39 | Hereda el `Role` de Spatie para llevar `Auditable`; registrado en `config/permission.php`. `esDelSistema()` = está en `RolSistema` |
-| `AprovechamientoPesq.php` | 451 | La bolsa madre. `volumen_total_kg` y `kilos_disponibles` los escribe ventanilla; las faenas no descuentan (12/10/2026). `puedeEmitirFaena()` = `estaVigente()`. `numeroLegible()` lee `nro` |
+| `AprovechamientoPesq.php` | 451 | La bolsa madre. `escala`, `volumen_total_kg` y `kilos_disponibles` salen del `rango_hasta` de SIREB (`escalaLegible()`); las faenas no descuentan (12/10/2026). `puedeEmitirFaena()` = `estaVigente()`. `numeroLegible()` lee `nro` |
 | `Carnet.php` | 425 | `estaVigente()`, `sinEfecto()` y `etiquetaEstado()` **miran a su autorización**: la consulta tiene que precargarla. `amparaSusPapeles()`: faenas y guías valen si el titular tiene carnet vigente de la actividad. `registro_legible` = `nro` con seis dígitos |
 | `PermisoFaena.php` | 305 | Vigencia configurable (`fecha_desembarque`, ver `Support\Vigencia`). Vale si su carnet y su autorización valen. `$attributes` lleva los defaults que lee el código |
 | `GuiaMovimiento.php` | 330 | Vigencia configurable (`Support\Vigencia`). `factorArancel()`: piscicultura al 50%. `numero_legible` lee `nro` |
@@ -89,7 +90,8 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Beneficiario.php` | 273 | **camelCase** de `primerNombre` en adelante: en SQL a mano va entrecomillado (`SQL_NOMBRE`). `documento_identidad` lee `ci`, `complemento` y `departamento_id`: los tres van en el select |
 | `Recibo.php` | 65 | Copia congelada: monto, concepto, N° de transacción, banco y fecha de pago de SIREB. `recibible` es polimórfica: se precarga con `morphWith` |
 | `Codigo.php` | 31 | El código de verificación de los cinco documentos, en una tabla aparte. Ver trait `Codificable` |
-| `ArancelSireb.php` | 39 | El único catálogo de precios: una fila por `ConceptoArancel`, con **solo** `servicio_sireb` (uuid). Se busca con `de($concepto)` |
+| `ArancelSireb.php` | 60 | El único catálogo de precios: nombre y `servicio_sireb`; los de los trámites llevan `concepto` y se buscan con `de($concepto)`. `tarifasDefinidas()`, `clavesFijas()`, `usaTarifasDefinidas()` |
+| `ArancelTarifa.php` | 37 | Una tarifa definida: etiqueta, `clave` oculta (solo carnet) y `sireb_tarifa_id`. `idDe($concepto, $clave)`. La guarda `DefinirTarifasService` |
 | `Asociacion.php`, `Departamento.php` | 150 / 83 | Departamento es catálogo cerrado, sembrado en su migración |
 | `User.php` | 75 | Con `beneficiario_id` = cuenta del portal, nunca entra al panel |
 | `Auditoria.php`, `Acceso.php`, `Configuracion.php`, `Correlativo.php` | 18–63 | Soporte |
@@ -143,7 +145,7 @@ funcionario; el controlador lo pone en el campo o en el aviso.
 | `../Jobs/VerificarPagoJob.php` | Consulta en SIREB el pago de un trámite, después de mandar la página | Lo dispara el portal (inicio y «En curso») con `dispatchAfterResponse()`: sin trabajador de cola. `encolarDe()` usa la reserva de 2 min por trámite. Saltea lo vencido o anulado, como el comando |
 | `TramitesDisponibles.php` | Qué puede pedir la persona (el sello «Usted puede pedirlo» de la vitrina del portal): pregunta a los mismos métodos del modelo |
 | `DocumentoDelPortal.php` | Busca por código público, solo lo propio: lo ajeno da 404 igual que lo inexistente |
-| `Vigencia.php` | 60 | Hasta cuándo vale autorización, faena y guía | Lee `configuraciones` (`vigencia.{tramite}.modo/dias`); `hasta()` conserva la hora (la guía se cuenta con hora). Pantalla: `VigenciaController` |
+| `Vigencia.php` | 60 | Hasta cuándo vale autorización, carnets (uno por actividad, `carnetDe()`), faena y guía | Lee `configuraciones` (`vigencia.{tramite}.modo/dias`); `hasta()` conserva la hora (la guía se cuenta con hora). Pantalla: `VigenciaController` |
 | `QrVerificacion.php`, `CodigoQr.php` | URL **relativa + `APP_URL`** (nunca el host de la petición); QR pintado con `gd` |
 | `ReciboImpreso.php`, `TextoVertical.php`, `MarcaAgua.php` | Piezas de los PDF: lo que DomPDF no sabe hacer va horneado en PNG |
 | `Archivos.php`, `Paginacion.php`, `Sql.php` | `Sql` tiene lo que cambia entre PostgreSQL y SQLite |

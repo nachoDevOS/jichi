@@ -9,7 +9,7 @@ import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fechaInput } from '@/lib/utils';
+import { bs, fecha } from '@/lib/utils';
 import type { PageProps, TarifaSireb } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 
@@ -39,16 +39,12 @@ export default function CrearCupo({
     const form = useForm({
         beneficiario_id: beneficiario?.id ?? null,
         tarifa_sireb: '',
-        // Los escribe ventanilla: la tarifa de SIREB solo trae el precio.
-        volumen_total_kg: '',
         tipo_embarcacion: '',
-        // Lo normal es otorgar hoy. El servidor rechaza fechas futuras: el cupo
-        // vence con la gestión, así que una del año que viene arrancaría vencida.
-        fecha_solicitud: fechaInput(new Date()),
     });
 
     const tramo = escala?.find((t) => t.id === form.data.tarifa_sireb) ?? null;
-    const kilos = Number(form.data.volumen_total_kg || 0);
+    // Los kilos son el `rango_hasta` de la escala: ventanilla no los escribe.
+    const kilos = Number(tramo?.rango_hasta ?? 0);
 
     function elegirPersona(elegida: BeneficiarioSugerido | null) {
         setPersona(elegida);
@@ -68,7 +64,7 @@ export default function CrearCupo({
     const sinEscala = !servicioConfigurado
         ? {
               titulo: 'Falta el servicio de la escala',
-              descripcion: 'Elija en Catálogos › Aranceles el servicio de SIREB cuyas tarifas son los tramos de la escala.',
+              descripcion: 'Elija en Catálogos › Aranceles el servicio de SIREB que cobra la escala.',
           }
         : escala === null
           ? {
@@ -117,10 +113,10 @@ export default function CrearCupo({
                         </Campo>
 
                         <Campo
-                            etiqueta="Tramo de la escala"
+                            etiqueta="Escala"
                             htmlFor="tarifa_sireb"
                             error={form.errors.tarifa_sireb}
-                            ayuda="Las tarifas de Recaudaciones (SIREB): de cada una sale el monto."
+                            ayuda="Las tarifas de Recaudaciones (SIREB): de cada una salen el monto y los kilos."
                             obligatorio
                         >
                             <Select
@@ -129,36 +125,19 @@ export default function CrearCupo({
                                 onChange={(e) => form.setData('tarifa_sireb', e.target.value)}
                                 aria-invalid={Boolean(form.errors.tarifa_sireb)}
                             >
-                                <option value="">Elija un tramo…</option>
+                                <option value="">Elija la escala…</option>
                                 {escala.map((t) => (
-                                    <option key={t.id} value={t.id} disabled={!t.activa}>
-                                        {/* Solo el tramo: el precio se ve en «Lo que se va a registrar». */}
+                                    <option key={t.id} value={t.id} disabled={!t.activa || !(Number(t.rango_hasta) > 0)}>
+                                        {/* Solo la escala: el precio se ve en «Lo que se va a registrar». */}
                                         {t.etiqueta}
-                                        {!t.activa ? ' (tarifa no disponible)' : ''}
+                                        {!t.activa
+                                            ? ' (tarifa no disponible)'
+                                            : !(Number(t.rango_hasta) > 0)
+                                              ? ' (sin rango en SIREB)'
+                                              : ''}
                                     </option>
                                 ))}
                             </Select>
-                        </Campo>
-
-                        <Campo
-                            etiqueta="Kilos autorizados"
-                            htmlFor="volumen_total_kg"
-                            error={form.errors.volumen_total_kg}
-                            ayuda="El cupo de la gestión: cada permiso de faena descuenta de estos kilos."
-                            obligatorio
-                            className="max-w-xs"
-                        >
-                            <Input
-                                id="volumen_total_kg"
-                                type="number"
-                                min="0.01"
-                                step="0.01"
-                                inputMode="decimal"
-                                value={form.data.volumen_total_kg}
-                                onChange={(e) => form.setData('volumen_total_kg', e.target.value)}
-                                aria-invalid={Boolean(form.errors.volumen_total_kg)}
-                                placeholder="200"
-                            />
                         </Campo>
 
                         {/*
@@ -192,23 +171,6 @@ export default function CrearCupo({
                                 ))}
                             </datalist>
                         </Campo>
-
-                        <Campo
-                            etiqueta="Fecha de solicitud"
-                            htmlFor="fecha_solicitud"
-                            error={form.errors.fecha_solicitud}
-                            ayuda="El día que la persona lo pidió. La fecha de otorgamiento la escribe el sistema al aprobarlo."
-                            obligatorio
-                            className="max-w-xs"
-                        >
-                            <Input
-                                id="fecha_solicitud"
-                                type="date"
-                                value={form.data.fecha_solicitud}
-                                onChange={(e) => form.setData('fecha_solicitud', e.target.value)}
-                                aria-invalid={Boolean(form.errors.fecha_solicitud)}
-                            />
-                        </Campo>
                     </CardContent>
                 </Card>
 
@@ -219,15 +181,23 @@ export default function CrearCupo({
                     </CardHeader>
 
                     <CardContent className="space-y-4">
+                        {/* Solo se muestra: la fecha la pone el servidor al registrar. */}
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Fecha de solicitud
+                            </p>
+                            <p className="font-medium">{fecha(new Date())}</p>
+                        </div>
+
                         {tramo === null ? (
                             <p className="flex items-start gap-2 text-sm text-muted-foreground">
                                 <Info className="mt-0.5 size-4 shrink-0" />
-                                Elija un tramo para ver cuánto se cobra.
+                                Elija la escala para ver cuánto se cobra.
                             </p>
                         ) : (
                             <>
                                 <div>
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Tramo</p>
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Escala</p>
                                     <p className="font-medium">{tramo.etiqueta}</p>
                                 </div>
 
@@ -258,17 +228,6 @@ export default function CrearCupo({
                                     </p>
                                     <p className="text-3xl font-semibold tabular-nums">
                                         {bs(tramo.monto, institucion.moneda)}
-                                    </p>
-                                    {/*
-                                        Se dice a dónde lleva el botón. Decía que
-                                        abría la CAJA, y hace rato que termina en
-                                        la ficha: los depósitos se cargan ahí
-                                        mismo, sin salir del expediente.
-                                    */}
-                                    <p className="text-xs text-muted-foreground">
-                                        Al registrarlo queda PENDIENTE y se registra el cobro en
-                                        Recaudaciones. Cuando se paga allá, queda aprobada sola y
-                                        recién ahí autoriza a pescar.
                                     </p>
                                 </div>
                             </>

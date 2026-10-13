@@ -339,8 +339,8 @@ pesar más que el encabezado.
 
 Hoy dice «CÉDULA DE PESCADOR» o «CÉDULA DE COMERCIALIZADOR», igual que el
 plástico de papel. Sale de `carnets.tipo_actor` (`TipoActor::etiqueta()`). Desde
-el 12/10/2026 no hay catálogo de tipos de carnet: el precio es la tarifa del
-servicio «Carnet» de SIREB que elige ventanilla (Catálogos › Aranceles).
+el 12/10/2026 no hay catálogo de tipos de carnet: el precio es la tarifa de SIREB
+definida para la actividad en Aranceles › Carnet › Definir tarifas (13/10/2026).
 
 Decía «CÉDULA» a secas mientras el carnet era UNO para todas las actividades de
 una persona. Con un carnet por actividad, el título es lo que se lee de lejos

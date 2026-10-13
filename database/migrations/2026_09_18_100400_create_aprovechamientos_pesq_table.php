@@ -21,10 +21,9 @@ return new class extends Migration
 
             $table->unsignedInteger('nro')->unique()->comment('Del talonario: 000001');
 
-            // La escala es el tarifario de SIREB: el tramo elegido se COPIA, porque
-            // Recaudaciones puede renombrar o dar de baja la tarifa después.
-            $table->string('tramo', 160)->comment('Etiqueta de la tarifa de SIREB al otorgar');
-            $table->decimal('volumen_total_kg', 12, 2)->comment('Kilos autorizados: los escribe ventanilla');
+            // Copia del `rango_hasta` de la tarifa de SIREB: Recaudaciones puede cambiarla después.
+            $table->decimal('escala', 12, 2)->comment('rango_hasta de la tarifa de SIREB al otorgar');
+            $table->decimal('volumen_total_kg', 12, 2)->comment('Kilos autorizados: los de la escala');
             // Fijo: las faenas no descuentan. Cada faena sale con este valor.
             $table->decimal('kilos_disponibles', 12, 2)->comment('Kilos con que sale cada faena');
 

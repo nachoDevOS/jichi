@@ -118,9 +118,8 @@ class AprovechamientoController extends Controller
             $cupo = $this->servicio->otorgar(
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
                 $datos['tarifa_sireb'],
-                (float) $datos['volumen_total_kg'],
+                // La fecha de solicitud es hoy: la pone el servidor, no el formulario.
                 $datos['tipo_embarcacion'],
-                now()->parse($datos['fecha_solicitud']),
             );
         } catch (CupoInvalidoException $e) {
             if ($e->avisoGeneral) {
@@ -326,14 +325,14 @@ class AprovechamientoController extends Controller
             'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
         );
 
-        // Titular, tramo, kilos, monto y fechas llegan FIJOS: solo se corrige la embarcación.
+        // Titular, escala, kilos, monto y fechas llegan FIJOS: solo se corrige la embarcación.
         return Inertia::render('panel/aprovechamientos/editar', [
             'cupo' => [
                 'id' => $aprovechamiento->id,
                 'beneficiario' => $aprovechamiento->beneficiario?->nombreCompleto,
                 'documento' => $aprovechamiento->beneficiario?->documento_identidad,
                 'foto_url' => $aprovechamiento->beneficiario?->foto_url,
-                'tramo' => $aprovechamiento->tramo,
+                'escala' => $aprovechamiento->escalaLegible(),
                 'volumen_total_kg' => (float) $aprovechamiento->volumen_total_kg,
                 'monto' => $aprovechamiento->montoACobrar(),
                 'tipo_embarcacion' => $aprovechamiento->tipo_embarcacion,
@@ -424,8 +423,7 @@ class AprovechamientoController extends Controller
             // columna TIENE que estar en el select de arriba.
             'foto_url' => $cupo->beneficiario?->foto_url,
 
-            // La etiqueta de la tarifa de SIREB, copiada al otorgar.
-            'descripcion' => $cupo->tramo,
+            'descripcion' => $cupo->escalaLegible(),
 
             'volumen_total_kg' => (float) $cupo->volumen_total_kg,
             // NULL y no cadena vacía: así la pantalla dice «no declarada» en vez

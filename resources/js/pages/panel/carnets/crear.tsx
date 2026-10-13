@@ -2,19 +2,17 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { Info, TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
-import { SelectorTarifa } from '@/components/panel/comunes/selector-tarifa';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha, fechaInput } from '@/lib/utils';
-import type { OpcionEnum, PageProps, TarifaSireb, TipoActor } from '@/types';
+import { bs, fecha } from '@/lib/utils';
+import type { OpcionEnum, PageProps, TipoActor } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
-import type { AsociacionElegible, CupoVigente, ReposicionDeCarnet } from '@/types/carnets';
+import type { AsociacionElegible, CupoVigente, PreciosCarnet, ReposicionDeCarnet } from '@/types/carnets';
 
 /**
  *  Emitir una credencial — paso 3 del flujo
@@ -25,7 +23,7 @@ export default function CrearCarnet({
     aprovechamientoId,
     asociaciones,
     actividades,
-    tarifas,
+    precios,
     servicioConfigurado,
 }: {
     beneficiario: BeneficiarioSugerido | null;
@@ -35,8 +33,8 @@ export default function CrearCarnet({
     aprovechamientoId: number | null;
     asociaciones: AsociacionElegible[];
     actividades: OpcionEnum[];
-    /** Las tarifas del servicio «Carnet» de SIREB; null si no responde. */
-    tarifas: TarifaSireb[] | null;
+    /** El precio de cada actividad en SIREB; null si no responde. */
+    precios: PreciosCarnet | null;
     /** false = falta elegir el servicio en Catálogos › Aranceles. */
     servicioConfigurado: boolean;
 }) {
@@ -47,14 +45,12 @@ export default function CrearCarnet({
         beneficiario_id: beneficiario?.id ?? null,
         asociacion_id: reposicion ? String(reposicion.asociacion_id) : '',
         tipo_actor: (reposicion?.tipo_actor ?? '') as TipoActor | '',
-        tarifa_sireb: reposicion?.tarifa_sireb ?? '',
         // De qué bolsa madre cuelga. Se manda explícito en vez de dejar que el
         // servidor adivine: así la pantalla y lo guardado dicen lo mismo.
         aprovechamiento_id: (reposicion?.aprovechamiento_id ??
             beneficiario?.cupos_elegibles?.find((c) => c.id === aprovechamientoId)?.id ??
             beneficiario?.cupos_elegibles?.[0]?.id ??
             null) as number | null,
-        fecha_solicitud: fechaInput(new Date()),
 
         // Los dos papeles que respaldan la emisión. Suben con el formulario,
         // así que el post va con `forceFormData`.
@@ -63,14 +59,18 @@ export default function CrearCarnet({
     });
 
     const actor = form.data.tipo_actor;
-    const tarifa = tarifas?.find((t) => t.id === form.data.tarifa_sireb) ?? null;
-
-    // La tarifa cuyo nombre menciona la actividad («Carnet Pescador»), si hay una sola: es una sugerencia.
-    const tarifaDe = (a: TipoActor | '') => {
-        const candidatas = (tarifas ?? []).filter((t) => t.activa && a !== '' && t.etiqueta.toLowerCase().includes(a));
-
-        return candidatas.length === 1 ? candidatas[0].id : '';
-    };
+    // La tarifa sale de la actividad: el servidor la busca por nombre en SIREB.
+    const precio = actor !== '' ? (precios?.[actor] ?? null) : null;
+    const sinPrecio =
+        actor === ''
+            ? null
+            : !servicioConfigurado
+              ? 'Falta elegir el servicio «Carnet» de SIREB en Catálogos › Aranceles.'
+              : precios === null
+                ? 'Recaudaciones (SIREB) no responde: no se puede saber el precio. Intente en unos minutos.'
+                : precio === null
+                  ? `Falta definir la tarifa del carnet de ${actor} en Catálogos › Aranceles › Definir tarifas, o SIREB la dio de baja.`
+                  : null;
     const esPescador = actor === 'pescador';
 
     /*
@@ -171,7 +171,6 @@ export default function CrearCarnet({
                                     form.setData((datos) => ({
                                         ...datos,
                                         tipo_actor: elegido,
-                                        tarifa_sireb: tarifaDe(elegido) || datos.tarifa_sireb,
                                         aprovechamiento_id:
                                             elegido === 'comercializador'
                                                 ? null
@@ -192,14 +191,21 @@ export default function CrearCarnet({
                             </Select>
                         </Campo>
 
-                        <SelectorTarifa
-                            tarifas={tarifas}
-                            servicioConfigurado={servicioConfigurado}
-                            valor={form.data.tarifa_sireb}
-                            onElegir={(t) => form.setData('tarifa_sireb', t)}
-                            etiqueta="Tarifa del carnet"
-                            error={form.errors.tarifa_sireb}
-                        />
+                        {/* La lista sale de las tarifas definidas en Aranceles › Carnet. */}
+                        {actividades.length === 0 && (
+                            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                                Ninguna actividad tiene tarifa definida. Defínalas en Catálogos › Aranceles › Carnet ›
+                                Definir tarifas.
+                            </p>
+                        )}
+
+                        {sinPrecio && (
+                            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                                {sinPrecio}
+                            </p>
+                        )}
 
                         {/*
                             DE QUÉ BOLSA MADRE CUELGA. El operador tiene que
@@ -238,7 +244,7 @@ export default function CrearCarnet({
                                         {cupos.map((c) => (
                                             <option key={c.id} value={c.id}>
                                                 {c.volumen_total_kg} kg ·{' '}
-                                                {c.descripcion ?? 'sin tramo'} · {c.estado_etiqueta} ·
+                                                {c.descripcion ?? 'sin escala'} · {c.estado_etiqueta} ·
                                                 vence {fecha(c.fecha_vencimiento)}
                                             </option>
                                         ))}
@@ -364,22 +370,6 @@ export default function CrearCarnet({
                             </Campo>
                         </div>
 
-                        <Campo
-                            etiqueta="Fecha de solicitud"
-                            htmlFor="fecha_solicitud"
-                            error={form.errors.fecha_solicitud}
-                            ayuda="El día que la persona lo pidió. La fecha de emisión la escribe el sistema al aprobarlo."
-                            obligatorio
-                            className="max-w-xs"
-                        >
-                            <Input
-                                id="fecha_solicitud"
-                                type="date"
-                                value={form.data.fecha_solicitud}
-                                onChange={(e) => form.setData('fecha_solicitud', e.target.value)}
-                                aria-invalid={Boolean(form.errors.fecha_solicitud)}
-                            />
-                        </Campo>
                     </CardContent>
                 </Card>
 
@@ -390,6 +380,14 @@ export default function CrearCarnet({
                     </CardHeader>
 
                     <CardContent className="space-y-4">
+                        {/* Solo se muestra: la fecha la pone el servidor al registrar. */}
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Fecha de solicitud
+                            </p>
+                            <p className="font-medium">{fecha(new Date())}</p>
+                        </div>
+
                         {actor === '' ? (
                             <p className="flex items-start gap-2 text-sm text-muted-foreground">
                                 <Info className="mt-0.5 size-4 shrink-0" />
@@ -418,15 +416,16 @@ export default function CrearCarnet({
                             </div>
                         )}
 
-                        {tarifa && (
+                        {precio && (
                             <div>
                                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                                     A cobrar
                                 </p>
                                 {/* De referencia: el que vale lo pide el servidor al guardar. */}
                                 <p className="text-3xl font-semibold tabular-nums">
-                                    {bs(tarifa.monto, institucion.moneda)}
+                                    {bs(precio.monto, institucion.moneda)}
                                 </p>
+                                <p className="text-xs text-muted-foreground">{precio.etiqueta}</p>
                                 <p className="text-xs text-muted-foreground">
                                     Se paga en Recaudaciones: el carnet queda PENDIENTE hasta que
                                     el pago se valide allá, y entonces queda aprobado solo.
@@ -440,7 +439,7 @@ export default function CrearCarnet({
                                 form.processing ||
                                 persona === null ||
                                 form.data.tipo_actor === '' ||
-                                form.data.tarifa_sireb === '' ||
+                                precio === null ||
                                 form.data.archivo_ci === null ||
                                 form.data.archivo_asociacion === null ||
                                 form.data.asociacion_id === ''

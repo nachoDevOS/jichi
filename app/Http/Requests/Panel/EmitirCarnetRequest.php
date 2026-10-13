@@ -42,9 +42,6 @@ class EmitirCarnetRequest extends FormRequest
             // La actividad decide qué emite el carnet y qué fila de Aranceles cobra.
             'tipo_actor' => ['required', Rule::enum(TipoActor::class)],
 
-            // Una tarifa del servicio «Carnet» de SIREB: si se puede cobrar lo decide el servicio.
-            'tarifa_sireb' => ['required', 'uuid'],
-
             // Opcional: sin ella el servicio toma el cupo vigente de la persona.
             // En un comercializador está PROHIBIDA: no extrae, no lleva cupo.
             'aprovechamiento_id' => [
@@ -52,10 +49,6 @@ class EmitirCarnetRequest extends FormRequest
                 Rule::prohibitedIf(fn (): bool => $this->input('tipo_actor') === TipoActor::Comercializador->value),
                 Rule::exists('aprovechamientos_pesq', 'id')->whereNull('deleted_at'),
             ],
-
-            // La fecha en que se PIDIÓ; la de emisión la escribe la aprobación.
-            // Pasada sí, para poner al día lo emitido en papel.
-            'fecha_solicitud' => ['required', 'date', 'before_or_equal:today'],
 
             // El tope de 3 MB lo aplica igual StorageController; acá está para que
             // el mensaje diga qué pasó en vez de un error de subida.
@@ -76,12 +69,8 @@ class EmitirCarnetRequest extends FormRequest
             'asociacion_id.exists' => 'Esa asociación no existe o está inactiva.',
             'tipo_actor.required' => 'Elija la actividad del carnet.',
             'tipo_actor.enum' => 'Esa actividad no existe.',
-            'tarifa_sireb.required' => 'Elija la tarifa del carnet.',
-            'tarifa_sireb.uuid' => 'Esa tarifa no es de SIREB.',
             'aprovechamiento_id.prohibited' => 'Un carnet de comercializador no lleva cupo de pesca.',
             'aprovechamiento_id.exists' => 'Ese aprovechamiento no existe o fue dado de baja.',
-            'fecha_solicitud.required' => 'Indique la fecha de la solicitud.',
-            'fecha_solicitud.before_or_equal' => 'La fecha de la solicitud no puede ser futura.',
             'archivo_ci.required' => 'Adjunte la cédula del titular.',
             'archivo_ci.mimes' => 'La cédula tiene que ser una imagen (JPG, PNG, WEBP) o un PDF.',
             'archivo_ci.max' => 'La cédula no puede pasar de 3 MB.',
@@ -90,16 +79,5 @@ class EmitirCarnetRequest extends FormRequest
                 '(JPG, PNG, WEBP) o un PDF.',
             'archivo_asociacion.max' => 'El documento de la asociación no puede pasar de 3 MB.',
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        // Lo normal es emitir hoy; sin este valor por defecto la validación
-        // rechazaría un campo que no hace falta preguntar.
-        $this->merge([
-            'fecha_solicitud' => $this->input('fecha_solicitud') ?: now()->toDateString(),
-            // SIREB manda los ids en minúscula: así se comparan tal cual.
-            'tarifa_sireb' => mb_strtolower(trim((string) $this->input('tarifa_sireb'))),
-        ]);
     }
 }

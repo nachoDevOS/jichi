@@ -64,8 +64,9 @@ para no equivocarse:
   autoriza el trabajo de cada día son la faena y la guía.
 - **Qué emite cada carnet lo dice `carnets.tipo_actor`** (`TipoActor::emiteFaenas()`
   / `emiteGuias()`) y el nombre impreso (`nombreCarnet()`). Ya no hay catálogo
-  de tipos de carnet (12/10/2026): el precio es la tarifa del servicio «Carnet»
-  de SIREB que elige ventanilla.
+  de tipos de carnet (12/10/2026): el precio es la tarifa de SIREB que la unidad
+  definió para la actividad en Aranceles › Definir tarifas (`arancel_tarifas`,
+  por id; 13/10/2026): ventanilla elige solo la actividad.
 - **Una autorización vigente por persona y un carnet vigente por actividad.** El
   pescador no saca carnet sin autorización; el comercializador nunca lleva una.
 - **El circuito es el mismo para los cuatro documentos**, y lo dictan los enums
@@ -80,7 +81,7 @@ para no equivocarse:
   **Dos plazos que no se mezclan** (03/10/2026): el de PAGO lo pone SIREB
   (`plazo_pago_dias`, 5 días) y si vence el trámite **sigue `pendiente`** (08/10/2026:
   el estado `no_pagado` se quitó de los enums);
-  la VIGENCIA del trámite —la de autorización, faena y guía se configura en
+  la VIGENCIA del trámite —la de autorización, carnets, faena y guía se configura en
   Administración › Vigencias (`App\Support\Vigencia`, 12/10/2026)— NO es un estado: un aprobado
   sigue `aprobado` y si vale hoy lo dicen sus fechas (`estaVigente()`).
 
@@ -656,8 +657,8 @@ Los tres tienen que pasar.
   La escala ni siquiera es una tabla (12/10/2026): son las tarifas del servicio
   que guarda la fila `autorizacion` de `aranceles_sireb` (`TarifarioSireb`). Al
   otorgar, `OtorgarCupoService` pide la tarifa elegida a Recaudaciones y congela
-  monto y etiqueta (`tramo`). **Los kilos los escribe ventanilla**: de cada
-  tarifa se usan solo etiqueta, precio y si está activa. **Sin SIREB no se
+  monto y `rango_hasta` (`escala`), que son los kilos (13/10/2026): de cada
+  tarifa se usan etiqueta, precio, si está activa y, en la escala, el rango. **Sin SIREB no se
   otorga**: es a propósito, ninguna tarifa se escribe a mano. Las pantallas que
   solo MUESTRAN precio usan `SirebService::serviciosSiResponde()` y abren igual
   con SIREB caído. **`servicios()` va en caché 2 minutos** (`SIREB_CACHE_MINUTOS`,

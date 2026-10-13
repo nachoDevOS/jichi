@@ -36,7 +36,7 @@ class ResumenPortal
             'puede_pagar_qr' => self::puedePagarQr($a),
             'pago' => self::estadoPago($a),
             'descargar' => self::urlDescargar($a),
-            'escala' => $a->tramo,
+            'escala' => $a->escalaLegible(),
             'volumen_total_kg' => (float) $a->volumen_total_kg,
             'kilos_disponibles' => (float) $a->kilos_disponibles,
             'ya_fue_aprobado' => $a->yaFueAprobado(),

@@ -4,8 +4,8 @@ namespace App\Enums;
 
 /**
  * Qué servicio de SIREB cobra cada trámite: una fila de `aranceles_sireb` por
- * caso, con SOLO el servicio. La tarifa la elige ventanilla al emitir, entre las
- * de ese servicio. Uno nuevo es un caso más acá y una fila en el seeder.
+ * caso, con SOLO el servicio. La pone el seeder; un trámite nuevo es un caso
+ * más acá. Los aranceles que registra la unidad no llevan concepto.
  */
 enum ConceptoArancel: string
 {
@@ -24,12 +24,26 @@ enum ConceptoArancel: string
         };
     }
 
+    /**
+     * Las claves fijas del trámite en `arancel_tarifas`, con su etiqueta inicial.
+     * Vacío: ventanilla elige entre todas las tarifas del servicio.
+     *
+     * @return array<string, string>
+     */
+    public function claves(): array
+    {
+        return match ($this) {
+            self::Carnet => collect(TipoActor::cases())->mapWithKeys(fn (TipoActor $a): array => [$a->value => $a->nombreCarnet()])->all(),
+            default => [],
+        };
+    }
+
     /** Qué elige ventanilla entre las tarifas del servicio, para que no haya que adivinar. */
     public function descripcion(): string
     {
         return match ($this) {
-            self::Autorizacion => 'Sus tarifas son los tramos de la escala, con su monto. Los kilos los escribe ventanilla.',
-            self::Carnet => 'Sus tarifas son los carnets de pescador y de comercializador.',
+            self::Autorizacion => 'Sus tarifas son las escalas, con su monto y sus kilos (rango hasta).',
+            self::Carnet => 'Una tarifa definida por actividad: pescador y comercializador.',
             self::Faena => 'Ventanilla elige la tarifa de la salida al emitir el permiso.',
             self::Guia => 'Sus tarifas son los productos del cuadro D, con su precio por kilo.',
         };

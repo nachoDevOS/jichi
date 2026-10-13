@@ -13,6 +13,8 @@ use App\Http\Requests\Panel\EditarCarnetRequest;
 use App\Http\Requests\Panel\EmitirCarnetRequest;
 use App\Http\Requests\Panel\MotivoRequest;
 use App\Models\AprovechamientoPesq;
+use App\Models\ArancelSireb;
+use App\Models\ArancelTarifa;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
@@ -139,7 +141,6 @@ class CarnetController extends Controller
                 'codigo' => $reemplaza->codigo_legible,
                 'asociacion_id' => $reemplaza->asociacion_id,
                 'tipo_actor' => $reemplaza->tipo_actor->value,
-                'tarifa_sireb' => $reemplaza->sireb_tarifa_id,
                 'aprovechamiento_id' => $reemplaza->aprovechamiento_id,
             ] : null,
 
@@ -156,11 +157,48 @@ class CarnetController extends Controller
                 ])
                 ->all(),
 
-            'actividades' => TipoActor::opciones(),
-            // Las tarifas del servicio «Carnet» de SIREB: null si no responde.
-            'tarifas' => $tarifario->tarifas(ConceptoArancel::Carnet),
+            // Solo las que tienen tarifa definida en Aranceles › Carnet: sin ella no se cobra.
+            'actividades' => self::actividadesConTarifa(),
+            // El precio de cada actividad, de referencia: null si SIREB no responde.
+            'precios' => self::preciosPorActividad($tarifario),
             'servicioConfigurado' => $tarifario->servicioId(ConceptoArancel::Carnet) !== null,
         ]);
+    }
+
+    /** Las actividades con tarifa definida en el arancel Carnet, con la etiqueta que les puso la unidad. */
+    private static function actividadesConTarifa(): array
+    {
+        $etiquetas = ArancelSireb::de(ConceptoArancel::Carnet)?->tarifasDefinidas()->pluck('etiqueta', 'clave')->all() ?? [];
+
+        return collect(TipoActor::opciones())
+            ->filter(fn (array $o): bool => isset($etiquetas[$o['value']]))
+            ->map(fn (array $o): array => [...$o, 'label' => $etiquetas[$o['value']]])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * La tarifa definida de cada actividad, para mostrar: null si SIREB no responde;
+     * la actividad en null si no tiene tarifa definida o SIREB la dio de baja.
+     */
+    private static function preciosPorActividad(TarifarioSireb $tarifario): ?array
+    {
+        $tarifas = $tarifario->tarifas(ConceptoArancel::Carnet);
+
+        if ($tarifas === null) {
+            return null;
+        }
+
+        $porId = collect($tarifas)->keyBy('id');
+
+        // La definida en Aranceles, si SIREB la tiene activa; si no, null y la pantalla avisa.
+        return collect(TipoActor::cases())->mapWithKeys(function (TipoActor $a) use ($porId): array {
+            $tarifa = $porId->get(ArancelTarifa::idDe(ConceptoArancel::Carnet, $a->value) ?? '');
+
+            return [$a->value => $tarifa !== null && $tarifa['activa']
+                ? ['etiqueta' => $tarifa['etiqueta'], 'monto' => $tarifa['monto']]
+                : null];
+        })->all();
     }
 
     /**
@@ -182,8 +220,8 @@ class CarnetController extends Controller
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
                 Asociacion::query()->findOrFail($datos['asociacion_id']),
                 TipoActor::from($datos['tipo_actor']),
-                $datos['tarifa_sireb'],
-                now()->parse($datos['fecha_solicitud']),
+                // La fecha de solicitud es hoy: la pone el servidor, no el formulario.
+                now(),
                 // `?? null`: `validated()` devuelve SOLO las claves que vinieron,
                 // así que un nullable ausente revienta si se lee directo.
                 isset($datos['aprovechamiento_id'])
@@ -246,7 +284,7 @@ class CarnetController extends Controller
                 // La autorización que respalda el carnet: sus kilos salen fijos en cada faena.
                 'cupo' => $carnet->aprovechamiento ? [
                     'id' => $carnet->aprovechamiento->id,
-                    'descripcion' => $carnet->aprovechamiento->tramo,
+                    'descripcion' => $carnet->aprovechamiento->escalaLegible(),
                     'volumen_total_kg' => (float) $carnet->aprovechamiento->volumen_total_kg,
                     'kilos_disponibles' => (float) $carnet->aprovechamiento->kilos_disponibles,
                     'vigente' => $carnet->aprovechamiento->estaVigente(),
@@ -371,9 +409,8 @@ class CarnetController extends Controller
                 'tipo_actor_etiqueta' => $carnet->tipo_actor->etiqueta(),
 
                 'asociacion_id' => $carnet->asociacion_id,
-                // De referencia: el que vale lo congela la emisión. null sin SIREB o sin tarifa.
-                // El de hoy de SU tarifa, de referencia: la tarifa no se cambia al corregir.
-                'precio' => collect($tarifario->tarifas(ConceptoArancel::Carnet) ?? [])->firstWhere('id', $carnet->sireb_tarifa_id)['monto'] ?? null,
+                // El de hoy de su actividad, de referencia. null sin SIREB o sin una única tarifa.
+                'precio' => self::preciosPorActividad($tarifario)[$carnet->tipo_actor->value]['monto'] ?? null,
                 'aprovechamiento_id' => $carnet->aprovechamiento_id,
                 'fecha_solicitud' => $carnet->fecha_solicitud?->toDateString(),
 

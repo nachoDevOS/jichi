@@ -393,10 +393,19 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
             ->middleware('permiso:asociaciones.editar')
             ->name('asociaciones.update');
 
-        // --- Aranceles de SIREB: lo que cobra cada trámite. SIN alta ni baja: una fila por concepto.
+        // --- Aranceles de SIREB: lo que cobra cada trámite. Una fila por concepto; sin baja.
         Route::get('/aranceles', [ArancelSirebController::class, 'index'])
             ->middleware('permiso:catalogos.ver')
             ->name('aranceles.index');
+
+        // `crear` ANTES de `{arancel}`, o la palabra se toma como id.
+        Route::middleware('permiso:catalogos.crear')->group(function () {
+            Route::get('/aranceles/crear', [ArancelSirebController::class, 'create'])
+                ->name('aranceles.create');
+
+            Route::post('/aranceles', [ArancelSirebController::class, 'store'])
+                ->name('aranceles.store');
+        });
 
         // Borra la caché del catálogo: lo cambiado en SIREB se ve sin esperar.
         Route::post('/aranceles/refrescar', [ArancelSirebController::class, 'refrescar'])
@@ -410,6 +419,13 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         Route::middleware('permiso:catalogos.editar')->group(function () {
             Route::get('/aranceles/{arancel}/editar', [ArancelSirebController::class, 'edit'])
                 ->name('aranceles.edit');
+
+            // Qué tarifa de SIREB cobra cada caso (carnet de pescador, de comercializador…).
+            Route::get('/aranceles/{arancel}/tarifas', [ArancelSirebController::class, 'tarifas'])
+                ->name('aranceles.tarifas');
+
+            Route::put('/aranceles/{arancel}/tarifas', [ArancelSirebController::class, 'guardarTarifas'])
+                ->name('aranceles.tarifas.guardar');
 
             Route::put('/aranceles/{arancel}', [ArancelSirebController::class, 'update'])
                 ->name('aranceles.update');

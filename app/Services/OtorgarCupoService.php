@@ -27,19 +27,18 @@ class OtorgarCupoService
     ) {}
 
     /**
-     * Otorga la bolsa madre a una persona. `$tarifaId` es el tramo (una tarifa
-     * del servicio de la escala en SIREB) y `$kilos`, lo que escribe ventanilla.
+     * Otorga la bolsa madre a una persona. `$tarifaId` es la escala: una tarifa
+     * del servicio en SIREB, de la que salen el precio y los kilos (`rango_hasta`).
      */
     public function otorgar(
         Beneficiario $beneficiario,
         string $tarifaId,
-        float $kilos,
         string $tipoEmbarcacion,
         ?Carbon $solicitud = null,
     ): AprovechamientoPesq {
         $solicitud ??= now();
 
-        $cupo = DB::transaction(function () use ($beneficiario, $tarifaId, $kilos, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
+        $cupo = DB::transaction(function () use ($beneficiario, $tarifaId, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
             // `lockForUpdate()` devuelve OTRA instancia: acá solo toma el candado,
             // todo lo demás se lee del modelo que llegó.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
@@ -53,20 +52,20 @@ class OtorgarCupoService
                 );
             }
 
-            $tramo = $this->verificarTramo($tarifaId);
+            $escala = $this->verificarEscala($tarifaId);
 
             $cupo = AprovechamientoPesq::create([
                 'beneficiario_id' => $beneficiario->id,
                 // Correlativo propio, no el id: el talonario no puede tener huecos de filas ajenas.
                 'nro' => $this->correlativos->siguienteContinuo(AprovechamientoPesq::SERIE),
-                'monto' => $tramo['monto'],
-                'sireb_tarifa_id' => $tramo['tarifa_id'],
-                // Copia: Recaudaciones puede renombrar o dar de baja la tarifa después.
-                'tramo' => $tramo['etiqueta'],
-                // Los escribe ventanilla: la tarifa de SIREB solo trae el precio.
-                'volumen_total_kg' => $kilos,
-                // Arranca entero: lo baja cada faena aprobada.
-                'kilos_disponibles' => $kilos,
+                'monto' => $escala['monto'],
+                'sireb_tarifa_id' => $escala['tarifa_id'],
+                // Copia: Recaudaciones puede cambiar o dar de baja la tarifa después.
+                'escala' => $escala['kilos'],
+                // Los kilos son los de la escala pagada: ventanilla no los escribe.
+                'volumen_total_kg' => $escala['kilos'],
+                // Fijo: cada faena sale con este valor y no lo descuenta.
+                'kilos_disponibles' => $escala['kilos'],
 
                 // Obligatorio: va impreso en la autorización. Texto libre porque no
                 // hay padrón de embarcaciones.
@@ -184,27 +183,32 @@ class OtorgarCupoService
     }
 
     /**
-     * Lo que otorgar() revisa del tramo antes de escribir: la tarifa activa en
-     * SIREB. No escribe nada, así que sirve también para probar.
+     * Lo que otorgar() revisa de la escala antes de escribir: la tarifa activa en
+     * SIREB y su `rango_hasta`. No escribe nada, así que sirve también para probar.
      *
-     * @return array{monto: float, tarifa_id: string, etiqueta: string}
+     * @return array{monto: float, tarifa_id: string, kilos: float}
      *
      * @throws CupoInvalidoException
      */
-    public function verificarTramo(string $tarifaId): array
+    public function verificarEscala(string $tarifaId): array
     {
         $precio = $this->precioDe($tarifaId);
+        $kilos = (float) ($precio['tarifa']['rango_hasta'] ?? 0);
 
-        return ['monto' => $precio['monto'], 'tarifa_id' => $precio['tarifa_id'], 'etiqueta' => $precio['tarifa']['etiqueta'] ?? ''];
+        if ($kilos <= 0) {
+            throw CupoInvalidoException::sinRango($precio['tarifa']['etiqueta'] ?? null);
+        }
+
+        return ['monto' => $precio['monto'], 'tarifa_id' => $precio['tarifa_id'], 'kilos' => $kilos];
     }
 
     /**
-     * El precio de un tramo según SIREB, el de ahora, con la tarifa activa. Sin
+     * El precio de una escala según SIREB, el de ahora, con la tarifa activa. Sin
      * eso no se otorga; ninguna tarifa se escribe a mano.
      *
      * @return array{monto: float, tarifa_id: string, tarifa: array}
      */
-    public function precioDe(string $tarifaId, ?string $tramo = null): array
+    public function precioDe(string $tarifaId, ?string $escala = null): array
     {
         if ($this->tarifario->servicioId(ConceptoArancel::Autorizacion) === null) {
             throw CupoInvalidoException::sinServicio();
@@ -218,7 +222,7 @@ class OtorgarCupoService
                 'tarifa' => $tarifaId, 'motivo' => $e->getMessage(),
             ]);
 
-            throw CupoInvalidoException::sireb($tramo, $e->sinRespuesta);
+            throw CupoInvalidoException::sireb($escala, $e->sinRespuesta);
         }
     }
 }

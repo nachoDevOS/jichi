@@ -357,7 +357,7 @@ class Carnet extends Model
             'fecha_vencimiento' => $this->fecha_vencimiento?->toDateString(),
 
             // El cupo que respalda al pescador. Null en el comercializador.
-            'capacidad' => $cupo?->tramo,
+            'capacidad' => $cupo?->escalaLegible(),
             'volumen_total_kg' => $cupo !== null ? (float) $cupo->volumen_total_kg : null,
             // Los kilos que sale cada faena, fijos: las faenas no descuentan.
             'kilos_disponibles' => $cupo !== null ? (float) $cupo->kilos_disponibles : null,

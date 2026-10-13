@@ -36,8 +36,7 @@ class RevisarCarnetService
             }
 
             // La emisión se escribe ACÁ: hasta el pago había una solicitud. El
-            // vencimiento se recalcula sobre ella porque el carnet vale por
-            // GESTIÓN: uno pedido el 28/12 y firmado en enero vence con el año nuevo.
+            // vencimiento se recalcula sobre ella con la vigencia configurada.
             $emision = now();
             $gestion = (int) $emision->format('Y');
 
@@ -52,7 +51,7 @@ class RevisarCarnetService
                 'estado' => EstadoCarnet::Aprobado,
                 'nro' => $registro,
                 'fecha_emision' => $emision->toDateString(),
-                'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
+                'fecha_vencimiento' => Vigencia::hasta(TramiteConVigencia::carnetDe($bloqueado->tipo_actor), $emision)->toDateString(),
             ]);
 
             return $carnet->refresh();

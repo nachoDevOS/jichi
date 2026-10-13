@@ -42,7 +42,12 @@ class TarifarioSireb
      */
     public function tarifas(ConceptoArancel $concepto): ?array
     {
-        $servicioId = $this->servicioId($concepto);
+        return $this->tarifasDelServicio($this->servicioId($concepto));
+    }
+
+    /** Lo mismo, de un servicio cualquiera: lo usan los aranceles sin trámite. */
+    public function tarifasDelServicio(?string $servicioId): ?array
+    {
         $servicios = $this->sireb->serviciosSiResponde();
 
         if ($servicios === null) {

@@ -34,6 +34,13 @@ class CarnetInvalidoException extends RuntimeException
         return new self("No se puede emitir el carnet: {$motivo}");
     }
 
+    /** La actividad no tiene tarifa definida en Catálogos › Aranceles. */
+    public static function sinTarifaDefinida(TipoActor $actor): self
+    {
+        return new self('No se puede emitir el carnet: falta definir la tarifa del '.mb_strtolower($actor->nombreCarnet())
+            .' en Catálogos › Aranceles › Carnet › Definir tarifas.');
+    }
+
     /**
      * Un carnet de pescador sin bolsa madre detrás.
      */

@@ -4,43 +4,58 @@ import type { FormEvent } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import LayoutPanel from '@/layouts/layout-panel';
 import { cn } from '@/lib/utils';
 import type { ServicioSireb } from '@/types/catalogos';
 
 /**
- *  Elegir el servicio de SIREB de un arancel. Solo el servicio: la tarifa se
- *  elige al emitir. El concepto no se edita
+ *  Registrar un arancel o corregirlo: nombre y servicio de SIREB. La tarifa no se
+ *  guarda: se elige al emitir
  */
 export default function ArancelesFormulario({
     arancel,
     serviciosSireb,
 }: {
+    /** null = registrar. */
     arancel: {
         id: number;
-        etiqueta: string;
-        descripcion: string;
+        nombre: string;
+        /** null en los registrados en el panel: no los usa ningún trámite. */
+        descripcion: string | null;
         servicio_sireb: string | null;
-    };
+    } | null;
     /** Los servicios activos; null = SIREB no respondió y el select queda deshabilitado. */
     serviciosSireb: ServicioSireb[] | null;
 }) {
-    const form = useForm({ servicio_sireb: arancel.servicio_sireb ?? '' });
+    const form = useForm({
+        nombre: arancel?.nombre ?? '',
+        servicio_sireb: arancel?.servicio_sireb ?? '',
+    });
 
     // El guardado se ofrece aunque SIREB ya no lo mande: editar no lo borra sin avisar.
     const guardadoAusente =
-        arancel.servicio_sireb !== null && !(serviciosSireb ?? []).some((s) => s.id === arancel.servicio_sireb);
+        arancel !== null &&
+        arancel.servicio_sireb !== null &&
+        !(serviciosSireb ?? []).some((s) => s.id === arancel.servicio_sireb);
+
+    const titulo = arancel ? `Arancel: ${arancel.nombre}` : 'Registrar arancel';
 
     function enviar(e: FormEvent) {
         e.preventDefault();
-        form.put(route('aranceles.update', arancel.id));
+
+        if (arancel) {
+            form.put(route('aranceles.update', arancel.id));
+        } else {
+            form.post(route('aranceles.store'));
+        }
     }
 
     return (
         <LayoutPanel
-            titulo={`Arancel: ${arancel.etiqueta}`}
-            descripcion={arancel.descripcion}
+            titulo={titulo}
+            descripcion={arancel?.descripcion ?? undefined}
             acciones={
                 <Link href={route('aranceles.index')} className={cn(buttonVariants({ variant: 'outline' }))}>
                     <ArrowLeft className="size-4" />
@@ -48,11 +63,22 @@ export default function ArancelesFormulario({
                 </Link>
             }
         >
-            <Head title={`Arancel: ${arancel.etiqueta}`} />
+            <Head title={titulo} />
 
             <Card>
                 <CardContent className="pt-6">
                     <form onSubmit={enviar} className="space-y-6">
+                        <Campo etiqueta="Nombre" htmlFor="nombre" error={form.errors.nombre} obligatorio>
+                            <Input
+                                id="nombre"
+                                value={form.data.nombre}
+                                onChange={(e) => form.setData('nombre', e.target.value)}
+                                aria-invalid={Boolean(form.errors.nombre)}
+                                placeholder="Solicitud de importe de alevines"
+                                maxLength={120}
+                            />
+                        </Campo>
+
                         <Campo
                             etiqueta="Servicio SIREB"
                             htmlFor="servicio_sireb"
@@ -84,7 +110,7 @@ export default function ArancelesFormulario({
 
                         <div className="flex gap-2">
                             <Button type="submit" disabled={form.processing}>
-                                Guardar cambios
+                                {arancel ? 'Guardar cambios' : 'Registrar'}
                             </Button>
 
                             <Link href={route('aranceles.index')} className={cn(buttonVariants({ variant: 'outline' }))}>

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Panel;
 
-use App\Enums\ConceptoArancel;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Panel\DefinirTarifasRequest;
 use App\Http\Requests\Panel\GuardarArancelSirebRequest;
 use App\Models\ArancelSireb;
+use App\Models\ArancelTarifa;
+use App\Services\DefinirTarifasService;
 use App\Sireb\SirebException;
 use App\Sireb\SirebService;
 use App\Sireb\TarifarioSireb;
@@ -18,7 +20,8 @@ use Inertia\Response;
  *  Aranceles de SIREB — qué servicio cobra cada trámite (solo el servicio: la
  *  tarifa se elige al emitir)
  *
- * Sin alta ni baja: hay una fila por `ConceptoArancel` y la pone el seeder.
+ * Los de los trámites (`concepto`) los pone el seeder; la unidad registra los
+ * demás. Sin baja.
  */
 class ArancelSirebController extends Controller
 {
@@ -31,22 +34,50 @@ class ArancelSirebController extends Controller
 
         return Inertia::render('panel/catalogos/aranceles', [
             'aranceles' => ArancelSireb::query()
+                ->withCount('tarifasDefinidas')
                 ->orderBy('id')
                 ->get()
                 ->map(fn (ArancelSireb $a): array => [
                     'id' => $a->id,
-                    'concepto' => $a->concepto->value,
-                    'etiqueta' => $a->concepto->etiqueta(),
-                    'descripcion' => $a->concepto->descripcion(),
+                    'concepto' => $a->concepto?->value,
+                    'etiqueta' => $a->nombre,
+                    'descripcion' => $a->concepto?->descripcion() ?? 'Registrado en el panel: todavía no lo cobra ningún trámite.',
                     'servicio_sireb' => $a->servicio_sireb,
                     // Cómo se llama HOY en SIREB y cuántas tarifas cobra; null si no está o no responde.
                     'servicio' => $servicios[$a->servicio_sireb] ?? null,
                     // Para «Ver tarifas»: etiqueta, precio y si está activa, de la caché del catálogo.
-                    'tarifas' => $tarifario->tarifas($a->concepto) ?? [],
+                    'tarifas' => $tarifario->tarifasDelServicio($a->servicio_sireb) ?? [],
+                    // «Definir tarifas»: solo el carnet y los que registra la unidad.
+                    'usa_tarifas_definidas' => $a->usaTarifasDefinidas(),
+                    'tarifas_definidas' => $a->tarifas_definidas_count,
                 ])
                 ->all(),
             'sirebDisponible' => $servicios !== null,
         ]);
+    }
+
+    /**
+     * Formulario de alta — GET /panel/catalogos/aranceles/crear
+     */
+    public function create(TarifarioSireb $tarifario): Response
+    {
+        return Inertia::render('panel/catalogos/aranceles-formulario', [
+            'arancel' => null,
+            'serviciosSireb' => self::serviciosActivos($tarifario),
+        ]);
+    }
+
+    /**
+     * Alta — POST /panel/catalogos/aranceles
+     */
+    public function store(GuardarArancelSirebRequest $request): RedirectResponse
+    {
+        $arancel = ArancelSireb::create($request->validated());
+
+        // Lo siguiente es definir sus tarifas: se va directo ahí.
+        return redirect()
+            ->route('aranceles.tarifas', $arancel)
+            ->with('exito', "Arancel «{$arancel->nombre}» registrado. Ahora defina sus tarifas.");
     }
 
     /**
@@ -65,7 +96,7 @@ class ArancelSirebController extends Controller
 
         Cache::forget('portada.especies');
 
-        return back()->with('exito', 'Precios, tramos y productos actualizados desde SIREB.');
+        return back()->with('exito', 'Precios, escalas y productos actualizados desde SIREB.');
     }
 
     /**
@@ -74,7 +105,7 @@ class ArancelSirebController extends Controller
     public function show(ArancelSireb $arancel, TarifarioSireb $tarifario): Response
     {
         return Inertia::render('panel/catalogos/aranceles-historial', [
-            'arancel' => ['etiqueta' => $arancel->concepto->etiqueta()],
+            'arancel' => ['etiqueta' => $arancel->nombre],
             ...$tarifario->historial($arancel),
         ]);
     }
@@ -84,17 +115,14 @@ class ArancelSirebController extends Controller
      */
     public function edit(ArancelSireb $arancel, TarifarioSireb $tarifario): Response
     {
-        $servicios = $tarifario->servicios();
-
         return Inertia::render('panel/catalogos/aranceles-formulario', [
             'arancel' => [
                 'id' => $arancel->id,
-                'etiqueta' => $arancel->concepto->etiqueta(),
-                'descripcion' => $arancel->concepto->descripcion(),
+                'nombre' => $arancel->nombre,
+                'descripcion' => $arancel->concepto?->descripcion(),
                 'servicio_sireb' => $arancel->servicio_sireb,
             ],
-            // Para el select: null si SIREB no responde, y la pantalla abre igual.
-            'serviciosSireb' => $servicios === null ? null : array_values(array_filter($servicios, fn (array $s): bool => $s['activo'])),
+            'serviciosSireb' => self::serviciosActivos($tarifario),
         ]);
     }
 
@@ -107,6 +135,56 @@ class ArancelSirebController extends Controller
 
         return redirect()
             ->route('aranceles.index')
-            ->with('exito', "Arancel «{$arancel->concepto->etiqueta()}» actualizado.");
+            ->with('exito', "Arancel «{$arancel->nombre}» actualizado.");
+    }
+
+    /**
+     * Definir tarifas — GET /panel/catalogos/aranceles/{arancel}/tarifas
+     */
+    public function tarifas(ArancelSireb $arancel, TarifarioSireb $tarifario): Response|RedirectResponse
+    {
+        if (! $arancel->usaTarifasDefinidas()) {
+            return redirect()->route('aranceles.index')
+                ->with('aviso', 'Este arancel no lleva tarifas definidas: ventanilla elige entre todas las de su servicio.');
+        }
+
+        $definidas = $arancel->tarifasDefinidas()->orderBy('id')->get();
+        $fijas = $arancel->clavesFijas();
+        $fila = fn (ArancelTarifa $t): array => [
+            'id' => $t->id, 'clave' => $t->clave, 'etiqueta' => $t->etiqueta, 'sireb_tarifa_id' => $t->sireb_tarifa_id,
+        ];
+
+        return Inertia::render('panel/catalogos/aranceles-tarifas', [
+            'arancel' => ['id' => $arancel->id, 'nombre' => $arancel->nombre],
+            // Fijas (carnet): una por clave, con la etiqueta inicial si no se definió. Libres: las guardadas.
+            'fijas' => $fijas !== null,
+            'filas' => $fijas !== null
+                ? collect($fijas)->map(fn (string $inicial, string $clave): array => ($t = $definidas->firstWhere('clave', $clave))
+                    ? $fila($t)
+                    : ['id' => null, 'clave' => $clave, 'etiqueta' => $inicial, 'sireb_tarifa_id' => null])->values()->all()
+                : $definidas->map($fila)->all(),
+            // null si SIREB no responde: la pantalla abre y no deja guardar.
+            'tarifasSireb' => $tarifario->tarifasDelServicio($arancel->servicio_sireb),
+        ]);
+    }
+
+    /**
+     * Guardar tarifas — PUT /panel/catalogos/aranceles/{arancel}/tarifas
+     */
+    public function guardarTarifas(DefinirTarifasRequest $request, ArancelSireb $arancel, DefinirTarifasService $servicio): RedirectResponse
+    {
+        $servicio->guardar($arancel, $request->validated()['tarifas'] ?? []);
+
+        return redirect()
+            ->route('aranceles.index')
+            ->with('exito', "Tarifas de «{$arancel->nombre}» guardadas.");
+    }
+
+    /** Para el select: null si SIREB no responde, y la pantalla abre igual. */
+    private static function serviciosActivos(TarifarioSireb $tarifario): ?array
+    {
+        $servicios = $tarifario->servicios();
+
+        return $servicios === null ? null : array_values(array_filter($servicios, fn (array $s): bool => $s['activo']));
     }
 }

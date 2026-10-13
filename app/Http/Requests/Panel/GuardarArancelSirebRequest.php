@@ -3,10 +3,11 @@
 namespace App\Http\Requests\Panel;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
- * Reglas para elegir el servicio de SIREB de un arancel. El concepto no se
- * edita: lo fija el seeder. La tarifa no se guarda: se elige al emitir.
+ * Reglas para un arancel: nombre (sin repetir) y servicio de SIREB. El concepto
+ * no viene del formulario: lo pone el seeder. La tarifa no se guarda.
  */
 class GuardarArancelSirebRequest extends FormRequest
 {
@@ -22,6 +23,10 @@ class GuardarArancelSirebRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'nombre' => [
+                'required', 'string', 'max:120',
+                Rule::unique('aranceles_sireb', 'nombre')->ignore($this->route('arancel'))->whereNull('deleted_at'),
+            ],
             'servicio_sireb' => ['required', 'uuid'],
         ];
     }
@@ -34,6 +39,9 @@ class GuardarArancelSirebRequest extends FormRequest
         return [
             'servicio_sireb.required' => 'Elija el servicio de SIREB.',
             'servicio_sireb.uuid' => 'El id del servicio no tiene el formato de SIREB.',
+            'nombre.required' => 'Escriba el nombre del arancel.',
+            'nombre.max' => 'El nombre no puede pasar de 120 caracteres.',
+            'nombre.unique' => 'Ya hay un arancel con ese nombre.',
         ];
     }
 
@@ -41,6 +49,7 @@ class GuardarArancelSirebRequest extends FormRequest
     {
         // SIREB manda los ids en minúscula: así se comparan tal cual.
         $this->merge([
+            'nombre' => trim((string) $this->input('nombre')),
             'servicio_sireb' => mb_strtolower(trim((string) $this->input('servicio_sireb'))),
         ]);
     }

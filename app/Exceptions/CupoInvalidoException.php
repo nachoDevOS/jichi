@@ -36,12 +36,22 @@ class CupoInvalidoException extends RuntimeException
     }
 
     /** SIREB no dio el precio o no aceptó la venta. Texto para ventanilla: el detalle va al log. */
-    public static function sireb(?string $tramo, bool $noResponde): self
+    public static function sireb(?string $escala, bool $noResponde): self
     {
         $e = new self($noResponde
             ? 'Recaudaciones no responde en este momento. Espere unos minutos y vuelva a intentarlo.'
-            : 'La escala '.($tramo === null ? 'elegida' : "«{$tramo}»").' no está habilitada para cobrar en este momento. '.
+            : 'La escala '.($escala === null ? 'elegida' : "«{$escala}»").' no está habilitada para cobrar en este momento. '.
               'Elija otra escala o consulte con el encargado del sistema.');
+        $e->avisoGeneral = true;
+
+        return $e;
+    }
+
+    /** La tarifa no trae `rango_hasta`: sin eso no hay kilos que autorizar. */
+    public static function sinRango(?string $etiqueta): self
+    {
+        $e = new self('La escala '.($etiqueta ? "«{$etiqueta}» " : '').'no indica hasta cuántos kilos autoriza en SIREB. '.
+            'Elija otra escala o pida a Recaudaciones que cargue su rango.');
         $e->avisoGeneral = true;
 
         return $e;

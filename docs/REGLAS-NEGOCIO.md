@@ -29,9 +29,10 @@
   un tramo**, con su precio. El servicio se elige en Catálogos › Aranceles;
   Jichi no guarda la escala. Sin respuesta de SIREB no se otorga.
 - Cuando un pescador solicita un cupo se genera un registro en
-  **`aprovechamientos_pesq`** que **copia** el tramo elegido (su etiqueta) y el
-  precio. **Los kilos autorizados los escribe ventanilla** (12/10/2026): la
-  tarifa de SIREB solo trae el precio, y Jichi no los deduce del tramo.
+  **`aprovechamientos_pesq`** que **copia** la escala elegida (su `rango_hasta`,
+  en la columna `escala`) y el precio. **Los kilos autorizados son los de la
+  escala** (13/10/2026): ventanilla no los escribe, y se imprimen en «Volumen
+  Establecido».
 - Su ciclo de vida pasa por los estados `pendiente`, `aprobado` y `revocado`
   (`no_pagado` se quitó el 08/10/2026; `agotado`, el 12/10/2026: las faenas ya
   no descuentan).
@@ -286,8 +287,8 @@ boletas en Jichi y la firma de supervisión.)*
   Si la tarifa del catálogo está de baja, no se genera. Vale igual para una
   liquidación **anulada** en SIREB: decide solo el estado de la liquidación
   (08/10/2026). La **vigencia** del
-  trámite es otra cosa y empieza al aprobarse: carnet hasta el 31/12;
-  autorización, faena y guía según Administración › Vigencias (de inicio 31/12,
+  trámite es otra cosa y empieza al aprobarse: carnets (pescador y
+  comercializador), autorización, faena y guía según Administración › Vigencias (de inicio 31/12,
   30 días y 5 días).
 - *(03/10/2026)* **Antes de anular la liquidación —al eliminar, o al corregir
   cambiando lo que se cobra— Jichi la consulta en SIREB** (`GET /liquidaciones/{id}`).
@@ -424,7 +425,7 @@ el formulario solo si ese carnet ya está revocado.
 
 | Regla | Dónde se hace cumplir |
 | --- | --- |
-| El precio del carnet es una tarifa del servicio «Carnet» | `EmitirCarnetService::precioDe($tarifaId)`; el servicio sale de Catálogos › Aranceles |
+| El precio del carnet sale de su actividad | `EmitirCarnetService::precioDeActividad()`: la tarifa definida para la actividad en `arancel_tarifas` (Aranceles › Definir tarifas) |
 | Pescador SIN cupo no saca carnet | `EmitirCarnetService::emitir()` → `pescadorSinCupo()` |
 | Nada vale antes de pagarse en SIREB | `ConfirmarPagoService` (aprueba solo con la liquidación `pagada`) + los `Revisar*Service::aprobar()`; imprimir exige `yaFueAprobado()` |
 | Cada documento registra su cobro en SIREB y no lo duplica | `LiquidarSirebService` (clave guardada antes de llamar) + el trait `LiquidableSireb` |
@@ -437,7 +438,7 @@ el formulario solo si ese carnet ya está revocado.
 | Comercializador NUNCA lleva cupo | `EmitirCarnetService` + `EmitirCarnetRequest` (`prohibitedIf`) |
 | La faena solo cuelga del carnet | `permisos_faena.carnet_id` es la única FK; el cupo llega por `hasManyThrough` |
 | La faena sale con los `kilos_disponibles` de la autorización y no descuenta | `EmitirFaenaService::emitir()` |
-| Vigencia de autorización, faena y guía, configurable | `App\Support\Vigencia` + `TramiteConVigencia` / `ModoVigencia`, pantalla `VigenciaController` |
+| Vigencia de autorización, carnets, faena y guía, configurable | `App\Support\Vigencia` + `TramiteConVigencia` / `ModoVigencia`, pantalla `VigenciaController` |
 | La guía solo cuelga del carnet | `guias_movimiento.carnet_id` es la única FK hacia la persona |
 | Cada actor emite solo lo suyo | `TipoActor::emiteFaenas()` / `emiteGuias()`, en los dos servicios |
 | Fechas de la faena al aprobar | `RevisarFaenaService::aprobar()` + `PermisoFaena::desembarqueDesde()` |

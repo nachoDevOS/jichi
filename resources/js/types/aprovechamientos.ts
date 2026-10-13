@@ -15,11 +15,11 @@ export interface CupoFila {
     /** Puede faltar: mucha gente del padrón todavía no tiene foto cargada. */
     foto_url: string | null;
 
-    /** El tramo: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
+    /** La escala: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
     descripcion: string | null;
 
     /**
-     * Los kilos OTORGADOS, copiados del techo del tramo al otorgar.
+     * Los kilos OTORGADOS, escritos por ventanilla al otorgar.
      */
     volumen_total_kg: number;
 

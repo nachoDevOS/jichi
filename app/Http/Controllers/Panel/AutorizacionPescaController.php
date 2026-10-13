@@ -138,7 +138,7 @@ class AutorizacionPescaController extends Controller
             // complemento salía sin guion.
             'documento' => $b?->documento_identidad ?: '—',
             'embarcacion' => $cupo->tipo_embarcacion ?: 'No declarada',
-            'volumen' => number_format((float) $cupo->volumen_total_kg, 2, ',', '.'),
+            'volumen' => number_format((float) $cupo->escala, 2, ',', '.'),
             'monto' => number_format($cupo->montoACobrar(), 2, ',', '.'),
             'vigencia' => sprintf(
                 'Del %s al %s',

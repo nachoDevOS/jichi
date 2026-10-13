@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'beneficiario_id',
     'nro',
-    'tramo',
+    'escala',
     'volumen_total_kg',
     'kilos_disponibles',
     'monto',
@@ -59,6 +59,7 @@ class AprovechamientoPesq extends Model
     protected function casts(): array
     {
         return [
+            'escala' => 'decimal:2',
             'volumen_total_kg' => 'decimal:2',
             'kilos_disponibles' => 'decimal:2',
             'monto' => 'decimal:2',
@@ -111,6 +112,16 @@ class AprovechamientoPesq extends Model
     public function montoACobrar(): float
     {
         return (float) $this->monto;
+    }
+
+    /** La escala como se muestra: «Hasta 100 kg». */
+    public function escalaLegible(): ?string
+    {
+        if ($this->escala === null) {
+            return null;
+        }
+
+        return 'Hasta '.str_replace(',00', '', number_format((float) $this->escala, 2, ',', '.')).' kg';
     }
 
     /** El N° de la autorización impresa, con los ceros del talonario: «000001». */

@@ -12,8 +12,8 @@ import type { PageProps } from '@/types';
 /**
  *  Corregir una autorización: solo la embarcación
  *
- * El tramo, los kilos, el monto y las fechas quedan como se otorgaron. Para otro
- * tramo se elimina y se otorga de nuevo, así queda el motivo escrito.
+ * La escala, los kilos, el monto y las fechas quedan como se otorgaron. Para otro
+ * escala se elimina y se otorga de nuevo, así queda el motivo escrito.
  */
 export default function EditarCupo({
     cupo,
@@ -23,7 +23,7 @@ export default function EditarCupo({
         beneficiario: string | null;
         documento: string | null;
         foto_url: string | null;
-        tramo: string | null;
+        escala: string | null;
         volumen_total_kg: number;
         /** Lo que se congeló de SIREB al otorgar. */
         monto: number;
@@ -99,7 +99,7 @@ export default function EditarCupo({
                     </CardHeader>
 
                     <CardContent className="space-y-4 text-sm">
-                        <Fijo etiqueta="Tramo de la escala" valor={cupo.tramo ?? '—'} />
+                        <Fijo etiqueta="Escala" valor={cupo.escala ?? '—'} />
                         <Fijo etiqueta="Volumen autorizado" valor={`${cupo.volumen_total_kg} kg`} />
                         <Fijo etiqueta="Monto" valor={bs(cupo.monto, institucion.moneda)} />
                         <Fijo etiqueta="Solicitado el" valor={cupo.fecha_solicitud ? fecha(cupo.fecha_solicitud) : '—'} />
@@ -107,7 +107,7 @@ export default function EditarCupo({
 
                         <p className="flex items-start gap-2 rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">
                             <Lock className="mt-0.5 size-3.5 shrink-0" />
-                            El titular y el tramo no se cambian. Si se cargó mal, elimine la autorización y
+                            El titular y la escala no se cambian. Si se cargó mal, elimine la autorización y
                             otórguela de nuevo: así queda el motivo escrito.
                         </p>
 

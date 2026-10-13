@@ -5,8 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /*
-| Aranceles de SIREB — qué servicio cobra cada trámite: una fila por concepto,
-| SOLO con el servicio. La tarifa se elige al emitir. Ver docs/MER.md.
+| Aranceles de SIREB — un nombre y el servicio de SIREB que lo cobra. Los de los
+| trámites llevan `concepto`; los registrados en el panel, no. Ver docs/MER.md.
 */
 return new class extends Migration
 {
@@ -15,8 +15,9 @@ return new class extends Migration
         Schema::create('aranceles_sireb', function (Blueprint $table) {
             $table->id();
 
-            // Único a secas: las filas las pone el seeder y no se dan de baja.
-            $table->string('concepto', 30)->unique()->comment('ConceptoArancel');
+            $table->string('nombre', 120)->comment('Como se ve en Catálogos › Aranceles');
+            // Solo en las filas que usa un trámite. Único a secas: NULL no choca con NULL.
+            $table->string('concepto', 30)->nullable()->unique()->comment('ConceptoArancel; null si lo registró la unidad');
 
             // Nullable: nace sin servicio hasta que alguien lo elige.
             $table->uuid('servicio_sireb')->nullable()->comment('Id del servicio en SIREB');

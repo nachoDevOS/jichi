@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 
-type Tramite = 'autorizacion' | 'faena' | 'guia';
+type Tramite = 'autorizacion' | 'carnet_pescador' | 'carnet_comercializador' | 'faena' | 'guia';
 type Modo = 'fin_de_anio' | 'dias';
 
 interface VigenciaTramite {

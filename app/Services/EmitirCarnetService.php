@@ -7,6 +7,7 @@ use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
 use App\Exceptions\CarnetInvalidoException;
 use App\Models\AprovechamientoPesq;
+use App\Models\ArancelTarifa;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
@@ -32,8 +33,6 @@ class EmitirCarnetService
         Beneficiario $beneficiario,
         Asociacion $asociacion,
         TipoActor $actor,
-        // La tarifa del servicio «Carnet» de SIREB que eligió ventanilla.
-        string $tarifaId,
         ?Carbon $emision = null,
         ?AprovechamientoPesq $cupoElegido = null,
         // Llegan como RUTA, ya escritos ANTES de la transacción: un rollback
@@ -43,7 +42,7 @@ class EmitirCarnetService
     ): Carnet {
         $emision ??= now();
         // Fuera de la transacción: una llamada a SIREB no debe tener filas bloqueadas.
-        $precio = $this->precioDe($tarifaId);
+        $precio = $this->precioDeActividad($actor);
 
         $carnet = DB::transaction(function () use ($beneficiario, $asociacion, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
             // Releer con lockForUpdate() devuelve OTRA instancia: acá solo sirve
@@ -107,7 +106,8 @@ class EmitirCarnetService
                 // La fecha en que se PIDIÓ. La de emisión la escribe la aprobación.
                 'fecha_solicitud' => $emision->toDateString(),
                 'fecha_emision' => null,
-                'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
+                // Provisoria: la aprobación la recalcula.
+                'fecha_vencimiento' => Vigencia::hasta(TramiteConVigencia::carnetDe($actor), $emision)->toDateString(),
             ]);
 
             // Su llave pública, en la misma transacción: sin código, el documento
@@ -144,8 +144,8 @@ class EmitirCarnetService
         }
 
         // Corregir el borrador vuelve a pedir el precio; si cambia, la liquidación vieja se anula antes.
-        // Con SU tarifa: la actividad no cambia al corregir, y la tarifa tampoco.
-        $precio = $this->precioDe((string) $carnet->sireb_tarifa_id);
+        // La tarifa de su actividad, que no cambia al corregir.
+        $precio = $this->precioDeActividad($carnet->tipo_actor);
         $otraLiquidacion = $this->liquidaciones->anularSiCambia(
             $carnet,
             [['tarifa_id' => $precio['tarifa_id'], 'cantidad' => 1]],
@@ -184,7 +184,7 @@ class EmitirCarnetService
                 'monto' => $precio['monto'],
                 'sireb_tarifa_id' => $precio['tarifa_id'],
                 'fecha_solicitud' => $emision->toDateString(),
-                'fecha_vencimiento' => $emision->copy()->endOfYear()->toDateString(),
+                'fecha_vencimiento' => Vigencia::hasta(TramiteConVigencia::carnetDe($bloqueado->tipo_actor), $emision)->toDateString(),
 
                 // Los adjuntos solo se pisan si vinieron nuevos: el formulario
                 // de corrección no obliga a volver a subir lo que ya está.
@@ -307,6 +307,24 @@ class EmitirCarnetService
         } catch (SinPrecioException $e) {
             throw CarnetInvalidoException::sinPrecio($e->getMessage());
         }
+    }
+
+    /**
+     * El precio del carnet de una actividad: la tarifa que la unidad definió para
+     * ella en Aranceles, por su id de SIREB. Ventanilla no elige tarifa.
+     *
+     * @return array{monto: float, tarifa_id: string, tarifa: array}
+     */
+    public function precioDeActividad(TipoActor $actor): array
+    {
+        $tarifaId = ArancelTarifa::idDe(ConceptoArancel::Carnet, $actor->value);
+
+        if ($tarifaId === null) {
+            throw CarnetInvalidoException::sinTarifaDefinida($actor);
+        }
+
+        // El de ahora y sin caché; si la dieron de baja en SIREB, no se emite.
+        return $this->precioDe($tarifaId);
     }
 
     /** La asociación se relee DENTRO de la transacción: pudo desactivarse recién. */

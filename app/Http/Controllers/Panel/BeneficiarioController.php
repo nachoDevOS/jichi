@@ -228,7 +228,7 @@ class BeneficiarioController extends Controller
             'cupos' => ExpedienteBeneficiario::aprovechamientos($beneficiario)
                 ->map(fn (AprovechamientoPesq $a): array => [
                     'id' => $a->id,
-                    'descripcion' => $a->tramo,
+                    'descripcion' => $a->escalaLegible(),
                     'volumen_total_kg' => (float) $a->volumen_total_kg,
                     'kilos_disponibles' => (float) $a->kilos_disponibles,
                     'estado' => $a->estado->value,
@@ -385,7 +385,7 @@ class BeneficiarioController extends Controller
             ->sortByDesc('fecha_solicitud')
             ->map(fn (AprovechamientoPesq $a): array => [
                 'id' => $a->id,
-                'descripcion' => $a->tramo,
+                'descripcion' => $a->escalaLegible(),
                 'volumen_total_kg' => (float) $a->volumen_total_kg,
                 'kilos_disponibles' => (float) $a->kilos_disponibles,
                 'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),

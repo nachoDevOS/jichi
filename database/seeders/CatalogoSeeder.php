@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\ConceptoArancel;
 use App\Models\ArancelSireb;
+use App\Models\ArancelTarifa;
 use App\Models\Asociacion;
 use Illuminate\Database\Seeder;
 
@@ -45,6 +46,12 @@ class CatalogoSeeder extends Seeder
      *
      * @var array<string, string>
      */
+    /** Las tarifas del servicio «Carnet» de test.sireb, por actividad (13/10/2026). */
+    private const TARIFAS_CARNET = [
+        'pescador' => ['01a0f3a1-b0a0-7234-a607-a05ba41d9caa', 'Carnet de pescador'],
+        'comercializador' => ['01a0f3a3-7544-71d7-951f-68ea41a80dd5', 'Carnet de comercializador'],
+    ];
+
     private const ARANCELES = [
         'autorizacion' => self::SERVICIO_ESCALA,
         'carnet' => self::SERVICIO_CARNET,
@@ -60,9 +67,18 @@ class CatalogoSeeder extends Seeder
             Asociacion::firstOrCreate(['nombre' => $fila['nombre']], ['sigla' => $fila['sigla']]);
         }
 
-        // Una fila por concepto: es lo que la pantalla corrige, nunca agrega.
+        // Una fila por trámite; las demás las registra la unidad desde el panel.
         foreach (ConceptoArancel::cases() as $concepto) {
-            ArancelSireb::firstOrCreate(['concepto' => $concepto->value], ['servicio_sireb' => self::ARANCELES[$concepto->value] ?? null]);
+            ArancelSireb::firstOrCreate(['concepto' => $concepto->value], [
+                'nombre' => $concepto->etiqueta(),
+                'servicio_sireb' => self::ARANCELES[$concepto->value] ?? null,
+            ]);
+        }
+
+        $carnet = ArancelSireb::de(ConceptoArancel::Carnet);
+
+        foreach (self::TARIFAS_CARNET as $clave => [$id, $etiqueta]) {
+            ArancelTarifa::firstOrCreate(['arancel_id' => $carnet->id, 'clave' => $clave], ['sireb_tarifa_id' => $id, 'etiqueta' => $etiqueta]);
         }
 
         $this->command?->warn(

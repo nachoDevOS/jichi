@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Reglas para guardar la vigencia de los tres trámites: un modo y, si es por
+ * Reglas para guardar la vigencia de cada trámite: un modo y, si es por
  * días, cuántos (de 1 a 3650).
  */
 class GuardarVigenciasRequest extends FormRequest

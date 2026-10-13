@@ -693,7 +693,7 @@ export default function VerCupo({
                 }
                 etiquetaMotivo="Motivo de la eliminación"
                 ayuda="Queda en la auditoría con su nombre, y es lo que va a explicar la baja dentro de seis meses."
-                placeholder="Cargado por error: el tramo corresponde a otro pescador."
+                placeholder="Cargado por error: la escala corresponde a otro pescador."
                 textoConfirmar="Eliminar aprovechamiento"
                 confirmacion="Entiendo que el cupo desaparece del sistema y que esto no se deshace desde el panel."
                 valor={borrado.data.motivo}
