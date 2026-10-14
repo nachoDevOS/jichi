@@ -127,11 +127,33 @@ class FaenaController extends Controller
 
             'vigencia' => Vigencia::texto(TramiteConVigencia::Faena),
 
-            // Las tarifas del servicio de la faena en SIREB: null si no responde.
-            // El precio es de referencia: el que vale lo congela la emisión.
-            'tarifas' => $tarifario->tarifas(ConceptoArancel::Faena),
-            'servicioConfigurado' => $tarifario->servicioId(ConceptoArancel::Faena) !== null,
+            // El arancel de referencia (el que vale lo congela la emisión), o el motivo de por qué no hay.
+            ...$this->arancelDeReferencia($tarifario),
         ]);
+    }
+
+    /**
+     * La tarifa del permiso, para mostrar (la misma regla que al cobrar): `arancel`
+     * {etiqueta, monto} si se puede cobrar; si no, `sinArancel` con el motivo.
+     */
+    private function arancelDeReferencia(TarifarioSireb $tarifario): array
+    {
+        $tarifas = $tarifario->tarifas(ConceptoArancel::Faena);
+        $id = $this->servicio->tarifaDeLaFaena();
+        $tarifa = collect($tarifas ?? [])->firstWhere('id', $id);
+
+        $motivo = match (true) {
+            $tarifario->servicioId(ConceptoArancel::Faena) === null => 'Falta elegir el servicio de la faena en Catálogos › Aranceles.',
+            $tarifas === null => 'Recaudaciones (SIREB) no responde: no se puede saber el arancel. Intente en unos minutos.',
+            $id === null => 'El servicio de la faena tiene varias tarifas activas (o ninguna): defina cuál en Catálogos › Aranceles › Permiso de faena › Definir tarifas.',
+            $tarifa === null || ! $tarifa['activa'] => 'La tarifa definida del permiso ya no está activa en SIREB: vuelva a definirla en Catálogos › Aranceles.',
+            default => null,
+        };
+
+        return [
+            'arancel' => $motivo === null ? ['etiqueta' => $tarifa['etiqueta'], 'monto' => $tarifa['monto']] : null,
+            'sinArancel' => $motivo,
+        ];
     }
 
     /**
@@ -144,7 +166,6 @@ class FaenaController extends Controller
         try {
             $faena = $this->servicio->emitir(
                 Carnet::query()->findOrFail($datos['carnet_id']),
-                $datos['tarifa_sireb'],
                 // `validated()` devuelve SOLO lo que vino: un nullable que el
                 // formulario no mandó no existe en el arreglo.
                 $datos,
@@ -301,7 +322,7 @@ class FaenaController extends Controller
                 // La autorización de la que copió los kilos. No descuenta de ella.
                 'cupo' => $faena->cupo() ? [
                     'id' => $faena->cupo()->id,
-                    'descripcion' => $faena->cupo()->escalaLegible(),
+                    'descripcion' => $faena->cupo()->escala,
                     'volumen_total_kg' => (float) $faena->cupo()->volumen_total_kg,
                     'kilos_disponibles' => (float) $faena->cupo()->kilos_disponibles,
                 ] : null,

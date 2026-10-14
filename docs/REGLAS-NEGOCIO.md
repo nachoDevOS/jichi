@@ -29,13 +29,13 @@
   un tramo**, con su precio. El servicio se elige en Catálogos › Aranceles;
   Jichi no guarda la escala. Sin respuesta de SIREB no se otorga.
 - Cuando un pescador solicita un cupo se genera un registro en
-  **`aprovechamientos_pesq`** que **copia** la escala elegida (su `rango_hasta`,
-  en la columna `escala`) y el precio. **Los kilos autorizados son los de la
-  escala** (13/10/2026): ventanilla no los escribe, y se imprimen en «Volumen
-  Establecido».
+  **`aprovechamientos_pesq`** que **copia** de la escala elegida su etiqueta
+  (`escala`), su `rango_hasta` (`volumen_total_kg`) y el precio. **Los kilos
+  autorizados son el `rango_hasta`** (13/10/2026): ventanilla no los escribe, y
+  se imprimen en la autorización («Volumen Establecido»), el recibo y el carnet.
 - Su ciclo de vida pasa por los estados `pendiente`, `aprobado` y `revocado`
-  (`no_pagado` se quitó el 08/10/2026; `agotado`, el 12/10/2026: las faenas ya
-  no descuentan).
+  (`no_pagado` se quitó el 08/10/2026; `agotado`, el 12/10/2026). Sin kilos
+  disponibles no hay estado nuevo: la guía simplemente se frena.
   Pasa de `pendiente` a `aprobado` cuando SIREB confirma el pago; si la
   liquidación vence sin pago, **sigue `pendiente`** (ver Paso 6). **La vigencia no es un estado**: pasada su fecha sigue
   `aprobado`, y si vale hoy lo dicen las fechas.
@@ -203,11 +203,10 @@ dentro de una transacción deshecha con `rollBack()`.
   *(25/09/2026)*
 - **Los kilos proponen todo lo LIBRE** de la autorización de pesca; ventanilla
   los baja si la salida autoriza menos. *(25/09/2026; «libre» desde el 27/09/2026)*
-- **Los kilos de la faena son fijos y NO descuentan** *(12/10/2026)*. Cada
-  faena sale con los `kilos_disponibles` de la autorización —los escribe
-  ventanilla al otorgarla— copiados en `kilos_extraidos`. Ventanilla no los
-  tipea al emitir la faena, y ninguna faena —pendiente, aprobada ni revocada—
-  baja nada de la autorización: no hay saldo, reserva ni estado `agotado`.
+- **La faena NO descuenta** *(12/10/2026, confirmado el 13/10/2026)*. Sale con
+  los `kilos_disponibles` que tenga la autorización ese día, copiados en
+  `kilos_extraidos`. Ventanilla no los tipea. Lo que baja el cupo es la guía
+  (paso 5).
 - **No se registra la vuelta.** La faena termina en `aprobado`. *(25/09/2026)*
 - **Circuito:** pendiente → se paga el arancel en SIREB → aprobado. Se imprime
   recién aprobada. Se puede emitir desde la ficha de la
@@ -221,6 +220,26 @@ dentro de una transacción deshecha con `rollBack()`.
   comercializador (`carnet_id`) y a su respectiva asociación (`asociacion_id`).
 - Controla las rutas especificando `origen`, `destino`, `peso_total_kg` y un
   indicador booleano de si proviene de **piscicultura**.
+- **La guía descuenta el cupo del pescador que vendió** *(decidido en reunión,
+  13/10/2026)*. El comercializador declara **a qué pescador le compró** y de qué
+  autorización (`aprovechamiento_id`). Reglas:
+  1. Se descuenta el total del cuadro D **al registrar** la guía (queda reservado
+     aunque no esté pagada).
+  2. **Un solo pescador por guía.**
+  3. Solo de una autorización **aprobada y en fecha**.
+  4. **Si no alcanzan los `kilos_disponibles`, se frena.**
+  5. **Eliminar** una guía pendiente devuelve los kilos; **revocarla, no** (el
+     pescado ya viajó). Corregirla devuelve los viejos y descuenta los nuevos.
+  6. Si **revocan la autorización** mientras la guía espera el pago, la guía no
+     se aprueba.
+  7. **Piscicultura** no lleva pescador ni descuenta (hoy la casilla está oculta,
+     así que toda guía pide pescador).
+  8. La guía impresa muestra el pescador y el N° de autorización.
+
+  *Ejemplo:* Juan tiene 1000 kg. Nacho le compra 300 y registra su guía → a Juan
+  le quedan 700. Pedro registra otra por 500 → 200. Pedro no paga y su guía se
+  elimina → 700. Una guía de 800 → «Juan solo tiene 700 kg disponibles».
+  Detalle en [modulos/GUIA-DESCUENTA-CUPO.md](modulos/GUIA-DESCUENTA-CUPO.md).
 - **Una guía aprobada vale si está en fecha y el titular tiene un carnet de
   comercializador vigente** (el suyo o el que lo reemplazó). Ejemplo: Juan
   pierde el carnet 00010 con la guía 000308 en ruta → se revoca el 00010 y la
@@ -406,11 +425,10 @@ el formulario solo si ese carnet ya está revocado.
                   CARNET (con cupo)             (máx. 5 días, por traslado)
                           │
                           ▼
-                  PERMISO DE FAENA
-              (máx. 30 días, por salida;
-               sale con los kilos_disponibles
-               de la autorización, fijos;
-               no descuenta nada)
+                  PERMISO DE FAENA              la GUÍA dice de qué pescador
+              (máx. 30 días, por salida;        es el pescado y DESCUENTA sus
+               sale con los kilos_disponibles   kilos_disponibles al registrarse
+               de ese día; no descuenta)
 
    Los cuatro documentos —autorización, carnet, faena y guía— se pagan en SIREB;
    al confirmarse el pago quedan aprobados y se entrega el RECIBO.
@@ -437,7 +455,9 @@ el formulario solo si ese carnet ya está revocado.
 | Los dos adjuntos del carnet, 3 MB | `EmitirCarnetRequest` + `StorageController` |
 | Comercializador NUNCA lleva cupo | `EmitirCarnetService` + `EmitirCarnetRequest` (`prohibitedIf`) |
 | La faena solo cuelga del carnet | `permisos_faena.carnet_id` es la única FK; el cupo llega por `hasManyThrough` |
-| La faena sale con los `kilos_disponibles` de la autorización y no descuenta | `EmitirFaenaService::emitir()` |
+| La faena sale con los `kilos_disponibles` de ese día y no descuenta | `EmitirFaenaService::emitir()` |
+| La guía descuenta el cupo del pescador al registrar; eliminar devuelve, revocar no | `EmitirGuiaService` (`descontarDe()`, `moverCupo()`, `eliminar()`) + `AprovechamientoPesq::descontar()` / `devolver()` |
+| Guía con la autorización revocada no se aprueba | `RevisarGuiaService::aprobar()` |
 | Vigencia de autorización, carnets, faena y guía, configurable | `App\Support\Vigencia` + `TramiteConVigencia` / `ModoVigencia`, pantalla `VigenciaController` |
 | La guía solo cuelga del carnet | `guias_movimiento.carnet_id` es la única FK hacia la persona |
 | Cada actor emite solo lo suyo | `TipoActor::emiteFaenas()` / `emiteGuias()`, en los dos servicios |

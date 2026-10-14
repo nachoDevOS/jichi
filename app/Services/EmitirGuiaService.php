@@ -6,6 +6,7 @@ use App\Enums\ConceptoArancel;
 use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
 use App\Exceptions\PermisoOperativoException;
+use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
@@ -65,9 +66,14 @@ class EmitirGuiaService
         }
 
         $guia = DB::transaction(function () use ($carnet, $datos, $renglones, $solicitud): GuiaMovimiento {
+            $kilos = $this->kilosDe($renglones);
+            // De qué pescador sale el pescado: se descuenta acá, con su autorización bloqueada.
+            $autorizacion = $this->descontarDe($datos, $kilos);
+
             $guia = GuiaMovimiento::create([
                 // La guía cuelga del CARNET: la persona se lee de él.
                 'carnet_id' => $carnet->id,
+                'aprovechamiento_id' => $autorizacion?->id,
 
                 /*
                  * La asociación se copia del carnet, no se pregunta de nuevo.
@@ -82,7 +88,7 @@ class EmitirGuiaService
 
                 'transporte_capacidad_kg' => $this->numeroONull($datos['transporte_capacidad_kg'] ?? null),
                 'es_piscicultura' => (bool) ($datos['es_piscicultura'] ?? false),
-                'peso_total_kg' => $this->kilosDe($renglones),
+                'peso_total_kg' => $kilos,
 
                 // PENDIENTE, como el carnet y el cupo: la emisión y el
                 // vencimiento los escribe la aprobación.
@@ -146,11 +152,17 @@ class EmitirGuiaService
                 );
             }
 
+            // Los kilos viejos vuelven a su autorización y los nuevos se descuentan
+            // (de la misma o de otra, si cambió el pescador).
+            $kilos = $this->kilosDe($renglones);
+            $autorizacion = $this->moverCupo($bloqueada, $datos, $kilos);
+
             $bloqueada->update([
                 ...$this->renglonesDelPapel($datos),
+                'aprovechamiento_id' => $autorizacion?->id,
                 'transporte_capacidad_kg' => $this->numeroONull($datos['transporte_capacidad_kg'] ?? null),
                 'es_piscicultura' => (bool) ($datos['es_piscicultura'] ?? false),
-                'peso_total_kg' => $this->kilosDe($renglones),
+                'peso_total_kg' => $kilos,
             ]);
 
             // El monto se vuelve a calcular: cambiaron la carga o la piscicultura.
@@ -206,6 +218,12 @@ class EmitirGuiaService
             // SoftDeletes es un UPDATE. Sin esto quedan renglones huérfanos.
             $bloqueada->detalles()->delete();
 
+            // Nunca se pagó ni viajó: los kilos vuelven al pescador.
+            if ($bloqueada->aprovechamiento_id !== null) {
+                AprovechamientoPesq::query()->whereKey($bloqueada->aprovechamiento_id)->lockForUpdate()->first()
+                    ?->devolver((float) $bloqueada->peso_total_kg);
+            }
+
             // El motivo se deja y se borra: `Auditable` ya engancha el `deleted`,
             // y registrarlo a mano además dejaría el hecho dos veces.
             $bloqueada->motivoAuditoria = $motivo;
@@ -249,6 +267,52 @@ class EmitirGuiaService
 
             return $guia->refresh();
         });
+    }
+
+    //  El cupo del pescador
+
+    /**
+     * Bloquea la autorización elegida, comprueba que esté aprobada y en fecha y
+     * descuenta los kilos. Null si es de piscicultura (no lleva pescador).
+     */
+    private function descontarDe(array $datos, float $kilos): ?AprovechamientoPesq
+    {
+        if ((bool) ($datos['es_piscicultura'] ?? false)) {
+            return null;
+        }
+
+        $id = $datos['aprovechamiento_id'] ?? null;
+
+        if ($id === null) {
+            throw PermisoOperativoException::guiaSinPescador();
+        }
+
+        $autorizacion = AprovechamientoPesq::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+
+        if ($motivo = $autorizacion->motivoSinGuia()) {
+            throw PermisoOperativoException::autorizacionNoVendible($motivo);
+        }
+
+        $autorizacion->descontar($kilos);
+
+        return $autorizacion;
+    }
+
+    /**
+     * Al corregir: devuelve los kilos viejos y descuenta los nuevos. Las dos filas
+     * se bloquean en orden de id, para que dos correcciones cruzadas no se traben.
+     */
+    private function moverCupo(GuiaMovimiento $guia, array $datos, float $kilos): ?AprovechamientoPesq
+    {
+        $ids = array_filter([$guia->aprovechamiento_id, $datos['aprovechamiento_id'] ?? null]);
+        sort($ids);
+        AprovechamientoPesq::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
+
+        if ($guia->aprovechamiento_id !== null) {
+            AprovechamientoPesq::query()->find($guia->aprovechamiento_id)?->devolver((float) $guia->peso_total_kg);
+        }
+
+        return $this->descontarDe($datos, $kilos);
     }
 
     //  Auxiliares

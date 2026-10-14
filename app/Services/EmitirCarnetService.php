@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoCarnet;
 use App\Enums\TipoActor;
+use App\Enums\TramiteConVigencia;
 use App\Exceptions\CarnetInvalidoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\ArancelTarifa;
@@ -13,6 +14,7 @@ use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Sireb\SinPrecioException;
 use App\Sireb\TarifarioSireb;
+use App\Support\Vigencia;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 

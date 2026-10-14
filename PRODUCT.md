@@ -37,7 +37,7 @@ sin ir a la oficina.
 Es el sistema oficial del SEDAG, no un producto comercial: su valor es ser la
 fuente de verdad. Cada documento impreso lleva un código y un QR que lo contrasta
 contra la base en tiempo real, y el cupo de kilos se controla en el mismo
-momento en que se emite cada faena.
+momento en que se registra cada guía de transporte (descuenta del pescador que vendió).
 
 ## Operating Context
 
@@ -58,10 +58,10 @@ momento en que se emite cada faena.
   estructura interna.
 - Todo en español (interfaz, mensajes, código). Vocabulario fijo: el documento
   se llama siempre «Autorización de Pesca para Aprovechamiento Pesquero»; nunca
-  se muestra «Escala N», sino la capacidad en kilos.
-- Estados de cada documento: pendiente → aprobado → vencido / revocado /
-  agotado. Un papel puede quedar «sin efecto» si se revoca la autorización
-  madre; el estado no se imprime, porque cambia después de impreso.
+  se muestra «Escala N», sino la etiqueta de la escala y sus kilos.
+- Estados de cada documento: pendiente → aprobado → revocado. La vigencia no es
+  un estado: la dicen las fechas. Un papel puede quedar «sin efecto» si se revoca
+  la autorización madre; el estado no se imprime, porque cambia después de impreso.
 - Fechas en hora de Bolivia (America/La_Paz).
 - Pendientes de producto: módulos de Reportes, Configuración y Usuarios.
 

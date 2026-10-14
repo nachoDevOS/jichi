@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
+use App\Enums\TramiteConVigencia;
 use App\Exceptions\CarnetInvalidoException;
 use App\Models\Carnet;
+use App\Support\Vigencia;
 use Illuminate\Support\Facades\DB;
 
 /**

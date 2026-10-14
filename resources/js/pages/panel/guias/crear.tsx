@@ -1,17 +1,17 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { Info, ShieldAlert, Truck } from 'lucide-react';
+import { Info, ShieldAlert, TriangleAlert, Truck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
+import { BloqueProcedencia } from '@/components/panel/guias/bloque-procedencia';
 import { CamposGuia } from '@/components/panel/guias/campos-guia';
 import { filaVacia, TablaDetalle } from '@/components/panel/guias/tabla-detalle';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fechaInput } from '@/lib/utils';
+import { bs, fecha } from '@/lib/utils';
 import type { PageProps } from '@/types';
-import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
+import type { AutorizacionVendible, BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 import type { CatalogosGuia, FormularioGuia } from '@/types/guias';
 
 /**
@@ -42,6 +42,9 @@ export default function CrearGuia({
     const inicial =
         beneficiario?.carnets_vigentes.find((c) => c.id === carnetElegido && c.puede_emitir_guias) ?? null;
     const [carnet, setCarnet] = useState<CarnetVigenteSugerido | null>(inicial);
+    // A quién se le compró el pescado: su autorización descuenta los kilos.
+    const [pescador, setPescador] = useState<BeneficiarioSugerido | null>(null);
+    const [autorizacion, setAutorizacion] = useState<AutorizacionVendible | null>(null);
 
     const form = useForm<FormularioGuia & { carnet_id: number | null }>({
         carnet_id: inicial?.id ?? null,
@@ -64,13 +67,7 @@ export default function CrearGuia({
 
         es_piscicultura: false,
         observaciones: '',
-
-        /*
-         * La solicitud es un día, no un instante: es la fecha en que la persona
-         * vino al mostrador. La emisión —y con ella los cinco días de validez—
-         * la escribe la APROBACIÓN.
-         */
-        fecha_solicitud: fechaInput(new Date()),
+        aprovechamiento_id: null,
 
         detalles: [filaVacia()],
     });
@@ -96,9 +93,13 @@ export default function CrearGuia({
     );
     const monto = form.data.es_piscicultura ? importe * (1 - descuentoPiscicultura) : importe;
     const kilos = form.data.detalles.reduce((suma, f) => suma + Number(f.cantidad_kg || 0), 0);
+    // De referencia: el servidor vuelve a medir con la autorización bloqueada.
+    const quedan = autorizacion !== null ? Math.round((autorizacion.kilos_disponibles - kilos) * 100) / 100 : null;
+    const excede = quedan !== null && quedan < 0;
 
     const completo =
         carnet !== null &&
+        (form.data.es_piscicultura || (autorizacion !== null && !excede)) &&
         form.data.origen.trim() !== '' &&
         form.data.destino.trim() !== '' &&
         form.data.detalles.some(
@@ -142,29 +143,33 @@ export default function CrearGuia({
                                 </Campo>
                             )}
 
-                            {carnet && (
-                                <Campo
-                                    etiqueta="Fecha de solicitud"
-                                    htmlFor="fecha_solicitud"
-                                    error={form.errors.fecha_solicitud}
-                                    ayuda="El día que la persona vino al mostrador. La emisión la escribe la aprobación."
-                                    obligatorio
-                                    className="max-w-xs"
-                                >
-                                    <Input
-                                        id="fecha_solicitud"
-                                        type="date"
-                                        value={form.data.fecha_solicitud}
-                                        onChange={(e) => form.setData('fecha_solicitud', e.target.value)}
-                                        aria-invalid={Boolean(form.errors.fecha_solicitud)}
-                                    />
-                                </Campo>
-                            )}
                         </CardContent>
                     </Card>
 
                     {carnet && (
                         <>
+                            {!form.data.es_piscicultura && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Procedencia del pescado</CardTitle>
+                                    </CardHeader>
+
+                                    <CardContent>
+                                        <BloqueProcedencia
+                                            pescador={pescador}
+                                            autorizacionId={form.data.aprovechamiento_id}
+                                            error={form.errors.aprovechamiento_id}
+                                            onPescador={setPescador}
+                                            onAutorizacion={(a) => {
+                                                setAutorizacion(a);
+                                                form.setData('aprovechamiento_id', a?.id ?? null);
+                                                form.clearErrors('aprovechamiento_id');
+                                            }}
+                                        />
+                                    </CardContent>
+                                </Card>
+                            )}
+
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Ubicación y transporte</CardTitle>
@@ -212,6 +217,14 @@ export default function CrearGuia({
                     </CardHeader>
 
                     <CardContent className="space-y-4">
+                        {/* Solo se muestra: la fecha la pone el servidor al registrar. */}
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Fecha de solicitud
+                            </p>
+                            <p className="font-medium">{fecha(new Date())}</p>
+                        </div>
+
                         {carnet === null ? (
                             <p className="flex items-start gap-2 text-sm text-muted-foreground">
                                 <Info className="mt-0.5 size-4 shrink-0" />
@@ -243,6 +256,27 @@ export default function CrearGuia({
                                         {kilos.toFixed(2)} kg
                                     </p>
                                 </div>
+
+                                {pescador && autorizacion && (
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                            Pescado de
+                                        </p>
+                                        <p className="font-medium">{pescador.nombreCompleto}</p>
+                                        <p className="text-xs text-muted-foreground">Autorización N° {autorizacion.numero}</p>
+                                        <p className="mt-1 text-sm tabular-nums">
+                                            Le quedan {autorizacion.kilos_disponibles} → <strong>{quedan}</strong> kg
+                                        </p>
+                                    </div>
+                                )}
+
+                                {excede && pescador && autorizacion && (
+                                    <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                                        Se pasa por {Math.abs(quedan!)} kg: {pescador.nombreCompleto} tiene{' '}
+                                        {autorizacion.kilos_disponibles} kg disponibles.
+                                    </p>
+                                )}
 
                                 <p className="text-xs text-muted-foreground">
                                     La guía queda <strong>PENDIENTE</strong>: todavía no ampara

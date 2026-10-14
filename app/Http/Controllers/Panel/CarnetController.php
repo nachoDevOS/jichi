@@ -284,7 +284,7 @@ class CarnetController extends Controller
                 // La autorización que respalda el carnet: sus kilos salen fijos en cada faena.
                 'cupo' => $carnet->aprovechamiento ? [
                     'id' => $carnet->aprovechamiento->id,
-                    'descripcion' => $carnet->aprovechamiento->escalaLegible(),
+                    'descripcion' => $carnet->aprovechamiento->escala,
                     'volumen_total_kg' => (float) $carnet->aprovechamiento->volumen_total_kg,
                     'kilos_disponibles' => (float) $carnet->aprovechamiento->kilos_disponibles,
                     'vigente' => $carnet->aprovechamiento->estaVigente(),

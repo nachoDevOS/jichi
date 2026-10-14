@@ -165,8 +165,8 @@ administrador:
 docker compose exec app php artisan db:seed --force
 ```
 
-Y esto carga los catálogos (asociaciones, tipos de carnet, productos,
-categorías):
+Y esto carga los catálogos (asociaciones y las filas de Aranceles con su servicio
+de SIREB y las tarifas definidas del carnet):
 
 ```sh
 docker compose exec app php artisan db:seed --class=CatalogoSeeder --force

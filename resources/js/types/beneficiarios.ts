@@ -274,4 +274,21 @@ export interface BeneficiarioSugerido {
      * en curso por persona.
      */
     cupos_elegibles?: CupoVigente[];
+    /** Para la guía: sus autorizaciones aprobadas y en fecha, de las que se le puede comprar. */
+    autorizaciones_vendibles?: AutorizacionVendible[];
+    /** Si se la buscó por el código de su autorización: cuál. */
+    autorizacion_buscada_id?: number | null;
+}
+
+/** Una autorización de la que un comercializador le puede comprar pescado al pescador. */
+export interface AutorizacionVendible {
+    id: number;
+    /** El N° del talonario: «000012». */
+    numero: string;
+    /** La etiqueta de la escala: «801 kg hasta 1000 kg». */
+    escala: string | null;
+    volumen_total_kg: number;
+    /** Lo que le queda: las guías lo bajan al registrarse. */
+    kilos_disponibles: number;
+    fecha_vencimiento: string | null;
 }

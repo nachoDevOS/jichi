@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoAprovechamiento;
+use App\Exceptions\PermisoOperativoException;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * La autorización de pesca del pescador: el volumen anual en kilos, con fecha.
- * Las faenas NO descuentan de acá (12/10/2026): se emiten por el carnet.
+ * Las faenas NO descuentan; las GUÍAS que le compran sí (`kilos_disponibles`).
  */
 #[Fillable([
     'beneficiario_id',
@@ -59,7 +60,6 @@ class AprovechamientoPesq extends Model
     protected function casts(): array
     {
         return [
-            'escala' => 'decimal:2',
             'volumen_total_kg' => 'decimal:2',
             'kilos_disponibles' => 'decimal:2',
             'monto' => 'decimal:2',
@@ -93,6 +93,12 @@ class AprovechamientoPesq extends Model
         );
     }
 
+    /** Las guías que le compraron pescado: cada una descontó sus kilos. */
+    public function guias(): HasMany
+    {
+        return $this->hasMany(GuiaMovimiento::class, 'aprovechamiento_id');
+    }
+
     /**
      * Las credenciales que se apoyan en este cupo.
      *
@@ -112,16 +118,6 @@ class AprovechamientoPesq extends Model
     public function montoACobrar(): float
     {
         return (float) $this->monto;
-    }
-
-    /** La escala como se muestra: «Hasta 100 kg». */
-    public function escalaLegible(): ?string
-    {
-        if ($this->escala === null) {
-            return null;
-        }
-
-        return 'Hasta '.str_replace(',00', '', number_format((float) $this->escala, 2, ',', '.')).' kg';
     }
 
     /** El N° de la autorización impresa, con los ceros del talonario: «000001». */
@@ -193,6 +189,40 @@ class AprovechamientoPesq extends Model
     {
         return $this->fecha_vencimiento !== null
             && $this->fecha_vencimiento->endOfDay()->isFuture();
+    }
+
+    /**
+     * Resta kilos del cupo. Solo sobre la copia bloqueada con lockForUpdate(),
+     * dentro de la transacción de la guía: si no alcanza, no toca nada.
+     */
+    public function descontar(float $kilos): void
+    {
+        if (round($kilos, 2) > round((float) $this->kilos_disponibles, 2)) {
+            throw PermisoOperativoException::sinKilosDisponibles(
+                $this->beneficiario?->nombreCompleto ?? 'El pescador',
+                (float) $this->kilos_disponibles,
+                $kilos,
+            );
+        }
+
+        $this->update(['kilos_disponibles' => round((float) $this->kilos_disponibles - $kilos, 2)]);
+    }
+
+    /** Devuelve kilos de una guía eliminada o corregida, sin pasarse de lo autorizado. */
+    public function devolver(float $kilos): void
+    {
+        $this->update(['kilos_disponibles' => min((float) $this->volumen_total_kg, round((float) $this->kilos_disponibles + $kilos, 2))]);
+    }
+
+    /** POR QUÉ no se le puede comprar pescado (guía), o null si sí. */
+    public function motivoSinGuia(): ?string
+    {
+        return match (true) {
+            $this->estaVigente() => null,
+            $this->estado === EstadoAprovechamiento::Revocado => 'su autorización fue revocada',
+            $this->estado === EstadoAprovechamiento::Pendiente => 'su autorización todavía no se pagó',
+            default => 'su autorización venció',
+        };
     }
 
     /** ¿Se le puede colgar una faena hoy? Aprobada y en fecha: las faenas no descuentan kilos. */

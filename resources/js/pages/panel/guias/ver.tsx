@@ -2,6 +2,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Ban, CalendarX, Clock, IdCard, Pencil, Printer, Receipt, Trash2, Truck, User } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -153,6 +154,27 @@ export default function VerGuia({
                                     valor={guia.codigo ? <TextoCopiable texto={guia.codigo} className="-ml-1.5" /> : '—'}
                                 />
                             </dl>
+
+                            {/* De quién es el pescado: sus kilos se descontaron de esa autorización. */}
+                            {guia.procedencia && (
+                                <div className="rounded-md bg-secondary/60 p-3 text-sm">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Pescado de</p>
+                                    <p className="font-medium">
+                                        {guia.procedencia.pescador ?? '—'}{' '}
+                                        <span className="font-normal text-muted-foreground">{guia.procedencia.documento}</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        <EnlacePermitido
+                                            permiso="aprovechamientos.ver"
+                                            href={route('aprovechamientos.show', guia.procedencia.aprovechamiento_id)}
+                                            className="text-primary hover:underline"
+                                        >
+                                            Autorización N° {guia.procedencia.numero}
+                                        </EnlacePermitido>
+                                        {guia.procedencia.escala ? ` · ${guia.procedencia.escala}` : ''} · descontó {guia.peso_total_kg} kg
+                                    </p>
+                                </div>
+                            )}
 
                             {guia.es_piscicultura && (
                                 <p className="rounded-md bg-secondary p-3 text-xs text-muted-foreground">

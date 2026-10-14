@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'carnet_id',
     'asociacion_id',
+    'aprovechamiento_id',
     'nro',
     'monto',
     'origen',
@@ -104,6 +105,12 @@ class GuiaMovimiento extends Model
     public function asociacion(): BelongsTo
     {
         return $this->belongsTo(Asociacion::class);
+    }
+
+    /** De qué autorización sale el pescado (la del pescador que vende). Null si es de criadero. */
+    public function aprovechamiento(): BelongsTo
+    {
+        return $this->belongsTo(AprovechamientoPesq::class, 'aprovechamiento_id');
     }
 
     /** Los renglones del cuadro D. */

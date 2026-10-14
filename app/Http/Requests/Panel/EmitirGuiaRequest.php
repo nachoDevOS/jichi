@@ -63,16 +63,16 @@ class EmitirGuiaRequest extends FormRequest
              */
             'es_piscicultura' => ['required', 'boolean'],
 
-            'observaciones' => ['nullable', 'string', 'max:1000'],
+            // De qué autorización sale el pescado. Si está aprobada, en fecha y le
+            // alcanzan los kilos lo decide el servicio, con la fila bloqueada.
+            'aprovechamiento_id' => [
+                Rule::requiredIf(fn (): bool => ! $this->boolean('es_piscicultura')),
+                Rule::prohibitedIf(fn (): bool => $this->boolean('es_piscicultura')),
+                'nullable', 'integer',
+                Rule::exists('aprovechamientos_pesq', 'id')->whereNull('deleted_at'),
+            ],
 
-            /*
-             * NO se pide con fecha futura: es el día que la persona vino al
-             * mostrador. Pasada sí, para poner al día lo tramitado en papel.
-             *
-             * ⚠️ No es la emisión: esa la escribe la APROBACIÓN, y desde ahí
-             * corren los 5 días de validez.
-             */
-            'fecha_solicitud' => ['required', 'date', 'before_or_equal:today'],
+            'observaciones' => ['nullable', 'string', 'max:1000'],
 
             /*
              *  El cuadro D. Al menos un renglón: una guía sin especies no
@@ -99,7 +99,9 @@ class EmitirGuiaRequest extends FormRequest
             'origen.required' => 'Indique desde dónde sale la carga.',
             'destino.required' => 'Indique a dónde va la carga.',
             'es_piscicultura.required' => 'Indique si el producto es de piscicultura.',
-            'fecha_solicitud.before_or_equal' => 'La fecha de solicitud no puede ser futura.',
+            'aprovechamiento_id.required' => 'Indique a qué pescador le compró el pescado.',
+            'aprovechamiento_id.prohibited' => 'El producto de criadero no lleva pescador.',
+            'aprovechamiento_id.exists' => 'Esa autorización no existe o fue eliminada.',
             'detalles.required' => 'Cargue al menos una especie en el detalle.',
             'detalles.min' => 'Cargue al menos una especie en el detalle.',
             'detalles.*.tarifa_sireb.required' => 'Elija el producto de este renglón.',
@@ -129,8 +131,6 @@ class EmitirGuiaRequest extends FormRequest
             'destino' => trim((string) $this->input('destino')),
             'es_piscicultura' => $this->boolean('es_piscicultura'),
             'detalles' => $detalles,
-            // El día del mostrador, no el instante: la columna guarda un DÍA.
-            'fecha_solicitud' => $this->input('fecha_solicitud') ?: now()->toDateString(),
         ]);
     }
 }

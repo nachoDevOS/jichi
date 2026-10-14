@@ -18,14 +18,14 @@ verificar un documento escaneando su QR, desde la calle y sin iniciar sesión.
  APROVECHAMIENTO PESQUERO              │
  (un cupo en kg)                       ▼
           │                     GUÍA ÚNICA DE TRANSPORTE
-          ▼                     (una por traslado, 5 días)
-   CARNET (pescador)
-          │
+          ▼                     (una por traslado, 5 días;
+   CARNET (pescador)             dice a qué pescador le compró y
+          │                      DESCUENTA de su cupo)
           ▼
-   PERMISO DE FAENA (una por salida, 30 días; reserva y descuenta kilos)
+   PERMISO DE FAENA (una por salida, 30 días; no descuenta)
 
  PENDIENTE ──(SIREB: pagada)──▶ APROBADO  + RECIBO
-     └────(SIREB: vencida, sin pago)──▶ NO PAGADO
+     └────(SIREB: vencida, sin pago)──▶ sigue PENDIENTE
 ```
 
 - **Una autorización vigente por persona y un carnet vigente por actividad.**
@@ -125,11 +125,11 @@ Lo que **sí** queda armado es la lista de permisos, y cada ruta exige el suyo
 - Inicio de sesión con bitácora de accesos, y login con Ibare (OAuth2)
 - Panel principal: trabajo pendiente, vigentes, recaudación y avisos
 - **Beneficiarios** — alta, edición, búsqueda, baja lógica, fotografía, ficha por actividad
-- **Autorización de Pesca para Aprovechamiento Pesquero** — cupo en kg por la escala oficial, revocación
+- **Autorización de Pesca para Aprovechamiento Pesquero** — cupo en kg por la escala de SIREB, saldo que bajan las guías, revocación
 - **Carnets** — pescador y comercializador, revocación, reposición, impresión del plástico
-- **Permisos de faena y guías de transporte** — reserva y descuento de kilos, impresión
-- **Cobro en SIREB** — liquidación, «Cargar pago», «Verificar pago», «No pagado», recibo oficial
-- **Catálogos** — asociaciones, escala, tipos de carnet, productos y aranceles, con tarifas de SIREB
+- **Permisos de faena y guías de transporte** — la guía descuenta el cupo del pescador que vendió, impresión
+- **Cobro en SIREB** — liquidación, «Cargar pago», «Verificar pago», «Generar nueva liquidación», recibo oficial
+- **Catálogos** — asociaciones y aranceles: el servicio de SIREB de cada trámite y sus tarifas definidas
 - **Portal del beneficiario** (`/mi-cuenta`) y **verificación pública** por código QR
 
 **Pendiente:** Reportes y Configuración. Aparecen en gris en el menú lateral. La

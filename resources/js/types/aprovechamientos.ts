@@ -187,3 +187,14 @@ export interface FaenaDelCupo {
     fecha_desembarque: string | null;
 }
 
+
+/** Una guía que le compró pescado a esta autorización: descontó sus kilos. */
+export interface GuiaDelCupo {
+    id: number;
+    numero_legible: string;
+    comercializador: string | null;
+    peso_total_kg: number;
+    estado_etiqueta: string;
+    estado_color: string;
+    fecha_solicitud: string | null;
+}

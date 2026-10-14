@@ -49,12 +49,12 @@ para no equivocarse:
  (la bolsa madre: un cupo en kg)             ▼
                  │                     GUÍA ÚNICA DE TRANSPORTE
                  ▼                     (una por traslado, 5 días)
-        CARNET (pescador)                    └──< detalle por producto
-                 │
-                 ▼
-        PERMISO DE FAENA (una por salida, 30 días;
-        sale con los kilos_disponibles de la autorización, fijos;
-        NO descuenta nada — 12/10/2026)
+        CARNET (pescador)                    ├──< detalle por producto
+                 │                           └──▶ de qué pescador es el pescado:
+                 ▼                                DESCUENTA sus kilos_disponibles
+        PERMISO DE FAENA (una por salida,         (13/10/2026)
+        30 días; sale con los kilos_disponibles
+        de ese día; NO descuenta)
 
  Los cuatro se PAGAN EN SIREB (Recaudaciones): cada uno registra su liquidación
  y, cuando SIREB la da por pagada, Jichi lo aprueba y emite su RECIBO.
@@ -93,10 +93,13 @@ para no equivocarse:
   «sin efecto»**, porque su vigencia se calcula mirando al padre. Ver la trampa
   de la vigencia, más abajo.
 - **Lo que se entregó, se congela**: el recibo copia monto, concepto y la boleta
-  de SIREB; la guía copia el precio de cada producto. **Las faenas NO
-  descuentan de la autorización** (12/10/2026): cada faena sale con
-  `aprovechamientos_pesq.kilos_disponibles`, un valor fijo que pone ventanilla al
-  otorgar. No hay saldo, reserva, `agotado` ni `APROVECHAMIENTO_ESTRICTO`.
+  de SIREB; la guía copia el precio de cada producto. **Lo que descuenta el cupo
+  es la GUÍA, no la faena** (13/10/2026): el comercializador declara a qué
+  pescador le compró, y el total del cuadro D baja
+  `aprovechamientos_pesq.kilos_disponibles` (un SALDO guardado) **al registrar**.
+  Eliminar una guía pendiente lo devuelve; revocarla, no. La faena no descuenta y
+  sale con los disponibles de ese día. Ver
+  [docs/modulos/GUIA-DESCUENTA-CUPO.md](docs/modulos/GUIA-DESCUENTA-CUPO.md).
 
 Todo eso vive en `app/Services/` (`OtorgarCupoService`, `Emitir*Service`,
 `Revisar*Service`, `LiquidarSirebService`, `ConfirmarPagoService`), en transacciones con
@@ -318,19 +321,20 @@ El procedimiento detallado está en
 ## Verificar antes de dar algo por terminado
 
 ```sh
-php artisan test        # las pruebas (92, SIREB simulado: ninguna sale a la red)
+php artisan test        # las pruebas (29, solo la guía; SIREB simulado: ninguna sale a la red)
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
 ```
 
-> **Las pruebas volvieron el 12/10/2026** (se habían retirado el 27/09/2026).
-> Corren sobre SQLite en memoria con **SIREB e Ibare simulados**
-> (`tests/Concerns/SirebFalso.php`, `Http::preventStrayRequests()`): ninguna
-> llama al SIREB real ni escribe en el log de SIREB. `ArmaEscenarios` arma el
-> camino de ventanilla con los servicios reales y aprueba por la vía de verdad
-> (pagar en SIREB → `ConfirmarPagoService`). **Un cambio en una regla va con su
-> prueba.** Las pruebas no ven el navegador: la pantalla se sigue probando a
+> **Las pruebas de hoy son 29 y cubren SOLO la guía** (13/10/2026): el descuento
+> del cupo y la búsqueda por código (`tests/Feature/Guias/`, `tests/Unit/`). Las
+> 92 del 12/10/2026 **nunca se commitearon y se perdieron**: la carpeta `tests/`
+> no existía. **`tests/` va en el commit, siempre.** Corren sobre SQLite en
+> memoria con **SIREB e Ibare simulados** (`tests/Concerns/SirebFalso.php`,
+> `Http::preventStrayRequests()`): ninguna llama al SIREB real ni escribe en el
+> log de SIREB. **Un cambio en una regla va con su prueba**, y conviene comprobar
+> que la prueba FALLA rompiendo el código a propósito. Las pruebas no ven el navegador: la pantalla se sigue probando a
 > mano, incluidos los bordes.
 
 Los tres tienen que pasar.
@@ -621,6 +625,13 @@ Los tres tienen que pasar.
   la ficha del cupo, y **ningún ensayo lo detecta**: llamando al servicio
   directamente se pasan todos los argumentos, y el agujero solo aparece cuando
   lo llena un formulario de verdad.
+- **Un `use` que falta NO lo detecta ningún chequeo, y revienta recién al ejecutar.**
+  `php -l`, Pint, `tsc` y el build pasan con `Vigencia::hasta()` sin su `use`: PHP
+  busca la clase en el namespace del archivo (`App\Services\Vigencia`) solo al
+  correr esa línea. Pasó el 13/10/2026: un `sed` que agregaba el import no
+  coincidió y no avisó, y registrar y aprobar un carnet daban 500. Lo encontró
+  una prueba que EJECUTÓ el servicio. Al usar una clase nueva en un archivo,
+  confirmar el `use` con `grep`, y probar corriendo el camino, no compilando.
 - **Para borrar un método de PHP, NO se usa una expresión regular multilínea.**
   Las llaves anidadas no se pueden expresar con una regex, así que lo que sobra o
   falta no se nota hasta que el archivo ya está escrito: al sacar `ampliar()` de
@@ -657,7 +668,8 @@ Los tres tienen que pasar.
   La escala ni siquiera es una tabla (12/10/2026): son las tarifas del servicio
   que guarda la fila `autorizacion` de `aranceles_sireb` (`TarifarioSireb`). Al
   otorgar, `OtorgarCupoService` pide la tarifa elegida a Recaudaciones y congela
-  monto y `rango_hasta` (`escala`), que son los kilos (13/10/2026): de cada
+  monto, la etiqueta (`escala`) y el `rango_hasta` (`volumen_total_kg`, los kilos
+  que se imprimen; 13/10/2026): de cada
   tarifa se usan etiqueta, precio, si está activa y, en la escala, el rango. **Sin SIREB no se
   otorga**: es a propósito, ninguna tarifa se escribe a mano. Las pantallas que
   solo MUESTRAN precio usan `SirebService::serviciosSiResponde()` y abren igual

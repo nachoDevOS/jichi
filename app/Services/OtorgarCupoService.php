@@ -60,9 +60,9 @@ class OtorgarCupoService
                 'nro' => $this->correlativos->siguienteContinuo(AprovechamientoPesq::SERIE),
                 'monto' => $escala['monto'],
                 'sireb_tarifa_id' => $escala['tarifa_id'],
-                // Copia: Recaudaciones puede cambiar o dar de baja la tarifa después.
-                'escala' => $escala['kilos'],
-                // Los kilos son los de la escala pagada: ventanilla no los escribe.
+                // Copias: Recaudaciones puede cambiar o dar de baja la tarifa después.
+                'escala' => $escala['etiqueta'],
+                // Los kilos son el `rango_hasta` de la escala pagada: ventanilla no los escribe.
                 'volumen_total_kg' => $escala['kilos'],
                 // Fijo: cada faena sale con este valor y no lo descuenta.
                 'kilos_disponibles' => $escala['kilos'],
@@ -186,7 +186,7 @@ class OtorgarCupoService
      * Lo que otorgar() revisa de la escala antes de escribir: la tarifa activa en
      * SIREB y su `rango_hasta`. No escribe nada, así que sirve también para probar.
      *
-     * @return array{monto: float, tarifa_id: string, kilos: float}
+     * @return array{monto: float, tarifa_id: string, etiqueta: string, kilos: float}
      *
      * @throws CupoInvalidoException
      */
@@ -199,7 +199,7 @@ class OtorgarCupoService
             throw CupoInvalidoException::sinRango($precio['tarifa']['etiqueta'] ?? null);
         }
 
-        return ['monto' => $precio['monto'], 'tarifa_id' => $precio['tarifa_id'], 'kilos' => $kilos];
+        return ['monto' => $precio['monto'], 'tarifa_id' => $precio['tarifa_id'], 'etiqueta' => $precio['tarifa']['etiqueta'] ?? '', 'kilos' => $kilos];
     }
 
     /**

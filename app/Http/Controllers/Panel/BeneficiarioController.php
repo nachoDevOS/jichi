@@ -12,11 +12,13 @@ use App\Models\Departamento;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
+use App\Services\CodigoService;
 use App\Support\Archivos;
 use App\Support\ExpedienteBeneficiario;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -228,7 +230,7 @@ class BeneficiarioController extends Controller
             'cupos' => ExpedienteBeneficiario::aprovechamientos($beneficiario)
                 ->map(fn (AprovechamientoPesq $a): array => [
                     'id' => $a->id,
-                    'descripcion' => $a->escalaLegible(),
+                    'descripcion' => $a->escala,
                     'volumen_total_kg' => (float) $a->volumen_total_kg,
                     'kilos_disponibles' => (float) $a->kilos_disponibles,
                     'estado' => $a->estado->value,
@@ -317,8 +319,15 @@ class BeneficiarioController extends Controller
             return [];
         }
 
+        // En «Procedencia del pescado» también vale el código de la autorización (o la URL de su QR).
+        $porCodigo = $request->boolean('autorizacion') ? self::autorizacionPorCodigo($termino) : null;
+
         return Beneficiario::query()
-            ->buscar($termino)
+            ->when(
+                $porCodigo !== null,
+                fn ($q) => $q->whereKey($porCodigo->beneficiario_id),
+                fn ($q) => $q->buscar($termino),
+            )
             /*
              * Se traen los carnets VIGENTES con su tipo, todo en la misma tanda
              * de consultas.
@@ -360,8 +369,45 @@ class BeneficiarioController extends Controller
                 'carnets_vigentes' => $b->carnets->map(fn (Carnet $c): array => $c->resumenParaEmitir())->values()->all(),
 
                 'cupos_elegibles' => self::cuposElegibles($b),
+
+                // Para la guía: las autorizaciones de las que se le puede comprar (aprobadas y en fecha).
+                'autorizaciones_vendibles' => $b->aprovechamientos
+                    ->filter(fn (AprovechamientoPesq $a): bool => $a->estaVigente())
+                    ->map(fn (AprovechamientoPesq $a): array => [
+                        'id' => $a->id,
+                        'numero' => $a->numeroLegible(),
+                        'escala' => $a->escala,
+                        'volumen_total_kg' => (float) $a->volumen_total_kg,
+                        'kilos_disponibles' => (float) $a->kilos_disponibles,
+                        'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
+                    ])
+                    ->values()
+                    ->all(),
+
+                // La que se buscó por código: la pantalla la elige sola, si se puede vender.
+                'autorizacion_buscada_id' => $porCodigo?->id,
             ])
             ->all();
+    }
+
+    /**
+     * La autorización cuyo código de verificación es el término. `codigos` guarda
+     * los de los cinco documentos: `whereHas('codigo')` filtra por el tipo, así que
+     * el código de un carnet o de un recibo no encuentra nada. Solo el código
+     * COMPLETO: es una llave, no se busca por partes.
+     */
+    private static function autorizacionPorCodigo(string $termino): ?AprovechamientoPesq
+    {
+        // Un lector de QR «tipea» la URL de verificación: el código es lo último.
+        $codigo = AprovechamientoPesq::normalizarCodigo(Str::afterLast($termino, '/'));
+
+        if (strlen($codigo) !== CodigoService::LARGO) {
+            return null;
+        }
+
+        return AprovechamientoPesq::query()
+            ->whereHas('codigo', fn ($q) => $q->where('codigo', $codigo))
+            ->first();
     }
 
     /**
@@ -385,7 +431,7 @@ class BeneficiarioController extends Controller
             ->sortByDesc('fecha_solicitud')
             ->map(fn (AprovechamientoPesq $a): array => [
                 'id' => $a->id,
-                'descripcion' => $a->escalaLegible(),
+                'descripcion' => $a->escala,
                 'volumen_total_kg' => (float) $a->volumen_total_kg,
                 'kilos_disponibles' => (float) $a->kilos_disponibles,
                 'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),

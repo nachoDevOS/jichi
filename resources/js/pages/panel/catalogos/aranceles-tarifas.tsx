@@ -93,7 +93,7 @@ export default function ArancelesTarifas({
                                         etiqueta="Tarifa de SIREB"
                                         htmlFor={`tarifa-${i}`}
                                         error={errores[`tarifas.${i}.sireb_tarifa_id`]}
-                                        ayuda={ausente ? 'Esta tarifa ya no está en SIREB: elija otra.' : undefined}
+                                        ayuda={ausente ? 'Esta tarifa ya no está activa en SIREB: elija otra.' : undefined}
                                     >
                                         <Select
                                             id={`tarifa-${i}`}
@@ -102,7 +102,7 @@ export default function ArancelesTarifas({
                                             disabled={tarifasSireb === null}
                                         >
                                             <option value="">{fijas ? 'Sin definir' : 'Elija una tarifa…'}</option>
-                                            {ausente && <option value={f.sireb_tarifa_id}>Tarifa guardada (ya no está en SIREB)</option>}
+                                            {ausente && <option value={f.sireb_tarifa_id}>Tarifa guardada (ya no está activa en SIREB)</option>}
                                             {(tarifasSireb ?? []).map((t) => (
                                                 <option key={t.id} value={t.id} disabled={!t.activa}>
                                                     {t.etiqueta} — {t.monto} Bs{!t.activa ? ' (inactiva)' : ''}

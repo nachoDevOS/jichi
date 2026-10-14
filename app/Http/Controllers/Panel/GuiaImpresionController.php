@@ -55,7 +55,7 @@ class GuiaImpresionController extends Controller
      */
     public function documento(GuiaMovimiento $guia, ?string $marcaAgua = null): ArchivoPdf
     {
-        $guia->loadMissing(['codigo', 'carnet.beneficiario', 'detalles']);
+        $guia->loadMissing(['codigo', 'carnet.beneficiario', 'detalles', 'aprovechamiento.beneficiario']);
 
         $pdf = Pdf::loadView('documentos.guia-transporte', [
             ...$this->datos($guia),
@@ -108,6 +108,10 @@ class GuiaImpresionController extends Controller
             //  BLOQUE A — el interesado
             'comerciante' => $beneficiario?->nombreCompleto ?: '',
             'documento' => $beneficiario?->documento_identidad ?: '',
+            // De quién es el pescado: el pescador y su autorización. Vacío si es de criadero.
+            'pescador' => $guia->aprovechamiento?->beneficiario?->nombreCompleto ?: '',
+            'pescadorDocumento' => $guia->aprovechamiento?->beneficiario?->documento_identidad ?: '',
+            'autorizacion' => $guia->aprovechamiento?->numeroLegible() ?: '',
 
             //  BLOQUE B — la ubicación
             'origen' => [

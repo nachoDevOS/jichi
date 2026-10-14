@@ -197,4 +197,30 @@ class PermisoOperativoException extends RuntimeException
             'no autoriza faenas. Hace falta una autorización nueva y un carnet colgado de ella.',
         );
     }
+
+    /** La guía pide más kilos de los que le quedan al pescador. */
+    public static function sinKilosDisponibles(string $pescador, float $disponibles, float $pedidos): self
+    {
+        $kg = fn (float $n): string => rtrim(rtrim(number_format($n, 2, ',', '.'), '0'), ',');
+
+        return new self("{$pescador} solo tiene {$kg($disponibles)} kg disponibles en su autorización, y la guía lleva {$kg($pedidos)} kg.");
+    }
+
+    /** Toda guía (salvo piscicultura) dice de qué pescador viene el pescado. */
+    public static function guiaSinPescador(): self
+    {
+        return new self('Indique a qué pescador le compró el pescado: sus kilos se descuentan de su autorización.');
+    }
+
+    /** La autorización elegida no está aprobada y en fecha. */
+    public static function autorizacionNoVendible(string $motivo): self
+    {
+        return new self("No se puede descontar de esa autorización: {$motivo}.");
+    }
+
+    /** Revocaron la autorización del pescador mientras la guía esperaba el pago. */
+    public static function guiaConAutorizacionRevocada(): self
+    {
+        return new self('La Autorización de Pesca del pescador que vendió fue revocada: la guía no se aprueba. Elimínela.');
+    }
 }

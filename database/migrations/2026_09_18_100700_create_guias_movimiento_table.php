@@ -23,6 +23,9 @@ return new class extends Migration
             // La asociación SÍ se copia: es el aval impreso, y un cambio de
             // gremio no puede reescribir lo entregado.
             $table->foreignId('asociacion_id')->index()->constrained('asociaciones')->restrictOnDelete();
+            // De qué autorización sale el pescado: descuenta su cupo. Null = piscicultura.
+            $table->foreignId('aprovechamiento_id')->nullable()->index()->constrained('aprovechamientos_pesq')->restrictOnDelete()
+                ->comment('Autorización del pescador que vende; null si es de criadero');
 
             // Correlativo global y continuo, lo genera el sistema. Único y no
             // parcial: la hoja del talonario se gastó.

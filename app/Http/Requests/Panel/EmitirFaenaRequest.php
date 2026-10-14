@@ -28,9 +28,6 @@ class EmitirFaenaRequest extends FormRequest
 
             // El número NO viene del formulario: lo genera el correlativo.
 
-            // Una tarifa del servicio de la faena en SIREB: si se puede cobrar lo decide el servicio.
-            'tarifa_sireb' => ['required', 'uuid'],
-
             // Las fechas NO vienen del formulario: las escribe la aprobación.
 
             /*
@@ -55,8 +52,6 @@ class EmitirFaenaRequest extends FormRequest
     {
         return [
             'carnet_id.required' => 'Elija el carnet del pescador.',
-            'tarifa_sireb.required' => 'Elija la tarifa del permiso.',
-            'tarifa_sireb.uuid' => 'Esa tarifa no es de SIREB.',
             'carnet_id.exists' => 'Ese carnet no existe.',
         ];
     }

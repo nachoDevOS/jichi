@@ -7,6 +7,7 @@ use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
+use App\Models\ArancelTarifa;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
 use App\Sireb\SinPrecioException;
@@ -36,8 +37,6 @@ class EmitirFaenaService
      */
     public function emitir(
         Carnet $carnet,
-        // La tarifa del servicio de la faena en SIREB que eligió ventanilla.
-        string $tarifaId,
         array $papel = [],
     ): PermisoFaena {
         if (! $carnet->tipo_actor->emiteFaenas()) {
@@ -66,7 +65,7 @@ class EmitirFaenaService
         }
 
         // Fuera de la transacción: una llamada a SIREB no debe tener filas bloqueadas.
-        $precio = $this->precioDeLaFaena($tarifaId);
+        $precio = $this->precioDeLaFaena();
 
         $faena = DB::transaction(function () use ($carnet, $cupo, $papel, $precio): PermisoFaena {
             $faena = PermisoFaena::create([
@@ -186,18 +185,47 @@ class EmitirFaenaService
     }
 
     /**
-     * El precio de una tarifa del servicio de la faena (Catálogos › Aranceles)
-     * según SIREB, el de ahora. Sin él no se emite: ninguna tarifa se escribe a mano.
+     * El precio del permiso: la tarifa definida en Aranceles › Permiso de faena, por
+     * su id de SIREB, al precio de ahora. Ventanilla no elige tarifa.
      *
      * @return array{monto: float, tarifa_id: string, tarifa: array}
      */
-    public function precioDeLaFaena(string $tarifaId): array
+    public function precioDeLaFaena(): array
     {
+        if ($this->tarifario->servicioId(ConceptoArancel::Faena) === null) {
+            throw PermisoOperativoException::faenaSinPrecio('no tiene servicio de SIREB elegido en Catálogos › Aranceles.');
+        }
+
+        $tarifaId = $this->tarifaDeLaFaena();
+
+        if ($tarifaId === null) {
+            throw PermisoOperativoException::faenaSinPrecio($this->tarifario->tarifas(ConceptoArancel::Faena) === null
+                ? 'Recaudaciones (SIREB) no responde. Intente de nuevo en unos minutos.'
+                : 'su servicio tiene varias tarifas activas (o ninguna): defina cuál en Catálogos › Aranceles › Permiso de faena › Definir tarifas.');
+        }
+
         try {
             return $this->tarifario->precio(ConceptoArancel::Faena, $tarifaId);
         } catch (SinPrecioException $e) {
             throw PermisoOperativoException::faenaSinPrecio($e->getMessage());
         }
+    }
+
+    /**
+     * La tarifa del permiso: la definida en Aranceles y, si no hay, la única activa
+     * del servicio. Null si no hay ninguna o hay varias: ahí no se adivina.
+     */
+    public function tarifaDeLaFaena(): ?string
+    {
+        $definida = ArancelTarifa::idDe(ConceptoArancel::Faena, ConceptoArancel::CLAVE_FAENA);
+
+        if ($definida !== null) {
+            return $definida;
+        }
+
+        $activas = array_values(array_filter($this->tarifario->tarifas(ConceptoArancel::Faena) ?? [], fn (array $t): bool => $t['activa']));
+
+        return count($activas) === 1 ? $activas[0]['id'] : null;
     }
 
     /**

@@ -224,7 +224,7 @@ export default function CatalogoAranceles({
 /** Las tarifas del servicio, como las manda SIREB hoy: etiqueta, precio y si está activa. */
 function TablaTarifas({ arancel, moneda }: { arancel: ArancelFila; moneda: string }) {
     if (arancel.tarifas.length === 0) {
-        return <p className="text-sm text-muted-foreground">El servicio no tiene tarifas en SIREB.</p>;
+        return <p className="text-sm text-muted-foreground">El servicio no tiene tarifas activas en SIREB.</p>;
     }
 
     return (

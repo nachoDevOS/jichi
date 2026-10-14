@@ -1,6 +1,7 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { TriangleAlert } from 'lucide-react';
-import { type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
+import { BloqueProcedencia } from '@/components/panel/guias/bloque-procedencia';
 import { CamposGuia } from '@/components/panel/guias/campos-guia';
 import { filaVacia, TablaDetalle } from '@/components/panel/guias/tabla-detalle';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,9 @@ import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs } from '@/lib/utils';
+import { bs, fecha } from '@/lib/utils';
 import type { PageProps } from '@/types';
+import type { AutorizacionVendible, BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { CatalogosGuia, FilaDetalle, FormularioGuia, GuiaEditable } from '@/types/guias';
 
 /**
@@ -34,6 +36,12 @@ export default function EditarGuia({
     // sale del bolso que Inertia comparte en cada respuesta.
     const { institucion, errors } = usePage<PageProps & { errors: Record<string, string> }>().props;
 
+    // El pescador ya elegido; sus kilos de esta guía cuentan como disponibles.
+    const [pescador, setPescador] = useState<BeneficiarioSugerido | null>(guia.pescador);
+    const [autorizacion, setAutorizacion] = useState<AutorizacionVendible | null>(
+        guia.pescador?.autorizaciones_vendibles.find((a) => a.id === guia.aprovechamiento_id) ?? null,
+    );
+
     const form = useForm<FormularioGuia>({
         origen: guia.origen ?? '',
         origen_departamento: guia.origen_departamento ?? '',
@@ -54,7 +62,7 @@ export default function EditarGuia({
 
         es_piscicultura: guia.es_piscicultura,
         observaciones: guia.observaciones ?? '',
-        fecha_solicitud: guia.fecha_solicitud ?? '',
+        aprovechamiento_id: autorizacion?.id ?? null,
 
         // Se rellena con una fila vacía si la guía quedó sin detalle: la tabla
         // necesita al menos un renglón sobre el que escribir.
@@ -85,8 +93,11 @@ export default function EditarGuia({
     );
     const monto = form.data.es_piscicultura ? importe * (1 - descuentoPiscicultura) : importe;
     const kilos = form.data.detalles.reduce((suma, f) => suma + Number(f.cantidad_kg || 0), 0);
+    const quedan = autorizacion !== null ? Math.round((autorizacion.kilos_disponibles - kilos) * 100) / 100 : null;
+    const excede = quedan !== null && quedan < 0;
 
     const completo =
+        (form.data.es_piscicultura || (autorizacion !== null && !excede)) &&
         form.data.origen.trim() !== '' &&
         form.data.destino.trim() !== '' &&
         form.data.detalles.some(
@@ -112,27 +123,37 @@ export default function EditarGuia({
 
             <form onSubmit={enviar} className="grid gap-6 lg:grid-cols-3">
                 <div className="space-y-6 lg:col-span-2">
+                    {!form.data.es_piscicultura && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Procedencia del pescado</CardTitle>
+                            </CardHeader>
+
+                            <CardContent>
+                                <BloqueProcedencia
+                                    pescador={pescador}
+                                    autorizacionId={form.data.aprovechamiento_id}
+                                    error={form.errors.aprovechamiento_id}
+                                    onPescador={setPescador}
+                                    onAutorizacion={(a) => {
+                                        setAutorizacion(a);
+                                        form.setData('aprovechamiento_id', a?.id ?? null);
+                                        form.clearErrors('aprovechamiento_id');
+                                    }}
+                                />
+                            </CardContent>
+                        </Card>
+                    )}
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Ubicación y transporte</CardTitle>
                         </CardHeader>
 
                         <CardContent className="space-y-5">
-                            <Campo
-                                etiqueta="Fecha de solicitud"
-                                htmlFor="fecha_solicitud"
-                                error={form.errors.fecha_solicitud}
-                                ayuda="El día que la persona vino al mostrador."
-                                obligatorio
-                                className="max-w-xs"
-                            >
-                                <Input
-                                    id="fecha_solicitud"
-                                    type="date"
-                                    value={form.data.fecha_solicitud}
-                                    onChange={(e) => form.setData('fecha_solicitud', e.target.value)}
-                                    aria-invalid={Boolean(form.errors.fecha_solicitud)}
-                                />
+                            {/* No se corrige: la puso el servidor al registrar. */}
+                            <Campo etiqueta="Fecha de solicitud" htmlFor="fecha_solicitud" className="max-w-xs">
+                                <Input id="fecha_solicitud" value={guia.fecha_solicitud ? fecha(guia.fecha_solicitud) : '—'} readOnly disabled />
                             </Campo>
 
                             <CamposGuia
@@ -195,6 +216,25 @@ export default function EditarGuia({
                             </p>
                             <p className="text-xl font-semibold tabular-nums">{kilos.toFixed(2)} kg</p>
                         </div>
+
+                        {pescador && autorizacion && (
+                            <div>
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Pescado de</p>
+                                <p className="font-medium">{pescador.nombreCompleto}</p>
+                                <p className="text-xs text-muted-foreground">Autorización N° {autorizacion.numero}</p>
+                                <p className="mt-1 text-sm tabular-nums">
+                                    Le quedarían <strong>{quedan}</strong> kg
+                                </p>
+                            </div>
+                        )}
+
+                        {excede && pescador && autorizacion && (
+                            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                                Se pasa por {Math.abs(quedan!)} kg: {pescador.nombreCompleto} tiene{' '}
+                                {autorizacion.kilos_disponibles} kg disponibles.
+                            </p>
+                        )}
 
                         <p className="text-xs text-muted-foreground">
                             Sigue <strong>PENDIENTE</strong>. Vale {vigencia}, no desde hoy.

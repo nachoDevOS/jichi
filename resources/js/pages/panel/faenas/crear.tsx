@@ -1,8 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Info, ShieldAlert, Ship } from 'lucide-react';
+import { Info, ShieldAlert, Ship, TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
-import { SelectorTarifa } from '@/components/panel/comunes/selector-tarifa';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
@@ -10,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import LayoutPanel from '@/layouts/layout-panel';
 import { fecha } from '@/lib/utils';
-import type { TarifaSireb } from '@/types';
 import type { BeneficiarioSugerido, CarnetVigenteSugerido } from '@/types/beneficiarios';
 
 /**
@@ -20,18 +18,18 @@ export default function CrearFaena({
     beneficiario,
     carnetElegido,
     vigencia,
-    tarifas,
-    servicioConfigurado,
+    arancel,
+    sinArancel,
 }: {
     beneficiario: (BeneficiarioSugerido & { carnets_vigentes: CarnetVigenteSugerido[] }) | null;
     /** `?carnet=`: llega desde la ficha del cupo con el carnet ya elegido. */
     carnetElegido: number | null;
     /** «30 días desde la aprobación» o «hasta el 31 de diciembre»: lo configura la unidad. */
     vigencia: string;
-    /** Las tarifas del servicio de la faena en SIREB; null si no responde. */
-    tarifas: TarifaSireb[] | null;
-    /** false = falta elegir el servicio en Catálogos › Aranceles. */
-    servicioConfigurado: boolean;
+    /** La tarifa definida del permiso, de referencia; null si no se puede cobrar. */
+    arancel: { etiqueta: string; monto: number } | null;
+    /** Por qué no hay arancel (sin definir, SIREB caído, tarifa de baja); null si lo hay. */
+    sinArancel: string | null;
 }) {
     const [persona, setPersona] = useState<BeneficiarioSugerido | null>(beneficiario);
     // Solo si está entre los vigentes y puede emitir: si no, se elige a mano.
@@ -41,8 +39,6 @@ export default function CrearFaena({
 
     const form = useForm({
         carnet_id: inicial?.id ?? (null as number | null),
-        // Si el servicio tiene una sola tarifa que se cobra, va elegida.
-        tarifa_sireb: tarifas?.filter((t) => t.activa).length === 1 ? tarifas.find((t) => t.activa)!.id : '',
         embarcacion: '',
         propietario: '',
         comandante_barco: '',
@@ -69,8 +65,6 @@ export default function CrearFaena({
         e.preventDefault();
         form.post(route('faenas.store'));
     }
-
-    const tarifaElegida = tarifas?.find((t) => t.id === form.data.tarifa_sireb) ?? null;
 
     return (
         <LayoutPanel
@@ -106,14 +100,12 @@ export default function CrearFaena({
 
                         {carnet && (
                             <>
-                                <SelectorTarifa
-                                    tarifas={tarifas}
-                                    servicioConfigurado={servicioConfigurado}
-                                    valor={form.data.tarifa_sireb}
-                                    onElegir={(t) => form.setData('tarifa_sireb', t)}
-                                    etiqueta="Tarifa del permiso"
-                                    error={form.errors.tarifa_sireb}
-                                />
+                                {sinArancel && (
+                                    <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                                        {sinArancel}
+                                    </p>
+                                )}
 
                                 {/*
                                     LOS RENGLONES DEL TALONARIO. Ninguno es obligatorio: el
@@ -247,6 +239,14 @@ export default function CrearFaena({
                     </CardHeader>
 
                     <CardContent className="space-y-4">
+                        {/* Solo se muestra: la fecha la pone el servidor al registrar. */}
+                        <div>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Fecha de solicitud
+                            </p>
+                            <p className="font-medium">{fecha(new Date())}</p>
+                        </div>
+
                         {carnet === null ? (
                             <p className="flex items-start gap-2 text-sm text-muted-foreground">
                                 <Info className="mt-0.5 size-4 shrink-0" />
@@ -274,8 +274,8 @@ export default function CrearFaena({
                                     </p>
                                     {/* De referencia: el que vale lo pide el servidor al guardar. */}
                                     <p className="text-xl font-semibold tabular-nums">
-                                        {tarifaElegida ? tarifaElegida.monto.toFixed(2) : '—'}
-                                        {tarifaElegida && (
+                                        {arancel ? arancel.monto.toFixed(2) : '—'}
+                                        {arancel && (
                                             <span className="ml-1 text-sm font-normal text-muted-foreground">Bs</span>
                                         )}
                                     </p>
@@ -292,7 +292,7 @@ export default function CrearFaena({
                             disabled={
                                 form.processing ||
                                 carnet === null ||
-                                form.data.tarifa_sireb === ''
+                                arancel === null
                             }
                             className="w-full"
                         >

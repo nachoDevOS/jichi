@@ -227,9 +227,9 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | --- | --- | --- |
 | `beneficiario_id` | FK RESTRICT | |
 | `nro` | unsigned, único **global** | El N° impreso: correlativo **continuo** (`AUTORIZACION-PESCA`), `000001`. Lo pone el sistema al otorgar; antes del 03/10/2026 se imprimía el `id` |
-| `escala` | decimal(12,2) | **Copiado**: el `rango_hasta` de la tarifa de SIREB al otorgar (13/10/2026; antes `tramo`, con la etiqueta). Va impreso en «Volumen Establecido» y en las fichas como «Hasta 100 kg» (`escalaLegible()`) |
-| `volumen_total_kg` | decimal(12,2) | Los kilos autorizados: **los de la escala** (13/10/2026) |
-| `kilos_disponibles` | decimal(12,2) | Los kilos con que sale **cada** faena: los de la escala, y **no cambian**: las faenas no descuentan (12/10/2026) |
+| `escala` | string(160) | **Copiada**: la etiqueta de la tarifa de SIREB al otorgar («801 kg hasta 1000 kg»; antes `tramo`). Se muestra en fichas, listados y portal (13/10/2026) |
+| `volumen_total_kg` | decimal(12,2) | **Copiado**: el `rango_hasta` de esa tarifa. Es lo que imprimen la autorización («Volumen Establecido»), el concepto del recibo y el renglón CUPO del carnet (13/10/2026) |
+| `kilos_disponibles` | decimal(12,2) | **Saldo**: lo que le queda. Lo bajan las guías al registrarse; eliminar una pendiente lo devuelve, revocar no (13/10/2026). La faena sale con este valor |
 | `monto` | decimal(10,2) | **Congelado** de SIREB al otorgar. Corregir no lo toca: solo cambia la embarcación (03/10/2026) |
 | `sireb_tarifa_id` | uuid **null** | La tarifa de SIREB de ese monto: **es el tramo**. «Generar nueva liquidación» vuelve a pedir esta misma (12/10/2026) |
 | `sireb_idempotency_key` | uuid **null**, único global | La `Idempotency-Key` de la venta en SIREB. Se guarda ANTES de llamar; corregir con otra tarifa genera otra (02/10/2026) |
@@ -311,10 +311,13 @@ de 500 kg no puede pasar a valer 800 en agosto porque Recaudaciones renombró o
 dio de baja la tarifa. Leerlos de SIREB al mostrar sería además una llamada por
 fila, que con SIREB caído deja la ficha vacía.
 
-**`kilos_disponibles` es fijo** *(12/10/2026)*: sale de la escala al otorgar
-y cada faena lo copia en su `kilos_extraidos`. Las faenas **no descuentan**: no
-hay saldo, reserva, `agotado` ni modo estricto. Antes de esa fecha la faena
-reservaba al registrarse y descontaba al aprobarse; está en el historial de git.
+**`kilos_disponibles` es un SALDO guardado** *(13/10/2026)*: arranca igual a
+`volumen_total_kg` y lo bajan **las guías** que le compran, al registrarse
+(`AprovechamientoPesq::descontar()` / `devolver()`, siempre con la fila
+bloqueada). Se guarda —y no se calcula— por decisión de la unidad, para verlo de
+un vistazo; por eso **todo** movimiento pasa por esos dos métodos. La faena copia
+el valor de ese día y no descuenta. (Del 12 al 13/10/2026 fue fijo; antes, la
+faena reservaba y descontaba.)
 
 **`tipo_embarcacion` es texto libre y nullable.** Es el renglón «Tipo de
 Embarcación» del talonario verde. No hay padrón de embarcaciones ni nomenclatura
@@ -423,7 +426,7 @@ tarifa elegida en su `sireb_tarifa_id`.
 | --- | --- | --- |
 | `arancel_id` | FK RESTRICT → `aranceles_sireb` | |
 | `etiqueta` | string(120) | El nombre que se ve y **se edita**: «Carnet de pescador», «Alevines de tambaquí». No se repite en el arancel (validación) |
-| `clave` | string(30), null | **Oculta**: solo en el carnet, `pescador` / `comercializador` (`ConceptoArancel::claves()`). El código busca por ella, nunca por la etiqueta, así que renombrar no rompe nada. NULL en los aranceles de la unidad |
+| `clave` | string(30), null | **Oculta**: en el carnet, `pescador` / `comercializador`; en la faena, `faena` (`ConceptoArancel::claves()`). El código busca por ella, nunca por la etiqueta, así que renombrar no rompe nada. NULL en los aranceles de la unidad |
 | `sireb_tarifa_id` | uuid | **El id**, no el nombre: un renombre en SIREB no rompe el vínculo. El precio se pide siempre en vivo |
 
 No hay columna «caso»: se quitó a pedido el mismo 13/10/2026; la etiqueta la
@@ -473,7 +476,7 @@ fecha, porque la salida es ese mismo día.
 **`monto` es una COPIA CONGELADA**, como en `recibos`: una suba por resolución
 no puede mover lo que dice un papel ya entregado. `PermisoFaena::montoACobrar()`
 lee la columna. El precio lo pide `EmitirFaenaService` a SIREB al emitir, con la
-tarifa que eligió ventanilla del servicio de la fila `faena` (12/10/2026).
+tarifa definida en `arancel_tarifas` para la fila `faena` (clave `faena`) o, sin definir, la única activa del servicio (13/10/2026; antes la elegía ventanilla).
 
 **LA FAENA SE PAGA ANTES DE VALER, igual que el carnet y el cupo.** Antes nacía
 ACTIVA y autorizaba en el acto. Hoy recorre el mismo circuito que los otros:
@@ -499,7 +502,7 @@ quedó alguna fila así.
 emite al aprobarse. La aprobación vive en `RevisarFaenaService::aprobar()`.
 
 **Los kilos de la faena son fijos** *(12/10/2026)*: al emitirse copia
-`kilos_disponibles` de la autorización en `kilos_extraidos`, y no descuenta nada
+`kilos_disponibles` de la autorización (el saldo de ese día) en `kilos_extraidos`, y no descuenta nada
 del cupo —ni al registrarse ni al aprobarse—. Ventanilla no los tipea.
 
 **El titular llega por un accesor.** El recibo sale a nombre de

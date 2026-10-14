@@ -14,6 +14,7 @@ use App\Http\Requests\Panel\ActualizarGuiaRequest;
 use App\Http\Requests\Panel\CargarPagoRequest;
 use App\Http\Requests\Panel\EmitirGuiaRequest;
 use App\Http\Requests\Panel\MotivoRequest;
+use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaDetalle;
@@ -160,7 +161,8 @@ class GuiaController extends Controller
                 Carnet::query()->findOrFail($datos['carnet_id']),
                 $datos,
                 $datos['detalles'],
-                now()->parse($datos['fecha_solicitud']),
+                // La fecha de solicitud es hoy: la pone el servidor, no el formulario.
+                now(),
             );
         } catch (PermisoOperativoException $e) {
             // Nada de esto tiene arreglo desde otro campo del formulario: lo
@@ -194,6 +196,8 @@ class GuiaController extends Controller
             'carnet.codigo',
             'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             'detalles',
+            // Entera: `documento_identidad` y `estaVigente()` leen varias columnas.
+            'aprovechamiento.beneficiario.aprovechamientos',
         ]);
 
         return Inertia::render('panel/guias/editar', [
@@ -211,6 +215,10 @@ class GuiaController extends Controller
                 ...$this->renglonesDelPapel($guia),
                 'fecha_solicitud' => $guia->fecha_solicitud?->toDateString(),
                 'detalles' => $this->resumirDetalle($guia),
+
+                // El pescador y su autorización ya elegidos, con lo que la propia guía tiene descontado.
+                'aprovechamiento_id' => $guia->aprovechamiento_id,
+                'pescador' => $this->pescadorParaEditar($guia),
             ],
 
             // Los que la guía ya usa siguen en la lista aunque SIREB ya no los mande.
@@ -279,6 +287,7 @@ class GuiaController extends Controller
             'asociacion:id,nombre,sigla',
             'detalles',
             'codigo',
+            'aprovechamiento.beneficiario',
         ]);
 
         // El recibo del trámite —uno solo— y cuántas boletas faltan controlar.
@@ -292,6 +301,7 @@ class GuiaController extends Controller
                 // Solo en la ficha: en el listado haría una consulta por fila.
                 'codigo' => $guia->codigo_legible,
                 'asociacion_nombre' => $guia->asociacion?->nombre,
+                'procedencia' => self::procedencia($guia),
 
                 'detalles' => $this->resumirDetalle($guia),
             ],
@@ -464,6 +474,57 @@ class GuiaController extends Controller
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * De quién es el pescado: el pescador y su autorización. Null si es de criadero.
+     * Necesita `aprovechamiento.beneficiario` cargado entero.
+     */
+    public static function procedencia(GuiaMovimiento $guia): ?array
+    {
+        $a = $guia->aprovechamiento;
+
+        return $a === null ? null : [
+            'aprovechamiento_id' => $a->id,
+            'numero' => $a->numeroLegible(),
+            'escala' => $a->escala,
+            'beneficiario_id' => $a->beneficiario_id,
+            'pescador' => $a->beneficiario?->nombreCompleto,
+            'documento' => $a->beneficiario?->documento_identidad,
+        ];
+    }
+
+    /**
+     * El pescador ya elegido, con la misma forma que el buscador. A su autorización
+     * se le suman los kilos de esta guía: al corregir, vuelven antes de descontar.
+     */
+    private function pescadorParaEditar(GuiaMovimiento $guia): ?array
+    {
+        $b = $guia->aprovechamiento?->beneficiario;
+
+        if ($b === null) {
+            return null;
+        }
+
+        return [
+            'id' => $b->id,
+            'nombreCompleto' => $b->nombreCompleto,
+            'documento_identidad' => $b->documento_identidad,
+            'foto_url' => $b->foto_url,
+            'autorizaciones_vendibles' => $b->aprovechamientos
+                ->filter(fn (AprovechamientoPesq $a): bool => $a->estaVigente())
+                ->map(fn (AprovechamientoPesq $a): array => [
+                    'id' => $a->id,
+                    'numero' => $a->numeroLegible(),
+                    'escala' => $a->escala,
+                    'volumen_total_kg' => (float) $a->volumen_total_kg,
+                    'kilos_disponibles' => (float) $a->kilos_disponibles
+                        + ($a->id === $guia->aprovechamiento_id ? (float) $guia->peso_total_kg : 0),
+                    'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     /**

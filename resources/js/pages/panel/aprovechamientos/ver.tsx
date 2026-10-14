@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Ban, Banknote, BadgeCheck, ExternalLink, Eye, Pencil, Plus, Printer, Receipt, RefreshCw, Ship, Trash2 } from 'lucide-react';
+import { Ban, Banknote, BadgeCheck, ExternalLink, Eye, Pencil, Plus, Printer, Receipt, RefreshCw, Ship, Trash2, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { Retrato } from '@/components/comunes/retrato';
@@ -18,6 +18,7 @@ import type {
     CarnetDelCupo,
     CupoFicha,
     FaenaDelCupo,
+    GuiaDelCupo,
     ReciboDelCupo,
 } from '@/types/aprovechamientos';
 
@@ -28,12 +29,15 @@ export default function VerCupo({
     cupo,
     carnets,
     faenas,
+    guias,
     recibo,
     carnetParaFaena,
 }: {
     cupo: CupoFicha;
     carnets: CarnetDelCupo[];
     faenas: FaenaDelCupo[];
+    /** Las guías que le compraron pescado: cada una descontó sus kilos. */
+    guias: GuiaDelCupo[];
     /** El recibo: llega en null mientras está pendiente; se emite cuando SIREB confirma el pago. */
     recibo: ReciboDelCupo | null;
     /** El carnet aprobado con el que se emite la próxima faena; null si ninguno puede. */
@@ -191,14 +195,28 @@ export default function VerCupo({
                     </CardHeader>
 
                     <CardContent className="space-y-5">
-                        {/* Las faenas no descuentan: cada una sale con los kilos disponibles, fijos. */}
+                        {/* Las guías que le compran descuentan; las faenas no, y salen con lo disponible. */}
                         <dl className="grid grid-cols-2 gap-4 text-sm">
                             <Dato
                                 etiqueta={cupo.ya_fue_aprobado ? 'Otorgado' : 'Solicitado'}
                                 valor={`${cupo.volumen_total_kg} kg`}
                             />
-                            <Dato etiqueta="Kilos por faena" valor={`${cupo.kilos_disponibles} kg`} />
+                            <Dato etiqueta="Disponible" valor={`${cupo.kilos_disponibles} kg`} />
                         </dl>
+
+                        <div className="space-y-1">
+                            <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                                <div
+                                    className="h-full rounded-full bg-primary"
+                                    style={{
+                                        width: `${cupo.volumen_total_kg > 0 ? Math.max(0, Math.min(100, (cupo.kilos_disponibles / cupo.volumen_total_kg) * 100)) : 0}%`,
+                                    }}
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Vendido en guías: {Math.round((cupo.volumen_total_kg - cupo.kilos_disponibles) * 100) / 100} kg
+                            </p>
+                        </div>
 
                         {/*
                             PENDIENTE NO ES UN DETALLE DE COLOR: el cupo existe,
@@ -572,6 +590,61 @@ export default function VerCupo({
                                                             )}
                                                         </div>
                                                     </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Las guías que le compraron: son las que bajan el disponible. */}
+                {(cupo.ya_fue_aprobado || guias.length > 0) && (
+                    <Card className="min-w-0 lg:col-span-3">
+                        <CardHeader>
+                            <CardTitle>Guías que le compraron pescado</CardTitle>
+                        </CardHeader>
+
+                        <CardContent className="p-0">
+                            {guias.length === 0 ? (
+                                <EstadoVacio
+                                    icono={Truck}
+                                    titulo="Sin guías"
+                                    descripcion="Ningún comercializador declaró todavía pescado de esta autorización."
+                                />
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                            <tr>
+                                                <th className="px-5 py-2.5 font-medium">N°</th>
+                                                <th className="px-5 py-2.5 font-medium">Comercializador</th>
+                                                <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
+                                                <th className="px-5 py-2.5 font-medium">Estado</th>
+                                                <th className="px-5 py-2.5 font-medium">Solicitada</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody className="divide-y divide-border">
+                                            {guias.map((g) => (
+                                                <tr key={g.id} className="hover:bg-secondary/50">
+                                                    <td className="px-5 py-2.5 font-mono tabular-nums">
+                                                        <EnlacePermitido
+                                                            permiso="guias.ver"
+                                                            href={route('guias.show', g.id)}
+                                                            className="text-primary hover:underline"
+                                                        >
+                                                            {g.numero_legible}
+                                                        </EnlacePermitido>
+                                                    </td>
+                                                    <td className="px-5 py-2.5">{g.comercializador ?? '—'}</td>
+                                                    <td className="px-5 py-2.5 text-right tabular-nums">{g.peso_total_kg} kg</td>
+                                                    <td className="px-5 py-2.5">
+                                                        <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
+                                                    </td>
+                                                    <td className="px-5 py-2.5 text-muted-foreground">{fecha(g.fecha_solicitud)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>

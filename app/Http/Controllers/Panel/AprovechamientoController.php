@@ -14,6 +14,7 @@ use App\Http\Requests\Panel\OtorgarCupoRequest;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
+use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
@@ -305,6 +306,22 @@ class AprovechamientoController extends Controller
                     'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
                 ])
                 ->all(),
+
+            // Las guías que le compraron pescado: cada una descontó sus kilos.
+            'guias' => $aprovechamiento->guias()
+                ->with('carnet.beneficiario')
+                ->orderByDesc('nro')
+                ->get()
+                ->map(fn (GuiaMovimiento $g): array => [
+                    'id' => $g->id,
+                    'numero_legible' => $g->numero_legible,
+                    'comercializador' => $g->comercializador()?->nombreCompleto,
+                    'peso_total_kg' => (float) $g->peso_total_kg,
+                    'estado_etiqueta' => $g->estado->etiqueta(),
+                    'estado_color' => $g->estado->color(),
+                    'fecha_solicitud' => $g->fecha_solicitud?->toDateString(),
+                ])
+                ->all(),
         ]);
     }
 
@@ -332,7 +349,7 @@ class AprovechamientoController extends Controller
                 'beneficiario' => $aprovechamiento->beneficiario?->nombreCompleto,
                 'documento' => $aprovechamiento->beneficiario?->documento_identidad,
                 'foto_url' => $aprovechamiento->beneficiario?->foto_url,
-                'escala' => $aprovechamiento->escalaLegible(),
+                'escala' => $aprovechamiento->escala,
                 'volumen_total_kg' => (float) $aprovechamiento->volumen_total_kg,
                 'monto' => $aprovechamiento->montoACobrar(),
                 'tipo_embarcacion' => $aprovechamiento->tipo_embarcacion,
@@ -423,7 +440,7 @@ class AprovechamientoController extends Controller
             // columna TIENE que estar en el select de arriba.
             'foto_url' => $cupo->beneficiario?->foto_url,
 
-            'descripcion' => $cupo->escalaLegible(),
+            'descripcion' => $cupo->escala,
 
             'volumen_total_kg' => (float) $cupo->volumen_total_kg,
             // NULL y no cadena vacía: así la pantalla dice «no declarada» en vez

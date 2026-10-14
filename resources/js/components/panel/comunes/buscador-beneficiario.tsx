@@ -14,11 +14,14 @@ export function BuscadorBeneficiario({
     error,
     /** Texto de ayuda bajo la caja, para explicar qué se ofrece en cada módulo. */
     ayuda,
+    /** Acepta además el código de verificación de una autorización (o la URL de su QR). */
+    porCodigoDeAutorizacion = false,
 }: {
     seleccionado: BeneficiarioSugerido | null;
     onSeleccionar: (beneficiario: BeneficiarioSugerido | null) => void;
     error?: string;
     ayuda?: string;
+    porCodigoDeAutorizacion?: boolean;
 }) {
     const [termino, setTermino] = useState('');
     const [resultados, setResultados] = useState<BeneficiarioSugerido[]>([]);
@@ -44,7 +47,7 @@ export function BuscadorBeneficiario({
             peticion.current = new AbortController();
             setBuscando(true);
 
-            fetch(route('beneficiarios.buscar', { q: termino }), {
+            fetch(route('beneficiarios.buscar', { q: termino, ...(porCodigoDeAutorizacion ? { autorizacion: 1 } : {}) }), {
                 headers: { Accept: 'application/json' },
                 signal: peticion.current.signal,
             })
@@ -62,7 +65,7 @@ export function BuscadorBeneficiario({
         // Se limpia el reloj en cada tecleo: es lo que hace que solo la última
         // pausa dispare la búsqueda.
         return () => clearTimeout(reloj);
-    }, [termino]);
+    }, [termino, porCodigoDeAutorizacion]);
 
     // --- Con la persona ya elegida, la caja se reemplaza por su ficha.
     if (seleccionado) {

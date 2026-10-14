@@ -151,9 +151,9 @@ class RenovarLiquidacionService
     {
         return match (true) {
             // La autorización renueva con SU tarifa: el tramo no se cambia nunca.
-            $documento instanceof AprovechamientoPesq => $this->cupos->precioDe((string) $documento->sireb_tarifa_id, $documento->escalaLegible()),
+            $documento instanceof AprovechamientoPesq => $this->cupos->precioDe((string) $documento->sireb_tarifa_id, $documento->escala),
             $documento instanceof Carnet => $this->carnets->precioDeActividad($documento->tipo_actor),
-            $documento instanceof PermisoFaena => $this->faenas->precioDeLaFaena((string) $documento->sireb_tarifa_id),
+            $documento instanceof PermisoFaena => $this->faenas->precioDeLaFaena(),
             $documento instanceof GuiaMovimiento => $this->precioDeLaGuia($documento),
         };
     }
@@ -177,7 +177,7 @@ class RenovarLiquidacionService
     {
         // El aviso de otorgar dice «elija otra escala», y la escala de una autorización no se cambia nunca.
         if ($e instanceof CupoInvalidoException && ! str_contains($e->getMessage(), 'no responde')) {
-            return 'la tarifa de SIREB de la escala «'.$documento->escalaLegible().'» está dada de baja o no se '
+            return 'la tarifa de SIREB de la escala «'.$documento->escala.'» está dada de baja o no se '
                 .'puede cobrar hoy. Elimine esta autorización y registre otra con una escala vigente.';
         }
 

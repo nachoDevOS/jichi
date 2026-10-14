@@ -114,13 +114,20 @@ precios**: se quitaron la escala, los tipos de carnet y los productos.
 | --- | --- | --- |
 | `autorizacion` | Los tramos de la escala | `aprovechamientos/crear` → `OtorgarCupoService` |
 | `carnet` | Los carnets (pescador, comercializador) | La unidad, una vez, en «Definir tarifas»; ventanilla elige solo la actividad → `EmitirCarnetService::precioDeActividad()` |
-| `faena` | Las del servicio «Aranceles», entre ellas la del permiso | `faenas/crear` → `EmitirFaenaService::precioDeLaFaena($tarifaId)` |
+| `faena` | Las del servicio «Aranceles», entre ellas la del permiso | Nadie: la única activa del servicio, o la definida en «Definir tarifas» si hay varias → `EmitirFaenaService::precioDeLaFaena()` |
 | `guia` | Los productos del cuadro D, por kilo | `guias/crear` → `EmitirGuiaService::precioDelProducto($tarifaId)`, y la portada |
 
-El formulario de faena usa `components/panel/comunes/selector-tarifa.tsx` con
-`TarifarioSireb::tarifas()`: «etiqueta — precio», deshabilitada la que SIREB no
-deja cobrar, y un aviso si falta el servicio o SIREB no responde; si hay una
-sola tarifa cobrable, va elegida.
+**La faena tampoco elige tarifa** (13/10/2026): su servicio es el general
+«Aranceles» de SIREB, con tarifas de otras cosas, así que «la única activa» era
+casualidad. Regla (`EmitirFaenaService::tarifaDeLaFaena()`): manda la definida en
+«Definir tarifas» (clave `faena`); **si no hay, la única activa del servicio**, sin
+configurar nada; con varias activas (o ninguna) no se emite y avisa que hay que
+definirla. El formulario muestra el arancel, o el motivo si no se puede cobrar. Se quitó
+`selector-tarifa.tsx`, que ya no usaba nadie.
+
+**En Aranceles solo se ven las tarifas ACTIVAS** (13/10/2026): «Ver tarifas» y el
+desplegable de «Definir tarifas» omiten las dadas de baja en SIREB. Una definida
+que se dio de baja se sigue mostrando en su fila, marcada, para elegir otra.
 
 **Tarifas definidas** (13/10/2026): en Aranceles, el carnet y los aranceles que
 registra la unidad tienen «Definir tarifas»: filas con una **etiqueta** editable y
@@ -165,8 +172,8 @@ de `ConceptoArancel` y una fila del seeder.
 elegida y, con `verificarEscala()`, pide su precio con
 `TarifarioSireb::precio(ConceptoArancel::Autorizacion, $tarifaId)`
 —directo a SIREB, sin caché—. **Congela** en `aprovechamientos_pesq` el
-`monto`, la `sireb_tarifa_id` y la `escala` (`rango_hasta`), que es también
-`volumen_total_kg` y `kilos_disponibles` (13/10/2026). La verificación completa está en
+`monto`, la `sireb_tarifa_id`, la etiqueta (`escala`) y el `rango_hasta`
+(`volumen_total_kg` y `kilos_disponibles`; 13/10/2026). La verificación completa está en
 [Validación de la tarifa al emitir](#validación-de-la-tarifa-al-emitir).
 `montoACobrar()` lee esa columna, así que los listados y el tablero no
 llaman a SIREB. `editar()` no lo pide: desde el 03/10/2026 solo corrige la

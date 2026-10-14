@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoGuia;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\GuiaMovimiento;
@@ -22,6 +23,11 @@ class RevisarGuiaService
 
             if (! $bloqueada->estado->estaAbierto()) {
                 throw PermisoOperativoException::guiaNoSePuedeRevisar($bloqueada->estado->etiqueta());
+            }
+
+            // Si revocaron la autorización del pescador mientras esperaba el pago, no se aprueba.
+            if ($bloqueada->aprovechamiento?->estado === EstadoAprovechamiento::Revocado) {
+                throw PermisoOperativoException::guiaConAutorizacionRevocada();
             }
 
             // Los cinco días corren desde ACÁ: contarlos desde el borrador le

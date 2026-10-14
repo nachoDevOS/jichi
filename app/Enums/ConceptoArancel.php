@@ -14,6 +14,9 @@ enum ConceptoArancel: string
     case Faena = 'faena';
     case Guia = 'guia';
 
+    /** La clave de la única tarifa definida de la faena en `arancel_tarifas`. */
+    public const CLAVE_FAENA = 'faena';
+
     public function etiqueta(): string
     {
         return match ($this) {
@@ -34,6 +37,7 @@ enum ConceptoArancel: string
     {
         return match ($this) {
             self::Carnet => collect(TipoActor::cases())->mapWithKeys(fn (TipoActor $a): array => [$a->value => $a->nombreCarnet()])->all(),
+            self::Faena => [self::CLAVE_FAENA => 'Permiso de faena'],
             default => [],
         };
     }
@@ -44,7 +48,7 @@ enum ConceptoArancel: string
         return match ($this) {
             self::Autorizacion => 'Sus tarifas son las escalas, con su monto y sus kilos (rango hasta).',
             self::Carnet => 'Una tarifa definida por actividad: pescador y comercializador.',
-            self::Faena => 'Ventanilla elige la tarifa de la salida al emitir el permiso.',
+            self::Faena => 'Una tarifa definida: la del permiso. Ventanilla no la elige.',
             self::Guia => 'Sus tarifas son los productos del cuadro D, con su precio por kilo.',
         };
     }

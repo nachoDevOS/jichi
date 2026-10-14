@@ -27,9 +27,10 @@ class CatalogoSeeder extends Seeder
 
     /**
      * Servicio «Autorización de Pesca…» de SIREB (código `p`): sus tarifas son
-     * los tramos del Art. 20 del Reglamento de Pesca. Id copiado el 30/09/2026.
+     * las escalas del Art. 20 del Reglamento de Pesca. Id de test.sireb al 13/10/2026
+     * (el del 30/09 ya no existe: la escala se volvió a cargar allá).
      */
-    private const SERVICIO_ESCALA = '01a0f088-34b2-71a5-9d9f-89e2ec9b9096';
+    private const SERVICIO_ESCALA = '01a13592-0a9f-7122-980d-4baffb3f462e';
 
     /** Servicio «Carnet» de SIREB: una tarifa por actividad. */
     private const SERVICIO_CARNET = '01a0f39c-d6b4-731b-a76d-c4ef5695edbf';

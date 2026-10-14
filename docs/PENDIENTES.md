@@ -190,14 +190,17 @@ se reescribieron las de los estados. Puede quedar alguna palabra del modelo
 anterior (trámite, rubro) dentro de una nota que vale en lo demás. Ante una
 contradicción, mandan REGLAS-NEGOCIO.md y MER.md.
 
-## ✅ Volvieron las pruebas automáticas — 12/10/2026
+## 🔴 Las pruebas cubren solo la guía — 13/10/2026
 
-92 pruebas (`php artisan test`), con SIREB e Ibare simulados: la escala, los
-cuatro trámites, el pago y la renovación en SIREB, las pantallas del panel y la
-portada. **Lo que todavía no cubren:** revocar y eliminar, la impresión de PDF,
-el portal del beneficiario, la verificación pública, Seguridad (usuarios, roles)
-y la pantalla en el navegador (React). Las 204 viejas eran del modelo anterior y
-no se recuperaron (commit `7dc0ac6`).
+Las 92 pruebas del 12/10/2026 **nunca se commitearon** y se perdieron. Hoy hay 29
+(`php artisan test`), con SIREB e Ibare simulados (`tests/Concerns/SirebFalso.php`),
+y cubren solo la guía: descuento del cupo (registrar, frenar, corregir, cambiar de
+pescador, eliminar, revocar, autorización revocada, no vendibles, piscicultura,
+faena) y búsqueda por código. Se comprobó que detectan errores rompiendo el código
+en 8 lugares: las 8 roturas hicieron fallar alguna prueba. **Falta recuperar** las de
+la autorización, el carnet, la faena, el pago en SIREB y las pantallas. **`tests/`
+va en el commit.** Tampoco se probó la concurrencia (dos ventanillas a la vez):
+SQLite no la ejercita.
 
 ## 🟠 El recibo no se puede anular
 

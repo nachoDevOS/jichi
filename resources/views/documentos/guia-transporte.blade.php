@@ -250,6 +250,22 @@
             <td class="dato" colspan="2">{{ $comerciante }}</td>
             <td class="dato" colspan="2">{{ $documento }}</td>
         </tr>
+        {{-- De quién es el pescado (13/10/2026): sus kilos se descontaron de esa
+             autorización. No está en el talonario preimpreso; sin número de casilla. --}}
+        <tr>
+            <td class="ref"></td>
+            <td class="rot">b) Pescador (procedencia)</td>
+            <td class="ref"></td>
+            <td class="rot rot-c">Nombre y Apellido</td>
+            <td class="ref"></td>
+            <td class="rot rot-c">C.I. · Autorización N°</td>
+        </tr>
+        <tr>
+            <td class="dato"></td>
+            <td class="dato"></td>
+            <td class="dato" colspan="2">{{ $pescador }}</td>
+            <td class="dato" colspan="2">{{ $pescadorDocumento }}{{ $autorizacion !== '' ? ' · '.$autorizacion : '' }}</td>
+        </tr>
     </table>
 
     {{-- ══ B.- UBICACIÓN ══ --}}

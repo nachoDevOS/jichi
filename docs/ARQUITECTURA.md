@@ -22,7 +22,7 @@ Tailwind 4 · PostgreSQL 18** (corre también en SQLite).
 | Dato | Valor |
 | --- | --- |
 | Líneas de código | ~37.000 (`app/` + `resources/js/`) |
-| Pruebas | 92, con SIREB simulado: `php artisan test` (volvieron el 12/10/2026, ver §9) |
+| Pruebas | 29, solo la guía (13/10/2026), con SIREB simulado: `php artisan test`. Las 92 del 12/10 se perdieron sin commitear (ver §9) |
 | Idioma del código | Español, sin excepciones salvo `components/ui/` |
 | Pendiente | Reportes y Configuración (en gris en el menú) |
 
@@ -42,13 +42,13 @@ salen **dos ramas**, según la actividad:
    (la bolsa madre: un cupo en kg)             ▼
                  │                       GUÍA ÚNICA DE TRANSPORTE
                  ▼                       (una por traslado, 5 días)
-        CARNET (pescador)                      └──< detalle por especie
-                 │
-                 ▼
-        PERMISO DE FAENA
+        CARNET (pescador)                      ├──< detalle por especie
+                 │                             └──▶ pescado de: autorización
+                 ▼                                  del pescador → DESCUENTA
+        PERMISO DE FAENA                            sus kilos_disponibles
         (una por salida, 30 días;
-         sale con los kilos_disponibles de la autorización;
-         no descuenta nada)
+         sale con los kilos_disponibles de ese día;
+         no descuenta)
 
    Los cuatro —autorización, carnet, faena y guía— se PAGAN EN SIREB; al
    confirmarse el pago quedan aprobados y se entrega el RECIBO.
@@ -167,14 +167,14 @@ El esquema completo, con el porqué de cada columna e índice, está en
 | Tabla | Qué guarda | Lo que no es obvio |
 | --- | --- | --- |
 | `beneficiarios` | La persona | C.I. único con índice **parcial** (`WHERE deleted_at IS NULL`). Columnas en camelCase desde `primerNombre` |
-| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Copia la escala (`rango_hasta` de la tarifa de SIREB), que son sus kilos. `kilos_disponibles` fijo: con eso sale cada faena, que no descuenta (12/10/2026). Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
+| `aprovechamientos_pesq` | La bolsa madre, en kg | `nro` correlativo propio (no el id). Copia de la tarifa de SIREB la etiqueta (`escala`) y el `rango_hasta` (`volumen_total_kg`: los kilos que imprimen la autorización, el recibo y el carnet). `kilos_disponibles` fijo: con eso sale cada faena, que no descuenta (12/10/2026). Columnas `sireb_*` de su liquidación, igual que carnet, faena y guía |
 | `carnets` | La credencial anual | `tipo_actor` decide qué emite. El de pescador lleva `aprovechamiento_id`; el de comercializador, NULL |
 | `permisos_faena` | Una salida de pesca | Cuelga **solo** del carnet; llega a la autorización por `hasManyThrough` |
 | `guias_movimiento` | Un traslado | Cuelga solo del carnet; copia la asociación porque va impresa |
 | `guia_detalles` | El cuadro D, una fila por especie | La única FK CASCADE del dominio. El producto es una tarifa de SIREB (`sireb_tarifa_id`) y su etiqueta se copia en `especie` |
 | `recibos` | El comprobante, uno por documento pagado | Polimórfico (`recibible`); correlativo continuo; monto, concepto y boleta de SIREB congelados |
 | `codigos` | La llave pública de los cinco documentos | Polimórfica; único completo, un código impreso queda quemado |
-| `asociaciones`, `aranceles_sireb`, `arancel_tarifas`, `departamentos` | Catálogos | Los edita la unidad desde el panel. **`aranceles_sireb` es el único catálogo de precios** (12/10/2026): una fila por trámite con **solo el servicio de SIREB**; ventanilla elige la tarifa al emitir (el carnet no: su tarifa por actividad está definida en `arancel_tarifas`). La unidad registra aranceles propios, con nombre y sus tarifas definidas (etiqueta + tarifa de SIREB). La escala y los productos de la guía no son tablas: son las tarifas de esos servicios |
+| `asociaciones`, `aranceles_sireb`, `arancel_tarifas`, `departamentos` | Catálogos | Los edita la unidad desde el panel. **`aranceles_sireb` es el único catálogo de precios** (12/10/2026): una fila por trámite con **solo el servicio de SIREB**; ventanilla elige la tarifa al emitir en la autorización y la guía; el carnet (una por actividad) y la faena la tienen definida en `arancel_tarifas`. La unidad registra aranceles propios, con nombre y sus tarifas definidas (etiqueta + tarifa de SIREB). La escala y los productos de la guía no son tablas: son las tarifas de esos servicios |
 
 Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 `correlativos` y las tablas de `spatie/laravel-permission`.
@@ -184,12 +184,14 @@ Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
 - **Nada del dominio se borra de verdad**: todas las tablas tienen
   `softDeletes()`. Un índice único que la baja deba liberar es parcial; uno de
   papel entregado queda quemado. Tabulado en [MER.md](MER.md).
-- **Las faenas no descuentan de la autorización** (12/10/2026). Ventanilla
-  escribe `volumen_total_kg` y `kilos_disponibles` al otorgar, y cada faena sale
-  con `kilos_disponibles` copiado en `kilos_extraidos`, fijo. No hay saldo,
-  reserva, estado `agotado` ni modo estricto (`APROVECHAMIENTO_ESTRICTO` se quitó).
-- **La faena y la guía cuelgan solo del carnet.** Una segunda clave hacia la
-  persona abriría la puerta a que el papel y el carnet apunten a gente distinta.
+- **Lo que descuenta el cupo es la GUÍA, no la faena** (13/10/2026). La guía
+  declara de qué autorización sale el pescado (`guias_movimiento.aprovechamiento_id`,
+  aprobada y en fecha) y su total baja `kilos_disponibles` **al registrarse**, con
+  la autorización bloqueada; si no alcanza, se frena. Eliminar una pendiente lo
+  devuelve; revocar, no. La faena copia los disponibles de ese día y no descuenta.
+  Ver [modulos/GUIA-DESCUENTA-CUPO.md](modulos/GUIA-DESCUENTA-CUPO.md).
+- **La faena y la guía cuelgan solo del carnet** (el de quien la saca). La guía
+  tiene además `aprovechamiento_id`, pero es OTRA persona: el pescador que vendió.
 - **El código de un documento no es una columna suya**: vive en `codigos`. Se
   lee con `codigo_legible` y necesita `with('codigo')` para no hacer N+1.
 
@@ -458,16 +460,15 @@ verdad —no solo un CRUD—, copiar además el par `EmitirFaenaService` +
 ## 9. Verificar antes de dar algo por terminado
 
 ```sh
-php artisan test        # las pruebas (92, SIREB simulado: ninguna sale a la red)
+php artisan test        # las pruebas (29, solo la guía; SIREB simulado)
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
 ```
 
-**Las pruebas volvieron el 12/10/2026**: unitarias (`tests/Unit`: enums y el
-lector de kilos) y de punta a punta (`tests/Feature`: otorgar, carnet, faena,
-guía, pago y renovación en SIREB, pantallas y formularios del panel por HTTP,
-portada). SIREB e Ibare van simulados en memoria (`tests/Concerns/SirebFalso.php`)
+**Las pruebas (13/10/2026)** cubren solo la guía: el descuento del cupo del
+pescador y la búsqueda por código (`tests/Feature/Guias/`, `tests/Unit/`). Las
+92 del 12/10/2026 no se commitearon y se perdieron. SIREB e Ibare van simulados en memoria (`tests/Concerns/SirebFalso.php`)
 y `Http::preventStrayRequests()` revienta cualquier llamada real. Las pruebas no
 ven el navegador: **la pantalla se sigue probando a mano.**
 

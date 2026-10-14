@@ -30,7 +30,7 @@ class CarnetImpresionController extends Controller
     public function imprimir(Carnet $carnet): Response|RedirectResponse
     {
         // Ojo con pedir columnas sueltas: `aprovechamiento` va ENTERO porque
-        // `cupoImpreso()` lee `volumen_total_kg`. La que falte vuelve null sin
+        // `cupoImpreso()` lee `escala`. La que falte vuelve null sin
         // error, y el renglón CUPO sale vacío en un carnet válido.
         $carnet->load(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
 

@@ -23,10 +23,10 @@ beneficiario ──< aprovechamiento_pesq (la bolsa madre, en kg)
 | Dice | Embarcación, propietario, comandante, matrícula, kardex, región y kilos | Origen y destino, medio y vehículo, y la carga especie por especie |
 | Sale del carnet de | **Pescador** (`TipoActor::emiteFaenas()`) | **Comercializador** (`TipoActor::emiteGuias()`) |
 | Además exige | Autorización de pesca **aprobada** y en fecha | Nada más que el carnet vigente |
-| Arancel | La tarifa que elige ventanilla del servicio de la fila `faena` de Catálogos › Aranceles, copiada en `permisos_faena.monto` | **El total del cuadro D** (kilos × precio por kilo de SIREB de cada producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
+| Arancel | La definida en Catálogos › Aranceles › Permiso de faena (`arancel_tarifas`, clave `faena`) o, si no hay, la única activa del servicio; ventanilla no elige, copiada en `permisos_faena.monto` | **El total del cuadro D** (kilos × precio por kilo de SIREB de cada producto), **la mitad si es piscicultura**, guardado en `guias_movimiento.monto` |
 | Número | `permisos_faena.nro`, correlativo continuo del sistema | `guias_movimiento.nro`, correlativo continuo del sistema |
 | Tiene detalle | No | Sí, `guia_detalles`: una fila por producto del catálogo |
-| Kilos contra la autorización | Sale con `kilos_disponibles`, fijo; **no descuenta** | No toca ningún cupo |
+| Kilos contra la autorización | Sale con los `kilos_disponibles` de ese día; **no descuenta** | **Descuenta** el total del cuadro D de la autorización del pescador que vendió, al registrar (13/10/2026) |
 | Vale | Configurable: N días o hasta el 31/12 (de inicio 30 días) | Configurable: N días con hora o hasta el 31/12 (de inicio 5 días) |
 | Termina en | `aprobado` (no se registra la vuelta), o `revocado` | `aprobado` (no se registra la llegada), o `revocado` |
 | Se imprime | `PermisoFaenaImpresionController` | `GuiaImpresionController` |
@@ -108,11 +108,11 @@ carnet sin reemplazo).
 
 ## 2. Los kilos de la faena contra la autorización
 
-**Fijos, y no descuentan** *(12/10/2026)*. Al emitirse, la faena copia los
-`kilos_disponibles` de la autorización en `kilos_extraidos`
-(`EmitirFaenaService::emitir()`). Ventanilla no los tipea ni los corrige, y
-ninguna faena baja nada de la autorización: no hay saldo, reserva, estado
-`agotado` ni modo estricto (`APROVECHAMIENTO_ESTRICTO` se quitó).
+**No descuentan** *(12/10/2026)*. Al emitirse, la faena copia los
+`kilos_disponibles` de la autorización —el saldo de ese día— en
+`kilos_extraidos` (`EmitirFaenaService::emitir()`). Ventanilla no los tipea. Lo
+que baja el saldo es la **guía** (13/10/2026): ver
+[GUIA-DESCUENTA-CUPO.md](GUIA-DESCUENTA-CUPO.md).
 
 **Historia:** hasta el 12/10/2026 la faena reservaba sus kilos al registrarse y
 los descontaba al aprobarse, con un modo estricto que frenaba lo que no

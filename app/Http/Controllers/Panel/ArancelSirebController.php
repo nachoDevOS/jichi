@@ -45,9 +45,9 @@ class ArancelSirebController extends Controller
                     'servicio_sireb' => $a->servicio_sireb,
                     // Cómo se llama HOY en SIREB y cuántas tarifas cobra; null si no está o no responde.
                     'servicio' => $servicios[$a->servicio_sireb] ?? null,
-                    // Para «Ver tarifas»: etiqueta, precio y si está activa, de la caché del catálogo.
-                    'tarifas' => $tarifario->tarifasDelServicio($a->servicio_sireb) ?? [],
-                    // «Definir tarifas»: solo el carnet y los que registra la unidad.
+                    // Para «Ver tarifas»: solo las activas; las dadas de baja en SIREB no se muestran.
+                    'tarifas' => self::activas($tarifario->tarifasDelServicio($a->servicio_sireb)) ?? [],
+                    // «Definir tarifas»: el carnet, la faena y los que registra la unidad.
                     'usa_tarifas_definidas' => $a->usaTarifasDefinidas(),
                     'tarifas_definidas' => $a->tarifas_definidas_count,
                 ])
@@ -163,8 +163,8 @@ class ArancelSirebController extends Controller
                     ? $fila($t)
                     : ['id' => null, 'clave' => $clave, 'etiqueta' => $inicial, 'sireb_tarifa_id' => null])->values()->all()
                 : $definidas->map($fila)->all(),
-            // null si SIREB no responde: la pantalla abre y no deja guardar.
-            'tarifasSireb' => $tarifario->tarifasDelServicio($arancel->servicio_sireb),
+            // Solo las activas; null si SIREB no responde: la pantalla abre y no deja guardar.
+            'tarifasSireb' => self::activas($tarifario->tarifasDelServicio($arancel->servicio_sireb)),
         ]);
     }
 
@@ -178,6 +178,12 @@ class ArancelSirebController extends Controller
         return redirect()
             ->route('aranceles.index')
             ->with('exito', "Tarifas de «{$arancel->nombre}» guardadas.");
+    }
+
+    /** Las tarifas activas de una lista de SIREB; null sigue siendo «no responde». */
+    private static function activas(?array $tarifas): ?array
+    {
+        return $tarifas === null ? null : array_values(array_filter($tarifas, fn (array $t): bool => $t['activa']));
     }
 
     /** Para el select: null si SIREB no responde, y la pantalla abre igual. */

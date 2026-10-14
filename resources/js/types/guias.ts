@@ -1,3 +1,4 @@
+import type { AutorizacionVendible, BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { EstadoGuia } from '@/types';
 import type { VentaSireb } from '@/types/aprovechamientos';
 
@@ -149,6 +150,8 @@ export interface GuiaFicha extends GuiaFila {
     /** El de verificación, 16 caracteres. */
     codigo: string | null;
     asociacion_nombre: string | null;
+    /** De quién es el pescado; null si es de criadero. */
+    procedencia: ProcedenciaGuia | null;
     detalles: DetalleGuia[];
 
 }
@@ -164,6 +167,19 @@ export interface GuiaEditable extends RenglonesGuia {
     carnet_registro: string | null;
     fecha_solicitud: string | null;
     detalles: DetalleGuia[];
+    aprovechamiento_id: number | null;
+    /** El pescador ya elegido, con sus autorizaciones (la de esta guía suma sus propios kilos). */
+    pescador: (BeneficiarioSugerido & { autorizaciones_vendibles: AutorizacionVendible[] }) | null;
+}
+
+/** El pescador y la autorización de la que salió el pescado. */
+export interface ProcedenciaGuia {
+    aprovechamiento_id: number;
+    numero: string;
+    escala: string | null;
+    beneficiario_id: number;
+    pescador: string | null;
+    documento: string | null;
 }
 
 /**
@@ -209,7 +225,8 @@ export interface FormularioGuia {
 
     es_piscicultura: boolean;
     observaciones: string;
-    fecha_solicitud: string;
+    /** De qué autorización sale el pescado (descuenta su cupo). Null en piscicultura. */
+    aprovechamiento_id: number | null;
 
     detalles: FilaDetalle[];
 }
