@@ -14,6 +14,7 @@ use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use App\Support\Sql;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -28,6 +29,9 @@ class DashboardController extends Controller
      */
     private const DIAS_AVISO = 30;
 
+    /** Las columnas que lee `nombreCompleto` y `foto_url`: la que falte vuelve null sin avisar. */
+    private const COLUMNAS_NOMBRE = 'id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto';
+
     public function __invoke(): Response
     {
         $gestion = (int) now()->format('Y');
@@ -39,6 +43,13 @@ class DashboardController extends Controller
             'porMes' => fn (): array => $this->recaudacionMensual(),
             'ultimosCarnets' => fn (): array => $this->ultimosCarnets(),
             'avisos' => fn (): array => $this->avisos(),
+            'pesca' => fn (): array => $this->pesca(),
+            'kilosPorMes' => fn (): array => $this->serieMensual(GuiaMovimiento::query(), 'peso_total_kg'),
+            'porConcepto' => fn (): array => $this->porConcepto(),
+            'casiAgotadas' => fn (): array => $this->casiAgotadas(),
+            'topPescadores' => fn (): array => $this->topPescadores(),
+            'destinos' => fn (): array => $this->destinos(),
+            'actividad' => fn (): array => $this->actividad(),
         ]);
     }
 
@@ -101,21 +112,31 @@ class DashboardController extends Controller
      */
     private function recaudacionMensual(): array
     {
+        return $this->serieMensual(Recibo::query(), 'monto_total');
+    }
+
+    /**
+     * La suma de una columna por mes, los últimos 12, con los meses vacíos en cero.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function serieMensual(Builder $consulta, string $columna): array
+    {
         $desde = now()->startOfMonth()->subMonths(11);
 
         // La expresión que reduce un timestamp a 'YYYY-MM' cambia entre motores: vive en App\Support\Sql.
-        $periodo = Sql::periodoMes('created_at');
+        $periodo = Sql::periodoMes($consulta->qualifyColumn('created_at'));
 
-        $totales = Recibo::query()
-            ->where('created_at', '>=', $desde)
+        $totales = $consulta
+            ->where($consulta->qualifyColumn('created_at'), '>=', $desde)
             ->groupBy($periodo)
             ->select(
                 DB::raw($periodo->getValue(DB::connection()->getQueryGrammar()).' as periodo'),
-                DB::raw('SUM(monto_total) as total'),
+                DB::raw("SUM({$columna}) as total"),
             )
             ->pluck('total', 'periodo');
 
-        // La serie se arma entera en PHP: un mes sin cobros no vuelve en la consulta y el gráfico lo saltaría.
+        // La serie se arma entera en PHP: un mes sin movimiento no vuelve en la consulta y el gráfico lo saltaría.
         return collect(range(0, 11))
             ->map(function (int $i) use ($desde, $totales): array {
                 $mes = $desde->copy()->addMonths($i);
@@ -126,6 +147,158 @@ class DashboardController extends Controller
                     'total' => (float) ($totales[$mes->format('Y-m')] ?? 0),
                 ];
             })
+            ->all();
+    }
+
+    /**
+     * La pesca de las autorizaciones vigentes: lo autorizado, lo que bajaron las guías y lo que queda.
+     *
+     * @return array<string, float|int>
+     */
+    private function pesca(): array
+    {
+        $fila = AprovechamientoPesq::vigentes()
+            ->selectRaw('COUNT(*) as cantidad, SUM(volumen_total_kg) as autorizado, SUM(kilos_disponibles) as disponible')
+            ->first();
+        $autorizado = (float) ($fila->autorizado ?? 0);
+        $disponible = (float) ($fila->disponible ?? 0);
+
+        return [
+            'autorizaciones' => (int) ($fila->cantidad ?? 0),
+            'autorizado' => $autorizado,
+            'disponible' => $disponible,
+            // Solo la guía descuenta: lo vendido es lo que falta del autorizado.
+            'vendido' => max(0, $autorizado - $disponible),
+        ];
+    }
+
+    /**
+     * Lo cobrado en la gestión por trámite: de dónde sale la plata.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function porConcepto(): array
+    {
+        $totales = Recibo::query()
+            ->whereBetween('created_at', [now()->startOfYear(), now()->endOfYear()])
+            ->groupBy('recibible_type')
+            ->select('recibible_type', DB::raw('SUM(monto_total) as total'), DB::raw('COUNT(*) as cantidad'))
+            ->get()
+            ->keyBy('recibible_type');
+
+        return collect([
+            ['aprovechamientos', 'Autorizaciones', AprovechamientoPesq::class],
+            ['carnets', 'Carnets', Carnet::class],
+            ['faenas', 'Permisos de faena', PermisoFaena::class],
+            ['guias', 'Guías de transporte', GuiaMovimiento::class],
+        ])
+            ->map(fn (array $t): array => [
+                'clave' => $t[0],
+                'etiqueta' => $t[1],
+                'total' => (float) ($totales[$t[2]]->total ?? 0),
+                'cantidad' => (int) ($totales[$t[2]]->cantidad ?? 0),
+            ])
+            ->all();
+    }
+
+    /**
+     * Las autorizaciones vigentes con el 20 % o menos: las próximas guías se van a frenar.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function casiAgotadas(): array
+    {
+        return AprovechamientoPesq::vigentes()
+            ->with('beneficiario:'.self::COLUMNAS_NOMBRE)
+            ->whereRaw('aprovechamientos_pesq.kilos_disponibles <= aprovechamientos_pesq.volumen_total_kg * 0.2')
+            ->orderByRaw('aprovechamientos_pesq.kilos_disponibles / NULLIF(aprovechamientos_pesq.volumen_total_kg, 0)')
+            ->limit(5)
+            ->get()
+            ->map(fn (AprovechamientoPesq $a): array => [
+                'id' => $a->id,
+                'beneficiario' => $a->beneficiario?->nombreCompleto,
+                'foto' => $a->beneficiario?->foto_url,
+                'disponible' => (float) $a->kilos_disponibles,
+                'total' => (float) $a->volumen_total_kg,
+            ])
+            ->all();
+    }
+
+    /**
+     * Los pescadores que más vendieron con su autorización vigente.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function topPescadores(): array
+    {
+        return AprovechamientoPesq::vigentes()
+            ->with('beneficiario:'.self::COLUMNAS_NOMBRE)
+            ->whereColumn('aprovechamientos_pesq.kilos_disponibles', '<', 'aprovechamientos_pesq.volumen_total_kg')
+            ->orderByRaw('aprovechamientos_pesq.volumen_total_kg - aprovechamientos_pesq.kilos_disponibles DESC')
+            ->limit(5)
+            ->get()
+            ->map(fn (AprovechamientoPesq $a): array => [
+                'id' => $a->id,
+                'beneficiario_id' => $a->beneficiario_id,
+                'beneficiario' => $a->beneficiario?->nombreCompleto,
+                'foto' => $a->beneficiario?->foto_url,
+                'vendido' => (float) $a->volumen_total_kg - (float) $a->kilos_disponibles,
+                'total' => (float) $a->volumen_total_kg,
+            ])
+            ->all();
+    }
+
+    /**
+     * Adónde va el pescado: los destinos de las guías de la gestión, por kilos.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function destinos(): array
+    {
+        return GuiaMovimiento::query()
+            ->whereBetween('created_at', [now()->startOfYear(), now()->endOfYear()])
+            ->groupBy('destino')
+            ->select('destino', DB::raw('SUM(peso_total_kg) as kilos'), DB::raw('COUNT(*) as guias'))
+            ->orderByDesc('kilos')
+            ->limit(5)
+            ->get()
+            ->map(fn ($d): array => [
+                'destino' => $d->destino ?? '—',
+                'kilos' => (float) $d->kilos,
+                'guias' => (int) $d->guias,
+            ])
+            ->all();
+    }
+
+    /**
+     * Lo último que se aprobó: cada recibo es un trámite que SIREB dio por pagado.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function actividad(): array
+    {
+        $claves = [
+            AprovechamientoPesq::class => 'aprovechamientos',
+            Carnet::class => 'carnets',
+            PermisoFaena::class => 'faenas',
+            GuiaMovimiento::class => 'guias',
+        ];
+
+        return Recibo::query()
+            ->with('beneficiario:'.self::COLUMNAS_NOMBRE)
+            ->latest('created_at')
+            ->limit(7)
+            ->get()
+            ->map(fn (Recibo $r): array => [
+                'id' => $r->id,
+                'tipo' => $claves[$r->recibible_type] ?? null,
+                'documento_id' => $r->recibible_id,
+                'concepto' => $r->concepto,
+                'beneficiario' => $r->beneficiario?->nombreCompleto,
+                'monto' => (float) $r->monto_total,
+                // Un MOMENTO: con hora.
+                'cuando' => $r->created_at?->toIso8601String(),
+            ])
             ->all();
     }
 

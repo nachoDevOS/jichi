@@ -11,13 +11,7 @@ import type { RecaudacionMes } from '@/types/dashboard';
 /** Color del texto sobre el panel. Se repite en todos los trazos del gráfico. */
 const TINTA = 'var(--widget-1-fg)';
 
-export function GraficoRecaudacionMensual({
-    datos,
-    moneda,
-}: {
-    datos: RecaudacionMes[];
-    moneda: string;
-}) {
+export function GraficoRecaudacionMensual({ datos, moneda }: { datos: RecaudacionMes[]; moneda: string }) {
     const total = datos.reduce((suma, d) => suma + d.total, 0);
 
     // El mejor mes se busca con reduce y no ordenando una copia: ordenar para
@@ -31,7 +25,7 @@ export function GraficoRecaudacionMensual({
     const ultimo = datos[datos.length - 1];
 
     return (
-        <Card className="overflow-hidden lg:col-span-3">
+        <Card className="min-w-0 overflow-hidden lg:col-span-2">
             <div className="bg-widget-1 px-5 pt-5 pb-3 text-widget-1-fg">
                 <h3 className="text-base font-semibold tracking-tight">Recaudación del año</h3>
 
@@ -39,7 +33,7 @@ export function GraficoRecaudacionMensual({
                     Últimos 12 meses en {moneda}, sumando lo cobrado en Recaudaciones (SIREB).
                 </p>
 
-                <div className="mt-4 h-64">
+                <div className="mt-4 h-56">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={datos} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
                             <defs>
@@ -55,12 +49,7 @@ export function GraficoRecaudacionMensual({
                                 </linearGradient>
                             </defs>
 
-                            <CartesianGrid
-                                strokeDasharray="3 3"
-                                stroke={TINTA}
-                                strokeOpacity={0.18}
-                                vertical={false}
-                            />
+                            <CartesianGrid strokeDasharray="3 3" stroke={TINTA} strokeOpacity={0.18} vertical={false} />
 
                             {/* dataKey dice qué campo de cada fila usar. 'etiqueta'
                                 es el 'Sep 26' que armó el controlador en PHP. */}
@@ -137,9 +126,7 @@ export function GraficoRecaudacionMensual({
 function CifraPie({ titulo, valor, pie }: { titulo: string; valor: string; pie?: string }) {
     return (
         <div className="px-5 py-3.5">
-            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                {titulo}
-            </p>
+            <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{titulo}</p>
 
             <p className="mt-0.5 truncate text-base font-semibold tabular-nums">{valor}</p>
 

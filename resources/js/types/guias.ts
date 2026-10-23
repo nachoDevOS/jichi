@@ -1,3 +1,4 @@
+import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
 import type { AutorizacionVendible, BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { EstadoGuia } from '@/types';
 import type { VentaSireb } from '@/types/aprovechamientos';
@@ -136,6 +137,11 @@ export interface GuiaFila extends RenglonesGuia {
     /** Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
+    recibo_enlace: EnlaceDirecto | null;
+    /** De qué pescador es el pescado; null si es de criadero. */
+    pescador: string | null;
 
     /** Un DÍA: se muestra con fecha(). */
     fecha_solicitud: string | null;
@@ -153,7 +159,6 @@ export interface GuiaFicha extends GuiaFila {
     /** De quién es el pescado; null si es de criadero. */
     procedencia: ProcedenciaGuia | null;
     detalles: DetalleGuia[];
-
 }
 
 /** La guía como la abre el formulario de corrección. */

@@ -3121,6 +3121,8 @@
 
 ## `resources/js/components/panel/dashboard/panel-avisos.tsx`
 
+> Retirado el 23/10/2026: el tablero se rehízo (`tarjetas-tablero.tsx`). Lo de abajo queda como historia.
+
 ### Lo que está por caducar y lo que ya caducó sin cerrarse.
 
    SON DOS COSAS DISTINTAS Y VAN SEPARADAS A PROPÓSITO
@@ -3134,6 +3136,8 @@
    siempre es más numeroso.
 
 ## `resources/js/components/panel/dashboard/tabla-ultimos-carnets.tsx`
+
+> Retirado el 23/10/2026: el tablero se rehízo (`tarjetas-tablero.tsx`). Lo de abajo queda como historia.
 
 ### `min-w-0` NO ES DECORACIÓN, y sin él el `overflow-x-auto` de abajo no
 

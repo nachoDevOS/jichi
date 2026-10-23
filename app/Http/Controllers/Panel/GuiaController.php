@@ -65,11 +65,17 @@ class GuiaController extends Controller
             // cinco partes del nombre y las tres de la cédula, porque
             // `nombreCompleto` y `documento_identidad` las concatenan.
             ->with([
+                'documentoEmitido',
                 'recibo:id,recibible_type,recibible_id,numero_recibo',
+                'recibo.documentoEmitido',
                 'carnet:id,beneficiario_id,tipo_actor,nro,fecha_emision,aprovechamiento_id,estado,fecha_vencimiento',
                 'carnet.codigo',
-                'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
+                // Con `foto`: sin ella `foto_url` vuelve null y el listado sale sin retratos.
+                'carnet.beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
                 'asociacion:id,nombre,sigla',
+                // De qué pescador es el pescado: su autorización es la que descontó.
+                'aprovechamiento:id,beneficiario_id',
+                'aprovechamiento.beneficiario:id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado',
             ])
             ->when($filtros['buscar'], function ($q, $termino) {
                 $operador = Sql::like($q->getConnection());
@@ -593,6 +599,10 @@ class GuiaController extends Controller
             // El recibo existe desde el ENVÍO; null mientras es borrador.
             'recibo_id' => $recibo?->id,
             'recibo_numero' => $recibo?->numero_recibo,
+            // Los botones abren el PDF guardado directo de S3, como en la ficha.
+            'pdf_enlace' => DocumentoEmitidoService::enlace($guia),
+            'recibo_enlace' => DocumentoEmitidoService::enlace($recibo),
+            'pescador' => $guia->aprovechamiento?->beneficiario?->nombreCompleto,
 
             // Un DÍA: con toDateString().
             'fecha_solicitud' => $guia->fecha_solicitud?->toDateString(),

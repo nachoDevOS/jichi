@@ -117,7 +117,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | Los cuatro anteriores | — | `verificarPago()`, `cargarPago()` y `destroy()` con la captura de `frenaPorPago()`: si al eliminar hay pago, vuelven a la ficha con el aviso |
 | `Panel/*ImpresionController.php`, `Panel/AutorizacionPescaController.php` | 160–516 | Devuelven bytes (DomPDF), no pantallas. `documento()` lo reusa el portal con la marca «NO VÁLIDO». `CarnetImpresionController::texto()` achica lo que no entra (una línea → dos → más chico) y `fotoRedonda()` recorta la foto en círculo con GD; carnet horizontal desde el 23/10/2026, ver CARNETS.md §0 |
 | `Panel/ReciboController.php` | 203 | Libro de recibos; `recibible` con `morphWith` |
-| `Panel/DashboardController.php` | 202 | El tablero |
+| `Panel/DashboardController.php` | 379 | El tablero: cifras, recaudación y kilos por mes (`serieMensual()`), pesca de las autorizaciones vigentes, cobro por trámite, casi agotadas, ranking de pescadores, destinos y actividad. Componentes en `components/panel/dashboard/` (`portada-tablero`, `tarjetas-tablero`, `graficos-tablero` con recharts en carga diferida, `colores.ts`) |
 | `Panel/UsuarioController.php` | 125 | Seguridad › Usuarios: todas las cuentas, funcionarios y beneficiarios. Solo lista; las acciones del beneficiario siguen en `CuentaPortalController` (la ficha) |
 | `Panel/RolController.php` | 175 | Seguridad › Roles: lista y CRUD de roles. Lee la base (lo que hace cumplir el middleware); los módulos, nombres y secciones salen de `RolSistema::CATALOGO`. Las reglas, en `GestionarRolService` |
 | Catálogos: `Asociacion`, `ArancelSireb` | 85–198 | Aranceles elige el servicio de SIREB de cada trámite con `TarifarioSireb` |

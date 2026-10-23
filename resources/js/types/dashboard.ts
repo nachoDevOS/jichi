@@ -60,3 +60,56 @@ export interface Avisos {
     /** Los listados ya filtrados; los arma el servidor con los enums. */
     urls: { carnets: string | null; autorizaciones: string | null };
 }
+
+/** La pesca de las autorizaciones vigentes. Solo la guía descuenta: vendido = autorizado − disponible. */
+export interface Pesca {
+    autorizaciones: number;
+    autorizado: number;
+    disponible: number;
+    vendido: number;
+}
+
+/** Lo cobrado en la gestión por trámite. */
+export interface CobroPorConcepto {
+    clave: 'aprovechamientos' | 'carnets' | 'faenas' | 'guias';
+    etiqueta: string;
+    total: number;
+    cantidad: number;
+}
+
+/** Una autorización vigente con el 20 % o menos disponible. */
+export interface CasiAgotada {
+    id: number;
+    beneficiario: string | null;
+    foto: string | null;
+    disponible: number;
+    total: number;
+}
+
+/** Un pescador por lo que vendió con su autorización vigente. */
+export interface TopPescador {
+    id: number;
+    beneficiario_id: number;
+    beneficiario: string | null;
+    foto: string | null;
+    vendido: number;
+    total: number;
+}
+
+export interface Destino {
+    destino: string;
+    kilos: number;
+    guias: number;
+}
+
+/** Un recibo emitido: un trámite que SIREB dio por pagado y Jichi aprobó. */
+export interface Actividad {
+    id: number;
+    tipo: CobroPorConcepto['clave'] | null;
+    documento_id: number;
+    concepto: string | null;
+    beneficiario: string | null;
+    monto: number;
+    /** Un MOMENTO. */
+    cuando: string | null;
+}

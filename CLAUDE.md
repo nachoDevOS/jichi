@@ -457,7 +457,7 @@ Los tres tienen que pasar.
   el celular se corre de costado la pantalla completa —menú, encabezado y todo—
   para leer una columna. `min-w-0` en el elemento de grilla devuelve el permiso
   de encogerse, y recién ahí el `overflow-x-auto` hace su trabajo. Lo mismo vale
-  para un elemento `flex`. Ver `tabla-ultimos-carnets.tsx`. **No se nota en el
+  para un elemento `flex`. Ver las tarjetas de `tarjetas-tablero.tsx`. **No se nota en el
   escritorio**, que es donde se prueba: aparece solo al angostar la ventana.
 - **LA APLICACIÓN CORRE EN HORA DE BOLIVIA, NO EN UTC** (27/09/2026).
   `config/app.php` traía `'timezone' => 'UTC'`, y en UTC-4 eso significa que
