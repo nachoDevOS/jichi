@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Models\Carnet;
 use App\Models\Configuracion;
+use App\Services\DocumentoEmitidoService;
 use App\Support\Archivos;
 use App\Support\QrVerificacion;
+use App\Support\TextoVertical;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as ArchivoPdf;
 use Illuminate\Http\RedirectResponse;
@@ -27,7 +29,7 @@ class CarnetImpresionController extends Controller
     /**
      * Imprimir — GET /panel/carnets/{carnet}/imprimir
      */
-    public function imprimir(Carnet $carnet): Response|RedirectResponse
+    public function imprimir(Carnet $carnet, bool $descarga = false): Response|RedirectResponse
     {
         // Ojo con pedir columnas sueltas: `aprovechamiento` va ENTERO porque
         // `cupoImpreso()` lee `escala`. La que falte vuelve null sin
@@ -42,7 +44,8 @@ class CarnetImpresionController extends Controller
 
         // `stream` y no `download`: se abre en el visor del navegador, que es
         // desde donde el operador aprieta imprimir.
-        return $this->documento($carnet)->stream("carnet-{$carnet->codigo?->codigo}.pdf");
+        // El PDF guardado al emitirse: se entrega tal como salió (ver DocumentoEmitidoService).
+        return app(DocumentoEmitidoService::class)->respuesta($carnet, $descarga);
     }
 
     /**
@@ -54,29 +57,25 @@ class CarnetImpresionController extends Controller
         $carnet->loadMissing(['codigo', 'beneficiario', 'asociacion', 'aprovechamiento']);
         $beneficiario = $carnet->beneficiario;
 
-        $pdf = Pdf::loadView('documentos.carnet-pescador', [
-            'carnet' => $carnet,
+        // El QR va en las dos caras: se resuelve UNA vez, el PNG no es gratis.
+        $verificacion = QrVerificacion::de($carnet);
 
+        $pdf = Pdf::loadView('documentos.carnet-pescador', [
             ...$this->datos($carnet),
 
-            /*
-             *  Las imágenes van embebidas, y el fondo viene horneado
-             */
-            'fondo' => $this->imagenEmbebida('image/carnet-fondo.png'),
-
-            // Solo el escudo: el texto —GOBERNACIÓN, BENI— lo escribe la plantilla.
-            'escudo' => $this->imagenEmbebida('image/carnet-escudo.png'),
-
-            /*
-             * La foto del titular, si la ficha tiene una cargada.
-             */
-            'foto' => $this->fotoEmbebida($beneficiario?->foto),
-
-            /*
-             * La carilla de atrás. Ver reverso().
-             */
-            'reverso' => $this->reverso($carnet),
-
+            // Las imágenes van embebidas: una ruta se resuelve contra el disco y en producción sale vacía.
+            // Escudo y texto del logo por separado: en horizontal van lado a lado, como en la credencial.
+            'escudo' => $this->imagenEmbebida('image/carnet-escudo-solo.png'),
+            'beni' => $this->imagenEmbebida('image/carnet-beni.png'),
+            'beniBlanco' => $this->imagenEmbebida('image/carnet-beni-blanco.png'),
+            // DomPDF no gira texto: la palabra de la banda va dibujada con GD.
+            'banda' => [
+                'imagen' => TextoVertical::dataUri('GOBERNACIÓN', self::CUERPO_BANDA, '#ffffff', negrita: true),
+                'medida' => TextoVertical::medida('GOBERNACIÓN', self::CUERPO_BANDA, negrita: true),
+            ],
+            'foto' => $this->fotoRedonda($beneficiario?->foto),
+            'qr' => $verificacion['qr'] ?? '',
+            'reverso' => $this->reverso($carnet, $verificacion),
             'marcaAgua' => $marcaAgua,
         ])
             ->setPaper([0, 0, self::ANCHO, self::ALTO])
@@ -119,12 +118,10 @@ class CarnetImpresionController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function reverso(Carnet $carnet): array
+    private function reverso(Carnet $carnet, array $verificacion): array
     {
         // LOS DOS: el QR es lo rápido y el código escrito es lo que funciona con
-        // el plástico rayado o poca luz. Se resuelve UNA vez: el PNG no es gratis.
-        $verificacion = QrVerificacion::de($carnet);
-
+        // el plástico rayado o poca luz.
         return [
             'titulo' => self::TITULO_REVERSO,
             'reglas' => self::REGLAS_REVERSO,
@@ -147,203 +144,87 @@ class CarnetImpresionController extends Controller
         ];
     }
 
-    /**
-     * El ancho útil de la tira del valor, en puntos, calzado con las
-     * coordenadas del Blade. Ver las cuentas del encabezado de esa plantilla.
+    /*
+     *  Las medidas del frente, en puntos (23/10/2026): banda verde a la izquierda,
+     *  columna de la foto y columna de los datos. Calzan con la plantilla.
      */
-    private const ANCHO_VALOR = 121.0;
+    /** El cuerpo de «GOBERNACIÓN» en la banda. */
+    private const CUERPO_BANDA = 10.5;
 
-    /**
-     * El ancho util de cada mitad del renglon partido, en puntos.
-     */
-    private const ANCHO_VALOR_ANGOSTO = 38.0;
+    /** El ancho útil de la columna de los datos y de media columna (ciudad | provincia). */
+    private const ANCHO_DATOS = 137.0;
 
-    /**
-     * Cuantos caracteres entran en el TITULO a cuerpo pleno.
-     */
-    private const CARACTERES_TITULO = 30;
+    private const ANCHO_MEDIO = 64.0;
 
-    /**
-     * El ancho util de la tira de la cedula, y su cuerpo, en puntos.
-     */
-    private const ANCHO_CEDULA = 43.6;
+    /** El ancho útil bajo la foto, para la cédula. */
+    private const ANCHO_CEDULA = 62.0;
 
-    private const CUERPO_CEDULA = 5.0;
+    /** Los cuerpos: el nombre manda; los datos, debajo. */
+    private const CUERPO_NOMBRE = 8.0;
 
-    /** Las medidas del recuadro de la foto, en puntos. */
-    private const ANCHO_FOTO = 46.0;
+    private const CUERPO_NOMBRE_DOS_LINEAS = 6.6;
 
-    private const ALTO_FOTO = 46.0;
+    private const CUERPO_VALOR = 5.4;
 
-    /**
-     * A cuantos pixeles de lado se reduce la foto antes de embeberla.
-     */
-    private const PIXELES_FOTO = 300;
+    private const CUERPO_CEDULA = 5.6;
+
+    /** El cuerpo de un valor que pasó a dos líneas. */
+    private const CUERPO_DOS_LINEAS = 4.6;
+
+    /** A cuántos píxeles de lado se dibuja la foto redonda antes de embeberla. */
+    private const PIXELES_FOTO = 360;
 
     /**
-     *  La jerarquia tipografica
+     * Cuanto ocupa cada caracter, en fraccion del cuerpo. Medido sobre la DejaVu
+     * que embebe DomPDF: la negrita promedia 0,605; se deja margen hacia arriba.
      */
-    // 5,2 pt y no 6: es donde terminaba la ASOCIACIÓN, el renglón más largo y
-    // el único que el encogido de `texto()` bajaba. Con 6 la tira se leía
-    // despareja.
-    private const CUERPO_VALOR = 5.2;
+    private const ANCHO_POR_CARACTER = 0.62;
 
-    /**
-     * El cuerpo y el alto de una tira que pasó a DOS líneas.
-     */
-    private const CUERPO_DOS_LINEAS = 4.5;
-
-    private const ALTO_DOS_LINEAS = 12.6;
-
-    private const ALTO_UNA_LINEA = 9.5;
-
-    /**
-     * Cuanto ocupa cada caracter, en fraccion del cuerpo.
-     */
-    private const ANCHO_POR_CARACTER = 0.55;
-
-    /**
-     * Hasta donde se puede achicar un texto que no entra, en fraccion de su
-     * cuerpo normal.
-     */
+    /** Hasta donde se puede achicar un texto que no entra, en fraccion de su cuerpo. */
     private const ENCOGIDO_MAXIMO = 0.7;
 
     /**
-     * Los datos de la tarjeta, ya resueltos aca.
+     * Los datos del frente, ya resueltos: la plantilla solo los dibuja.
      *
      * @return array<string, mixed>
      */
     private function datos(Carnet $carnet): array
     {
         $beneficiario = $carnet->beneficiario;
-        $sinCargar = 'Sin cargar en la ficha';
-        $anchoValor = self::ANCHO_VALOR;
-
-        /*
-         *  Los seis renglones del plastico
-         */
-        $campos = [
-            $this->campo('NOMBRE', $beneficiario?->nombreCompleto, 'Sin nombre en la ficha', $anchoValor),
-
-            $this->campo('ASOCIACIÓN', $carnet->asociacion?->nombre, 'Sin asociación declarada', $anchoValor),
-
-            /*
-                 * Ciudad y provincia van cada una en su renglon, a pedido.
-                 */
-            $this->campo('CIUDAD', $beneficiario?->ciudad, $sinCargar, $anchoValor),
-            $this->campo('PROVINCIA', $beneficiario?->provincia, $sinCargar, $anchoValor),
-
-            $this->campo('DIRECCIÓN', $beneficiario?->direccion, $sinCargar, $anchoValor),
-
-            /*
-                 * El código cierra la lista, como en el plastico, Y LLEVA EL
-                 * cupo al lado cuando la actividad se autoriza por volumen.
-                 */
-            $this->renglonRegistro($carnet),
-        ];
-
-        return [
-            /*
-             * El titulo de la tarjeta, con la actividad adentro.
-             */
-            'titulo' => $this->titulo($carnet),
-
-            /*
-             * La cedula pasa por el mismo calculo que los renglones.
-             */
-            'documento' => $this->texto(
-                ($documento = trim((string) $beneficiario?->documento_identidad)) !== ''
-                    ? 'C.I. '.$documento
-                    : null,
-                'C.I. —',
-                self::ANCHO_CEDULA,
-                self::CUERPO_CEDULA,
-            ),
-
-            'campos' => $campos,
-        ];
-    }
-
-    /**
-     *  El titulo de la tarjeta y el cuerpo en el que entra
-     *
-     * @return array{texto: string, clase: string}
-     */
-    private function titulo(Carnet $carnet): array
-    {
-        /*
-         * La actividad sale del enum y no del nombre del tipo de carnet.
-         */
-        $texto = mb_strtoupper('Cédula de '.$carnet->tipo_actor->etiqueta());
-
-        return [
-            'texto' => $texto,
-            'clase' => mb_strlen($texto) > self::CARACTERES_TITULO ? 'largo' : '',
-        ];
-    }
-
-    /**
-     *  El cupo, en la columna de la foto — o NADA, si la actividad no lleva
-     */
-    private function cupo(Carnet $carnet): ?array
-    {
-        // Lo decide el ENUM, nunca el nombre del tipo: la pesca se autoriza por
-        // volumen y la comercialización no.
+        $documento = trim((string) $beneficiario?->documento_identidad);
         $kilos = $carnet->cupoImpreso();
 
-        if ($kilos === null) {
-            return null;
-        }
+        return [
+            // La actividad sale del enum, nunca del nombre del tipo de carnet.
+            'titulo' => mb_strtoupper('Cédula de '.$carnet->tipo_actor->etiqueta()),
 
-        return $this->texto(
-            rtrim(rtrim(number_format($kilos, 2, ',', '.'), '0'), ',').' KG',
-            '— KG',
-            self::ANCHO_VALOR_ANGOSTO,
-            self::CUERPO_VALOR,
-        );
-    }
+            'nombre' => $this->texto(
+                mb_strtoupper((string) $beneficiario?->nombreCompleto),
+                'SIN NOMBRE EN LA FICHA',
+                self::ANCHO_DATOS,
+                self::CUERPO_NOMBRE,
+                self::CUERPO_NOMBRE_DOS_LINEAS,
+            ),
 
-    /**
-     *  El ultimo renglon — registro, gestion y, si corresponde, el cupo
-     *
-     * @return array<string, mixed>
-     */
-    private function renglonRegistro(Carnet $carnet): array
-    {
-        $cupo = $this->cupo($carnet);
+            'documento' => $this->texto($documento !== '' ? 'C.I.: '.$documento : null, 'C.I.: —', self::ANCHO_CEDULA, self::CUERPO_CEDULA),
 
-        /*
-         *  La gestión ya no se imprime, y no es un olvido
-         */
-        // «REGISTRO» con su número anual —«000001»— y no el código de 16: en el
-        // plástico entra un número que se dicta y se busca en el libro. El
-        // código sigue existiendo, y es el que usa la verificación pública.
-        if ($cupo === null) {
-            return $this->campo('REGISTRO', $carnet->registro_legible, '—', self::ANCHO_VALOR);
-        }
+            'asociacion' => $this->texto($carnet->asociacion?->nombre, 'Sin asociación declarada', self::ANCHO_DATOS, self::CUERPO_VALOR),
+            'ciudad' => $this->texto($beneficiario?->ciudad, 'Sin cargar', self::ANCHO_MEDIO, self::CUERPO_VALOR),
+            'provincia' => $this->texto($beneficiario?->provincia, 'Sin cargar', self::ANCHO_MEDIO, self::CUERPO_VALOR),
+            'direccion' => $this->texto($beneficiario?->direccion, 'Sin cargar en la ficha', self::ANCHO_DATOS, self::CUERPO_VALOR),
 
-        // Con cupo el renglón se parte en dos pares, y el rótulo del SEGUNDO va
-        // CORTO: su caja mide 32 pt y a 6,1 pt en negrita cada carácter pesa
-        // ~3,7, así que «CUPO» entra y «APROVECHAMIENTO» se desborda en silencio.
-        return $this->campo('REGISTRO', $carnet->registro_legible, '—', self::ANCHO_VALOR_ANGOSTO) + [
-            'segundo' => ['rotulo' => 'CUPO', 'alto' => self::ALTO_UNA_LINEA] + $cupo,
+            /*
+             * La franja de abajo: lo que no cambia después de impreso. El cupo solo
+             * si la actividad se autoriza por volumen (lo decide el enum).
+             */
+            'franja' => array_values(array_filter([
+                ['rotulo' => 'REGISTRO', 'valor' => 'N° '.($carnet->registro_legible ?? '—')],
+                $kilos !== null
+                    ? ['rotulo' => 'CUPO', 'valor' => rtrim(rtrim(number_format($kilos, 2, ',', '.'), '0'), ',').' KG']
+                    : null,
+                ['rotulo' => 'VÁLIDO HASTA', 'valor' => $carnet->fecha_vencimiento?->format('d/m/Y') ?? '—'],
+            ])),
         ];
-    }
-
-    /**
-     * Un campo con rotulo: el texto y el cuerpo en el que entra.
-     *
-     * @return array{rotulo: string, valor: string, molde: string, cuerpo: float, lineas: int}
-     */
-    private function campo(string $rotulo, ?string $valor, string $molde, float $disponible): array
-    {
-        $texto = $this->texto($valor, $molde, $disponible, self::CUERPO_VALOR);
-
-        // El alto lo manda el controlador: con alto fijo, el valor que pasa a dos
-        // líneas sale con la segunda cortada por la mitad.
-        $alto = $texto['lineas'] > 1 ? self::ALTO_DOS_LINEAS : self::ALTO_UNA_LINEA;
-
-        return ['rotulo' => $rotulo, 'alto' => $alto] + $texto;
     }
 
     /**
@@ -351,7 +232,7 @@ class CarnetImpresionController extends Controller
      *
      * @return array{valor: string, molde: string, cuerpo: float, lineas: int}
      */
-    private function texto(?string $valor, string $molde, float $disponible, float $cuerpo): array
+    private function texto(?string $valor, string $molde, float $disponible, float $cuerpo, ?float $cuerpoDosLineas = null): array
     {
         $texto = trim((string) $valor);
         $dibujado = $texto !== '' ? $texto : $molde;
@@ -369,115 +250,66 @@ class CarnetImpresionController extends Controller
             return ['valor' => $texto, 'molde' => $molde, 'cuerpo' => round($paraUnaLinea, 1), 'lineas' => 1];
         }
 
-        return ['valor' => $texto, 'molde' => $molde, 'cuerpo' => self::CUERPO_DOS_LINEAS, 'lineas' => 2];
-    }
-
-    /**
-     *  La foto del titular, recortada a un cuadrado sin deformarse
-     *
-     * @return array{datos: string, estilo: string}|null
-     */
-    private function fotoEmbebida(?string $ruta): ?array
-    {
-        $bytes = Archivos::contenido($ruta);
-
-        if ($bytes === null) {
-            return null;
-        }
-
-        // El tipo sale de los BYTES: el archivo se guardó con nombre al azar y la
-        // extensión del navegador no prueba nada. Si no es imagen, sale sin foto.
-        $medidas = getimagesizefromstring($bytes);
-        $tipo = (string) ($medidas['mime'] ?? '');
-
-        if (! str_starts_with($tipo, 'image/')) {
-            return null;
-        }
-
-        $ancho = (int) ($medidas[0] ?? 0);
-        $alto = (int) ($medidas[1] ?? 0);
-
-        // Se reduce ANTES de embeber. Si algo falla —un formato que gd no
-        // abre— se sigue con la original: un carnet pesado es mejor que ninguno.
-        [$bytes, $tipo, $ancho, $alto] = $this->reducir($bytes, $tipo, $ancho, $alto);
-
-        $anchoCaja = self::ANCHO_FOTO;
-        $altoCaja = self::ALTO_FOTO;
-
-        // Se compara la proporcion de la imagen contra la del recuadro: la que
-        // sobra por su lado es la que se recorta.
-        if ($ancho > 0 && $alto > 0 && ($ancho / $alto) > ($anchoCaja / $altoCaja)) {
-            // Mas apaisada que el recuadro: se ajusta por el alto y se
-            // recorta a los costados, por igual de los dos lados.
-            $dibujado = $altoCaja * $ancho / $alto;
-            $estilo = sprintf(
-                'width: %.2fpt; height: %.2fpt; margin-left: %.2fpt;',
-                $dibujado, $altoCaja, -($dibujado - $anchoCaja) / 2,
-            );
-        } elseif ($ancho > 0 && $alto > 0) {
-            /*
-             * Vertical, que es el caso normal de una foto de carnet: se ajusta
-             * por el ancho y se recorta arriba y abajo. El corte NO va a la
-             * mitad sino a un tercio —`/ 3` en vez de `/ 2`— porque en un
-             * retrato la cara está en el tercio superior: partiendo al medio se
-             * come la frente y sobra torso.
-             */
-            $dibujado = $anchoCaja * $alto / $ancho;
-            $estilo = sprintf(
-                'width: %.2fpt; height: %.2fpt; margin-top: %.2fpt;',
-                $anchoCaja, $dibujado, -($dibujado - $altoCaja) / 3,
-            );
-        } else {
-            // Sin medidas legibles: se dibuja al tamano del recuadro.
-            $estilo = sprintf('width: %.2fpt; height: %.2fpt;', $anchoCaja, $altoCaja);
-        }
+        // En dos líneas, y si tampoco entra, más chico: las palabras no se parten, por eso el 0,85.
+        $dosLineas = $cuerpoDosLineas ?? self::CUERPO_DOS_LINEAS;
+        $paraDosLineas = $disponible * 2 * 0.85 / $porPunto;
 
         return [
-            'datos' => "data:{$tipo};base64,".base64_encode($bytes),
-            'estilo' => $estilo,
+            'valor' => $texto,
+            'molde' => $molde,
+            'cuerpo' => round(max($dosLineas * self::ENCOGIDO_MAXIMO, min($dosLineas, $paraDosLineas)), 1),
+            'lineas' => 2,
         ];
     }
 
     /**
-     * Reduce la foto al tamaño en que se va a dibujar.
-     *
-     * @return array{0: string, 1: string, 2: int, 3: int}
+     *  La foto del titular, redonda: recortada a un cuadrado (a un tercio de arriba,
+     *  donde está la cara) y con el círculo hecho en GD, porque DomPDF no recorta
+     *  imágenes con border-radius. Sin foto, la silueta por defecto. Se reduce a
+     *  PIXELES_FOTO: entera, la del teléfono pesaba cientos de KB por carnet.
      */
-    private function reducir(string $bytes, string $tipo, int $ancho, int $alto): array
+    private function fotoRedonda(?string $ruta): string
     {
-        $mayor = max($ancho, $alto);
-
-        if ($mayor <= self::PIXELES_FOTO || $ancho < 1 || $alto < 1) {
-            return [$bytes, $tipo, $ancho, $alto];
-        }
-
-        $origen = @imagecreatefromstring($bytes);
+        $bytes = Archivos::contenido($ruta) ?? (string) @file_get_contents(public_path('image/user-default.png'));
+        $origen = $bytes !== '' ? @imagecreatefromstring($bytes) : false;
 
         if ($origen === false) {
-            return [$bytes, $tipo, $ancho, $alto];
+            return '';
         }
 
-        $escala = self::PIXELES_FOTO / $mayor;
-        $nuevoAncho = max(1, (int) round($ancho * $escala));
-        $nuevoAlto = max(1, (int) round($alto * $escala));
+        $ancho = imagesx($origen);
+        $alto = imagesy($origen);
+        $lado = min($ancho, $alto);
+        // Apaisada: se centra. Vertical: el corte va a un tercio, no a la mitad.
+        $x = (int) (($ancho - $lado) / 2);
+        $y = (int) (($alto - $lado) / 3);
 
-        $destino = imagecreatetruecolor($nuevoAncho, $nuevoAlto);
+        $px = self::PIXELES_FOTO;
+        $cuadrado = imagecreatetruecolor($px, $px);
+        imagecopyresampled($cuadrado, $origen, 0, 0, $x, $y, $px, $px, $lado, $lado);
+        imagedestroy($origen);
 
-        // Se conserva la transparencia por si la foto vino en PNG con fondo
-        // recortado: sin esto el fondo sale negro.
-        imagealphablending($destino, false);
-        imagesavealpha($destino, true);
+        // El círculo: lo de afuera queda transparente.
+        $redonda = imagecreatetruecolor($px, $px);
+        imagealphablending($redonda, false);
+        imagesavealpha($redonda, true);
+        imagefilledrectangle($redonda, 0, 0, $px, $px, imagecolorallocatealpha($redonda, 255, 255, 255, 127));
+        $radio = $px / 2;
 
-        imagecopyresampled($destino, $origen, 0, 0, 0, 0, $nuevoAncho, $nuevoAlto, $ancho, $alto);
+        for ($fila = 0; $fila < $px; $fila++) {
+            for ($col = 0; $col < $px; $col++) {
+                if (($col - $radio + 0.5) ** 2 + ($fila - $radio + 0.5) ** 2 <= $radio ** 2) {
+                    imagesetpixel($redonda, $col, $fila, imagecolorat($cuadrado, $col, $fila));
+                }
+            }
+        }
+        imagedestroy($cuadrado);
 
         ob_start();
-        imagepng($destino, null, 9);
-        $reducida = (string) ob_get_clean();
+        imagepng($redonda, null, 9);
+        imagedestroy($redonda);
 
-        imagedestroy($origen);
-        imagedestroy($destino);
-
-        return [$reducida, 'image/png', $nuevoAncho, $nuevoAlto];
+        return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
     }
 
     /**

@@ -18,6 +18,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
+use function Illuminate\Support\defer;
+
 /**
  * El pago se hace y se valida en SIREB; Jichi pregunta. Si la liquidación está
  * `pagada`, aprueba el documento y emite su recibo con la boleta de SIREB, en
@@ -36,6 +38,7 @@ class ConfirmarPagoService
         private readonly RevisarCarnetService $carnets,
         private readonly RevisarFaenaService $faenas,
         private readonly RevisarGuiaService $guias,
+        private readonly DocumentoEmitidoService $documentos,
     ) {}
 
     /**
@@ -168,6 +171,10 @@ class ConfirmarPagoService
             // Pagado, pero una regla de Jichi lo frena (p. ej. la autorización fue revocada).
             return $this->no('está pagado en Recaudaciones, pero no se pudo aprobar: '.$e->getMessage());
         }
+
+        // Ya emitido: el documento y su recibo se guardan en PDF tal como salen. Después de
+        // responder (defer), fuera de la transacción; si falla, se arma en la primera impresión.
+        defer(fn () => $this->documentos->emitirAlAprobar($documento->refresh()));
 
         return ['aprobado' => true, 'mensaje' => 'Pago confirmado en Recaudaciones: quedó aprobado y se emitió '.$this->documentoEmitido($documento).'.'];
     }

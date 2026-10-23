@@ -1,4 +1,4 @@
-import { Head, router, usePage } from "@inertiajs/react";
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Cake,
     CalendarDays,
@@ -11,21 +11,21 @@ import {
     Truck,
     User,
     type LucideIcon,
-} from "lucide-react";
-import { useState } from "react";
-import { Retrato } from "@/components/comunes/retrato";
-import { AccesoPortal } from "@/components/panel/beneficiarios/acceso-portal";
-import { PestanaComercializador } from "@/components/panel/beneficiarios/pestana-comercializador";
-import { PestanaPagos } from "@/components/panel/beneficiarios/pestana-pagos";
-import { PestanaPescador } from "@/components/panel/beneficiarios/pestana-pescador";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ConfirmarAccion } from "@/components/ui/confirmar-accion";
-import { usePermisos } from "@/hooks/use-permisos";
-import LayoutPanel from "@/layouts/layout-panel";
-import { cn, edadEnAnios, fecha, fechaHora, hace } from "@/lib/utils";
-import type { PageProps, TipoActor } from "@/types";
+} from 'lucide-react';
+import { useState } from 'react';
+import { Retrato } from '@/components/comunes/retrato';
+import { AccesoPortal } from '@/components/panel/beneficiarios/acceso-portal';
+import { PestanaComercializador } from '@/components/panel/beneficiarios/pestana-comercializador';
+import { PestanaPagos } from '@/components/panel/beneficiarios/pestana-pagos';
+import { PestanaPescador } from '@/components/panel/beneficiarios/pestana-pescador';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
+import { usePermisos } from '@/hooks/use-permisos';
+import LayoutPanel from '@/layouts/layout-panel';
+import { cn, edadEnAnios, fecha, fechaHora, hace } from '@/lib/utils';
+import type { PageProps, TipoActor } from '@/types';
 import type {
     AccesoPortal as Acceso,
     BeneficiarioFicha,
@@ -34,7 +34,7 @@ import type {
     FaenaDelBeneficiario,
     GuiaDelBeneficiario,
     ReciboDelBeneficiario,
-} from "@/types/beneficiarios";
+} from '@/types/beneficiarios';
 
 /**
  * La ficha del beneficiario.
@@ -67,16 +67,21 @@ export default function VerBeneficiario({
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
     const [confirmarBaja, setConfirmarBaja] = useState(false);
-    const [pestana, setPestana] = useState<ClavePestana>(() =>
-        pestanaInicial(carnets, cupos),
-    );
+    const [pestana, setPestana] = useState<ClavePestana>(() => pestanaInicial(carnets, cupos));
 
     // La pestaña va a la URL: al volver de una faena o recargar, se abre la misma.
+    // La réplica del carnet lleva la foto, el nombre y la cédula de la persona.
+    const titular = {
+        nombre: beneficiario.nombreCompleto,
+        documento: beneficiario.documento_identidad,
+        foto: beneficiario.foto_url,
+    };
+
     const elegir = (clave: ClavePestana) => {
         setPestana(clave);
         const url = new URL(window.location.href);
-        url.searchParams.set("pestana", clave);
-        window.history.replaceState(window.history.state, "", url);
+        url.searchParams.set('pestana', clave);
+        window.history.replaceState(window.history.state, '', url);
     };
 
     return (
@@ -86,47 +91,37 @@ export default function VerBeneficiario({
             acciones={
                 <div className="flex flex-wrap gap-2">
                     {/* La cuenta del portal vive en «Datos»: este atajo dice cómo está y lleva ahí. */}
-                    <Button variant="ver" onClick={() => elegir("datos")}>
+                    <Button variant="ver" onClick={() => elegir('datos')}>
                         <span
                             className={cn(
-                                "size-2 rounded-full",
+                                'size-2 rounded-full',
                                 acceso_portal?.activo
-                                    ? "bg-emerald-500"
+                                    ? 'bg-emerald-500'
                                     : acceso_portal
-                                      ? "bg-rose-500"
-                                      : "bg-muted-foreground/40",
+                                      ? 'bg-rose-500'
+                                      : 'bg-muted-foreground/40',
                             )}
                             aria-hidden
                         />
                         {acceso_portal?.activo
-                            ? "Portal: habilitado"
+                            ? 'Portal: habilitado'
                             : acceso_portal
-                              ? "Portal: desactivado"
-                              : "Portal: sin acceso"}
+                              ? 'Portal: desactivado'
+                              : 'Portal: sin acceso'}
                     </Button>
 
-                    {puede("beneficiarios.editar") && (
+                    {puede('beneficiarios.editar') && (
                         <Button
                             variant="editar"
-                            onClick={() =>
-                                router.visit(
-                                    route(
-                                        "beneficiarios.edit",
-                                        beneficiario.id,
-                                    ),
-                                )
-                            }
+                            onClick={() => router.visit(route('beneficiarios.edit', beneficiario.id))}
                         >
                             <Pencil className="size-4" />
                             Editar
                         </Button>
                     )}
 
-                    {puede("beneficiarios.eliminar") && (
-                        <Button
-                            variant="eliminar"
-                            onClick={() => setConfirmarBaja(true)}
-                        >
+                    {puede('beneficiarios.eliminar') && (
+                        <Button variant="eliminar" onClick={() => setConfirmarBaja(true)}>
                             <Trash2 className="size-4" />
                             Dar de baja
                         </Button>
@@ -136,11 +131,7 @@ export default function VerBeneficiario({
         >
             <Head title={beneficiario.nombreCompleto} />
 
-            <Cabecera
-                beneficiario={beneficiario}
-                carnets={carnets}
-                gestion={gestion}
-            />
+            <Cabecera beneficiario={beneficiario} carnets={carnets} gestion={gestion} />
 
             {/* Las pestañas: una por actividad, porque cada una es un carnet propio. */}
             <div
@@ -150,11 +141,7 @@ export default function VerBeneficiario({
             >
                 {PESTANAS.map((p) => {
                     const activa = pestana === p.clave;
-                    const vigente = p.actor
-                        ? carnets.some(
-                              (c) => c.tipo_actor === p.actor && c.vigente,
-                          )
-                        : null;
+                    const vigente = p.actor ? carnets.some((c) => c.tipo_actor === p.actor && c.vigente) : null;
 
                     return (
                         <button
@@ -164,10 +151,10 @@ export default function VerBeneficiario({
                             aria-selected={activa}
                             onClick={() => elegir(p.clave)}
                             className={cn(
-                                "flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
+                                'flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
                                 activa
-                                    ? "border-primary text-foreground"
-                                    : "border-transparent text-muted-foreground hover:text-foreground",
+                                    ? 'border-primary text-foreground'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground',
                             )}
                         >
                             <p.icono className="size-4" />
@@ -176,16 +163,10 @@ export default function VerBeneficiario({
                             {vigente !== null && (
                                 <span
                                     className={cn(
-                                        "size-2 rounded-full",
-                                        vigente
-                                            ? "bg-emerald-500"
-                                            : "bg-muted-foreground/30",
+                                        'size-2 rounded-full',
+                                        vigente ? 'bg-emerald-500' : 'bg-muted-foreground/30',
                                     )}
-                                    title={
-                                        vigente
-                                            ? "Con carnet vigente"
-                                            : "Sin carnet vigente"
-                                    }
+                                    title={vigente ? 'Con carnet vigente' : 'Sin carnet vigente'}
                                 />
                             )}
                         </button>
@@ -194,35 +175,28 @@ export default function VerBeneficiario({
             </div>
 
             <div role="tabpanel" className="pt-6">
-                {pestana === "pescador" && (
+                {pestana === 'pescador' && (
                     <PestanaPescador
+                        titular={titular}
                         carnets={carnets}
                         cupos={cupos}
                         faenas={faenas}
                         moneda={institucion.moneda}
                     />
                 )}
-                {pestana === "comercializador" && (
+                {pestana === 'comercializador' && (
                     <PestanaComercializador
+                        titular={titular}
                         carnets={carnets}
                         guias={guias}
                         moneda={institucion.moneda}
                     />
                 )}
-                {pestana === "pagos" && (
-                    <PestanaPagos
-                        recibos={recibos}
-                        deuda={deuda}
-                        moneda={institucion.moneda}
-                    />
-                )}
-                {pestana === "datos" && (
+                {pestana === 'pagos' && <PestanaPagos recibos={recibos} deuda={deuda} moneda={institucion.moneda} />}
+                {pestana === 'datos' && (
                     <>
                         <DatosPersonales beneficiario={beneficiario} />
-                        <AccesoPortal
-                            beneficiarioId={beneficiario.id}
-                            acceso={acceso_portal}
-                        />
+                        <AccesoPortal beneficiarioId={beneficiario.id} acceso={acceso_portal} />
                     </>
                 )}
             </div>
@@ -234,17 +208,13 @@ export default function VerBeneficiario({
                 textoConfirmar="Dar de baja"
                 confirmacion="Entiendo que la persona deja el padrón y no se le va a poder emitir nada nuevo."
                 onCancelar={() => setConfirmarBaja(false)}
-                onConfirmar={() =>
-                    router.delete(
-                        route("beneficiarios.destroy", beneficiario.id),
-                    )
-                }
+                onConfirmar={() => router.delete(route('beneficiarios.destroy', beneficiario.id))}
             />
         </LayoutPanel>
     );
 }
 
-type ClavePestana = "pescador" | "comercializador" | "pagos" | "datos";
+type ClavePestana = 'pescador' | 'comercializador' | 'pagos' | 'datos';
 
 const PESTANAS: {
     clave: ClavePestana;
@@ -252,33 +222,27 @@ const PESTANAS: {
     icono: LucideIcon;
     actor?: TipoActor;
 }[] = [
-    { clave: "pescador", titulo: "Pescador", icono: Fish, actor: "pescador" },
+    { clave: 'pescador', titulo: 'Pescador', icono: Fish, actor: 'pescador' },
     {
-        clave: "comercializador",
-        titulo: "Comercializador",
+        clave: 'comercializador',
+        titulo: 'Comercializador',
         icono: Truck,
-        actor: "comercializador",
+        actor: 'comercializador',
     },
-    { clave: "pagos", titulo: "Pagos", icono: Receipt },
-    { clave: "datos", titulo: "Datos personales", icono: User },
+    { clave: 'pagos', titulo: 'Pagos', icono: Receipt },
+    { clave: 'datos', titulo: 'Datos personales', icono: User },
 ];
 
 /** La pestaña inicial: la que se pidió en la URL, o la de la actividad que ejerce. */
-function pestanaInicial(
-    carnets: CarnetResumen[],
-    cupos: CupoResumen[],
-): ClavePestana {
-    const pedida = new URLSearchParams(window.location.search).get("pestana");
+function pestanaInicial(carnets: CarnetResumen[], cupos: CupoResumen[]): ClavePestana {
+    const pedida = new URLSearchParams(window.location.search).get('pestana');
 
     if (PESTANAS.some((p) => p.clave === pedida)) return pedida as ClavePestana;
 
-    const esPescador =
-        cupos.length > 0 || carnets.some((c) => c.tipo_actor === "pescador");
-    const esComercializador = carnets.some(
-        (c) => c.tipo_actor === "comercializador",
-    );
+    const esPescador = cupos.length > 0 || carnets.some((c) => c.tipo_actor === 'pescador');
+    const esComercializador = carnets.some((c) => c.tipo_actor === 'comercializador');
 
-    return !esPescador && esComercializador ? "comercializador" : "pescador";
+    return !esPescador && esComercializador ? 'comercializador' : 'pescador';
 }
 
 /**
@@ -295,9 +259,7 @@ function Cabecera({
 }) {
     const vigentes = carnets.filter((c) => c.vigente);
     const edad = edadEnAnios(beneficiario.fechaNacimiento);
-    const lugar = [beneficiario.ciudad, beneficiario.provincia]
-        .filter(Boolean)
-        .join(", ");
+    const lugar = [beneficiario.ciudad, beneficiario.provincia].filter(Boolean).join(', ');
 
     return (
         <Card className="min-w-0 overflow-hidden">
@@ -318,9 +280,7 @@ function Cabecera({
                     />
 
                     <div className="min-w-0 flex-1 sm:pt-3">
-                        <h2 className="truncate text-xl font-semibold">
-                            {beneficiario.nombreCompleto}
-                        </h2>
+                        <h2 className="truncate text-xl font-semibold">{beneficiario.nombreCompleto}</h2>
                         <p className="font-mono text-sm tabular-nums text-muted-foreground">
                             C.I. {beneficiario.documento_identidad}
                         </p>
@@ -333,8 +293,7 @@ function Cabecera({
                             )}
                             {beneficiario.telefono && (
                                 <span className="flex items-center gap-1">
-                                    <Phone className="size-3.5" />{" "}
-                                    {beneficiario.telefono}
+                                    <Phone className="size-3.5" /> {beneficiario.telefono}
                                 </span>
                             )}
                             {lugar && (
@@ -343,12 +302,8 @@ function Cabecera({
                                 </span>
                             )}
                             {beneficiario.registrado && (
-                                <span
-                                    className="flex items-center gap-1"
-                                    title={fechaHora(beneficiario.registrado)}
-                                >
-                                    <CalendarDays className="size-3.5" /> En el
-                                    padrón desde{" "}
+                                <span className="flex items-center gap-1" title={fechaHora(beneficiario.registrado)}>
+                                    <CalendarDays className="size-3.5" /> En el padrón desde{' '}
                                     {fecha(beneficiario.registrado)}
                                 </span>
                             )}
@@ -357,19 +312,12 @@ function Cabecera({
                         {/* Una insignia por actividad habilitada hoy. */}
                         <div className="mt-3 flex flex-wrap gap-1.5">
                             {vigentes.length === 0 ? (
-                                <Badge color="slate">
-                                    Sin carnet vigente en {gestion}
-                                </Badge>
+                                <Badge color="slate">Sin carnet vigente en {gestion}</Badge>
                             ) : (
                                 vigentes.map((c) => (
-                                    <Badge
-                                        key={c.id}
-                                        color={c.tipo_actor_color}
-                                    >
-                                        {c.tipo_actor_etiqueta} {gestion} ·{" "}
-                                        {c.tipo_actor === "pescador"
-                                            ? "emite faenas"
-                                            : "emite guías"}
+                                    <Badge key={c.id} color={c.tipo_actor_color}>
+                                        {c.tipo_actor_etiqueta} {gestion} ·{' '}
+                                        {c.tipo_actor === 'pescador' ? 'emite faenas' : 'emite guías'}
                                     </Badge>
                                 ))
                             )}
@@ -381,41 +329,24 @@ function Cabecera({
     );
 }
 
-function DatosPersonales({
-    beneficiario,
-}: {
-    beneficiario: BeneficiarioFicha;
-}) {
+function DatosPersonales({ beneficiario }: { beneficiario: BeneficiarioFicha }) {
     const edad = edadEnAnios(beneficiario.fechaNacimiento);
 
     return (
         <Card className="min-w-0">
             <CardContent className="grid gap-x-10 gap-y-3 pt-5 text-sm md:grid-cols-2">
-                <Dato
-                    etiqueta="Nombre completo"
-                    valor={beneficiario.nombreCompleto}
-                />
-                <Dato
-                    etiqueta="Cédula de identidad"
-                    valor={beneficiario.documento_identidad}
-                />
+                <Dato etiqueta="Nombre completo" valor={beneficiario.nombreCompleto} />
+                <Dato etiqueta="Cédula de identidad" valor={beneficiario.documento_identidad} />
                 <Dato
                     etiqueta="Nacimiento"
                     valor={
                         beneficiario.fechaNacimiento
-                            ? `${fecha(beneficiario.fechaNacimiento)}${edad !== null ? ` · ${edad} años` : ""}`
+                            ? `${fecha(beneficiario.fechaNacimiento)}${edad !== null ? ` · ${edad} años` : ''}`
                             : null
                     }
                 />
-                <Dato
-                    etiqueta="Género"
-                    valor={beneficiario.genero}
-                    capitalizar
-                />
-                <Dato
-                    etiqueta="Nacionalidad"
-                    valor={beneficiario.nacionalidad}
-                />
+                <Dato etiqueta="Género" valor={beneficiario.genero} capitalizar />
+                <Dato etiqueta="Nacionalidad" valor={beneficiario.nacionalidad} />
                 <Dato etiqueta="Teléfono" valor={beneficiario.telefono} />
                 <Dato etiqueta="Correo" valor={beneficiario.email} />
                 <Dato etiqueta="Ciudad" valor={beneficiario.ciudad} />
@@ -446,14 +377,7 @@ function Dato({
     return (
         <div className="flex justify-between gap-3 border-b border-border/60 pb-2">
             <span className="text-muted-foreground">{etiqueta}</span>
-            <span
-                className={cn(
-                    "text-right font-medium",
-                    capitalizar && "capitalize",
-                )}
-            >
-                {valor || "—"}
-            </span>
+            <span className={cn('text-right font-medium', capitalizar && 'capitalize')}>{valor || '—'}</span>
         </div>
     );
 }

@@ -15,6 +15,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { cn, fecha, fechaHora, hace } from '@/lib/utils';
 import type { OpcionEnum, Paginado } from '@/types';
 import type { CarnetFila } from '@/types/carnets';
+import { abrirDirecto } from '@/components/panel/comunes/ficha';
 
 /**
  *  Listado de carnets
@@ -309,6 +310,7 @@ export default function IndiceCarnets({
                                                                     )}
                                                                     target="_blank"
                                                                     rel="noreferrer"
+                                                                    onClick={abrirDirecto(c.recibo_enlace)}
                                                                     title={`Recibo ${c.recibo_numero ?? ''}`}
                                                                     aria-label={`Imprimir el recibo de ${c.beneficiario ?? 'la persona'}`}
                                                                     className={cn(
@@ -334,6 +336,7 @@ export default function IndiceCarnets({
                                                                     )}
                                                                     target="_blank"
                                                                     rel="noreferrer"
+                                                                    onClick={abrirDirecto(c.pdf_enlace)}
                                                                     title="Imprimir el carnet"
                                                                     aria-label={`Imprimir el carnet de ${c.beneficiario ?? 'la persona'}`}
                                                                     className={cn(

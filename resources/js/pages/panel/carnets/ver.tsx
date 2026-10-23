@@ -34,6 +34,7 @@ import {
     TarjetaCodigo,
     Td,
 } from '@/components/panel/comunes/ficha';
+import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -49,11 +50,16 @@ import type { CarnetFicha, FaenaDelCarnet, GuiaDelCarnet } from '@/types/carnets
 export default function VerCarnet({
     carnet,
     recibo,
+    pdf,
+    pdf_recibo,
     faenas,
     guias,
 }: {
     carnet: CarnetFicha;
     recibo: ReciboDelCupo | null;
+    /** El PDF guardado al emitirse; null si todavía no hay. */
+    pdf: PdfEmitido | null;
+    pdf_recibo: PdfEmitido | null;
     faenas: FaenaDelCarnet[];
     guias: GuiaDelCarnet[];
 }) {
@@ -85,12 +91,16 @@ export default function VerCarnet({
                         </Button>
                     )}
                     {puede('carnets.imprimir') && carnet.puede_imprimirse && (
-                        <EnlacePdf href={route('carnets.imprimir', carnet.id)} icono={Printer}>
+                        <EnlacePdf href={route('carnets.imprimir', carnet.id)} directo={pdf?.enlace} icono={Printer}>
                             Carnet
                         </EnlacePdf>
                     )}
                     {puede('recibos.imprimir') && recibo && (
-                        <EnlacePdf href={route('recibos.imprimir', recibo.id)} icono={Receipt}>
+                        <EnlacePdf
+                            href={route('recibos.imprimir', recibo.id)}
+                            directo={pdf_recibo?.enlace}
+                            icono={Receipt}
+                        >
                             Recibo
                         </EnlacePdf>
                     )}
@@ -267,11 +277,14 @@ export default function VerCarnet({
                                 },
                             ]}
                         />
+
+                        <EstadoPdf pdf={pdf} aprobado={carnet.ya_fue_aprobado} />
                     </CardContent>
                 </Card>
             </div>
 
             <TarjetaRecaudaciones
+                reciboDirecto={pdf_recibo?.enlace}
                 className="mt-6"
                 monto={carnet.monto}
                 pago={{

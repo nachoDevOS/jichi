@@ -36,6 +36,7 @@ import {
     porcentaje,
     TarjetaCodigo,
 } from '@/components/panel/comunes/ficha';
+import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,7 +50,17 @@ import type { FaenaFicha } from '@/types/faenas';
 /**
  *  La ficha de una faena: se paga en SIREB como los otros tres trámites.
  */
-export default function VerFaena({ faena, recibo }: { faena: FaenaFicha; recibo: ReciboDelCupo | null }) {
+export default function VerFaena({
+    faena,
+    recibo,
+    pdf,
+    pdf_recibo,
+}: {
+    faena: FaenaFicha;
+    recibo: ReciboDelCupo | null;
+    pdf: PdfEmitido | null;
+    pdf_recibo: PdfEmitido | null;
+}) {
     const { puede } = usePermisos();
     const [eliminando, setEliminando] = useState(false);
     const [revocando, setRevocando] = useState(false);
@@ -85,12 +96,16 @@ export default function VerFaena({ faena, recibo }: { faena: FaenaFicha; recibo:
                         </Button>
                     )}
                     {puede('faenas.imprimir') && faena.puede_imprimirse && (
-                        <EnlacePdf href={route('faenas.imprimir', faena.id)} icono={Printer}>
+                        <EnlacePdf href={route('faenas.imprimir', faena.id)} directo={pdf?.enlace} icono={Printer}>
                             Faena
                         </EnlacePdf>
                     )}
                     {puede('recibos.imprimir') && faena.recibo_id !== null && (
-                        <EnlacePdf href={route('recibos.imprimir', faena.recibo_id)} icono={Receipt}>
+                        <EnlacePdf
+                            href={route('recibos.imprimir', faena.recibo_id)}
+                            directo={pdf_recibo?.enlace}
+                            icono={Receipt}
+                        >
                             Recibo
                         </EnlacePdf>
                     )}
@@ -235,11 +250,14 @@ export default function VerFaena({ faena, recibo }: { faena: FaenaFicha; recibo:
                                 },
                             ]}
                         />
+
+                        <EstadoPdf pdf={pdf} aprobado={faena.ya_fue_aprobada} />
                     </CardContent>
                 </Card>
             </div>
 
             <TarjetaRecaudaciones
+                reciboDirecto={pdf_recibo?.enlace}
                 className="mt-6"
                 monto={faena.monto}
                 pago={{

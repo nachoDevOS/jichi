@@ -11,6 +11,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs, fechaHora } from '@/lib/utils';
 import type { PageProps, Paginado } from '@/types';
 import type { ReciboFila } from '@/types/recibos';
+import { abrirDirecto } from '@/components/panel/comunes/ficha';
 
 /**
  *  RECIBOS — los comprobantes entregados
@@ -187,6 +188,7 @@ export default function IndiceRecibos({
                                                                 href={route('recibos.imprimir', r.id)}
                                                                 target="_blank"
                                                                 rel="noreferrer"
+                                                                onClick={abrirDirecto(r.pdf_enlace)}
                                                                 title="Imprimir el recibo"
                                                                 aria-label={`Imprimir el recibo ${r.numero_recibo}`}
                                                                 className="inline-flex text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"

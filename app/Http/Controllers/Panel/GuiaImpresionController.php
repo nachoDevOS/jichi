@@ -6,6 +6,7 @@ use App\Enums\CondicionProducto;
 use App\Http\Controllers\Controller;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
+use App\Services\DocumentoEmitidoService;
 use App\Support\QrVerificacion;
 use App\Support\TextoVertical;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -38,7 +39,7 @@ class GuiaImpresionController extends Controller
      * Una guía cerrada o vencida SÍ se reimprime: puede hacer falta reponer el
      * papel de un traslado ya cumplido.
      */
-    public function imprimir(GuiaMovimiento $guia): Response|RedirectResponse
+    public function imprimir(GuiaMovimiento $guia, bool $descarga = false): Response|RedirectResponse
     {
         // Se vuelve a comprobar acá aunque la pantalla esconda el botón:
         // esconderlo en React es comodidad, la dirección se escribe a mano.
@@ -46,7 +47,8 @@ class GuiaImpresionController extends Controller
             return back()->with('error', 'La guía sale recién con el traslado aprobado.');
         }
 
-        return $this->documento($guia)->stream("guia-transporte-{$guia->numero_legible}.pdf");
+        // El PDF guardado al emitirse: se entrega tal como salió (ver DocumentoEmitidoService).
+        return app(DocumentoEmitidoService::class)->respuesta($guia, $descarga);
     }
 
     /**

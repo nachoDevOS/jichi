@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Models\AprovechamientoPesq;
 use App\Models\Configuracion;
+use App\Services\DocumentoEmitidoService;
 use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as ArchivoPdf;
@@ -59,7 +60,7 @@ class AutorizacionPescaController extends Controller
      * Solo con el cupo APROBADO. Un vencido sí se reimprime: puede
      * hacer falta reponer el papel de una gestión cerrada.
      */
-    public function imprimir(AprovechamientoPesq $aprovechamiento): Response|RedirectResponse
+    public function imprimir(AprovechamientoPesq $aprovechamiento, bool $descarga = false): Response|RedirectResponse
     {
         // Se vuelve a comprobar acá aunque la pantalla esconda el botón:
         // esconderlo en React es comodidad, la dirección se escribe a mano.
@@ -75,7 +76,8 @@ class AutorizacionPescaController extends Controller
             return back()->with('error', 'La autorización está revocada: no se imprime.');
         }
 
-        return $this->documento($aprovechamiento)->stream("autorizacion-{$aprovechamiento->numeroLegible()}.pdf");
+        // El PDF guardado al emitirse: se entrega tal como salió (ver DocumentoEmitidoService).
+        return app(DocumentoEmitidoService::class)->respuesta($aprovechamiento, $descarga);
     }
 
     /**

@@ -1,3 +1,5 @@
+import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
+
 import type { EstadoCarnet, TipoActor } from '@/types';
 import type { VentaSireb } from '@/types/aprovechamientos';
 
@@ -44,6 +46,9 @@ export interface CarnetFila {
     /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
+    recibo_enlace: EnlaceDirecto | null;
 
     estado: EstadoCarnet;
     estado_etiqueta: string;

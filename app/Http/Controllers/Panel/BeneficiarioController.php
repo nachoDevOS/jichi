@@ -13,6 +13,7 @@ use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use App\Services\CodigoService;
+use App\Services\DocumentoEmitidoService;
 use App\Support\Archivos;
 use App\Support\ExpedienteBeneficiario;
 use App\Support\Paginacion;
@@ -160,6 +161,7 @@ class BeneficiarioController extends Controller
              *  Sus credenciales — el paso 3 del flujo
              */
             'carnets' => ExpedienteBeneficiario::carnets($beneficiario)
+                ->load('documentoEmitido')
                 ->map($this->resumirCarnet(...))
                 ->all(),
 
@@ -190,15 +192,23 @@ class BeneficiarioController extends Controller
                     'region_hasta' => $f->region_hasta,
                     'ya_fue_aprobada' => $f->yaFueAprobada(),
                     'puede_imprimirse' => $f->puedeImprimirse(),
+                    'pdf_enlace' => DocumentoEmitidoService::enlace($f),
                 ])
                 ->all(),
 
             'guias' => ExpedienteBeneficiario::guias($beneficiario)
+                ->load('documentoEmitido')
                 ->map(fn (GuiaMovimiento $g): array => [
                     'id' => $g->id,
                     'carnet_id' => $g->carnet_id,
                     'numero_legible' => $g->numero_legible,
                     'ruta' => $g->ruta,
+                    'origen' => $g->origen,
+                    'destino' => $g->destino,
+                    // A qué pescador le compró: es la autorización que descontó.
+                    'pescador' => $g->aprovechamiento?->beneficiario?->nombreCompleto,
+                    'ya_fue_aprobada' => $g->yaFueAprobada(),
+                    'pdf_enlace' => DocumentoEmitidoService::enlace($g),
                     'peso_total_kg' => (float) $g->peso_total_kg,
                     'estado' => $g->estado->value,
                     'estado_etiqueta' => $g->etiquetaEstado(),
@@ -221,6 +231,7 @@ class BeneficiarioController extends Controller
                     'concepto' => $r->concepto,
                     'monto_total' => (float) $r->monto_total,
                     'emitido_en' => $r->created_at?->toIso8601String(),
+                    'pdf_enlace' => DocumentoEmitidoService::enlace($r),
                 ])
                 ->all(),
 
@@ -228,6 +239,8 @@ class BeneficiarioController extends Controller
              *  Sus bolsas madre — el paso 2, y el que explica las faenas
              */
             'cupos' => ExpedienteBeneficiario::aprovechamientos($beneficiario)
+                // Las guías que le compraron: cada una descontó sus kilos (sin N+1).
+                ->load(['guias' => fn ($q) => $q->orderBy('created_at'), 'guias.carnet.beneficiario'])
                 ->map(fn (AprovechamientoPesq $a): array => [
                     'id' => $a->id,
                     'descripcion' => $a->escala,
@@ -243,6 +256,18 @@ class BeneficiarioController extends Controller
                     'fecha_solicitud' => $a->fecha_solicitud?->toDateString(),
                     'fecha_emision' => $a->fecha_emision?->toDateString(),
                     'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
+                    'ventas' => $a->guias
+                        ->map(fn (GuiaMovimiento $g): array => [
+                            'id' => $g->id,
+                            'numero_legible' => $g->numero_legible,
+                            'comprador' => $g->comercializador()?->nombreCompleto,
+                            'kilos' => (float) $g->peso_total_kg,
+                            'fecha' => $g->created_at?->toDateString(),
+                            // Pendiente: los kilos ya bajaron, pero vuelven si se elimina.
+                            'pendiente' => $g->estado->estaAbierto(),
+                        ])
+                        ->values()
+                        ->all(),
                 ])
                 ->all(),
         ]);
@@ -486,6 +511,8 @@ class BeneficiarioController extends Controller
             'saldo_pendiente' => $carnet->porPagar(),
             'fecha_emision' => $carnet->fecha_emision?->toDateString(),
             'fecha_vencimiento' => $carnet->fecha_vencimiento?->toDateString(),
+            'puede_imprimirse' => $carnet->puedeImprimirse(),
+            'pdf_enlace' => DocumentoEmitidoService::enlace($carnet),
         ];
     }
 

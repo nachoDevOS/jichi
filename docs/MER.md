@@ -791,6 +791,21 @@ adivina cualquiera probando el siguiente.
 
 ---
 
+### `documentos_emitidos` — el PDF de cada papel entregado *(23/10/2026)*
+
+| Columna | Tipo | Nota |
+| --- | --- | --- |
+| `emitible_type`, `emitible_id` | polimórfica, sin FK | Autorización, carnet, faena, guía o recibo |
+| `disco`, `ruta` | string | s3 (o `local`); privado, se sirve a través de Jichi |
+| `sha256` | char(64) | Huella: si el archivo no coincide, se vuelve a generar |
+| `bytes` | unsigned int | Tamaño |
+| `motivo` | string null | Por qué se volvió a generar (el archivo faltaba); null en la primera emisión |
+| `generado_en` | timestamp | Cuándo se armó |
+
+**Único parcial** `(emitible_type, emitible_id) WHERE deleted_at IS NULL`: un PDF
+vigente por papel. Si se vuelve a generar, el anterior queda dado de baja como
+historial: por eso el único es parcial. Ver [modulos/DOCUMENTOS-EMITIDOS.md](modulos/DOCUMENTOS-EMITIDOS.md).
+
 ### Tablas de soporte — no son del dominio
 
 | Tabla | Columnas | Nota |

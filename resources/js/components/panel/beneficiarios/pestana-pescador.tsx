@@ -1,14 +1,37 @@
 import { Link } from '@inertiajs/react';
-import { Eye, Printer, Ship, Waves } from 'lucide-react';
+import { ArrowRight, Eye, Fish, Printer, Scale, Ship, ShoppingBasket, Waves } from 'lucide-react';
 import { useState } from 'react';
+import { GraficoDisponible } from '@/components/panel/aprovechamientos/grafico-disponible';
+import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
+import {
+    abrirDirecto,
+    BarraDisponible,
+    Conteo,
+    kg,
+    nivelDisponible,
+    porcentaje,
+    Tabla,
+    Td,
+} from '@/components/panel/comunes/ficha';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
 import { usePermisos } from '@/hooks/use-permisos';
 import { bs, cn, fecha, fechaInput } from '@/lib/utils';
+import type { PuntoDisponible } from '@/types/aprovechamientos';
 import type { CarnetResumen, CupoResumen, FaenaDelBeneficiario } from '@/types/beneficiarios';
-import { AvisoRegistroAnterior, CredencialMini, HistorialCarnets, Seccion, TarjetaPeriodo } from './partes-ficha';
-import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
+import {
+    AvisoRegistroAnterior,
+    CarnetReplica,
+    diasEntre,
+    HistorialCarnets,
+    PieCarnet,
+    Seccion,
+    TarjetaPeriodo,
+    TiraCifras,
+    type Titular,
+} from './partes-ficha';
 
 /**
  * Un PERÍODO del pescador: una autorización, la cédula que se emitió con ella y
@@ -26,11 +49,13 @@ interface Periodo {
  * Todo lo del pescador, período por período: autorización → cédula → faenas.
  */
 export function PestanaPescador({
+    titular,
     carnets,
     cupos,
     faenas,
     moneda,
 }: {
+    titular: Titular;
     carnets: CarnetResumen[];
     cupos: CupoResumen[];
     faenas: FaenaDelBeneficiario[];
@@ -58,9 +83,16 @@ export function PestanaPescador({
     // La cédula principal del período: la vigente o la última; el resto son reposiciones.
     const cedula = periodo.carnets.find((c) => c.vigente) ?? periodo.carnets[0] ?? null;
     const otras = periodo.carnets.filter((c) => c.id !== cedula?.id);
+    const cupo = periodo.cupo;
+
+    // Solo la guía descuenta: lo vendido es la suma de las guías que le compraron.
+    const vendido = cupo ? cupo.ventas.reduce((t, v) => t + v.kilos, 0) : 0;
+    const pct = cupo ? porcentaje(cupo.kilos_disponibles, cupo.volumen_total_kg) : 0;
+    const nivel = nivelDisponible(pct, cupo?.ya_fue_aprobado ?? false);
+    const vigentes = periodo.faenas.filter((f) => f.vigente).length;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-5">
             {/* Solo con historia: con un único período, elegir no tiene sentido. */}
             {periodos.length > 1 && (
                 <Seccion titulo={`Períodos (${periodos.length})`}>
@@ -78,67 +110,88 @@ export function PestanaPescador({
                 </Seccion>
             )}
 
-            {!esActual && <AvisoRegistroAnterior gestion={gestionDe(periodo)} onVolver={() => setElegido(actual?.clave ?? null)} />}
+            {!esActual && (
+                <AvisoRegistroAnterior
+                    gestion={gestionDe(periodo)}
+                    onVolver={() => setElegido(actual?.clave ?? null)}
+                />
+            )}
 
-            {/* En el orden del trámite: primero la autorización, después la cédula. */}
-            <div className="grid gap-6 lg:grid-cols-5">
-                <div className="min-w-0 space-y-3 lg:col-span-3">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                        Autorización de Pesca para Aprovechamiento Pesquero
-                    </h3>
-                    {periodo.cupo ? (
-                        <TarjetaCupo cupo={periodo.cupo} />
-                    ) : (
-                        <div className="flex h-40 items-center justify-center rounded-xl border-2 border-dashed border-border px-4 text-center text-sm text-muted-foreground">
-                            Esta cédula no está asociada a ninguna autorización
-                        </div>
-                    )}
-                </div>
+            {cupo && (
+                <TiraCifras
+                    cifras={[
+                        {
+                            icono: Scale,
+                            etiqueta: cupo.ya_fue_aprobado ? 'Autorizado' : 'Solicitado',
+                            valor: <Conteo valor={cupo.volumen_total_kg} formato={kg} />,
+                            pie: cupo.descripcion ?? 'el volumen de la gestión',
+                        },
+                        {
+                            icono: Fish,
+                            etiqueta: 'Disponible',
+                            valor: <Conteo valor={cupo.kilos_disponibles} formato={kg} />,
+                            pie: nivel.texto ?? `${Math.round(pct)} % del autorizado`,
+                            tono: nivel.tono,
+                        },
+                        {
+                            icono: ShoppingBasket,
+                            etiqueta: 'Vendido en guías',
+                            valor: <Conteo valor={vendido} formato={kg} />,
+                            pie: `${cupo.ventas.length} ${cupo.ventas.length === 1 ? 'guía' : 'guías'}`,
+                        },
+                        {
+                            icono: Ship,
+                            etiqueta: 'Salidas de pesca',
+                            valor: <Conteo valor={periodo.faenas.length} formato={(n) => String(n)} />,
+                            pie: vigentes > 0 ? `${vigentes} en el agua hoy` : 'ninguna vigente hoy',
+                        },
+                    ]}
+                />
+            )}
 
-                <div className="space-y-3 lg:col-span-2">
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Cédula</h3>
+            {/* La autorización ocupa lo que sobre; la cédula, el ancho de una tarjeta de verdad. */}
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+                {cupo ? (
+                    <TarjetaCupo cupo={cupo} />
+                ) : (
+                    <Hueco>Esta cédula no está asociada a ninguna autorización</Hueco>
+                )}
+
+                <div className="min-w-0 space-y-3">
                     {cedula ? (
-                        <CredencialMini carnet={cedula} moneda={moneda} />
+                        <>
+                            <CarnetReplica carnet={cedula} titular={titular} />
+                            <PieCarnet carnet={cedula} moneda={moneda} />
+                        </>
                     ) : (
-                        <div className="flex h-40 items-center justify-center rounded-xl border-2 border-dashed border-border px-4 text-center text-sm text-muted-foreground">
-                            Todavía no se emitió la cédula de esta autorización
-                        </div>
+                        <Hueco>Todavía no se emitió la cédula de esta autorización</Hueco>
                     )}
                 </div>
             </div>
 
             <Seccion titulo="Salidas de pesca">
                 {periodo.faenas.length === 0 ? (
-                    <div className="rounded-lg border border-border">
+                    <div className="rounded-lg border border-border bg-card">
                         <EstadoVacio
                             icono={Ship}
                             titulo="Sin faenas"
-                            descripcion={esActual ? 'Todavía no salió a pescar con esta autorización.' : 'En este período no salió a pescar.'}
+                            descripcion={
+                                esActual
+                                    ? 'Todavía no salió a pescar con esta autorización.'
+                                    : 'En este período no salió a pescar.'
+                            }
                         />
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-lg border border-border bg-card">
-                        <table className="w-full text-sm">
-                            <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                <tr>
-                                    <th className="px-4 py-2.5 font-medium">N°</th>
-                                    <th className="px-4 py-2.5 text-right font-medium">Kilos</th>
-                                    <th className="px-4 py-2.5 font-medium">Embarcación</th>
-                                    <th className="px-4 py-2.5 font-medium">Comandante</th>
-                                    <th className="px-4 py-2.5 font-medium">Región</th>
-                                    <th className="px-4 py-2.5 font-medium">Vigencia</th>
-                                    <th className="px-4 py-2.5 text-right font-medium">Arancel</th>
-                                    <th className="px-4 py-2.5 font-medium">Estado</th>
-                                    <th className="px-4 py-2.5" />
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {periodo.faenas.map((f) => (
-                                    <FilaFaena key={f.id} faena={f} moneda={moneda} />
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <Card className="min-w-0 overflow-hidden p-0">
+                        <Tabla
+                            columnas={['N°', 'Embarcación', 'Región', 'Vigencia', '>Kilos', '>Arancel', 'Estado', '']}
+                        >
+                            {periodo.faenas.map((f) => (
+                                <FilaFaena key={f.id} faena={f} moneda={moneda} />
+                            ))}
+                        </Tabla>
+                    </Card>
                 )}
             </Seccion>
 
@@ -147,6 +200,14 @@ export function PestanaPescador({
                     <HistorialCarnets carnets={otras} moneda={moneda} />
                 </Seccion>
             )}
+        </div>
+    );
+}
+
+function Hueco({ children }: { children: string }) {
+    return (
+        <div className="flex h-40 items-center justify-center rounded-xl border-2 border-dashed border-border px-4 text-center text-sm text-muted-foreground">
+            {children}
         </div>
     );
 }
@@ -164,9 +225,7 @@ function BotonPeriodo({
     onClick: () => void;
 }) {
     const cedula = p.carnets.find((c) => c.vigente) ?? p.carnets[0] ?? null;
-    const kilos = p.faenas
-        .filter((f) => f.estado === 'aprobado')
-        .reduce((total, f) => total + f.kilos_extraidos, 0);
+    const vendido = p.cupo ? p.cupo.ventas.reduce((t, v) => t + v.kilos, 0) : 0;
 
     return (
         <TarjetaPeriodo
@@ -174,8 +233,8 @@ function BotonPeriodo({
             esActual={esActual}
             activo={activo}
             insignia={p.cupo ? <Badge color={p.cupo.estado_color}>{p.cupo.estado_etiqueta}</Badge> : undefined}
-            titulo={p.cupo ? (p.cupo.descripcion ?? `${p.cupo.volumen_total_kg} kg`) : 'Sin autorización'}
-            detalle={`${cedula ? `Cédula N° ${cedula.registro ?? '—'}` : 'Sin cédula'} · ${p.faenas.length} ${p.faenas.length === 1 ? 'faena' : 'faenas'} · ${kilos} kg pescados`}
+            titulo={p.cupo ? (p.cupo.descripcion ?? kg(p.cupo.volumen_total_kg)) : 'Sin autorización'}
+            detalle={`${cedula ? `Cédula N° ${cedula.registro ?? '—'}` : 'Sin cédula'} · ${p.faenas.length} ${p.faenas.length === 1 ? 'faena' : 'faenas'} · ${kg(vendido)} vendidos`}
             onClick={onClick}
         />
     );
@@ -204,8 +263,98 @@ function armarPeriodos(carnets: CarnetResumen[], cupos: CupoResumen[], faenas: F
 
 /** La gestión del período: el año en que se otorgó, o en que se pidió. */
 function gestionDe(p: Periodo): number | null {
-    const fechaBase = p.cupo?.fecha_emision ?? p.cupo?.fecha_solicitud ?? p.carnets[0]?.fecha_emision ?? p.carnets[0]?.fecha_solicitud;
+    const fechaBase =
+        p.cupo?.fecha_emision ??
+        p.cupo?.fecha_solicitud ??
+        p.carnets[0]?.fecha_emision ??
+        p.carnets[0]?.fecha_solicitud;
     return fechaBase ? Number(fechaBase.slice(0, 4)) : null;
+}
+
+/**
+ * Los escalones del gráfico, armados con las guías que le compraron: lo
+ * otorgado, una caída por guía y «hoy». Es la misma cuenta que la ficha de la autorización.
+ */
+function evolucionDe(cupo: CupoResumen): PuntoDisponible[] {
+    let disponible = cupo.volumen_total_kg;
+    const base = { kilos: null, comprador: null, pendiente: false };
+
+    return [
+        { ...base, etiqueta: 'Otorgada', fecha: cupo.fecha_emision ?? cupo.fecha_solicitud, disponible },
+        ...cupo.ventas.map((v) => {
+            disponible -= v.kilos;
+            return {
+                etiqueta: `Guía ${v.numero_legible}`,
+                fecha: v.fecha,
+                disponible: Math.round(disponible * 100) / 100,
+                kilos: v.kilos,
+                comprador: v.comprador,
+                pendiente: v.pendiente,
+            };
+        }),
+        { ...base, etiqueta: 'Hoy', fecha: fechaInput(new Date()), disponible: Math.round(disponible * 100) / 100 },
+    ];
+}
+
+/** La autorización: cuánto queda, cómo bajó y sus fechas. */
+function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
+    const hoy = fechaInput(new Date());
+    // La vigencia la dice la fecha, no el estado: aprobada sigue aprobada aunque pase su fecha.
+    const vencido =
+        cupo.ya_fue_aprobado && cupo.fecha_vencimiento !== null && cupo.fecha_vencimiento.slice(0, 10) < hoy;
+    const revocado = cupo.estado === 'revocado';
+
+    return (
+        <Card className="min-w-0 overflow-hidden p-0">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+                <Waves className="size-4 text-primary" />
+                <span className="text-sm font-semibold">Autorización de Pesca</span>
+                {/* La capacidad y no el N° de escala: ese número es del catálogo interno. */}
+                <span className="text-sm text-muted-foreground">· {cupo.descripcion ?? kg(cupo.volumen_total_kg)}</span>
+                <Badge color={cupo.estado_color}>{cupo.estado_etiqueta}</Badge>
+                <EnlacePermitido
+                    permiso="aprovechamientos.ver"
+                    href={route('aprovechamientos.show', cupo.id)}
+                    className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                    Ver autorización <ArrowRight className="size-3.5" />
+                </EnlacePermitido>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+                <BarraDisponible
+                    disponible={cupo.kilos_disponibles}
+                    total={cupo.volumen_total_kg}
+                    aprobada={cupo.ya_fue_aprobado}
+                />
+
+                {revocado ? (
+                    <p className="text-sm text-rose-700 dark:text-rose-400">
+                        Revocada: no autoriza faenas ni carnets nuevos.
+                    </p>
+                ) : vencido ? (
+                    <p className="text-sm text-muted-foreground">Venció el {fecha(cupo.fecha_vencimiento)}.</p>
+                ) : !cupo.ya_fue_aprobado ? (
+                    <p className="text-sm text-muted-foreground">Todavía sin aprobar: falta el pago en SIREB.</p>
+                ) : (
+                    <GraficoDisponible puntos={evolucionDe(cupo)} total={cupo.volumen_total_kg} alto="h-44" />
+                )}
+            </div>
+
+            <dl className="grid grid-cols-3 border-t border-border bg-secondary/30 text-xs">
+                {[
+                    ['Solicitada', cupo.fecha_solicitud],
+                    ['Otorgada', cupo.fecha_emision],
+                    ['Vence', cupo.fecha_vencimiento],
+                ].map(([rotulo, valor], i) => (
+                    <div key={rotulo} className={cn('px-5 py-2.5', i > 0 && 'border-l border-border')}>
+                        <dt className="text-muted-foreground">{rotulo}</dt>
+                        <dd className="font-medium tabular-nums">{fecha(valor) || '—'}</dd>
+                    </div>
+                ))}
+            </dl>
+        </Card>
+    );
 }
 
 /** Una salida con lo que dice su talonario, sin tener que abrir la ficha. */
@@ -214,61 +363,77 @@ function FilaFaena({ faena: f, moneda }: { faena: FaenaDelBeneficiario; moneda: 
     const vigencia = vigenciaDe(f);
 
     return (
-        <tr className="hover:bg-secondary/50">
-            <td className="px-4 py-2.5">
+        <tr className="transition-colors hover:bg-secondary/50">
+            <Td>
                 <EnlacePermitido
                     permiso="faenas.ver"
                     href={route('faenas.show', f.id)}
-                    className="font-mono font-medium tabular-nums text-primary hover:underline"
+                    className="font-mono font-medium text-primary tabular-nums hover:underline"
                 >
                     {f.numero_legible}
                 </EnlacePermitido>
-            </td>
-            <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">{f.kilos_extraidos} kg</td>
-            <td className="px-4 py-2.5">
-                {f.embarcacion ?? '—'}
-                {(f.propietario || f.matricula_naval) && (
-                    <p className="text-xs text-muted-foreground">
-                        {[f.propietario && `de ${f.propietario}`, f.matricula_naval && `mat. ${f.matricula_naval}`]
-                            .filter(Boolean)
-                            .join(' · ')}
-                    </p>
+            </Td>
+            <Td>
+                <p className="font-medium">{f.embarcacion ?? '—'}</p>
+                <p className="text-xs text-muted-foreground">
+                    {[
+                        f.comandante_barco && `cmte. ${f.comandante_barco}`,
+                        f.matricula_naval && `mat. ${f.matricula_naval}`,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ') || '—'}
+                </p>
+            </Td>
+            <Td>
+                {f.region_desde || f.region_hasta ? (
+                    <span className="inline-flex items-center gap-1.5">
+                        {f.region_desde ?? '—'}
+                        <ArrowRight className="size-3.5 text-muted-foreground" />
+                        {f.region_hasta ?? '—'}
+                    </span>
+                ) : (
+                    '—'
                 )}
-            </td>
-            <td className="px-4 py-2.5">{f.comandante_barco ?? '—'}</td>
-            <td className="px-4 py-2.5">
-                {f.region_desde || f.region_hasta ? `${f.region_desde ?? '—'} → ${f.region_hasta ?? '—'}` : '—'}
-            </td>
+            </Td>
             {/* La vigencia junto a sus fechas, que son las que la deciden. Las fija la aprobación. */}
-            <td className="whitespace-nowrap px-4 py-2.5">
-                <div className="flex items-center gap-2">
+            <Td>
+                <div className="flex items-center gap-2 whitespace-nowrap">
                     <Badge color={vigencia.color}>{vigencia.etiqueta}</Badge>
                     {vigencia.detalle && <span className="text-xs text-muted-foreground">{vigencia.detalle}</span>}
                 </div>
+                {vigencia.pct !== null && (
+                    <div className="mt-1.5 h-1 w-32 overflow-hidden rounded-full bg-secondary">
+                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${vigencia.pct}%` }} />
+                    </div>
+                )}
                 {f.fecha_salida && (
-                    <p className="mt-1 tabular-nums">
+                    <p className="mt-1 text-xs whitespace-nowrap text-muted-foreground tabular-nums">
                         {fecha(f.fecha_salida)} → {fecha(f.fecha_desembarque)}
                     </p>
                 )}
-            </td>
-            <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">
-                {bs(f.monto, moneda)}
+            </Td>
+            <Td derecha>
+                <span className="font-medium whitespace-nowrap">{kg(f.kilos_extraidos)}</span>
+            </Td>
+            <Td derecha>
+                <span className="whitespace-nowrap">{bs(f.monto, moneda)}</span>
                 {f.debe > 0 ? (
                     <p className="text-xs text-amber-700 dark:text-amber-300">faltan {bs(f.debe, moneda)}</p>
                 ) : (
                     <p className="text-xs text-emerald-700 dark:text-emerald-400">Pagado</p>
                 )}
-            </td>
-            <td className="px-4 py-2.5">
+            </Td>
+            <Td>
                 <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
-            </td>
-            <td className="px-4 py-2.5">
+            </Td>
+            <Td>
                 <div className="flex justify-end gap-1">
                     {puede('faenas.imprimir') && f.puede_imprimirse && (
                         <a
                             href={route('faenas.imprimir', f.id)}
                             target="_blank"
                             rel="noreferrer"
+                            onClick={abrirDirecto(f.pdf_enlace)}
                             title="Imprimir faena"
                             aria-label={`Imprimir el permiso de la faena ${f.numero_legible}`}
                             className={cn(buttonVariants({ variant: 'outline', size: 'icon' }))}
@@ -287,7 +452,7 @@ function FilaFaena({ faena: f, moneda }: { faena: FaenaDelBeneficiario; moneda: 
                         </Link>
                     )}
                 </div>
-            </td>
+            </Td>
         </tr>
     );
 }
@@ -296,97 +461,31 @@ function FilaFaena({ faena: f, moneda }: { faena: FaenaDelBeneficiario; moneda: 
  * Si la salida vale HOY, aparte del estado: «aprobado» dice que se firmó,
  * no que siga dentro de sus fechas. `vigente` y `caducada` llegan del servidor.
  */
-function vigenciaDe(f: FaenaDelBeneficiario): { etiqueta: string; color: string; detalle?: string } {
+function vigenciaDe(f: FaenaDelBeneficiario): {
+    etiqueta: string;
+    color: string;
+    detalle?: string;
+    pct: number | null;
+} {
     if (!f.fecha_salida || !f.fecha_desembarque) {
-        return { etiqueta: 'Sin fechas', color: 'slate', detalle: 'se fijan al aprobar' };
+        return { etiqueta: 'Sin fechas', color: 'slate', detalle: 'se fijan al aprobar', pct: null };
     }
 
     if (f.vigente) {
-        const quedan = diasEntre(hoy(), f.fecha_desembarque) ?? 0;
+        const quedan = diasEntre(fechaInput(new Date()), f.fecha_desembarque) ?? 0;
+        const total = diasEntre(f.fecha_salida, f.fecha_desembarque) ?? 0;
         return {
             etiqueta: 'Vigente',
             color: 'emerald',
             detalle: quedan === 0 ? 'desembarca hoy' : `${quedan} ${quedan === 1 ? 'día' : 'días'} restantes`,
+            // Lo que le queda de la salida: la barra se vacía a medida que pasan los días.
+            pct: total > 0 ? Math.max(4, Math.min(100, (quedan / total) * 100)) : null,
         };
     }
 
     if (f.estado === 'revocado') {
-        return { etiqueta: 'Revocada', color: 'rose', detalle: 'por la Unidad' };
+        return { etiqueta: 'Revocada', color: 'rose', detalle: 'por la Unidad', pct: null };
     }
 
-    if (f.caducada) {
-        return { etiqueta: 'Vencida', color: 'rose', detalle: 'sin cerrar' };
-    }
-
-    return { etiqueta: 'Vencida', color: 'rose' };
-}
-
-/** Hoy como 'AAAA-MM-DD' local: para comparar días sin pasar por UTC. */
-function hoy(): string {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** Días entre dos fechas 'AAAA-MM-DD'. Se cuentan en UTC las dos, así el huso no mueve el resultado. */
-function diasEntre(desde: string | null, hasta: string | null): number | null {
-    if (!desde || !hasta) return null;
-    const dias = Math.round((Date.parse(hasta.slice(0, 10)) - Date.parse(desde.slice(0, 10))) / 86400000);
-    return Number.isNaN(dias) ? null : dias;
-}
-
-/** La autorización: lo otorgado y los kilos con que sale cada faena. */
-function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
-    // La vigencia la dice la fecha, no el estado: aprobada sigue aprobada aunque pase su fecha.
-    const vencido = cupo.ya_fue_aprobado && cupo.fecha_vencimiento !== null && cupo.fecha_vencimiento.slice(0, 10) < fechaInput(new Date());
-    const revocado = cupo.estado === 'revocado';
-
-    return (
-        <EnlacePermitido
-            permiso="aprovechamientos.ver"
-            href={route('aprovechamientos.show', cupo.id)}
-            className="block rounded-xl border border-border bg-card p-5 transition-colors hover:bg-secondary/40"
-        >
-            <div className="flex flex-wrap items-center gap-2">
-                <Waves className="size-4 text-sky-600 dark:text-sky-400" />
-                {/* La capacidad y no el N° de escala: ese número es del catálogo interno. */}
-                <span className="font-medium">{cupo.descripcion ?? `${cupo.volumen_total_kg} kg`}</span>
-                <Badge color={cupo.estado_color}>{cupo.estado_etiqueta}</Badge>
-            </div>
-
-            {/* Las faenas no descuentan: cada una sale con los kilos disponibles, fijos. */}
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
-                <div>
-                    <dt className="text-muted-foreground">{cupo.ya_fue_aprobado ? 'Autorizado' : 'Solicitado'}</dt>
-                    <dd className="text-2xl font-semibold tabular-nums">{cupo.volumen_total_kg} kg</dd>
-                </div>
-                <div>
-                    <dt className="text-muted-foreground">Kilos por faena</dt>
-                    <dd className="text-2xl font-semibold tabular-nums">{cupo.kilos_disponibles} kg</dd>
-                </div>
-            </dl>
-
-            {revocado ? (
-                <p className="mt-2 text-sm text-rose-700 dark:text-rose-400">Revocada: no autoriza faenas ni carnets nuevos.</p>
-            ) : vencido ? (
-                <p className="mt-2 text-sm text-muted-foreground">Venció el {fecha(cupo.fecha_vencimiento)}.</p>
-            ) : !cupo.ya_fue_aprobado ? (
-                <p className="mt-2 text-sm text-muted-foreground">Todavía sin firmar.</p>
-            ) : null}
-
-            <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-3 text-xs">
-                <div>
-                    <dt className="text-muted-foreground">Solicitado</dt>
-                    <dd className="font-medium tabular-nums">{fecha(cupo.fecha_solicitud)}</dd>
-                </div>
-                <div>
-                    <dt className="text-muted-foreground">Otorgado</dt>
-                    <dd className="font-medium tabular-nums">{fecha(cupo.fecha_emision)}</dd>
-                </div>
-                <div>
-                    <dt className="text-muted-foreground">Vence</dt>
-                    <dd className="font-medium tabular-nums">{fecha(cupo.fecha_vencimiento)}</dd>
-                </div>
-            </dl>
-        </EnlacePermitido>
-    );
+    return { etiqueta: 'Vencida', color: 'rose', detalle: f.caducada ? 'sin cerrar' : undefined, pct: null };
 }

@@ -16,7 +16,16 @@ const COLOR_RESERVADA = '#94a3b8';
  * Cómo bajó el disponible de la autorización, guía por guía. En escalón: el
  * disponible no se desliza entre dos guías, cae de golpe al registrarse cada una.
  */
-export function GraficoDisponible({ puntos, total }: { puntos: PuntoDisponible[]; total: number }) {
+export function GraficoDisponible({
+    puntos,
+    total,
+    alto = 'h-56',
+}: {
+    puntos: PuntoDisponible[];
+    total: number;
+    /** La altura del lienzo, como clase: la ficha del beneficiario lo usa más bajo. */
+    alto?: string;
+}) {
     const reducir = useReducirMovimiento();
     // La última guía late: es la que dejó el disponible como está hoy.
     const ultimaGuia = puntos.map((p) => p.kilos !== null).lastIndexOf(true);
@@ -47,7 +56,7 @@ export function GraficoDisponible({ puntos, total }: { puntos: PuntoDisponible[]
             </figcaption>
 
             {/* El contenedor necesita altura propia: sin ella recharts dibuja en cero. */}
-            <div className="h-56">
+            <div className={alto}>
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={puntos} margin={{ top: 8, right: 12, bottom: 0, left: -8 }}>
                         <defs>

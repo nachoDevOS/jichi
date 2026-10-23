@@ -277,6 +277,7 @@ copia en vez de leerse por relación:
 | `permisos_faena.monto` | El arancel del día en que se emitió |
 | `guias_movimiento.monto`, `guia_detalles.precio_kg` | El total del cuadro D y la tasa de cada producto al emitir (con el descuento de piscicultura) |
 | `recibos.monto_total`, `concepto`, `numero_boleta` (N° de transacción), `entidad_bancaria`, `fecha_pago` | Lo que dice el papel entregado, con el pago tal como lo validó SIREB |
+| `documentos_emitidos` (23/10/2026) | **El PDF entero** de cada documento y recibo, guardado al aprobarse: reimprimir entrega ese archivo. Ver [modulos/DOCUMENTOS-EMITIDOS.md](modulos/DOCUMENTOS-EMITIDOS.md) |
 | `guias_movimiento.asociacion_id` | El aval impreso en la guía |
 | `aprovechamientos_pesq.escala`, `volumen_total_kg` | Lo que se otorgó, aunque la tarifa cambie en SIREB |
 | `aprovechamientos_pesq.monto`, `sireb_tarifa_id` | El precio que dio SIREB al otorgar, solo si la tarifa está activa (ver [modulos/SIREB.md](modulos/SIREB.md#validación-de-la-tarifa-al-emitir)) |

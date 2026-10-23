@@ -16,6 +16,7 @@ use App\Models\Carnet;
 use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
+use App\Services\DocumentoEmitidoService;
 use App\Services\EmitirFaenaService;
 use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
@@ -65,7 +66,7 @@ class FaenaController extends Controller
                     // «000042» tecleado tal cual no encuentra al 42.
                     ->orWhere('permisos_faena.nro', 'like', '%'.ltrim(preg_replace('/\D/', '', $termino), '0').'%'),
             ))
-            ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
+            ->with(['documentoEmitido', 'recibo:id,recibible_type,recibible_id,numero_recibo', 'recibo.documentoEmitido'])
             ->when($filtros['estado'], fn ($q, $estado) => $q->where('permisos_faena.estado', $estado))
             // Lo último cargado, arriba: ver AprovechamientoController::index().
             ->orderByDesc('permisos_faena.created_at')
@@ -334,6 +335,10 @@ class FaenaController extends Controller
             ],
 
             // El recibo del trámite: uno solo, emitido cuando SIREB confirma el pago.
+            // El PDF guardado al emitirse (null si todavía no hay): ver DocumentoEmitidoService.
+            'pdf' => DocumentoEmitidoService::resumen($faena),
+            'pdf_recibo' => $recibo ? DocumentoEmitidoService::resumen($recibo) : null,
+
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,
@@ -457,6 +462,9 @@ class FaenaController extends Controller
             // El recibo existe desde el ENVÍO; null mientras es borrador.
             'recibo_id' => $recibo?->id,
             'recibo_numero' => $recibo?->numero_recibo,
+            // Los botones abren el PDF guardado directo de S3, como en la ficha.
+            'pdf_enlace' => DocumentoEmitidoService::enlace($faena),
+            'recibo_enlace' => DocumentoEmitidoService::enlace($recibo),
 
             // Cuándo se cargó la fila. Un MOMENTO: con toIso8601String().
             'registrado_en' => $faena->created_at?->toIso8601String(),

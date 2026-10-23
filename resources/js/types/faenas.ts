@@ -1,3 +1,5 @@
+import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
+
 import type { EstadoFaena } from '@/types';
 import type { VentaSireb } from '@/types/aprovechamientos';
 
@@ -76,6 +78,9 @@ export interface FaenaFila {
     /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
+    recibo_enlace: EnlaceDirecto | null;
 
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
     registrado_en: string | null;

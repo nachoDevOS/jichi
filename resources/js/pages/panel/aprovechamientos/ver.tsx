@@ -39,6 +39,7 @@ import {
     Td,
 } from '@/components/panel/comunes/ficha';
 import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
+import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,8 @@ export default function VerCupo({
     guias,
     evolucion,
     recibo,
+    pdf,
+    pdf_recibo,
     carnetParaFaena,
 }: {
     cupo: CupoFicha;
@@ -88,6 +91,9 @@ export default function VerCupo({
     evolucion: PuntoDisponible[];
     /** Null mientras está pendiente: se emite cuando SIREB confirma el pago. */
     recibo: ReciboDelCupo | null;
+    /** El PDF guardado al emitirse; null si todavía no hay. */
+    pdf: PdfEmitido | null;
+    pdf_recibo: PdfEmitido | null;
     /** El carnet aprobado con el que se emite la próxima faena; null si ninguno puede. */
     carnetParaFaena: number | null;
 }) {
@@ -133,12 +139,20 @@ export default function VerCupo({
                         </Button>
                     )}
                     {puede('aprovechamientos.imprimir') && cupo.puede_imprimirse && (
-                        <EnlacePdf href={route('aprovechamientos.autorizacion', cupo.id)} icono={Printer}>
+                        <EnlacePdf
+                            href={route('aprovechamientos.autorizacion', cupo.id)}
+                            directo={pdf?.enlace}
+                            icono={Printer}
+                        >
                             Autorización
                         </EnlacePdf>
                     )}
                     {puede('recibos.imprimir') && recibo && (
-                        <EnlacePdf href={route('recibos.imprimir', recibo.id)} icono={Receipt}>
+                        <EnlacePdf
+                            href={route('recibos.imprimir', recibo.id)}
+                            directo={pdf_recibo?.enlace}
+                            icono={Receipt}
+                        >
                             Recibo
                         </EnlacePdf>
                     )}
@@ -297,6 +311,8 @@ export default function VerCupo({
                             ]}
                         />
 
+                        <EstadoPdf pdf={pdf} aprobado={cupo.ya_fue_aprobado} />
+
                         <Aviso tono={cupo.puede_emitir_faena ? 'ok' : 'aviso'} icono={Ship}>
                             {cupo.puede_emitir_faena ? 'Habilitada para emitir faenas.' : cupo.motivo_sin_faena}
                         </Aviso>
@@ -305,6 +321,7 @@ export default function VerCupo({
             </div>
 
             <TarjetaRecaudaciones
+                reciboDirecto={pdf_recibo?.enlace}
                 className="mt-6"
                 monto={cupo.monto}
                 pago={{
@@ -416,6 +433,7 @@ export default function VerCupo({
                                                     {puede('carnets.imprimir') && c.puede_imprimirse && (
                                                         <EnlacePdf
                                                             href={route('carnets.imprimir', c.id)}
+                                                            directo={c.pdf_enlace}
                                                             icono={Printer}
                                                             chico
                                                         >
@@ -472,6 +490,7 @@ export default function VerCupo({
                                                     {puede('faenas.imprimir') && f.puede_imprimirse && (
                                                         <EnlacePdf
                                                             href={route('faenas.imprimir', f.id)}
+                                                            directo={f.pdf_enlace}
                                                             icono={Printer}
                                                             chico
                                                         >

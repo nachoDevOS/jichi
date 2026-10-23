@@ -2,6 +2,8 @@
  * Tipos del libro de recibos: uno por documento, emitido cuando SIREB confirmó el pago.
  */
 
+import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
+
 /** Un recibo, en el listado. */
 export interface ReciboFila {
     id: number;
@@ -18,6 +20,8 @@ export interface ReciboFila {
     /** La boleta tal como la validó SIREB. */
     numero_boleta: string | null;
     emitido_en: string | null;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
 }
 
 /** El recibo en la ficha: la boleta completa y el documento que pagó. */

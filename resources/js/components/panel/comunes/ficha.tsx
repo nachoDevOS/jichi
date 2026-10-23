@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { CalendarClock, ExternalLink, Users } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
 import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
@@ -424,24 +424,51 @@ export function Td({
     );
 }
 
-/** Un PDF abre en otra pestaña: el visor del navegador es desde donde se imprime. */
+/** Un enlace firmado a S3 y cuándo vence (ver DocumentoEmitidoService::resumen()). */
+export type EnlaceDirecto = { url: string; vence: string };
+
+/**
+ * Un PDF abre en otra pestaña: el visor del navegador es desde donde se imprime.
+ * Con `directo` vigente abre el archivo de S3 sin pasar por Jichi; si no hay o
+ * venció, va por `href`, que lo genera (la primera vez) o firma un enlace nuevo.
+ */
+// Un minuto de margen: el enlace no tiene que vencer mientras el visor lo abre.
+function enlaceVigente(directo?: EnlaceDirecto | null): boolean {
+    return !!directo && Date.parse(directo.vence) - Date.now() > 60_000;
+}
+
+/** Para un <a> que imprime: abre el PDF guardado directo de S3; sin él, sigue a su href (Jichi). */
+export function abrirDirecto(directo?: EnlaceDirecto | null) {
+    return (e: MouseEvent<HTMLAnchorElement>) => {
+        if (enlaceVigente(directo)) {
+            e.preventDefault();
+            window.open(directo!.url, '_blank', 'noreferrer');
+        }
+    };
+}
+
 export function EnlacePdf({
     href,
+    directo = null,
     icono: Icono,
     chico = false,
+    className,
     children,
 }: {
     href: string;
+    directo?: EnlaceDirecto | null;
     icono: LucideIcon;
     chico?: boolean;
+    className?: string;
     children: ReactNode;
 }) {
     return (
         <a
-            href={href}
+            href={enlaceVigente(directo) ? directo!.url : href}
             target="_blank"
             rel="noreferrer"
-            className={cn(buttonVariants({ variant: 'outline', size: chico ? 'sm' : 'default' }))}
+            onClick={abrirDirecto(directo)}
+            className={cn(buttonVariants({ variant: 'outline', size: chico ? 'sm' : 'default' }), className)}
         >
             <Icono className="size-4" />
             {children}

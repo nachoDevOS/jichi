@@ -1,3 +1,5 @@
+import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
+
 import type { EstadoAprovechamiento, EstadoFaena } from '@/types';
 
 /**
@@ -55,6 +57,9 @@ export interface CupoFila {
     /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;
     recibo_numero: string | null;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
+    recibo_enlace: EnlaceDirecto | null;
 
     monto: number;
     /** El cobro está en SIREB: su liquidación, y si se puede preguntar por el pago. */
@@ -166,6 +171,8 @@ export interface CarnetDelCupo {
     ya_fue_aprobado: boolean;
     /** Firmado y no revocado: el mismo corte que la impresión. */
     puede_imprimirse: boolean;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
     /** Solo el aprobado: reponer empieza por revocarlo. */
     puede_reponerse: boolean;
     fecha_solicitud: string | null;
@@ -188,6 +195,8 @@ export interface FaenaDelCupo {
     estado_color: string;
     /** Solo la que pasó por la firma. */
     puede_imprimirse: boolean;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
     fecha_salida: string | null;
     fecha_desembarque: string | null;
 }

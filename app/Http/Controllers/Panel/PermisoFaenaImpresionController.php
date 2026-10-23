@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Models\Configuracion;
 use App\Models\PermisoFaena;
+use App\Services\DocumentoEmitidoService;
 use App\Support\QrVerificacion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as ArchivoPdf;
@@ -30,7 +31,7 @@ class PermisoFaenaImpresionController extends Controller
      * Una faena vencida o completada SÍ se reimprime: puede hacer falta
      * reponer el papel de una salida ya cerrada.
      */
-    public function imprimir(PermisoFaena $faena): Response|RedirectResponse
+    public function imprimir(PermisoFaena $faena, bool $descarga = false): Response|RedirectResponse
     {
         // Se vuelve a comprobar acá aunque la pantalla esconda el botón:
         // esconderlo en React es comodidad, la dirección se escribe a mano.
@@ -43,7 +44,8 @@ class PermisoFaenaImpresionController extends Controller
             return back()->with('error', 'La faena está revocada: el permiso no se imprime.');
         }
 
-        return $this->documento($faena)->stream("permiso-faena-{$faena->numero_legible}.pdf");
+        // El PDF guardado al emitirse: se entrega tal como salió (ver DocumentoEmitidoService).
+        return app(DocumentoEmitidoService::class)->respuesta($faena, $descarga);
     }
 
     /**

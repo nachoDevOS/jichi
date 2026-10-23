@@ -10,11 +10,13 @@ use App\Models\Configuracion;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
+use App\Services\DocumentoEmitidoService;
 use App\Support\Paginacion;
 use App\Support\QrVerificacion;
 use App\Support\ReciboImpreso;
 use App\Support\Sql;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as ArchivoPdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -47,7 +49,7 @@ class ReciboController extends Controller
              * Con las columnas del nombre y las de la cédula: los dos accesores
              * las leen todas, y una que falte vuelve null sin ningún error.
              */
-            ->with('beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado')
+            ->with(['documentoEmitido', 'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado'])
             ->when($filtros['buscar'], function ($q, $termino) {
                 $operador = Sql::like($q->getConnection());
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $termino).'%';
@@ -74,6 +76,7 @@ class ReciboController extends Controller
                 'monto_total' => (float) $r->monto_total,
                 'numero_boleta' => $r->numero_boleta,
                 'emitido_en' => $r->created_at?->toIso8601String(),
+                'pdf_enlace' => DocumentoEmitidoService::enlace($r),
             ]);
 
         return Inertia::render('panel/recibos/index', [
@@ -100,6 +103,7 @@ class ReciboController extends Controller
                 'concepto' => $recibo->concepto,
                 'monto_total' => (float) $recibo->monto_total,
                 'emitido_en' => $recibo->created_at?->toIso8601String(),
+                'pdf_enlace' => DocumentoEmitidoService::enlace($recibo),
 
                 // La boleta tal como la validó SIREB.
                 'numero_boleta' => $recibo->numero_boleta,
@@ -127,7 +131,14 @@ class ReciboController extends Controller
     /**
      *  Imprimir — GET /panel/recibos/{recibo}/imprimir
      */
-    public function imprimir(Recibo $recibo): RespuestaHttp
+    public function imprimir(Recibo $recibo, bool $descarga = false): RespuestaHttp
+    {
+        // El PDF guardado al emitirse; si no está, se arma y se guarda (ver DocumentoEmitidoService).
+        return app(DocumentoEmitidoService::class)->respuesta($recibo, $descarga);
+    }
+
+    /** El PDF armado. Lo pide DocumentoEmitidoService para guardarlo. */
+    public function documento(Recibo $recibo): ArchivoPdf
     {
         $recibo->load(['codigo', 'beneficiario', 'recibible']);
 
@@ -181,9 +192,7 @@ class ReciboController extends Controller
              */
             ->setOption('enable_font_subsetting', true);
 
-        // `stream` y no `download`: se abre en el visor del navegador, que es
-        // desde donde el operador aprieta imprimir.
-        return $pdf->stream("recibo-{$impreso->numeroImpreso()}.pdf");
+        return $pdf;
     }
 
     /**

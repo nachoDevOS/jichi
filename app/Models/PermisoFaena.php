@@ -10,6 +10,7 @@ use App\Services\CorrelativoService;
 use App\Support\Vigencia;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
+use App\Traits\ConDocumentoEmitido;
 use App\Traits\LiquidableSireb;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -42,7 +43,7 @@ use Illuminate\Support\Carbon;
 ])]
 class PermisoFaena extends Model
 {
-    use Auditable, Codificable, LiquidableSireb, SoftDeletes;
+    use Auditable, Codificable, ConDocumentoEmitido, LiquidableSireb, SoftDeletes;
 
     /** El historial ya es el registro de cada liquidación: no se copia a `auditorias`. */
     protected $noAuditable = ['sireb_historial'];

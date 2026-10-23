@@ -1,3 +1,5 @@
+import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
+
 import type { CupoVigente } from '@/types/carnets';
 import type { EstadoAprovechamiento, EstadoCarnet, EstadoFaena, EstadoGuia, TipoActor } from '@/types';
 
@@ -97,7 +99,6 @@ export interface FormularioBeneficiario {
     _method?: 'put';
 }
 
-
 /**
  * El resumen de un carnet que muestra la ficha del beneficiario.
  */
@@ -136,6 +137,9 @@ export interface CarnetResumen {
     saldo_pendiente: number;
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
+    /** Firmado, no revocado y con la autorización viva. */
+    puede_imprimirse: boolean;
+    pdf_enlace: EnlaceDirecto | null;
 }
 
 /**
@@ -159,6 +163,18 @@ export interface CupoResumen {
     /** El día que lo firmaron. `null` mientras no esté aprobado. */
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
+    /** Las guías que le compraron, de la más vieja a la más nueva: cada una descontó sus kilos. */
+    ventas: VentaDelCupo[];
+}
+
+export interface VentaDelCupo {
+    id: number;
+    numero_legible: string;
+    comprador: string | null;
+    kilos: number;
+    fecha: string | null;
+    /** Pendiente: los kilos ya bajaron, pero vuelven si se elimina. */
+    pendiente: boolean;
 }
 
 /** Una salida del pescador, en su ficha. */
@@ -188,6 +204,8 @@ export interface FaenaDelBeneficiario {
     ya_fue_aprobada: boolean;
     /** Firmada y no revocada: recién ahí se imprime el permiso. */
     puede_imprimirse: boolean;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
 }
 
 /** Un traslado del comercializador, en su ficha. */
@@ -197,6 +215,12 @@ export interface GuiaDelBeneficiario {
     numero_legible: string;
     /** «Trinidad → Santa Cruz». */
     ruta: string;
+    origen: string | null;
+    destino: string | null;
+    /** A qué pescador le compró. */
+    pescador: string | null;
+    ya_fue_aprobada: boolean;
+    pdf_enlace: EnlaceDirecto | null;
     peso_total_kg: number;
     estado: EstadoGuia;
     estado_etiqueta: string;
@@ -218,6 +242,8 @@ export interface ReciboDelBeneficiario {
     monto_total: number;
     /** Un MOMENTO. */
     emitido_en: string | null;
+    /** El PDF guardado, para abrirlo directo de S3; null si todavía no hay. */
+    pdf_enlace: EnlaceDirecto | null;
 }
 
 /**

@@ -39,7 +39,7 @@ class ExpedienteBeneficiario
     public static function faenas(Beneficiario $beneficiario): Collection
     {
         return $beneficiario->faenas()
-            ->with('carnet.aprovechamiento:id,estado')
+            ->with(['carnet.aprovechamiento:id,estado', 'documentoEmitido'])
             ->orderByDesc('permisos_faena.nro')
             ->get();
     }
@@ -58,6 +58,7 @@ class ExpedienteBeneficiario
     public static function recibos(Beneficiario $beneficiario): Collection
     {
         return Recibo::query()
+            ->with('documentoEmitido')
             ->where('beneficiario_id', $beneficiario->id)
             ->orderByDesc('id')
             ->get();

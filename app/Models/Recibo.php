@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\Auditable;
 use App\Traits\Codificable;
+use App\Traits\ConDocumentoEmitido;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,7 +28,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class Recibo extends Model
 {
-    use Auditable, Codificable, SoftDeletes;
+    use Auditable, Codificable, ConDocumentoEmitido, SoftDeletes;
 
     /** Ver Asociacion::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [

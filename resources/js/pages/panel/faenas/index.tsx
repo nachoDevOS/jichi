@@ -15,6 +15,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha, fechaHora, hace } from '@/lib/utils';
 import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { FaenaFila } from '@/types/faenas';
+import { abrirDirecto } from '@/components/panel/comunes/ficha';
 
 /**
  *  Listado de permisos de faena
@@ -246,6 +247,7 @@ export default function IndiceFaenas({
                                                                 href={route('recibos.imprimir', f.recibo_id)}
                                                                 target="_blank"
                                                                 rel="noreferrer"
+                                                                onClick={abrirDirecto(f.recibo_enlace)}
                                                                 title={`Imprimir el recibo ${f.recibo_numero}`}
                                                                 aria-label={`Imprimir el recibo de la faena ${f.numero_legible}`}
                                                                 className={cn(
@@ -268,6 +270,7 @@ export default function IndiceFaenas({
                                                                 href={route('faenas.imprimir', f.id)}
                                                                 target="_blank"
                                                                 rel="noreferrer"
+                                                                onClick={abrirDirecto(f.pdf_enlace)}
                                                                 title="Imprimir el permiso de faena"
                                                                 aria-label={`Imprimir el permiso de la faena ${f.numero_legible}`}
                                                                 className={cn(

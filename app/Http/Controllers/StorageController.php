@@ -52,6 +52,23 @@ class StorageController extends Controller
     }
 
     /**
+     *  Guarda un PDF emitido por el sistema, PRIVADO: se sirve a través de Jichi,
+     *  que es donde se controla el permiso. Sin el tope de 3 MB: lo arma DomPDF, no un usuario.
+     *
+     * @return array{disco: string, ruta: string}
+     */
+    public function pdf(string $contenido, string $folder): array
+    {
+        // Mismo criterio que file(): s3 si es el disco del sistema; si no, el local privado.
+        $disco = config('filesystems.default') === 's3' ? 's3' : 'local';
+        $ruta = $folder.'/'.date('FY').'/'.Str::random(20).time().'.pdf';
+
+        Storage::disk($disco)->put($ruta, $contenido, 'private');
+
+        return ['disco' => $disco, 'ruta' => $ruta];
+    }
+
+    /**
      *  El límite de 3 MB — la última línea de defensa
      *
      * @throws ValidationException

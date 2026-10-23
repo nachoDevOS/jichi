@@ -24,6 +24,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { cn, fecha, fechaHora, hace } from '@/lib/utils';
 import type { OpcionEnum, Paginado } from '@/types';
 import type { CupoFila } from '@/types/aprovechamientos';
+import { abrirDirecto } from '@/components/panel/comunes/ficha';
 
 /**
  *  Listado de cupos de pesca
@@ -283,6 +284,7 @@ export default function IndiceCupos({
                                                                     )}
                                                                     target="_blank"
                                                                     rel="noreferrer"
+                                                                    onClick={abrirDirecto(c.recibo_enlace)}
                                                                     title={`Recibo ${c.recibo_numero ?? ''}`}
                                                                     aria-label={`Imprimir el recibo de ${c.beneficiario ?? 'la persona'}`}
                                                                     className={cn(
@@ -309,6 +311,7 @@ export default function IndiceCupos({
                                                                     )}
                                                                     target="_blank"
                                                                     rel="noreferrer"
+                                                                    onClick={abrirDirecto(c.pdf_enlace)}
                                                                     title="Autorización de Pesca para Aprovechamiento Pesquero"
                                                                     aria-label={`Imprimir la autorización de ${c.beneficiario ?? 'la persona'}`}
                                                                     className={cn(

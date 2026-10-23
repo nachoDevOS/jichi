@@ -7,6 +7,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha, fechaHora } from '@/lib/utils';
 import type { PageProps } from '@/types';
 import type { ReciboFicha } from '@/types/recibos';
+import { abrirDirecto } from '@/components/panel/comunes/ficha';
 
 /**
  *  La ficha de un recibo: el comprobante de un documento pagado en SIREB
@@ -32,6 +33,7 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
                             href={route('recibos.imprimir', recibo.id)}
                             target="_blank"
                             rel="noreferrer"
+                            onClick={abrirDirecto(recibo.pdf_enlace)}
                             className={cn(buttonVariants({ variant: 'default' }))}
                         >
                             <Printer className="size-4" />
@@ -57,7 +59,10 @@ export default function VerRecibo({ recibo }: { recibo: ReciboFicha }) {
                         {recibo.documento_pagado && (
                             <div className="flex justify-between gap-3">
                                 <span className="text-muted-foreground">Documento</span>
-                                <Link href={recibo.documento_pagado.url} className="font-medium text-primary hover:underline">
+                                <Link
+                                    href={recibo.documento_pagado.url}
+                                    className="font-medium text-primary hover:underline"
+                                >
                                     {recibo.documento_pagado.nombre}
                                 </Link>
                             </div>

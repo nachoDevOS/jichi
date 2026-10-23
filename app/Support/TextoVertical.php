@@ -18,6 +18,8 @@ class TextoVertical
     /** La tipografía que DomPDF embebe. Usar otra dejaría el rótulo distinto al resto. */
     private const FUENTE = 'vendor/dompdf/dompdf/lib/fonts/DejaVuSans.ttf';
 
+    private const FUENTE_NEGRITA = 'vendor/dompdf/dompdf/lib/fonts/DejaVuSans-Bold.ttf';
+
     /**
      * Cuántas veces más grande se dibuja antes de achicarlo en el PDF.
      *
@@ -34,9 +36,9 @@ class TextoVertical
      *
      * @param  float  $cuerpo  El cuerpo en PUNTOS, como si fuera CSS.
      */
-    public static function dataUri(string $texto, float $cuerpo = 6.0, string $color = '#2e7d32'): string
+    public static function dataUri(string $texto, float $cuerpo = 6.0, string $color = '#2e7d32', bool $negrita = false): string
     {
-        return 'data:image/png;base64,'.base64_encode(self::png($texto, $cuerpo, $color));
+        return 'data:image/png;base64,'.base64_encode(self::png($texto, $cuerpo, $color, $negrita));
     }
 
     /**
@@ -48,21 +50,21 @@ class TextoVertical
      *
      * @return array{0: float, 1: float}
      */
-    public static function medida(string $texto, float $cuerpo = 6.0): array
+    public static function medida(string $texto, float $cuerpo = 6.0, bool $negrita = false): array
     {
-        [$ancho, $alto] = self::cajaEnPixeles($texto, $cuerpo * self::SUPERMUESTREO);
+        [$ancho, $alto] = self::cajaEnPixeles($texto, $cuerpo * self::SUPERMUESTREO, $negrita);
 
         // Girado, el ancho y el alto se intercambian.
         return [$alto / self::SUPERMUESTREO, $ancho / self::SUPERMUESTREO];
     }
 
     /** El PNG crudo, con el texto leyéndose de abajo hacia arriba. */
-    public static function png(string $texto, float $cuerpo = 6.0, string $color = '#2e7d32'): string
+    public static function png(string $texto, float $cuerpo = 6.0, string $color = '#2e7d32', bool $negrita = false): string
     {
-        $fuente = base_path(self::FUENTE);
+        $fuente = base_path($negrita ? self::FUENTE_NEGRITA : self::FUENTE);
         $cuerpoPx = $cuerpo * self::SUPERMUESTREO;
 
-        [$ancho, $alto, $izquierda, $arriba] = self::cajaEnPixeles($texto, $cuerpoPx);
+        [$ancho, $alto, $izquierda, $arriba] = self::cajaEnPixeles($texto, $cuerpoPx, $negrita);
 
         /*
          * Se dibuja derecho y después se gira la imagen entera, en vez de
@@ -110,9 +112,9 @@ class TextoVertical
      *
      * @return array{0: int, 1: int, 2: int, 3: int}
      */
-    private static function cajaEnPixeles(string $texto, float $cuerpoPx): array
+    private static function cajaEnPixeles(string $texto, float $cuerpoPx, bool $negrita = false): array
     {
-        $caja = imagettfbbox($cuerpoPx, 0, base_path(self::FUENTE), $texto);
+        $caja = imagettfbbox($cuerpoPx, 0, base_path($negrita ? self::FUENTE_NEGRITA : self::FUENTE), $texto);
 
         $xs = [$caja[0], $caja[2], $caja[4], $caja[6]];
         $ys = [$caja[1], $caja[3], $caja[5], $caja[7]];

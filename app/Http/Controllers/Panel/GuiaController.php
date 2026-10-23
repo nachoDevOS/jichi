@@ -21,6 +21,7 @@ use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
+use App\Services\DocumentoEmitidoService;
 use App\Services\EmitirGuiaService;
 use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
@@ -306,7 +307,11 @@ class GuiaController extends Controller
                 'detalles' => $this->resumirDetalle($guia),
             ],
 
-            // El recibo del trámite: uno solo, emitido al enviar a revisión.
+            // El PDF guardado al emitirse (null si todavía no hay): ver DocumentoEmitidoService.
+            'pdf' => DocumentoEmitidoService::resumen($guia),
+            'pdf_recibo' => $recibo ? DocumentoEmitidoService::resumen($recibo) : null,
+
+            // El recibo del trámite: uno solo, emitido cuando SIREB confirma el pago.
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,

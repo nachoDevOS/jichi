@@ -22,6 +22,7 @@ use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
+use App\Services\DocumentoEmitidoService;
 use App\Services\EmitirCarnetService;
 use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
@@ -67,7 +68,7 @@ class CarnetController extends Controller
             // Los dos conteos de `puedeEliminarse()`: sin ellos son dos consultas
             // más POR FILA solo para decidir si se dibuja un botón.
             ->withCount(['faenas', 'guias'])
-            ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
+            ->with(['documentoEmitido', 'recibo:id,recibible_type,recibible_id,numero_recibo', 'recibo.documentoEmitido'])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->where(
                 fn ($s) => $s
                     ->whereHas('beneficiario', fn ($b) => $b->buscar($termino))
@@ -342,7 +343,11 @@ class CarnetController extends Controller
                 ])
                 ->all(),
 
-            // El recibo del trámite: uno solo, emitido al enviar a revisión.
+            // El PDF guardado al emitirse (null si todavía no hay): ver DocumentoEmitidoService.
+            'pdf' => DocumentoEmitidoService::resumen($carnet),
+            'pdf_recibo' => $recibo ? DocumentoEmitidoService::resumen($recibo) : null,
+
+            // El recibo del trámite: uno solo, emitido cuando SIREB confirma el pago.
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,
@@ -599,6 +604,9 @@ class CarnetController extends Controller
              */
             'recibo_id' => $recibo?->id,
             'recibo_numero' => $recibo?->numero_recibo,
+            // Los botones abren el PDF guardado directo de S3, como en la ficha.
+            'pdf_enlace' => DocumentoEmitidoService::enlace($carnet),
+            'recibo_enlace' => DocumentoEmitidoService::enlace($recibo),
 
             'estado' => $carnet->estado->value,
             'estado_etiqueta' => $carnet->etiquetaEstado(),

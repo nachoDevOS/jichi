@@ -63,6 +63,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `CargarPagoService.php` | 77 | Carga en SIREB el pago de un trámite | **Solo carga.** Antes consulta: liquidación `pendiente` y sin pago, o no carga y corre `verificar()` para poner la ficha al día |
 | `DefinirTarifasService.php` | 100 | Las tarifas definidas de un arancel: etiqueta y tarifa de SIREB | Solo tarifas del servicio que SIREB tiene hoy. Carnet: una fila por clave fija. Los de la unidad: por id, y lo que no viene se da de baja una por una (auditoría) |
 | `CorrelativoService.php` | 78 | Números correlativos con la fila bloqueada | `siguienteContinuo()` (año 0, no reinicia) para lo impreso: recibo, autorización, faena, guía. `siguienteNumero()` por gestión: el registro del carnet. `rellenar()` → seis dígitos |
+| `DocumentoEmitidoService.php` | — | El PDF guardado de cada papel (23/10/2026) | `respuesta()`/`contenido()` entregan el guardado (o lo arman si falta); `emitirAlAprobar()` lo llama `ConfirmarPagoService` con `defer()`; `resumen()` da a la ficha el enlace firmado para abrir S3 directo. Ver modulos/DOCUMENTOS-EMITIDOS.md |
 | `CodigoService.php` | 88 | El código de verificación de 16 caracteres | `asignar()` es idempotente: un reenvío no gasta otro código |
 | `CuentaPortalService.php` | 97 | Cuentas del portal | Clave temporal, obligatoria de cambiar. Esas cuentas nunca llevan roles |
 | `GestionarRolService.php` | 85 | Crear, editar y eliminar roles | El de `RolSistema` no se toca; con usuarios no se borra. `syncPermissions` no dispara eventos: el cambio se audita a mano (agregó/quitó) |
@@ -114,7 +115,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Panel/CarnetController.php` | 615 | Revocar y reponer, además del CRUD |
 | `Panel/FaenaController.php`, `Panel/GuiaController.php` | 447 / 513 | `excede` y `bloquea` separados: el modo flexible tiene que llegar a la pantalla |
 | Los cuatro anteriores | — | `verificarPago()`, `cargarPago()` y `destroy()` con la captura de `frenaPorPago()`: si al eliminar hay pago, vuelven a la ficha con el aviso |
-| `Panel/*ImpresionController.php`, `Panel/AutorizacionPescaController.php` | 160–516 | Devuelven bytes (DomPDF), no pantallas. `documento()` lo reusa el portal con la marca «NO VÁLIDO». `CarnetImpresionController::texto()` achica lo que no entra |
+| `Panel/*ImpresionController.php`, `Panel/AutorizacionPescaController.php` | 160–516 | Devuelven bytes (DomPDF), no pantallas. `documento()` lo reusa el portal con la marca «NO VÁLIDO». `CarnetImpresionController::texto()` achica lo que no entra (una línea → dos → más chico) y `fotoRedonda()` recorta la foto en círculo con GD; carnet horizontal desde el 23/10/2026, ver CARNETS.md §0 |
 | `Panel/ReciboController.php` | 203 | Libro de recibos; `recibible` con `morphWith` |
 | `Panel/DashboardController.php` | 202 | El tablero |
 | `Panel/UsuarioController.php` | 125 | Seguridad › Usuarios: todas las cuentas, funcionarios y beneficiarios. Solo lista; las acciones del beneficiario siguen en `CuentaPortalController` (la ficha) |

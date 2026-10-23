@@ -2,8 +2,9 @@ import { router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, Banknote, FilePlus, Printer, QrCode, RefreshCw } from 'lucide-react';
 import { useCallback, useState, type FormEvent } from 'react';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
+import { EnlacePdf, type EnlaceDirecto } from '@/components/panel/comunes/ficha';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ export function TarjetaRecaudaciones({
     monto,
     sireb,
     recibo,
+    reciboDirecto = null,
     puedeVerificar,
     rutaVerificar,
     puedeCargar = false,
@@ -36,6 +38,8 @@ export function TarjetaRecaudaciones({
     monto: number;
     sireb: VentaSireb | null;
     recibo: ReciboDelCupo | null;
+    /** El enlace firmado del PDF guardado del recibo: lo abre directo de S3. */
+    reciboDirecto?: EnlaceDirecto | null;
     puedeVerificar: boolean;
     /** La ruta ya resuelta: `route('carnets.verificar-pago', id)`. */
     rutaVerificar: string;
@@ -183,21 +187,15 @@ export function TarjetaRecaudaciones({
                                 </div>
                             )}
                             {puede('recibos.imprimir') && (
-                                <a
+                                <EnlacePdf
                                     href={route('recibos.imprimir', recibo.id)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className={cn(
-                                        buttonVariants({
-                                            variant: 'outline',
-                                            size: 'sm',
-                                        }),
-                                        'w-full',
-                                    )}
+                                    directo={reciboDirecto}
+                                    icono={Printer}
+                                    chico
+                                    className="w-full"
                                 >
-                                    <Printer className="size-4" />
                                     Imprimir recibo
-                                </a>
+                                </EnlacePdf>
                             )}
                         </div>
                     ) : sireb?.pago ? (

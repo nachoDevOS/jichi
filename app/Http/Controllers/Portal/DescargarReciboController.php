@@ -30,11 +30,9 @@ class DescargarReciboController extends Controller
             404,
         );
 
-        $pdf = app(ReciboController::class)->imprimir($recibo);
+        $pdf = app(ReciboController::class)->imprimir($recibo, descarga: true);
 
         // El panel lo manda `inline` para imprimirlo; acá se baja, con el mismo nombre de archivo.
-        $pdf->headers->set('Content-Disposition', str_replace('inline', 'attachment', (string) $pdf->headers->get('Content-Disposition')));
-
         return $pdf;
     }
 }

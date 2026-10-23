@@ -32,14 +32,12 @@ class DescargarController extends Controller
         abort_unless($documento !== null && ! $documento instanceof Carnet && $documento->estaVigente(), 404);
 
         $pdf = match (true) {
-            $documento instanceof AprovechamientoPesq => app(AutorizacionPescaController::class)->imprimir($documento),
-            $documento instanceof PermisoFaena => app(PermisoFaenaImpresionController::class)->imprimir($documento),
-            $documento instanceof GuiaMovimiento => app(GuiaImpresionController::class)->imprimir($documento),
+            $documento instanceof AprovechamientoPesq => app(AutorizacionPescaController::class)->imprimir($documento, descarga: true),
+            $documento instanceof PermisoFaena => app(PermisoFaenaImpresionController::class)->imprimir($documento, descarga: true),
+            $documento instanceof GuiaMovimiento => app(GuiaImpresionController::class)->imprimir($documento, descarga: true),
         };
 
         // El panel lo manda `inline` para verlo; acá se baja, con el mismo nombre de archivo.
-        $pdf->headers->set('Content-Disposition', str_replace('inline', 'attachment', (string) $pdf->headers->get('Content-Disposition')));
-
         return $pdf;
     }
 }

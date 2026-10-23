@@ -11,6 +11,45 @@ la credencial que la unidad venía mandando a imprimir por fuera, una por una.
 
 ---
 
+## 0. El diseño del 23/10/2026 — manda sobre §1, §4 y §6
+
+Se rehízo la tarjeta guiándose por la credencial de la Gobernación, pero
+**horizontal** (243 × 153 pt, CR80). Lo que dicen §1, §4 y §6 sobre el fondo
+horneado, las tiras blancas, el texto perfilado y el encabezado en dos pisos
+**es del diseño anterior**; queda como historia.
+
+**Frente, blanco:**
+
+| Zona | Qué lleva |
+| --- | --- |
+| Banda izquierda (22 pt) | Verde `#0c6b32` con «GOBERNACIÓN» girado (PNG de `TextoVertical`, en negrita) y un filete dorado `#c9a84c` |
+| Encabezado | Escudo (`carnet-escudo-solo.png`) + logo «BENI» (`carnet-beni.png`) a la izquierda; «SERVICIO DEPARTAMENTAL AGROPECUARIO / SEDAG - BENI / Unidad de Pesca» a la derecha; regla verde |
+| Columna de la foto | Foto **redonda** con doble aro, el C.I. debajo y el QR |
+| Columna de los datos | «CÉDULA DE <ACTIVIDAD>», el nombre en mayúscula, asociación, ciudad · provincia, dirección |
+| Franja de abajo | Registro, cupo (solo si `cupoImpreso()`) y válido hasta, sobre verde claro |
+
+**Dorso, verde:** escudo + logo en blanco (`carnet-beni-blanco.png`), «SEDAG -
+BENI», regla dorada, el título de la Dirección, las siete reglas y una tarjeta
+blanca con el QR, el código escrito y la línea de firma.
+
+**Lo no obvio:**
+
+- **La foto redonda se hace en GD** (`fotoRedonda()`): DomPDF dibuja
+  `border-radius` pero no recorta imágenes con él. Recorte cuadrado a un tercio
+  de arriba, máscara circular y reducción a 360 px.
+- **Los altos de cada renglón van declarados y MEDIDOS:** en el PDF cada línea
+  avanza ~1,53 veces su cuerpo. El nombre ocupa 12 pt (18 en dos líneas); un
+  valor, 8,5 (13 en dos). Con menos, la última línea se corta.
+- **Un texto que no entra en una línea pasa a dos, y si tampoco entra se achica**
+  (`texto()`): hasta el 70% de su cuerpo de dos líneas, con un 0,85 de margen
+  porque las palabras no se parten. Peor caso medido —nombre, asociación y
+  dirección de dos líneas—: el texto más bajo termina en 117,8 pt y la franja
+  empieza en 124.
+- El PDF bajó de **1,86 MB a ~330 KB**: el escudo viejo pesaba 1,8 MB.
+- `partes/texto-perfilado.blade.php` quedó **sin uso** (solo lo usaba el carnet).
+
+---
+
 ## 1. El diseño: un calco de la cédula de papel
 
 La tarjeta reproduce la credencial que el SEDAG viene entregando: el mismo verde
@@ -837,10 +876,11 @@ archivo.
 | --- | --- |
 | `app/Http/Controllers/Panel/CarnetImpresionController.php` | Arma el PDF y resuelve los renglones: `texto()` achica lo que no entra; `documento()` lo reusa el portal con la marca «NO VÁLIDO» |
 | `resources/views/documentos/carnet-pescador.blade.php` | La maqueta impresa, anverso y dorso |
-| `resources/views/documentos/partes/texto-perfilado.blade.php` | Las cinco copias del texto con contorno, para el título y los rótulos |
+| `resources/views/documentos/partes/texto-perfilado.blade.php` | Las cinco copias del texto con contorno. Sin uso desde el 23/10/2026 |
 | `resources/views/documentos/partes/qr-verificacion.blade.php` | El QR y el código escrito |
 | `app/Support/CodigoQr.php`, `app/Support/QrVerificacion.php` | El QR del dorso: BaconQrCode + `gd` (ver §8), con la URL relativa + `APP_URL` |
-| `public/image/carnet-fondo.png`, `carnet-escudo.png` | El verde con el sello horneado y el escudo del encabezado |
+| `public/image/carnet-escudo-solo.png`, `carnet-beni.png`, `carnet-beni-blanco.png` | Escudo y logo «BENI» (verde para el frente, blanco para el dorso). `carnet-fondo.png` y `carnet-escudo.png` se borraron el 23/10/2026 |
+| `app/Support/TextoVertical.php` | «GOBERNACIÓN» girado de la banda (`negrita: true`) |
 | `app/Models/Carnet.php` | `puedeImprimirse()`, `registro_legible`, `cupoImpreso()` |
 
 ---

@@ -6,6 +6,7 @@ import { usePermisos } from '@/hooks/use-permisos';
 import { bs, cn, fechaHora, hace } from '@/lib/utils';
 import type { ReciboDelBeneficiario } from '@/types/beneficiarios';
 import { Cifra } from './partes-ficha';
+import { abrirDirecto } from '@/components/panel/comunes/ficha';
 
 /**
  * Sus recibos y lo que todavía falta pagar en Recaudaciones.
@@ -82,6 +83,7 @@ export function PestanaPagos({
                                                     href={route('recibos.imprimir', r.id)}
                                                     target="_blank"
                                                     rel="noreferrer"
+                                                    onClick={abrirDirecto(r.pdf_enlace)}
                                                     title="Recibo"
                                                     aria-label={`Imprimir el recibo ${r.numero}`}
                                                     className={cn(buttonVariants({ variant: 'outline', size: 'icon' }))}

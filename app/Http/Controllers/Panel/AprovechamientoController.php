@@ -18,6 +18,7 @@ use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
 use App\Services\ConfirmarPagoService;
+use App\Services\DocumentoEmitidoService;
 use App\Services\OtorgarCupoService;
 use App\Services\RenovarLiquidacionService;
 use App\Services\RevisarCupoService;
@@ -58,7 +59,7 @@ class AprovechamientoController extends Controller
             ->with([
                 'beneficiario:id,ci,complemento,departamento_id,primerNombre,segundoNombre,apellidoPaterno,apellidoMaterno,apellidoCasado,foto',
             ])
-            ->with('recibo:id,recibible_type,recibible_id,numero_recibo')
+            ->with(['documentoEmitido', 'recibo:id,recibible_type,recibible_id,numero_recibo', 'recibo.documentoEmitido'])
             ->when($filtros['buscar'], fn ($q, $termino) => $q->whereHas(
                 'beneficiario',
                 fn ($b) => $b->buscar($termino),
@@ -272,6 +273,10 @@ class AprovechamientoController extends Controller
                         ->exists(),
             ],
 
+            // El PDF guardado al emitirse (null si todavía no hay): ver DocumentoEmitidoService.
+            'pdf' => DocumentoEmitidoService::resumen($aprovechamiento),
+            'pdf_recibo' => $recibo ? DocumentoEmitidoService::resumen($recibo) : null,
+
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,
@@ -285,6 +290,7 @@ class AprovechamientoController extends Controller
             // Las cédulas que se apoyan en este cupo. Son varias en teoría: el
             // carnet se renueva a mitad de un cupo vigente, o se repone uno perdido.
             'carnets' => $aprovechamiento->carnets()
+                ->with('documentoEmitido')
                 ->latest('created_at')
                 ->get()
                 // El padre ya está en memoria: sin esto, «sin efecto» consulta por fila.
@@ -301,6 +307,7 @@ class AprovechamientoController extends Controller
                     'ya_fue_aprobado' => $c->yaFueAprobado(),
                     // Mismo corte que CarnetImpresionController: firmado, no revocado y con la autorización viva.
                     'puede_imprimirse' => $c->puedeImprimirse(),
+                    'pdf_enlace' => DocumentoEmitidoService::enlace($c),
                     // Reponer usa ESTA autorización: revocada, no hay con qué emitir el nuevo.
                     'puede_reponerse' => $c->estado->permiteRevocacion() && ! $c->autorizacionRevocada(),
                     'fecha_solicitud' => $c->fecha_solicitud?->toDateString(),
@@ -322,7 +329,7 @@ class AprovechamientoController extends Controller
                 // Con `nro` y `fecha_emision`: de esas dos columnas
                 // salen los accesores del número del carnet, y sin ellas
                 // devuelven null sin ningún error.
-                ->with(['carnet:id,nro,fecha_emision,beneficiario_id,tipo_actor,aprovechamiento_id,estado,fecha_vencimiento', 'carnet.codigo'])
+                ->with(['documentoEmitido', 'carnet:id,nro,fecha_emision,beneficiario_id,tipo_actor,aprovechamiento_id,estado,fecha_vencimiento', 'carnet.codigo'])
                 ->orderByDesc('permisos_faena.nro')
                 ->get()
                 ->each(fn (PermisoFaena $f) => $f->carnet?->setRelation('aprovechamiento', $aprovechamiento))
@@ -341,6 +348,7 @@ class AprovechamientoController extends Controller
                     'estado_etiqueta' => $f->etiquetaEstado(),
                     'estado_color' => $f->colorEstado(),
                     'puede_imprimirse' => $f->puedeImprimirse(),
+                    'pdf_enlace' => DocumentoEmitidoService::enlace($f),
                     'fecha_salida' => $f->fecha_salida?->toDateString(),
                     'fecha_desembarque' => $f->fecha_desembarque?->toDateString(),
                 ])
@@ -520,6 +528,9 @@ class AprovechamientoController extends Controller
             // EL RECIBO, para poder imprimirlo sin entrar a la ficha. Existe desde la aprobación.
             'recibo_id' => $recibo?->id,
             'recibo_numero' => $recibo?->numero_recibo,
+            // Los botones abren el PDF guardado directo de S3, como en la ficha.
+            'pdf_enlace' => DocumentoEmitidoService::enlace($cupo),
+            'recibo_enlace' => DocumentoEmitidoService::enlace($recibo),
 
             'monto' => $cupo->montoACobrar(),
 

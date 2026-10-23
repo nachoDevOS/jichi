@@ -6,6 +6,19 @@
 
 ---
 
+## 🔴 PDF guardados: hay que migrar — 23/10/2026
+
+Tabla nueva `documentos_emitidos`. En la base de trabajo (el `RolPermisoSeeder` borra el permiso
+`documentos.regenerar`, que se probó y se quitó, si llegó a sembrarse):
+
+```sh
+php artisan migrate
+php artisan db:seed --class=RolPermisoSeeder
+```
+
+Sin migrar, imprimir responde `relation "documentos_emitidos" does not exist`. Revisar en el
+bucket que los PDF queden privados. Ver [modulos/DOCUMENTOS-EMITIDOS.md](modulos/DOCUMENTOS-EMITIDOS.md).
+
 ## 🟠 Vigencias configurables: la faena y el carnet no se cortan a la autorización — 12/10/2026
 
 Desde Administración › Vigencias la autorización puede durar N días. Hoy nada

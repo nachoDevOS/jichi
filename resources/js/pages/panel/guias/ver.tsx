@@ -34,6 +34,7 @@ import {
     Td,
     type TonoChip,
 } from '@/components/panel/comunes/ficha';
+import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,7 +49,17 @@ import type { GuiaFicha } from '@/types/guias';
 /**
  *  La ficha de una guía: se paga en SIREB como los otros tres trámites.
  */
-export default function VerGuia({ guia, recibo }: { guia: GuiaFicha; recibo: ReciboDelCupo | null }) {
+export default function VerGuia({
+    guia,
+    recibo,
+    pdf,
+    pdf_recibo,
+}: {
+    guia: GuiaFicha;
+    recibo: ReciboDelCupo | null;
+    pdf: PdfEmitido | null;
+    pdf_recibo: PdfEmitido | null;
+}) {
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
     const [eliminando, setEliminando] = useState(false);
@@ -86,12 +97,16 @@ export default function VerGuia({ guia, recibo }: { guia: GuiaFicha; recibo: Rec
                         </Button>
                     )}
                     {puede('guias.imprimir') && guia.ya_fue_aprobada && (
-                        <EnlacePdf href={route('guias.imprimir', guia.id)} icono={Printer}>
+                        <EnlacePdf href={route('guias.imprimir', guia.id)} directo={pdf?.enlace} icono={Printer}>
                             Guía
                         </EnlacePdf>
                     )}
                     {puede('recibos.imprimir') && guia.recibo_id !== null && (
-                        <EnlacePdf href={route('recibos.imprimir', guia.recibo_id)} icono={Receipt}>
+                        <EnlacePdf
+                            href={route('recibos.imprimir', guia.recibo_id)}
+                            directo={pdf_recibo?.enlace}
+                            icono={Receipt}
+                        >
                             Recibo
                         </EnlacePdf>
                     )}
@@ -300,6 +315,8 @@ export default function VerGuia({ guia, recibo }: { guia: GuiaFicha; recibo: Rec
                             ]}
                         />
 
+                        <EstadoPdf pdf={pdf} aprobado={guia.ya_fue_aprobada} />
+
                         {/* De quién es el pescado: sus kilos se descontaron de esa autorización. */}
                         {guia.procedencia && (
                             <div className="space-y-1 rounded-xl border border-border p-4">
@@ -328,6 +345,7 @@ export default function VerGuia({ guia, recibo }: { guia: GuiaFicha; recibo: Rec
             </div>
 
             <TarjetaRecaudaciones
+                reciboDirecto={pdf_recibo?.enlace}
                 className="mt-6"
                 monto={guia.monto}
                 pago={{
