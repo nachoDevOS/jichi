@@ -182,6 +182,9 @@ desconecta entero. Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `pages/panel/seguridad/usuarios.tsx` | La lista de usuarios, con filtro por estado y buscador |
 | `pages/panel/seguridad/roles-formulario.tsx` | Alta y edición: casillas por módulo (la del módulo queda a medias con `indeterminate`) y «Copiar permisos de» |
 | `components/panel/pagos/tarjeta-recaudaciones.tsx` | **La tarjeta de pago de las cuatro fichas**: estado de la liquidación, código de pago copiable, «Pago informado» / «Pago cargado: No», formulario «Cargar pago», «Verificar pago» y recibo |
+| `components/panel/comunes/ficha.tsx` | **Las piezas de las cuatro fichas** (autorización, carnet, faena, guía; 23/10/2026): `BandaTitular`, `Chip` + `avisoVencimiento`, `Cifra` + `Conteo`, `BarraDisponible` + `nivelDisponible` (amarillo ≤ 50 %, rojo ≤ 20 %), `TarjetaCodigo`, `LineaTiempo`, `Aviso`, `Tabla`/`Td`, `EnlacePdf`, `EnlaceVer`. Una ficha nueva se arma con estas |
+| `hooks/use-movimiento.ts` | `useConteo` (cifras que cuentan), `useMontado` (barras que se llenan), `useReducirMovimiento`: todo se apaga con «reducir movimiento» |
+| `components/panel/aprovechamientos/grafico-disponible.tsx` | «Cómo bajó el disponible», en escalón; la serie la arma `AprovechamientoController::show()` (`evolucion`) |
 | `components/panel/comunes/enlace-permitido.tsx` | Enlace a otro módulo que solo es enlace si el rol tiene su `ver`; si no, queda el texto |
 | `components/comunes/texto-copiable.tsx` | Copiar con un clic; respaldo con `execCommand` fuera de HTTPS |
 | `components/panel/beneficiarios/*` | La ficha del beneficiario por pestañas: pescador, comercializador, pagos |

@@ -345,6 +345,7 @@ class BeneficiarioController extends Controller
                 ->with([
                     'codigo',
                     'aprovechamiento',
+                    'asociacion',
                 ]),
             ])
             ->ordenAlfabetico()

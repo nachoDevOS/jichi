@@ -214,11 +214,50 @@ class AprovechamientoController extends Controller
         // El recibo: uno, emitido cuando SIREB confirmó el pago. NULL mientras está pendiente.
         $recibo = $aprovechamiento->recibo;
 
+        // Las guías que le compraron: las pendientes reservan, las demás ya se vendieron.
+        $guias = $aprovechamiento->guias()->with('carnet.beneficiario')->orderByDesc('nro')->get();
+        [$reservadas, $vendidas] = $guias->partition(fn (GuiaMovimiento $g): bool => $g->estado->estaAbierto());
+
+        // Cómo bajó el disponible: arranca con lo otorgado y cada guía, al registrarse, resta su carga.
+        $disponible = (float) $aprovechamiento->volumen_total_kg;
+        $evolucion = collect([[
+            'etiqueta' => 'Otorgada',
+            'fecha' => ($aprovechamiento->fecha_emision ?? $aprovechamiento->fecha_solicitud)?->toDateString(),
+            'disponible' => $disponible,
+            'kilos' => null,
+            'comprador' => null,
+            'pendiente' => false,
+        ]])->concat($guias->sortBy('created_at')->map(function (GuiaMovimiento $g) use (&$disponible): array {
+            $disponible -= (float) $g->peso_total_kg;
+
+            return [
+                'etiqueta' => 'Guía '.$g->numero_legible,
+                'fecha' => $g->created_at?->toDateString(),
+                'disponible' => round($disponible, 2),
+                'kilos' => (float) $g->peso_total_kg,
+                'comprador' => $g->comercializador()?->nombreCompleto,
+                'pendiente' => $g->estado->estaAbierto(),
+            ];
+        }))->push([
+            // Sin este punto el último escalón no tiene ancho y la caída queda pegada al borde.
+            'etiqueta' => 'Hoy',
+            'fecha' => now()->toDateString(),
+            'disponible' => round($disponible, 2),
+            'kilos' => null,
+            'comprador' => null,
+            'pendiente' => false,
+        ])->values()->all();
+
         return Inertia::render('panel/aprovechamientos/ver', [
             // Solo al abrir «Generar nueva liquidación» (partial reload): consulta a SIREB.
             'cotizacion_renovacion' => Inertia::optional(fn () => app(RenovarLiquidacionService::class)->cotizar($aprovechamiento)),
             'cupo' => [
                 ...$this->resumir($aprovechamiento),
+                'kilos_reservados' => (float) $reservadas->sum('peso_total_kg'),
+                // Negativo si ya venció; null si no tiene fecha. La banda lo pinta según cuánto falta.
+                'dias_para_vencer' => $aprovechamiento->fecha_vencimiento === null ? null
+                    : (int) now()->startOfDay()->diffInDays($aprovechamiento->fecha_vencimiento->copy()->startOfDay(), false),
+                'kilos_vendidos' => (float) $vendidas->sum('peso_total_kg'),
 
                 // La llave del QR de la autorización impresa.
                 'codigo' => $aprovechamiento->codigo_legible,
@@ -308,10 +347,9 @@ class AprovechamientoController extends Controller
                 ->all(),
 
             // Las guías que le compraron pescado: cada una descontó sus kilos.
-            'guias' => $aprovechamiento->guias()
-                ->with('carnet.beneficiario')
-                ->orderByDesc('nro')
-                ->get()
+            'evolucion' => $evolucion,
+
+            'guias' => $guias
                 ->map(fn (GuiaMovimiento $g): array => [
                     'id' => $g->id,
                     'numero_legible' => $g->numero_legible,

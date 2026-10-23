@@ -1,15 +1,51 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Ban, Banknote, BadgeCheck, ExternalLink, Eye, Pencil, Plus, Printer, Receipt, RefreshCw, Ship, Trash2, Truck } from 'lucide-react';
+import {
+    Ban,
+    Banknote,
+    BadgeCheck,
+    CalendarClock,
+    Hourglass,
+    Eye,
+    Fish,
+    Pencil,
+    Plus,
+    Printer,
+    Receipt,
+    RefreshCw,
+    Scale,
+    Ship,
+    Trash2,
+    Truck,
+    Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
-import { TextoCopiable } from '@/components/comunes/texto-copiable';
-import { Retrato } from '@/components/comunes/retrato';
+import { GraficoDisponible } from '@/components/panel/aprovechamientos/grafico-disponible';
+import {
+    Aviso,
+    avisoVencimiento,
+    BandaTitular,
+    BotonPestana,
+    Chip,
+    Cifra,
+    Conteo,
+    EnlacePdf,
+    EnlaceVer,
+    kg,
+    LineaTiempo,
+    nivelDisponible,
+    porcentaje,
+    Tabla,
+    TarjetaCodigo,
+    Td,
+} from '@/components/panel/comunes/ficha';
 import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { EstadoVacio } from '@/components/ui/estado-vacio';
+import { useMontado } from '@/hooks/use-movimiento';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha } from '@/lib/utils';
@@ -19,17 +55,28 @@ import type {
     CupoFicha,
     FaenaDelCupo,
     GuiaDelCupo,
+    PuntoDisponible,
     ReciboDelCupo,
 } from '@/types/aprovechamientos';
 
-/**
- *  La ficha de un cupo
- */
+const NOMBRE = 'Autorización de Pesca para Aprovechamiento Pesquero';
+
+// Los tramos de la barra, en orden. Mismos colores que los puntos del gráfico.
+const TRAMOS = [
+    { clave: 'kilos_vendidos', etiqueta: 'Vendido', color: 'bg-primary' },
+    // Reservado en gris: el amarillo queda para avisar que el disponible baja.
+    { clave: 'kilos_reservados', etiqueta: 'Reservado', color: 'bg-slate-400 dark:bg-slate-500' },
+    { clave: 'kilos_disponibles', etiqueta: 'Disponible', color: 'bg-rio-claro dark:bg-rio' },
+] as const;
+
+type Pestana = 'carnets' | 'faenas' | 'guias';
+
 export default function VerCupo({
     cupo,
     carnets,
     faenas,
     guias,
+    evolucion,
     recibo,
     carnetParaFaena,
 }: {
@@ -38,7 +85,8 @@ export default function VerCupo({
     faenas: FaenaDelCupo[];
     /** Las guías que le compraron pescado: cada una descontó sus kilos. */
     guias: GuiaDelCupo[];
-    /** El recibo: llega en null mientras está pendiente; se emite cuando SIREB confirma el pago. */
+    evolucion: PuntoDisponible[];
+    /** Null mientras está pendiente: se emite cuando SIREB confirma el pago. */
     recibo: ReciboDelCupo | null;
     /** El carnet aprobado con el que se emite la próxima faena; null si ninguno puede. */
     carnetParaFaena: number | null;
@@ -46,625 +94,438 @@ export default function VerCupo({
     const { puede } = usePermisos();
     const { institucion } = usePage<PageProps>().props;
 
+    // Abre en la primera pestaña con algo para mostrar.
+    const [pestana, setPestana] = useState<Pestana>(() =>
+        carnets.length > 0 || (faenas.length === 0 && guias.length === 0)
+            ? 'carnets'
+            : faenas.length > 0
+              ? 'faenas'
+              : 'guias',
+    );
     const [eliminando, setEliminando] = useState(false);
-    const [reponiendo, setReponiendo] = useState<CarnetDelCupo | null>(null);
-    const reposicion = useForm({ motivo: '' });
     const [revocando, setRevocando] = useState(false);
-    const revocacion = useForm({ motivo: '' });
-
+    const [reponiendo, setReponiendo] = useState<CarnetDelCupo | null>(null);
     const borrado = useForm({ motivo: '' });
+    const revocacion = useForm({ motivo: '' });
+    const reposicion = useForm({ motivo: '' });
 
+    const montado = useMontado();
+    const pctDisponible = porcentaje(cupo.kilos_disponibles, cupo.volumen_total_kg);
+    const nivel = nivelDisponible(pctDisponible, cupo.ya_fue_aprobado);
+    const colorTramo = (clave: (typeof TRAMOS)[number]['clave'], color: string) =>
+        clave === 'kilos_disponibles' ? nivel.barra : color;
+    const vence = avisoVencimiento(cupo.dias_para_vencer, cupo.ya_fue_aprobado);
+
+    const conHijos = cupo.ya_fue_aprobado || carnets.length + faenas.length + guias.length > 0;
 
     return (
         <LayoutPanel
-            /*
-             * El encabezado no repite al titular. El nombre, la cédula y el
-             * tramo están en la tarjeta de abajo, con la foto al lado; acá
-             * decían lo mismo sin la cara, y la pantalla abría con el nombre
-             * escrito dos veces. Arriba quedan las acciones, que es lo que se
-             * busca en el encabezado.
-             */
-            // El nombre oficial del documento, el mismo que imprime el
-            // recibo. Ver App\Enums\ConceptoRecibo.
-            titulo="Autorización de Pesca para Aprovechamiento Pesquero"
+            titulo={NOMBRE}
             acciones={
                 <div className="flex flex-wrap gap-2">
                     {puede('beneficiarios.ver') && (
                         <Button
                             variant="ver"
-                            onClick={() =>
-                                router.visit(route('beneficiarios.show', cupo.beneficiario_id))
-                            }
+                            onClick={() => router.visit(route('beneficiarios.show', cupo.beneficiario_id))}
                         >
                             <Eye className="size-4" />
                             Beneficiario
                         </Button>
                     )}
-
-                    {/* La autorización de pesca, en PDF. Sale recién con el cupo
-                        firmado, y abre una pestaña porque lo que vuelve es un
-                        archivo: el visor del navegador es desde donde se imprime. */}
                     {puede('aprovechamientos.imprimir') && cupo.puede_imprimirse && (
-                        <a
-                            href={route('aprovechamientos.autorizacion', cupo.id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={cn(buttonVariants({ variant: 'outline' }))}
-                        >
-                            <Printer className="size-4" />
+                        <EnlacePdf href={route('aprovechamientos.autorizacion', cupo.id)} icono={Printer}>
                             Autorización
-                        </a>
+                        </EnlacePdf>
                     )}
-
-                    {/* El recibo también se imprime desde arriba. Estaba solo
-                        dentro de «Pagos», al final de la ficha: el operador que
-                        venía a reimprimir el comprobante tenía que bajar a
-                        buscarlo. Misma condición y mismo PDF que el de allá. */}
                     {puede('recibos.imprimir') && recibo && (
-                        <a
-                            href={route('recibos.imprimir', recibo.id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={cn(buttonVariants({ variant: 'outline' }))}
-                        >
-                            <Receipt className="size-4" />
+                        <EnlacePdf href={route('recibos.imprimir', recibo.id)} icono={Receipt}>
                             Recibo
-                        </a>
+                        </EnlacePdf>
                     )}
-
-                    {/*
-                        EDITAR Y ELIMINAR SOLO SOBRE EL BORRADOR.
-                    */}
                     {puede('aprovechamientos.editar') && cupo.puede_editarse && (
-                        <Button
-                            variant="editar"
-                            onClick={() => router.visit(route('aprovechamientos.edit', cupo.id))}
-                        >
+                        <Button variant="editar" onClick={() => router.visit(route('aprovechamientos.edit', cupo.id))}>
                             <Pencil className="size-4" />
                             Editar
                         </Button>
                     )}
-
                     {puede('aprovechamientos.eliminar') && cupo.puede_eliminarse && (
-                        <Button
-                            variant="eliminar"
-                            onClick={() => setEliminando(true)}
-                        >
+                        <Button variant="eliminar" onClick={() => setEliminando(true)}>
                             <Trash2 className="size-4" />
                             Eliminar
                         </Button>
                     )}
-
-
-
-
-                    {/* Revocar es una sanción: motivo obligatorio y no se deshace. */}
                     {puede('aprovechamientos.revocar') && cupo.puede_revocarse && (
                         <Button variant="eliminar" onClick={() => setRevocando(true)}>
                             <Ban className="size-4" />
                             Revocar
                         </Button>
                     )}
-
                 </div>
             }
         >
-            <Head title={`Autorización de Pesca para Aprovechamiento Pesquero · ${cupo.beneficiario ?? ''}`} />
+            <Head title={`${NOMBRE} · ${cupo.beneficiario ?? ''}`} />
 
-            {/*
-                EL TITULAR, CON SU FOTO. El encabezado del layout solo admite
-                texto, y sobre un cupo la primera pregunta es de QUIÉN es: la
-                cara al lado del nombre es lo que deja confirmarlo de un
-                vistazo contra la persona que está en el mostrador.
-            */}
-            <Card className="mb-6 min-w-0">
-                <CardContent className="flex flex-wrap items-center gap-4 p-4">
-                    <Retrato
-                        url={cupo.foto_url}
-                        nombre={cupo.beneficiario ?? 'Sin nombre'}
-                        className="size-16"
-                    />
+            <BandaTitular
+                foto={cupo.foto_url}
+                nombre={cupo.beneficiario}
+                beneficiarioId={cupo.beneficiario_id}
+                linea={`C.I. ${cupo.documento ?? '—'} · Autorización N° ${cupo.numero}`}
+                estado={{ color: cupo.estado_color, etiqueta: cupo.estado_etiqueta }}
+            >
+                <Chip icono={Scale}>{cupo.descripcion ?? 'Sin escala'}</Chip>
+                <Chip icono={Ship}>{cupo.tipo_embarcacion || 'Embarcación no declarada'}</Chip>
+                <Chip icono={CalendarClock} tono={vence.tono}>
+                    Vence el {fecha(cupo.fecha_vencimiento)}
+                    {vence.texto && <span className="font-semibold">· {vence.texto}</span>}
+                </Chip>
+            </BandaTitular>
 
-                    <div className="min-w-0">
-                        {/* Al nombre se le va: la ficha de la persona es donde
-                            están sus otros carnets y sus otros trámites. */}
-                        <EnlacePermitido
-                            permiso="beneficiarios.ver"
-                            href={route('beneficiarios.show', cupo.beneficiario_id)}
-                            className="text-lg font-semibold text-primary hover:underline"
-                        >
-                            {cupo.beneficiario ?? '—'}
-                        </EnlacePermitido>
+            {cupo.estado === 'pendiente' && (
+                <p className="mt-4 flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+                    <Banknote className="mt-0.5 size-4 shrink-0" />
+                    <span>
+                        <strong>Pendiente de pago.</strong> Todavía no autoriza a pescar: falta que se pague y se valide
+                        en Recaudaciones. Mientras tanto se puede corregir o eliminar.
+                    </span>
+                </p>
+            )}
 
-                        {/* Con el rótulo adelante: «3944217 PT» solo no dice
-                            qué número es. tabular-nums para que la cédula quede
-                            alineada con el resto de los números de la ficha. */}
-                        <p className="tabular-nums text-sm text-muted-foreground">
-                            C.I. {cupo.documento ?? '—'}
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <Cifra
+                    icono={Fish}
+                    etiqueta="Disponible"
+                    valor={<Conteo valor={cupo.kilos_disponibles} formato={kg} />}
+                    pie={
+                        cupo.ya_fue_aprobado && cupo.kilos_disponibles <= 0
+                            ? 'Sin kilos: las guías nuevas se frenan'
+                            : `${Math.round(pctDisponible)}% de ${kg(cupo.volumen_total_kg)}${nivel.texto ? ` · ${nivel.texto}` : ''}`
+                    }
+                    destacada
+                    tono={nivel.tono}
+                />
+                <Cifra
+                    icono={Truck}
+                    etiqueta="Vendido en guías"
+                    valor={<Conteo valor={cupo.kilos_vendidos} formato={kg} />}
+                    pie="Guías aprobadas: no vuelve"
+                />
+                <Cifra
+                    icono={Hourglass}
+                    etiqueta="Reservado"
+                    valor={<Conteo valor={cupo.kilos_reservados} formato={kg} />}
+                    pie="Guías esperando el pago"
+                />
+                <Cifra
+                    icono={Wallet}
+                    etiqueta="Monto"
+                    valor={<Conteo valor={cupo.monto} formato={(n) => bs(n, institucion.moneda)} />}
+                    pie={recibo ? `Recibo N° ${recibo.numero_recibo}` : 'Sin recibo todavía'}
+                />
+            </div>
 
-            <div className="grid gap-6 lg:grid-cols-3">
-                {/* ------------------------------------------------ El volumen */}
-                <Card className="lg:col-span-2">
+            <div className="mt-6 grid gap-6 lg:grid-cols-3">
+                <Card className="min-w-0 lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Volumen</CardTitle>
-                                        <p className="text-sm text-muted-foreground">Capacidad: {cupo.descripcion ?? '—'}</p>
+                        <p className="text-sm text-muted-foreground">
+                            Lo bajan las guías de quien le compra; cada faena sale con lo disponible y no descuenta.
+                        </p>
                     </CardHeader>
 
                     <CardContent className="space-y-5">
-                        {/* Las guías que le compran descuentan; las faenas no, y salen con lo disponible. */}
-                        <dl className="grid grid-cols-2 gap-4 text-sm">
-                            <Dato
-                                etiqueta={cupo.ya_fue_aprobado ? 'Otorgado' : 'Solicitado'}
-                                valor={`${cupo.volumen_total_kg} kg`}
-                            />
-                            <Dato etiqueta="Disponible" valor={`${cupo.kilos_disponibles} kg`} />
-                        </dl>
-
-                        <div className="space-y-1">
-                            <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                                <div
-                                    className="h-full rounded-full bg-primary"
-                                    style={{
-                                        width: `${cupo.volumen_total_kg > 0 ? Math.max(0, Math.min(100, (cupo.kilos_disponibles / cupo.volumen_total_kg) * 100)) : 0}%`,
-                                    }}
-                                />
+                        <div className="space-y-2">
+                            <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-secondary">
+                                {TRAMOS.map((t) => (
+                                    <div
+                                        key={t.clave}
+                                        className={cn(
+                                            'transition-[width] duration-1000 ease-out motion-reduce:transition-none',
+                                            colorTramo(t.clave, t.color),
+                                            t.clave === 'kilos_disponibles' && 'animar-brillo',
+                                        )}
+                                        style={{
+                                            width: montado
+                                                ? `${porcentaje(cupo[t.clave], cupo.volumen_total_kg)}%`
+                                                : '0%',
+                                        }}
+                                        title={`${t.etiqueta}: ${kg(cupo[t.clave])}`}
+                                    />
+                                ))}
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                Vendido en guías: {Math.round((cupo.volumen_total_kg - cupo.kilos_disponibles) * 100) / 100} kg
-                            </p>
+                            <ul className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                                {TRAMOS.map((t) => (
+                                    <li key={t.clave} className="flex items-center gap-1.5">
+                                        <i
+                                            className={cn('size-2.5 rounded-full', colorTramo(t.clave, t.color))}
+                                            aria-hidden
+                                        />
+                                        {t.etiqueta}{' '}
+                                        <span className="font-medium text-foreground tabular-nums">
+                                            {kg(cupo[t.clave])}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
 
-                        {/*
-                            PENDIENTE NO ES UN DETALLE DE COLOR: el cupo existe,
-                            está en fecha y con el volumen entero, y aun así NO
-                            autoriza a pescar. Sin decirlo acá, la única señal
-                            sería una etiqueta celeste y el operador emitiría una
-                            faena para descubrirlo recién con el error.
-                        */}
-                        {cupo.estado === 'pendiente' && (
-                            <p className="flex items-start gap-2 rounded-md bg-sky-50 p-3 text-sm text-sky-900 dark:bg-sky-500/10 dark:text-sky-200">
-                                <Banknote className="mt-0.5 size-4 shrink-0" />
-                                <span>
-                                    <strong>Pendiente.</strong> Todavía no autoriza a pescar: falta
-                                    que se pague y se valide en Recaudaciones. Mientras tanto se puede
-                                    corregir o eliminar.
-                                </span>
-                            </p>
-                        )}
-
+                        {cupo.ya_fue_aprobado && <GraficoDisponible puntos={evolucion} total={cupo.volumen_total_kg} />}
                     </CardContent>
                 </Card>
 
-                {/* ------------------------------------------------ Estado y cobro */}
                 <Card className="h-fit">
                     <CardHeader>
-                        <CardTitle>Situación</CardTitle>
+                        <CardTitle>El documento</CardTitle>
                     </CardHeader>
 
-                    <CardContent className="space-y-3 text-sm">
-                        <div className="flex items-center justify-between gap-2">
-                            <span className="text-muted-foreground">Estado</span>
-                            <Badge color={cupo.estado_color}>{cupo.estado_etiqueta}</Badge>
-                        </div>
-
-                        {/* La llave del QR de la autorización impresa. */}
-                        <div className="flex items-center justify-between gap-3">
-                            <span className="text-muted-foreground">Código</span>
-                            {cupo.codigo ? <TextoCopiable texto={cupo.codigo} className="-mr-1.5" /> : <span>—</span>}
-                        </div>
-
-
-                        {/*
-                            EL RENGLÓN «Tipo de Embarcación» DEL TALONARIO. Se
-                            distingue el NULL de una cadena vacía: «no declarada»
-                            dice que nadie lo llenó, un renglón en blanco no dice
-                            nada.
-                        */}
-                        <Dato
-                            etiqueta="Embarcación"
-                            valor={cupo.tipo_embarcacion}
+                    <CardContent className="space-y-5 text-sm">
+                        <TarjetaCodigo
+                            titulo="Código de autorización"
+                            codigo={cupo.codigo}
+                            numero={cupo.numero}
+                            ayuda="Va en el QR del papel. Con él se verifica la autorización y el comercializador declara a quién le compró."
                         />
 
-                        {/* Dos fechas distintas: cuándo lo pidió y cuándo se lo
-                            firmaron. La segunda no existe hasta la aprobación. */}
-                        <Dato etiqueta="Solicitado el" valor={fecha(cupo.fecha_solicitud)} />
+                        <LineaTiempo
+                            hitos={[
+                                { etiqueta: 'Solicitada', fecha: cupo.fecha_solicitud, hecho: true },
+                                { etiqueta: 'Otorgada', fecha: cupo.fecha_emision, hecho: cupo.fecha_emision !== null },
+                                {
+                                    etiqueta: 'Vence',
+                                    fecha: cupo.fecha_vencimiento,
+                                    hecho: !cupo.vigente && cupo.ya_fue_aprobado,
+                                },
+                            ]}
+                        />
 
-                        {cupo.fecha_emision !== null && (
-                            <Dato etiqueta="Otorgado el" valor={fecha(cupo.fecha_emision)} />
-                        )}
-                        <Dato etiqueta="Vence el" valor={fecha(cupo.fecha_vencimiento)} />
-                        <Dato etiqueta="Monto" valor={bs(cupo.monto, institucion.moneda)} destacado />
-
-
-                        {/*
-                            La conclusión y su MOTIVO, los dos resueltos por el
-                            servidor: un cupo pendiente no es uno vencido, y
-                            decirlo mal manda a buscar un problema que no existe.
-                        */}
-                        <p
-                            className={
-                                cupo.puede_emitir_faena
-                                    ? 'rounded-md bg-emerald-50 p-3 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200'
-                                    : 'rounded-md bg-amber-50 p-3 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200'
-                            }
-                        >
-                            {cupo.puede_emitir_faena ? 'Habilitado para emitir faenas.' : cupo.motivo_sin_faena}
-                        </p>
+                        <Aviso tono={cupo.puede_emitir_faena ? 'ok' : 'aviso'} icono={Ship}>
+                            {cupo.puede_emitir_faena ? 'Habilitada para emitir faenas.' : cupo.motivo_sin_faena}
+                        </Aviso>
                     </CardContent>
                 </Card>
+            </div>
 
-                {/* El cobro: se paga en SIREB, igual que los otros tres documentos. */}
-                <TarjetaRecaudaciones
-                    className="lg:col-span-3"
-                    monto={cupo.monto}
-                    pago={{
-                        concepto: 'Autorización de Pesca para Aprovechamiento Pesquero',
-                        numero: cupo.numero,
-                        titular: cupo.beneficiario,
-                        documento: cupo.documento,
-                        detalle: `${cupo.volumen_total_kg} kg`,
-                    }}
-                    sireb={cupo.sireb}
-                    recibo={recibo}
-                    puedeVerificar={cupo.puede_verificar_pago}
-                    rutaVerificar={route('aprovechamientos.verificar-pago', cupo.id)}
-                    puedeCargar={cupo.puede_cargar_pago}
-                    rutaCargar={route('aprovechamientos.cargar-pago', cupo.id)}
-                    rutaConsultarQr={route('aprovechamientos.consultar-qr', cupo.id)}
-                    rutaRenovar={route('aprovechamientos.renovar-liquidacion', cupo.id)}
-                    documento="aprovechamientos"
-                />
+            <TarjetaRecaudaciones
+                className="mt-6"
+                monto={cupo.monto}
+                pago={{
+                    concepto: NOMBRE,
+                    numero: cupo.numero,
+                    titular: cupo.beneficiario,
+                    documento: cupo.documento,
+                    detalle: kg(cupo.volumen_total_kg),
+                }}
+                sireb={cupo.sireb}
+                recibo={recibo}
+                puedeVerificar={cupo.puede_verificar_pago}
+                rutaVerificar={route('aprovechamientos.verificar-pago', cupo.id)}
+                puedeCargar={cupo.puede_cargar_pago}
+                rutaCargar={route('aprovechamientos.cargar-pago', cupo.id)}
+                rutaConsultarQr={route('aprovechamientos.consultar-qr', cupo.id)}
+                rutaRenovar={route('aprovechamientos.renovar-liquidacion', cupo.id)}
+                documento="aprovechamientos"
+            />
 
-                {/*
-                    LAS CÉDULAS QUE SE APOYAN EN ESTE CUPO, de la más nueva a
-                    la más vieja. Aparece desde que el cupo está firmado —antes
-                    no puede haber ninguna— o si igual hubiera filas.
-                */}
-                {(cupo.ya_fue_aprobado || carnets.length > 0) && (
-                    <Card className="min-w-0 lg:col-span-3">
-                        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                            <CardTitle>Cédulas emitidas con este autorización</CardTitle>
+            {/* Lo que cuelga de la autorización, en pestañas: antes eran tres tablas una debajo de otra. */}
+            {conHijos && (
+                <Card className="mt-6 min-w-0 overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4">
+                        <div
+                            role="tablist"
+                            aria-label="Papeles de la autorización"
+                            className="flex gap-1 overflow-x-auto"
+                        >
+                            <BotonPestana
+                                activa={pestana === 'carnets'}
+                                onClick={() => setPestana('carnets')}
+                                icono={BadgeCheck}
+                                cantidad={carnets.length}
+                            >
+                                Carnets
+                            </BotonPestana>
+                            <BotonPestana
+                                activa={pestana === 'faenas'}
+                                onClick={() => setPestana('faenas')}
+                                icono={Ship}
+                                cantidad={faenas.length}
+                            >
+                                Faenas
+                            </BotonPestana>
+                            <BotonPestana
+                                activa={pestana === 'guias'}
+                                onClick={() => setPestana('guias')}
+                                icono={Truck}
+                                cantidad={guias.length}
+                            >
+                                Guías que le compraron
+                            </BotonPestana>
+                        </div>
 
-                            {/* Llega con la persona y este cupo ya elegidos. */}
-                            {puede('carnets.crear') && cupo.puede_emitir_carnet && (
-                                <Button
-                                    size="sm"
-                                    onClick={() =>
-                                        router.visit(route('carnets.create', { aprovechamiento: cupo.id }))
-                                    }
-                                >
-                                    <Plus className="size-4" />
-                                    Emitir cédula
-                                </Button>
-                            )}
-                        </CardHeader>
+                        {pestana === 'carnets' && puede('carnets.crear') && cupo.puede_emitir_carnet && (
+                            <Button
+                                size="sm"
+                                onClick={() => router.visit(route('carnets.create', { aprovechamiento: cupo.id }))}
+                            >
+                                <Plus className="size-4" />
+                                Emitir carnet
+                            </Button>
+                        )}
+                        {pestana === 'faenas' && puede('faenas.crear') && carnetParaFaena !== null && (
+                            <Button
+                                size="sm"
+                                onClick={() => router.visit(route('faenas.create', { carnet: carnetParaFaena }))}
+                            >
+                                <Plus className="size-4" />
+                                Emitir faena
+                            </Button>
+                        )}
+                    </div>
 
-                        <CardContent className="p-0">
-                            {carnets.length === 0 ? (
+                    <div role="tabpanel">
+                        {pestana === 'carnets' &&
+                            (carnets.length === 0 ? (
                                 <EstadoVacio
                                     icono={BadgeCheck}
-                                    titulo="Sin cédulas"
-                                    descripcion="Todavía no se registró ninguna credencial contra este cupo."
+                                    titulo="Sin carnets"
+                                    descripcion="Todavía no se emitió ningún carnet con esta autorización."
                                 />
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                            <tr>
-                                                <th className="px-5 py-2.5 font-medium">Registro</th>
-                                                <th className="px-5 py-2.5 font-medium">Tipo</th>
-                                                <th className="px-5 py-2.5 font-medium">Solicitado</th>
-                                                <th className="px-5 py-2.5 font-medium">Emitido</th>
-                                                <th className="px-5 py-2.5 font-medium">Vence</th>
-                                                <th className="px-5 py-2.5 font-medium">Estado</th>
-                                                {/* Sin rótulo: el ojo se explica solo. */}
-                                                <th className="px-5 py-2.5" />
-                                            </tr>
-                                        </thead>
-
-                                        <tbody className="divide-y divide-border">
-                                            {carnets.map((c) => (
-                                                <tr key={c.id} className="hover:bg-secondary/50">
-                                                    <td className="px-5 py-2.5">
-                                                        <EnlacePermitido
-                                                            permiso="carnets.ver"
-                                                            nuevaPestana
-                                                            href={route('carnets.show', c.id)}
-                                                            className="font-mono font-medium text-primary hover:underline"
+                                <Tabla columnas={['Registro', 'Emitido', 'Vence', 'Estado', '']}>
+                                    {carnets.map((c) => (
+                                        <tr key={c.id} className="hover:bg-secondary/50">
+                                            <Td>
+                                                <span className="font-mono font-medium">{c.registro ?? c.codigo}</span>
+                                                <p className="text-xs text-muted-foreground">{c.tipo_actor_etiqueta}</p>
+                                            </Td>
+                                            <Td apagada>{c.fecha_emision ? fecha(c.fecha_emision) : '—'}</Td>
+                                            <Td apagada>{fecha(c.fecha_vencimiento)}</Td>
+                                            <Td>
+                                                <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
+                                            </Td>
+                                            <Td>
+                                                <div className="flex justify-end gap-2">
+                                                    {puede('carnets.crear') && c.puede_reponerse && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="eliminar"
+                                                            onClick={() => setReponiendo(c)}
                                                         >
-                                                            {c.registro ?? c.codigo}
-                                                        </EnlacePermitido>
+                                                            <RefreshCw className="size-4" />
+                                                            Reponer
+                                                        </Button>
+                                                    )}
+                                                    {puede('carnets.imprimir') && c.puede_imprimirse && (
+                                                        <EnlacePdf
+                                                            href={route('carnets.imprimir', c.id)}
+                                                            icono={Printer}
+                                                            chico
+                                                        >
+                                                            Imprimir
+                                                        </EnlacePdf>
+                                                    )}
+                                                    {puede('carnets.ver') && (
+                                                        <EnlaceVer href={route('carnets.show', c.id)} />
+                                                    )}
+                                                </div>
+                                            </Td>
+                                        </tr>
+                                    ))}
+                                </Tabla>
+                            ))}
 
-                                                        {/* El código va debajo y en gris: en el
-                                                            mostrador se dicta el registro. */}
-                                                        {c.registro && (
-                                                            <p className="font-mono text-xs text-muted-foreground">
-                                                                {c.codigo}
-                                                            </p>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5">
-                                                        {c.tipo ?? '—'}
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {c.tipo_actor_etiqueta}
-                                                        </p>
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5 text-muted-foreground">
-                                                        {fecha(c.fecha_solicitud)}
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5 text-muted-foreground">
-                                                        {c.fecha_emision ? fecha(c.fecha_emision) : '—'}
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5 text-muted-foreground">
-                                                        {fecha(c.fecha_vencimiento)}
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5">
-                                                        <Badge color={c.estado_color}>
-                                                            {c.estado_etiqueta}
-                                                        </Badge>
-                                                    </td>
-
-                                                    {/*
-                                                        EN UNA PESTAÑA APARTE, igual que el enlace
-                                                        al cupo desde la ficha del carnet: la
-                                                        cédula se abre para contrastarla con lo
-                                                        que se está mirando acá, y salir obliga a
-                                                        volver y buscar el cupo de nuevo.
-                                                    */}
-                                                    <td className="px-5 py-2.5">
-                                                        <div className="flex justify-end gap-2">
-                                                            {puede('carnets.crear') &&
-                                                                c.puede_reponerse && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="eliminar"
-                                                                        onClick={() => setReponiendo(c)}
-                                                                    >
-                                                                        <RefreshCw className="size-4" />
-                                                                        Reponer
-                                                                    </Button>
-                                                                )}
-                                                            {puede('carnets.imprimir') && c.puede_imprimirse && (
-                                                                <a
-                                                                    href={route('carnets.imprimir', c.id)}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-                                                                >
-                                                                    <Printer className="size-4" />
-                                                                    Imprimir
-                                                                </a>
-                                                            )}
-                                                            {puede('carnets.ver') && (
-                                                                <a
-                                                                    href={route('carnets.show', c.id)}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    title="Abrir la cédula en otra pestaña"
-                                                                    aria-label={`Ver la cédula ${c.registro ?? c.codigo}`}
-                                                                    className={cn(
-                                                                        buttonVariants({
-                                                                            variant: 'ver',
-                                                                            size: 'sm',
-                                                                        }),
-                                                                    )}
-                                                                >
-                                                                    <ExternalLink className="size-4" />
-                                                                    Ver
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/*
-                    LAS FAENAS, solo desde que el cupo pasó por la firma. Antes
-                    no puede haber ninguna —emitirlas lo exige activo— así que la
-                    tarjeta solo decía «sin faenas» sobre un cupo recién creado,
-                    como si faltara hacer algo. Si igual hay filas —un cupo que
-                    venció después de emitir— se muestran.
-                */}
-                {(cupo.ya_fue_aprobado || faenas.length > 0) && (
-                    <Card className="min-w-0 lg:col-span-3">
-                        <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-                            <CardTitle>Faenas emitidas</CardTitle>
-
-                            {/* Llega con el carnet aprobado de este cupo ya elegido. */}
-                            {puede('faenas.crear') && carnetParaFaena !== null && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => router.visit(route('faenas.create', { carnet: carnetParaFaena }))}
-                                >
-                                    <Plus className="size-4" />
-                                    Emitir faena
-                                </Button>
-                            )}
-                        </CardHeader>
-
-                        <CardContent className="p-0">
-                            {faenas.length === 0 ? (
+                        {pestana === 'faenas' &&
+                            (faenas.length === 0 ? (
                                 <EstadoVacio
                                     icono={Ship}
                                     titulo="Sin faenas"
-                                    descripcion="Todavía no se emitió ninguna salida contra este cupo."
+                                    descripcion="Todavía no se emitió ninguna salida de pesca con esta autorización."
                                 />
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                            <tr>
-                                                <th className="px-5 py-2.5 font-medium">N°</th>
-                                                <th className="px-5 py-2.5 font-medium">Carnet</th>
-                                                <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
-                                                <th className="px-5 py-2.5 font-medium">Estado</th>
-                                                <th className="px-5 py-2.5 font-medium">Salida</th>
-                                                <th className="px-5 py-2.5 font-medium">Desembarque</th>
-                                                <th className="px-5 py-2.5" />
-                                            </tr>
-                                        </thead>
+                                <Tabla columnas={['N°', 'Carnet', 'Kilos', 'Salida', 'Desembarque', 'Estado', '']}>
+                                    {faenas.map((f) => (
+                                        <tr key={f.id} className="hover:bg-secondary/50">
+                                            <Td>
+                                                <span className="font-mono font-medium">{f.numero_legible}</span>
+                                            </Td>
+                                            <Td apagada>
+                                                {f.carnet_id !== null ? (
+                                                    <EnlacePermitido
+                                                        permiso="carnets.ver"
+                                                        href={route('carnets.show', f.carnet_id)}
+                                                        className="font-mono text-primary hover:underline"
+                                                    >
+                                                        N° {f.carnet_registro ?? '—'}
+                                                    </EnlacePermitido>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </Td>
+                                            <Td>
+                                                <span className="tabular-nums">{kg(f.kilos_extraidos)}</span>
+                                            </Td>
+                                            <Td apagada>{fecha(f.fecha_salida)}</Td>
+                                            <Td apagada>{fecha(f.fecha_desembarque)}</Td>
+                                            <Td>
+                                                <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
+                                            </Td>
+                                            <Td>
+                                                <div className="flex justify-end gap-2">
+                                                    {puede('faenas.imprimir') && f.puede_imprimirse && (
+                                                        <EnlacePdf
+                                                            href={route('faenas.imprimir', f.id)}
+                                                            icono={Printer}
+                                                            chico
+                                                        >
+                                                            Imprimir
+                                                        </EnlacePdf>
+                                                    )}
+                                                    {puede('faenas.ver') && (
+                                                        <EnlaceVer href={route('faenas.show', f.id)} />
+                                                    )}
+                                                </div>
+                                            </Td>
+                                        </tr>
+                                    ))}
+                                </Tabla>
+                            ))}
 
-                                        <tbody className="divide-y divide-border">
-                                            {faenas.map((f) => (
-                                                <tr key={f.id} className="hover:bg-secondary/50">
-                                                    {/* El número lo arma el servidor con los
-                                                        seis ceros del talonario: rellenarlo acá
-                                                        daba «0001» donde el resto del sistema
-                                                        dice «000001». */}
-                                                    <td className="px-5 py-2.5 font-mono tabular-nums">
-                                                        {f.numero_legible}
-                                                    </td>
-
-                                                    {/* De qué carnet cuelga. Un cupo puede
-                                                        respaldar más de una credencial, y esta es
-                                                        la columna que dice cuál gastó esos kilos. */}
-                                                    <td className="px-5 py-2.5 font-mono tabular-nums text-muted-foreground">
-                                                        {f.carnet_id !== null ? (
-                                                            <EnlacePermitido
-                                                                permiso="carnets.ver"
-                                                                href={route('carnets.show', f.carnet_id)}
-                                                                className="text-primary hover:underline"
-                                                            >
-                                                                N° {f.carnet_registro ?? '—'}
-                                                            </EnlacePermitido>
-                                                        ) : (
-                                                            '—'
-                                                        )}
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5 text-right tabular-nums">
-                                                        {f.kilos_extraidos} kg
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5">
-                                                        <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5 text-muted-foreground">
-                                                        {fecha(f.fecha_salida)}
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5 text-muted-foreground">
-                                                        {fecha(f.fecha_desembarque)}
-                                                    </td>
-
-                                                    <td className="px-5 py-2.5">
-                                                        <div className="flex justify-end gap-2">
-                                                            {puede('faenas.imprimir') && f.puede_imprimirse && (
-                                                                <a
-                                                                    href={route('faenas.imprimir', f.id)}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
-                                                                >
-                                                                    <Printer className="size-4" />
-                                                                    Imprimir
-                                                                </a>
-                                                            )}
-                                                            {puede('faenas.ver') && (
-                                                                <a
-                                                                    href={route('faenas.show', f.id)}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className={cn(buttonVariants({ variant: 'ver', size: 'sm' }))}
-                                                                >
-                                                                    <ExternalLink className="size-4" />
-                                                                    Ver
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Las guías que le compraron: son las que bajan el disponible. */}
-                {(cupo.ya_fue_aprobado || guias.length > 0) && (
-                    <Card className="min-w-0 lg:col-span-3">
-                        <CardHeader>
-                            <CardTitle>Guías que le compraron pescado</CardTitle>
-                        </CardHeader>
-
-                        <CardContent className="p-0">
-                            {guias.length === 0 ? (
+                        {pestana === 'guias' &&
+                            (guias.length === 0 ? (
                                 <EstadoVacio
                                     icono={Truck}
                                     titulo="Sin guías"
                                     descripcion="Ningún comercializador declaró todavía pescado de esta autorización."
                                 />
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                                            <tr>
-                                                <th className="px-5 py-2.5 font-medium">N°</th>
-                                                <th className="px-5 py-2.5 font-medium">Comercializador</th>
-                                                <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
-                                                <th className="px-5 py-2.5 font-medium">Estado</th>
-                                                <th className="px-5 py-2.5 font-medium">Solicitada</th>
-                                            </tr>
-                                        </thead>
+                                <Tabla columnas={['N°', 'Comercializador', 'Kilos', 'Solicitada', 'Estado', '']}>
+                                    {guias.map((g) => (
+                                        <tr key={g.id} className="hover:bg-secondary/50">
+                                            <Td>
+                                                <span className="font-mono font-medium">{g.numero_legible}</span>
+                                            </Td>
+                                            <Td>{g.comercializador ?? '—'}</Td>
+                                            <Td>
+                                                <span className="tabular-nums">{kg(g.peso_total_kg)}</span>
+                                            </Td>
+                                            <Td apagada>{fecha(g.fecha_solicitud)}</Td>
+                                            <Td>
+                                                <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
+                                            </Td>
+                                            <Td>
+                                                <div className="flex justify-end">
+                                                    {puede('guias.ver') && (
+                                                        <EnlaceVer href={route('guias.show', g.id)} />
+                                                    )}
+                                                </div>
+                                            </Td>
+                                        </tr>
+                                    ))}
+                                </Tabla>
+                            ))}
+                    </div>
+                </Card>
+            )}
 
-                                        <tbody className="divide-y divide-border">
-                                            {guias.map((g) => (
-                                                <tr key={g.id} className="hover:bg-secondary/50">
-                                                    <td className="px-5 py-2.5 font-mono tabular-nums">
-                                                        <EnlacePermitido
-                                                            permiso="guias.ver"
-                                                            href={route('guias.show', g.id)}
-                                                            className="text-primary hover:underline"
-                                                        >
-                                                            {g.numero_legible}
-                                                        </EnlacePermitido>
-                                                    </td>
-                                                    <td className="px-5 py-2.5">{g.comercializador ?? '—'}</td>
-                                                    <td className="px-5 py-2.5 text-right tabular-nums">{g.peso_total_kg} kg</td>
-                                                    <td className="px-5 py-2.5">
-                                                        <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
-                                                    </td>
-                                                    <td className="px-5 py-2.5 text-muted-foreground">{fecha(g.fecha_solicitud)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
-
-
-
-            {/*
-                RECHAZAR PIDE MOTIVO **Y** CASILLA. El motivo es lo único que le
-                dice a ventanilla QUÉ corregir —sin él el expediente rebota y se
-                vuelve a presentar igual— y la casilla iguala el peso de las dos
-                mitades de la firma: aprobar y rechazar se confirman igual.
-            */}
-            {/* REPONER: el mismo modal que revocar; después abre el formulario del nuevo. */}
+            {/* Reponer revoca el carnet y abre el formulario del nuevo con esta autorización. */}
             <ConfirmarConMotivo
                 abierto={reponiendo !== null}
                 titulo={`Reponer el carnet N° ${reponiendo?.registro ?? ''}`}
@@ -672,12 +533,12 @@ export default function VerCupo({
                     <div className="space-y-2">
                         <p>
                             El carnet <strong>{reponiendo?.codigo}</strong> de{' '}
-                            <strong>{cupo.beneficiario ?? 'el titular'}</strong> deja de valer, y al
-                            escanearlo figura como revocado. <strong>No se revierte.</strong>
+                            <strong>{cupo.beneficiario ?? 'el titular'}</strong> deja de valer, y al escanearlo figura
+                            como revocado. <strong>No se revierte.</strong>
                         </p>
                         <p>
-                            Las faenas ya emitidas con él <strong>siguen vigentes</strong>. Después se abre
-                            el formulario del carnet nuevo con esta misma Autorización de Pesca para Aprovechamiento Pesquero.
+                            Las faenas ya emitidas con él <strong>siguen vigentes</strong>. Después se abre el
+                            formulario del carnet nuevo con esta misma autorización.
                         </p>
                     </div>
                 }
@@ -694,28 +555,27 @@ export default function VerCupo({
                     setReponiendo(null);
                     reposicion.reset();
                 }}
-                onConfirmar={() =>
-                    reponiendo && reposicion.patch(route('carnets.reponer', reponiendo.id))
-                }
+                onConfirmar={() => reponiendo && reposicion.patch(route('carnets.reponer', reponiendo.id))}
             />
 
             <ConfirmarConMotivo
                 abierto={revocando}
-                titulo="Revocar la Autorización de Pesca para Aprovechamiento Pesquero"
+                titulo={`Revocar la ${NOMBRE}`}
                 descripcion={
                     <div className="space-y-2">
                         <p>
-                            La autorización de <strong>{cupo.beneficiario ?? 'el pescador'}</strong> queda
-                            REVOCADA aunque siga en fecha.
+                            La autorización de <strong>{cupo.beneficiario ?? 'el pescador'}</strong> queda REVOCADA
+                            aunque siga en fecha.
                         </p>
                         <ul className="list-disc space-y-1 pl-5">
                             <li>No se emiten más carnets ni faenas con ella.</li>
                             <li>
-                                Sus carnets y faenas aprobados <strong>quedan sin efecto</strong>: siguen
-                                registrados como estaban, pero ya no están vigentes, el QR lo informa y no se
-                                imprimen. La salida en curso se corta.
+                                Sus carnets y faenas aprobados <strong>quedan sin efecto</strong>: ya no están vigentes,
+                                el QR lo informa y no se imprimen.
                             </li>
-                            <li>Los que están pendientes o en revisión ya no se pueden aprobar.</li>
+                            <li>
+                                Los carnets, faenas y guías pendientes con ella ya no se aprueban, aunque se paguen.
+                            </li>
                             <li>La persona puede tramitar una autorización nueva.</li>
                         </ul>
                         <p>
@@ -747,28 +607,25 @@ export default function VerCupo({
                 }
             />
 
-
             <ConfirmarConMotivo
                 abierto={eliminando}
-                titulo="Eliminar este aprovechamiento"
+                titulo="Eliminar esta autorización"
                 descripcion={
                     <div className="space-y-2">
                         <p>
-                            Se da de baja el cupo de{' '}
-                            <strong>{cupo.beneficiario ?? 'el pescador'}</strong>:{' '}
-                            {cupo.volumen_total_kg} kg.
+                            Se da de baja la autorización de <strong>{cupo.beneficiario ?? 'el pescador'}</strong>:{' '}
+                            {kg(cupo.volumen_total_kg)}.
                         </p>
                         <p>
-                            Solo se puede porque está <strong>pendiente de pago</strong>, sin ningún
-                            cobro ni faena encima. No se deshace.
+                            Solo se puede porque está <strong>pendiente de pago</strong>. No se deshace.
                         </p>
                     </div>
                 }
                 etiquetaMotivo="Motivo de la eliminación"
-                ayuda="Queda en la auditoría con su nombre, y es lo que va a explicar la baja dentro de seis meses."
-                placeholder="Cargado por error: la escala corresponde a otro pescador."
-                textoConfirmar="Eliminar aprovechamiento"
-                confirmacion="Entiendo que el cupo desaparece del sistema y que esto no se deshace desde el panel."
+                ayuda="Queda en la auditoría con su nombre."
+                placeholder="Cargada por error: la escala corresponde a otro pescador."
+                textoConfirmar="Eliminar autorización"
+                confirmacion="Entiendo que la autorización desaparece del sistema y que esto no se deshace desde el panel."
                 valor={borrado.data.motivo}
                 onCambiar={(v) => borrado.setData('motivo', v)}
                 error={borrado.errors.motivo}
@@ -780,7 +637,7 @@ export default function VerCupo({
                 onConfirmar={() =>
                     borrado.delete(route('aprovechamientos.destroy', cupo.id), {
                         preserveScroll: true,
-                        // Borrado va al listado; con el pago ya validado vuelve acá aprobado.
+                        // Borrada va al listado; con el pago ya validado vuelve acá aprobada.
                         onSuccess: () => {
                             setEliminando(false);
                             borrado.reset();
@@ -789,18 +646,6 @@ export default function VerCupo({
                     })
                 }
             />
-
-
-            {/* CORREGIR — la única salida de una observación. */}
         </LayoutPanel>
-    );
-}
-
-function Dato({ etiqueta, valor, destacado = false }: { etiqueta: string; valor: string; destacado?: boolean }) {
-    return (
-        <div className="flex items-baseline justify-between gap-3">
-            <span className="text-muted-foreground">{etiqueta}</span>
-            <span className={destacado ? 'text-right text-base font-medium tabular-nums' : 'text-right font-medium tabular-nums'}>{valor}</span>
-        </div>
     );
 }

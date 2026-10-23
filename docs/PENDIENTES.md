@@ -288,15 +288,11 @@ Ver [docs/sesiones/09-2026/2026-09-18.md](sesiones/09-2026/2026-09-18.md).
 
 ---
 
-## 🟠 En el celular, los botones del encabezado se salen de la pantalla — 27/09/2026
+## ✅ En el celular, los botones del encabezado ya no se salen — 23/10/2026
 
-En la ficha del beneficiario, a 390 px la página mide 613 de ancho: la fila de
-acciones del `LayoutPanel` («Registrar aprovechamiento», «Emitir carnet»,
-«Editar», «Dar de baja») no se parte en renglones. Es del layout, así que
-probablemente pasa en toda ficha con varias acciones. En la ficha del
-beneficiario dejó de pasar al quitar «Registrar aprovechamiento» y «Emitir
-carnet» (27/09/2026); falta revisar las otras fichas. Se midió con
-`document.documentElement.scrollWidth` en Chrome sin cabeza.
+La fila de acciones de `BarraSuperior` tenía `shrink-0` y no se partía en
+renglones. Ahora se envuelve: en el celular los botones bajan debajo del título.
+Medido en la ficha de la autorización: a 390 px, `scrollWidth` = 390.
 
 ## 🟠 Login con Ibare: hecho del lado de Jichi, falta cargar Ibare — 24/09/2026
 

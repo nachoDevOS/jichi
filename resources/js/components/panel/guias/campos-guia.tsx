@@ -8,6 +8,28 @@ import type { CampoGuia, CatalogosGuia, FormularioGuia } from '@/types/guias';
 // productores, por 3 años y con registro previo, y eso todavía no se controla.
 const MOSTRAR_PISCICULTURA = false;
 
+/** Los renglones de los bloques B y C: obligatorios, igual que en EmitirGuiaRequest::reglasDelPapel(). */
+export const CAMPOS_RUTA: CampoGuia[] = [
+    'origen',
+    'origen_departamento',
+    'origen_provincia',
+    'origen_distrito',
+    'destino',
+    'destino_departamento',
+    'destino_provincia',
+    'destino_distrito',
+    'medio_transporte',
+    'tipo_transporte',
+    'transporte_nombre',
+    'transporte_placa',
+    'transporte_capacidad_kg',
+];
+
+/** Si la ruta y el transporte están completos; la capacidad, además, mayor que cero. */
+export function rutaCompleta(datos: FormularioGuia): boolean {
+    return CAMPOS_RUTA.every((c) => String(datos[c] ?? '').trim() !== '') && Number(datos.transporte_capacidad_kg) > 0;
+}
+
 /**
  * Los bloques B y C DEL PAPEL — la ubicación y el transporte.
  *
@@ -31,13 +53,11 @@ export function CamposGuia({
     onCambio: (campo: CampoGuia, valor: string | boolean) => void;
 }) {
     return (
-        <div className="space-y-6">
-            {/* ─────────────────────────────── B.- UBICACIÓN */}
-            <section className="space-y-4">
-                <h3 className="text-sm font-semibold">B. Ubicación</h3>
-
+        <div className="space-y-5">
+            {/* B. Ubicación: origen y destino lado a lado. */}
+            <section className="space-y-3">
                 <Ubicacion
-                    titulo="Producción u origen"
+                    titulo="Origen"
                     prefijo="origen"
                     datos={datos}
                     errores={errores}
@@ -55,24 +75,19 @@ export function CamposGuia({
                 />
             </section>
 
-            {/* ─────────────────────────────── C.- TRANSPORTE */}
-            <section className="space-y-4">
-                <h3 className="text-sm font-semibold">C. Transporte</h3>
+            {/* C. Transporte */}
+            <section className="space-y-3">
+                <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Transporte</h3>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                    <Campo
-                        etiqueta="Medio"
-                        htmlFor="medio_transporte"
-                        error={errores.medio_transporte}
-                        ayuda="El casillero 10 del papel: por dónde viaja."
-                    >
+                <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Campo etiqueta="Medio" htmlFor="medio_transporte" error={errores.medio_transporte} obligatorio>
                         <Select
                             id="medio_transporte"
                             value={datos.medio_transporte}
                             onChange={(e) => onCambio('medio_transporte', e.target.value)}
                             aria-invalid={Boolean(errores.medio_transporte)}
                         >
-                            <option value="">— sin indicar —</option>
+                            <option value="">Elija…</option>
                             {medios.map((m) => (
                                 <option key={m.value} value={m.value}>
                                     {m.label}
@@ -81,19 +96,14 @@ export function CamposGuia({
                         </Select>
                     </Campo>
 
-                    <Campo
-                        etiqueta="Vehículo"
-                        htmlFor="tipo_transporte"
-                        error={errores.tipo_transporte}
-                        ayuda="Los renglones a/b/c del bloque C: en qué se traslada."
-                    >
+                    <Campo etiqueta="Vehículo" htmlFor="tipo_transporte" error={errores.tipo_transporte} obligatorio>
                         <Select
                             id="tipo_transporte"
                             value={datos.tipo_transporte}
                             onChange={(e) => onCambio('tipo_transporte', e.target.value)}
                             aria-invalid={Boolean(errores.tipo_transporte)}
                         >
-                            <option value="">— sin indicar —</option>
+                            <option value="">Elija…</option>
                             {tiposTransporte.map((t) => (
                                 <option key={t.value} value={t.value}>
                                     {t.label}
@@ -106,6 +116,7 @@ export function CamposGuia({
                         etiqueta="Nombre o tipo"
                         htmlFor="transporte_nombre"
                         error={errores.transporte_nombre}
+                        obligatorio
                     >
                         <Input
                             id="transporte_nombre"
@@ -116,40 +127,33 @@ export function CamposGuia({
                         />
                     </Campo>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Campo
-                            etiqueta="Placa"
-                            htmlFor="transporte_placa"
-                            error={errores.transporte_placa}
-                        >
-                            <Input
-                                id="transporte_placa"
-                                value={datos.transporte_placa}
-                                onChange={(e) =>
-                                    onCambio('transporte_placa', e.target.value.toUpperCase())
-                                }
-                                aria-invalid={Boolean(errores.transporte_placa)}
-                                placeholder="1234-ABC"
-                                className="font-mono"
-                            />
-                        </Campo>
+                    <Campo etiqueta="Placa" htmlFor="transporte_placa" error={errores.transporte_placa} obligatorio>
+                        <Input
+                            id="transporte_placa"
+                            value={datos.transporte_placa}
+                            onChange={(e) => onCambio('transporte_placa', e.target.value.toUpperCase())}
+                            aria-invalid={Boolean(errores.transporte_placa)}
+                            placeholder="1234-ABC"
+                            className="font-mono"
+                        />
+                    </Campo>
 
-                        <Campo
-                            etiqueta="Cap. máxima (kg)"
-                            htmlFor="transporte_capacidad_kg"
-                            error={errores.transporte_capacidad_kg}
-                        >
-                            <Input
-                                id="transporte_capacidad_kg"
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                value={datos.transporte_capacidad_kg}
-                                onChange={(e) => onCambio('transporte_capacidad_kg', e.target.value)}
-                                aria-invalid={Boolean(errores.transporte_capacidad_kg)}
-                            />
-                        </Campo>
-                    </div>
+                    <Campo
+                        etiqueta="Cap. máxima (kg)"
+                        htmlFor="transporte_capacidad_kg"
+                        error={errores.transporte_capacidad_kg}
+                        obligatorio
+                    >
+                        <Input
+                            id="transporte_capacidad_kg"
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            value={datos.transporte_capacidad_kg}
+                            onChange={(e) => onCambio('transporte_capacidad_kg', e.target.value)}
+                            aria-invalid={Boolean(errores.transporte_capacidad_kg)}
+                        />
+                    </Campo>
                 </div>
             </section>
 
@@ -181,7 +185,7 @@ export function CamposGuia({
             >
                 <Textarea
                     id="observaciones"
-                    rows={3}
+                    rows={2}
                     value={datos.observaciones}
                     onChange={(e) => onCambio('observaciones', e.target.value)}
                     aria-invalid={Boolean(errores.observaciones)}
@@ -194,8 +198,7 @@ export function CamposGuia({
 /**
  * Un renglón del bloque B: lugar + departamento + provincia + distrito.
  *
- * Solo el LUGAR es obligatorio; lo demás llega incompleto del papel y frenarlo
- * dejaría al comerciante esperando por un dato que el talonario tampoco exige.
+ * Los cuatro son obligatorios desde el 23/10/2026.
  */
 function Ubicacion({
     titulo,
@@ -212,22 +215,14 @@ function Ubicacion({
     onCambio: (campo: CampoGuia, valor: string | boolean) => void;
     ejemplo: string;
 }) {
-    const campo = (sufijo: '' | '_departamento' | '_provincia' | '_distrito') =>
-        `${prefijo}${sufijo}` as CampoGuia;
+    const campo = (sufijo: '' | '_departamento' | '_provincia' | '_distrito') => `${prefijo}${sufijo}` as CampoGuia;
 
     return (
-        <div className="rounded-md border border-border p-4">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {titulo}
-            </p>
+        <div className="space-y-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{titulo}</p>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Campo
-                    etiqueta="Lugar"
-                    htmlFor={campo('')}
-                    error={errores[campo('')]}
-                    obligatorio
-                >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Campo etiqueta="Lugar" htmlFor={campo('')} error={errores[campo('')]} obligatorio>
                     <Input
                         id={campo('')}
                         value={datos[campo('')] as string}
@@ -237,7 +232,12 @@ function Ubicacion({
                     />
                 </Campo>
 
-                <Campo etiqueta="Departamento" htmlFor={campo('_departamento')}>
+                <Campo
+                    etiqueta="Departamento"
+                    htmlFor={campo('_departamento')}
+                    error={errores[campo('_departamento')]}
+                    obligatorio
+                >
                     <Input
                         id={campo('_departamento')}
                         value={datos[campo('_departamento')] as string}
@@ -245,7 +245,12 @@ function Ubicacion({
                     />
                 </Campo>
 
-                <Campo etiqueta="Provincia" htmlFor={campo('_provincia')}>
+                <Campo
+                    etiqueta="Provincia"
+                    htmlFor={campo('_provincia')}
+                    error={errores[campo('_provincia')]}
+                    obligatorio
+                >
                     <Input
                         id={campo('_provincia')}
                         value={datos[campo('_provincia')] as string}
@@ -253,7 +258,12 @@ function Ubicacion({
                     />
                 </Campo>
 
-                <Campo etiqueta="Distrito o cuenca" htmlFor={campo('_distrito')}>
+                <Campo
+                    etiqueta="Distrito o cuenca"
+                    htmlFor={campo('_distrito')}
+                    error={errores[campo('_distrito')]}
+                    obligatorio
+                >
                     <Input
                         id={campo('_distrito')}
                         value={datos[campo('_distrito')] as string}

@@ -302,7 +302,7 @@ function Cabecera({
     return (
         <Card className="min-w-0 overflow-hidden">
             {/* La franja institucional: azul del GAD con el filete dorado. */}
-            <div className="relative h-24 bg-gradient-to-r from-primary to-[var(--institucional-azul-claro)]">
+            <div className="relative h-24 bg-gradient-to-r from-primary to-[var(--rio-claro)]">
                 <span className="absolute inset-x-0 bottom-0 h-1 bg-accent" />
                 <span className="pointer-events-none absolute -right-8 -top-12 size-44 rounded-full bg-white/10" />
                 <span className="pointer-events-none absolute right-32 -bottom-16 size-32 rounded-full bg-white/5" />

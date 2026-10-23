@@ -48,6 +48,8 @@ class ExpedienteBeneficiario
     public static function guias(Beneficiario $beneficiario): Collection
     {
         return $beneficiario->guias()
+            // De qué pescador es el pescado: su autorización es la que descontó.
+            ->with(['aprovechamiento:id,nro,beneficiario_id', 'aprovechamiento.beneficiario'])
             ->orderByDesc('guias_movimiento.nro')
             ->get();
     }

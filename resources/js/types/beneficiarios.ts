@@ -236,6 +236,9 @@ export interface CarnetVigenteSugerido {
     volumen_total_kg: number | null;
     tipo_actor: TipoActor;
     tipo_actor_etiqueta: string;
+    /** La sigla del gremio que lo avala (o el nombre si no tiene sigla). */
+    asociacion: string | null;
+    asociacion_nombre: string | null;
     /** Exige además una autorización aprobada y en fecha, no solo que sea de pescador. */
     puede_emitir_faenas: boolean;
     puede_emitir_guias: boolean;

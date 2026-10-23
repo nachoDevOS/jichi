@@ -142,6 +142,9 @@ class ResumenPortal
             'descargar' => self::urlDescargar($g),
             'ruta' => $g->ruta,
             'kilos' => (float) $g->peso_total_kg,
+            // Estos kilos se descontaron de la autorización de ese pescador.
+            'pescado_de' => $g->aprovechamiento?->beneficiario?->nombreCompleto,
+            'autorizacion_numero' => $g->aprovechamiento?->numeroLegible(),
             'estado_etiqueta' => $g->etiquetaEstado(),
             'estado_color' => $g->colorEstado(),
             'vigente' => $g->estaVigente(),

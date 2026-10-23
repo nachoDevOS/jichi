@@ -30,18 +30,14 @@ class EmitirFaenaRequest extends FormRequest
 
             // Las fechas NO vienen del formulario: las escribe la aprobación.
 
-            /*
-             * Los renglones del papel. Nullable porque el formulario se llena a
-             * mano y llega incompleto: la obligatoriedad es del trámite en
-             * ventanilla, no de la tabla.
-             */
-            'embarcacion' => ['nullable', 'string', 'max:150'],
-            'propietario' => ['nullable', 'string', 'max:150'],
-            'comandante_barco' => ['nullable', 'string', 'max:150'],
-            'matricula_naval' => ['nullable', 'string', 'max:50'],
-            'nro_kardex' => ['nullable', 'string', 'max:50'],
-            'region_desde' => ['nullable', 'string', 'max:150'],
-            'region_hasta' => ['nullable', 'string', 'max:150'],
+            // Los renglones del talonario: obligatorios desde el 23/10/2026 (decisión del responsable).
+            'embarcacion' => ['required', 'string', 'max:150'],
+            'propietario' => ['required', 'string', 'max:150'],
+            'comandante_barco' => ['required', 'string', 'max:150'],
+            'matricula_naval' => ['required', 'string', 'max:50'],
+            'nro_kardex' => ['required', 'string', 'max:50'],
+            'region_desde' => ['required', 'string', 'max:150'],
+            'region_hasta' => ['required', 'string', 'max:150'],
         ];
     }
 
@@ -53,6 +49,13 @@ class EmitirFaenaRequest extends FormRequest
         return [
             'carnet_id.required' => 'Elija el carnet del pescador.',
             'carnet_id.exists' => 'Ese carnet no existe.',
+            'embarcacion.required' => 'Escriba la embarcación.',
+            'propietario.required' => 'Escriba de quién es la embarcación.',
+            'comandante_barco.required' => 'Escriba el comandante de barco.',
+            'matricula_naval.required' => 'Escriba la matrícula naval.',
+            'nro_kardex.required' => 'Escriba el N° de Kardex.',
+            'region_desde.required' => 'Escriba desde dónde va a pescar.',
+            'region_hasta.required' => 'Escriba hasta dónde va a pescar.',
         ];
     }
 

@@ -9,9 +9,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Paleta institucional del Gobierno Autónomo Departamental del Beni.
- * Azul oscuro #1e3a5f y dorado #c9a84c expresados en oklch para que las
- * variantes claras y oscuras mantengan el mismo tono percibido.
+ * Paleta institucional del Gobierno Autónomo Departamental del Beni, en oklch.
+ * Desde el 23/10/2026 el panel usa los «Ríos del Beni» de la portada; el azul
+ * institucional queda para los documentos impresos.
  */
 :root {
     /*
@@ -37,39 +37,40 @@
 
     --radius: 0.625rem;
 
-    --background: oklch(0.985 0.002 250);
-    --foreground: oklch(0.21 0.02 250);
+    --background: oklch(0.985 0.004 200);
+    --foreground: oklch(0.22 0.025 225);
 
     --card: oklch(1 0 0);
     --card-foreground: var(--foreground);
     --popover: oklch(1 0 0);
     --popover-foreground: var(--foreground);
 
-    --primary: var(--institucional-azul);
-    --primary-foreground: oklch(0.985 0.002 250);
+    /* El panel toma el río de la portada: petróleo profundo con acentos dorados. */
+    --primary: oklch(0.42 0.08 208);
+    --primary-foreground: oklch(0.985 0.004 200);
 
-    --secondary: oklch(0.955 0.006 250);
-    --secondary-foreground: var(--institucional-azul);
+    --secondary: oklch(0.955 0.014 198);
+    --secondary-foreground: oklch(0.36 0.07 210);
 
     --accent: var(--institucional-dorado);
     --accent-foreground: oklch(0.24 0.03 86);
 
-    --muted: oklch(0.955 0.006 250);
-    --muted-foreground: oklch(0.52 0.017 250);
+    --muted: oklch(0.955 0.012 200);
+    --muted-foreground: oklch(0.5 0.022 220);
 
     --destructive: oklch(0.577 0.245 27.3);
     --destructive-foreground: oklch(0.985 0 0);
 
-    --border: oklch(0.9 0.008 250);
-    --input: oklch(0.9 0.008 250);
-    --ring: var(--institucional-azul-claro);
+    --border: oklch(0.9 0.014 205);
+    --input: oklch(0.88 0.016 205);
+    --ring: oklch(0.6 0.09 198);
 
-    --sidebar: var(--institucional-azul);
-    --sidebar-foreground: oklch(0.93 0.012 250);
+    --sidebar: var(--rio-profundo);
+    --sidebar-foreground: oklch(0.92 0.02 200);
     --sidebar-primary: var(--institucional-dorado);
-    --sidebar-accent: oklch(0.4 0.062 251);
-    --sidebar-accent-foreground: oklch(0.98 0.002 250);
-    --sidebar-border: oklch(0.42 0.055 251);
+    --sidebar-accent: oklch(0.34 0.06 212);
+    --sidebar-accent-foreground: oklch(0.98 0.004 200);
+    --sidebar-border: oklch(0.34 0.045 218);
 
     /*
      * Fondo del área de trabajo del panel.
@@ -83,14 +84,14 @@
      * Es del panel y NO de todo el sistema a propósito: la pantalla pública de
      * verificación tiene su propio fondo y no debe heredar este.
      */
-    --panel-fondo: oklch(0.945 0.004 250);
+    --panel-fondo: oklch(0.948 0.012 200);
 
     /*
      * El gráfico del tablero va pintado de color entero: fondo y texto van en PAR.
      * La claridad deja el texto encima en 4.5:1 como pide la norma; si se toca,
      * medir el contraste otra vez.
      */
-    --widget-1: oklch(0.34 0.062 251); /* azul institucional */
+    --widget-1: var(--rio-profundo); /* el río de la portada */
     --widget-1-fg: oklch(0.98 0.002 250);
 }
 
@@ -110,8 +111,8 @@
     --popover: oklch(0.18 0.004 250);
     --popover-foreground: var(--foreground);
 
-    --primary: oklch(0.72 0.09 251);
-    --primary-foreground: oklch(0.15 0.01 250);
+    --primary: oklch(0.76 0.1 195);
+    --primary-foreground: oklch(0.16 0.02 220);
 
     --secondary: oklch(0.23 0.005 250);
     --secondary-foreground: oklch(0.95 0.003 250);
@@ -127,7 +128,7 @@
 
     --border: oklch(0.27 0.004 250);
     --input: oklch(0.3 0.004 250);
-    --ring: oklch(0.66 0.08 251);
+    --ring: oklch(0.68 0.09 198);
 
     --sidebar: oklch(0.165 0.004 250);
     --sidebar-foreground: oklch(0.93 0.004 250);
@@ -148,7 +149,7 @@
      * a 0.34 sobre un fondo de 0.12 se lee casi como un agujero: la tarjeta
      * desaparece y solo queda el número flotando.
      */
-    --widget-1: oklch(0.42 0.07 251);
+    --widget-1: oklch(0.38 0.07 212);
     --widget-1-fg: oklch(0.98 0.002 250);
 }
 
@@ -357,6 +358,37 @@
 
 .animar-desfile {
     animation: correr-agua 40s linear infinite;
+}
+
+/* Brillo que cruza la barra de volumen de la ficha de la autorización. */
+@keyframes brillo {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(250%);
+    }
+}
+
+.animar-brillo {
+    position: relative;
+    overflow: hidden;
+}
+
+.animar-brillo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.5), transparent);
+    animation: brillo 3s ease-in-out 1.2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animar-brillo::after {
+        animation: none;
+        display: none;
+    }
 }
 
 .animar-desfile:hover {

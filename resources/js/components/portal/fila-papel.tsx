@@ -53,10 +53,12 @@ export function FilaPapel({ papel }: { papel: PapelPortal }) {
                 </div>
             </div>
 
-            {/* La autorización vigente muestra los kilos con que sale cada permiso de faena. */}
+            {/* El saldo lo bajan las guías de quien le compra; la faena no descuenta. */}
             {papel.clase === 'aprovechamiento' && vigente && (
                 <p className="mt-3 text-[11px] font-semibold text-slate-500">
-                    Cada permiso de faena sale por <span className="text-rio">{kg(papel.kilos_disponibles)}</span>
+                    Le quedan <span className="text-rio">{kg(papel.kilos_disponibles)}</span> de{' '}
+                    {kg(papel.volumen_total_kg)}. Bajan cuando un comercializador le compra con su guía de transporte; el
+                    permiso de faena no los descuenta.
                 </p>
             )}
 

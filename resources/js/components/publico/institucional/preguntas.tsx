@@ -14,7 +14,7 @@ const PREGUNTAS = [
     },
     {
         p: '¿Qué es la Autorización de Pesca para Aprovechamiento Pesquero?',
-        r: 'Es la cantidad máxima de kilos que la Gobernación le autoriza a extraer en la gestión. Se otorga según una escala oficial, que también fija su costo. Cada permiso de faena descuenta sus kilos de ese total. Es requisito para sacar el carnet de pescador.',
+        r: 'Es la cantidad máxima de kilos que la Gobernación le autoriza a extraer en la gestión. Se otorga según una escala oficial, que también fija su costo. Los kilos bajan cuando un comercializador le compra y registra su Guía Única de Transporte; el permiso de faena no los descuenta. Es requisito para sacar el carnet de pescador.',
     },
     {
         p: '¿El comercializador necesita esa autorización?',

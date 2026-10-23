@@ -74,10 +74,9 @@ export function Cabecera({ portada }: { portada: InstitucionPortada }) {
                         className="size-11 shrink-0 object-contain sm:size-12"
                     />
 
-                    {/* min-w-0 para que el nombre largo de la institución pueda
-                        truncarse en vez de empujar al botón fuera de pantalla. */}
+                    {/* min-w-0: el nombre largo baja a dos líneas en vez de empujar al botón fuera de pantalla. */}
                     <div className="min-w-0 flex-1 leading-tight">
-                        <p className="truncate text-[11px] font-semibold tracking-[0.12em] text-rio-profundo uppercase sm:text-xs">
+                        <p className="line-clamp-2 text-[11px] font-semibold tracking-[0.08em] text-rio-profundo uppercase sm:text-xs">
                             {portada.nombre}
                         </p>
                         <p className="truncate text-[11px] text-slate-500">

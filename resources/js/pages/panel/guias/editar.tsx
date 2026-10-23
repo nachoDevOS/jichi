@@ -2,7 +2,7 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { TriangleAlert } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { BloqueProcedencia } from '@/components/panel/guias/bloque-procedencia';
-import { CamposGuia } from '@/components/panel/guias/campos-guia';
+import { CamposGuia, rutaCompleta } from '@/components/panel/guias/campos-guia';
 import { filaVacia, TablaDetalle } from '@/components/panel/guias/tabla-detalle';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
@@ -57,8 +57,7 @@ export default function EditarGuia({
         tipo_transporte: guia.tipo_transporte ?? '',
         transporte_nombre: guia.transporte_nombre ?? '',
         transporte_placa: guia.transporte_placa ?? '',
-        transporte_capacidad_kg:
-            guia.transporte_capacidad_kg !== null ? String(guia.transporte_capacidad_kg) : '',
+        transporte_capacidad_kg: guia.transporte_capacidad_kg !== null ? String(guia.transporte_capacidad_kg) : '',
 
         es_piscicultura: guia.es_piscicultura,
         observaciones: guia.observaciones ?? '',
@@ -68,14 +67,12 @@ export default function EditarGuia({
         // necesita al menos un renglón sobre el que escribir.
         detalles:
             guia.detalles.length > 0
-                ? guia.detalles.map(
-                      (d): FilaDetalle => ({
-                          key: `d-${d.id}`,
-                          tarifa_sireb: d.tarifa_sireb,
-                          condicion: d.condicion,
-                          cantidad_kg: String(d.cantidad_kg),
-                      }),
-                  )
+                ? guia.detalles.map((d): FilaDetalle => ({
+                      key: `d-${d.id}`,
+                      tarifa_sireb: d.tarifa_sireb,
+                      condicion: d.condicion,
+                      cantidad_kg: String(d.cantidad_kg),
+                  }))
                 : [filaVacia()],
     });
 
@@ -98,11 +95,8 @@ export default function EditarGuia({
 
     const completo =
         (form.data.es_piscicultura || (autorizacion !== null && !excede)) &&
-        form.data.origen.trim() !== '' &&
-        form.data.destino.trim() !== '' &&
-        form.data.detalles.some(
-            (f) => f.tarifa_sireb !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0,
-        );
+        rutaCompleta(form.data) &&
+        form.data.detalles.some((f) => f.tarifa_sireb !== '' && f.condicion !== '' && Number(f.cantidad_kg || 0) > 0);
 
     return (
         <LayoutPanel
@@ -153,7 +147,12 @@ export default function EditarGuia({
                         <CardContent className="space-y-5">
                             {/* No se corrige: la puso el servidor al registrar. */}
                             <Campo etiqueta="Fecha de solicitud" htmlFor="fecha_solicitud" className="max-w-xs">
-                                <Input id="fecha_solicitud" value={guia.fecha_solicitud ? fecha(guia.fecha_solicitud) : '—'} readOnly disabled />
+                                <Input
+                                    id="fecha_solicitud"
+                                    value={guia.fecha_solicitud ? fecha(guia.fecha_solicitud) : '—'}
+                                    readOnly
+                                    disabled
+                                />
                             </Campo>
 
                             <CamposGuia
@@ -162,9 +161,7 @@ export default function EditarGuia({
                                 medios={medios}
                                 tiposTransporte={tiposTransporte}
                                 descuentoPiscicultura={descuentoPiscicultura}
-                                onCambio={(campo, valor) =>
-                                    form.setData((datos) => ({ ...datos, [campo]: valor }))
-                                }
+                                onCambio={(campo, valor) => form.setData((datos) => ({ ...datos, [campo]: valor }))}
                             />
                         </CardContent>
                     </Card>
@@ -195,25 +192,18 @@ export default function EditarGuia({
 
                     <CardContent className="space-y-4">
                         <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                A cobrar
-                            </p>
-                            <p className="text-3xl font-semibold tabular-nums">
-                                {bs(monto, institucion.moneda)}
-                            </p>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">A cobrar</p>
+                            <p className="text-3xl font-semibold tabular-nums">{bs(monto, institucion.moneda)}</p>
 
                             {form.data.es_piscicultura && (
                                 <p className="text-xs text-muted-foreground">
-                                    Con el descuento de piscicultura. Sin él serían{' '}
-                                    {bs(importe, institucion.moneda)}.
+                                    Con el descuento de piscicultura. Sin él serían {bs(importe, institucion.moneda)}.
                                 </p>
                             )}
                         </div>
 
                         <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                Carga declarada
-                            </p>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Carga declarada</p>
                             <p className="text-xl font-semibold tabular-nums">{kilos.toFixed(2)} kg</p>
                         </div>
 

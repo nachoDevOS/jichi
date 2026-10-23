@@ -1,11 +1,7 @@
 import { ArrowRight, Fish, ScanLine, ShieldCheck, Truck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import {
-    Canoa,
-    Cardumen,
-    OlaDivisoria,
-    Olas,
-} from '@/components/publico/institucional/ilustraciones';
+import { Cardumen, Olas } from '@/components/publico/institucional/ilustraciones';
+import { PaisajeRio } from '@/components/publico/institucional/paisaje-rio';
 import type { InstitucionPortada } from '@/types/publico';
 
 /** Las tres cosas a las que viene el público: una por tarjeta, con el ícono como pista para quien lee poco. */
@@ -82,14 +78,14 @@ export function Hero({
                     </h1>
 
                     <p className="mt-5 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
-                        Tramite su carnet y sus permisos de pesca y transporte con el{' '}
-                        {portada.nombre}, y compruebe en segundos si un documento es auténtico.
+                        Tramite su carnet y sus permisos de pesca y transporte con el {portada.nombre}, y compruebe en
+                        segundos si un documento es auténtico.
                     </p>
 
                     {cifras.length > 0 && (
-                        <dl className="mt-8 grid grid-cols-3 gap-4 sm:flex sm:gap-x-8">
+                        <dl className="mt-8 grid grid-cols-3 divide-x divide-white/15 sm:inline-grid">
                             {cifras.map((c) => (
-                                <div key={c.texto}>
+                                <div key={c.texto} className="px-4 first:pl-0 sm:px-7">
                                     <dt className="sr-only">{c.texto}</dt>
                                     <dd className="text-3xl font-extrabold text-institucional-dorado sm:text-4xl">
                                         {c.valor}
@@ -103,17 +99,13 @@ export function Hero({
                     )}
                 </div>
 
-                {/* El sol sobre el río, con la canoa. Solo en pantallas anchas: en el teléfono empuja las tarjetas abajo. */}
-                <div
-                    className="relative hidden aspect-square w-full max-w-sm justify-self-center lg:block"
-                    aria-hidden
-                >
-                    <div className="absolute inset-0 overflow-hidden rounded-full border-4 border-white/15 bg-linear-to-b from-rio-claro/30 to-transparent shadow-2xl">
-                        <div className="absolute top-[18%] left-1/2 size-1/2 -translate-x-1/2 rounded-full bg-linear-to-b from-institucional-dorado to-institucional-dorado-oscuro" />
-                        <div className="absolute inset-x-0 bottom-0 h-[45%] bg-linear-to-b from-rio-claro to-rio-profundo" />
-                        <OlaDivisoria className="absolute bottom-[45%] h-6! text-rio-claro sm:h-8!" />
+                {/* Atardecer sobre el río, con el pescador. Solo en pantallas anchas: en el teléfono empuja las tarjetas abajo. */}
+                <div className="relative hidden aspect-square w-full max-w-sm justify-self-center lg:block" aria-hidden>
+                    {/* Anillo exterior fino: enmarca la lámina sin pesar. */}
+                    <div className="absolute -inset-4 rounded-full border border-dashed border-white/15" />
+                    <div className="absolute inset-0 overflow-hidden rounded-full border-4 border-white/15 shadow-2xl shadow-black/40">
+                        <PaisajeRio className="size-full" />
                     </div>
-                    <Canoa className="animar-flote absolute bottom-[41%] left-1/2 w-44 -translate-x-1/2 text-rio-profundo" />
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3 lg:col-span-2">
@@ -121,15 +113,17 @@ export function Hero({
                         <a
                             key={a.href}
                             href={a.href}
-                            className={`group flex items-center gap-4 rounded-2xl p-4 shadow-lg transition-all hover:-translate-y-0.5 ${
+                            className={`group flex min-h-24 items-center gap-4 rounded-2xl p-4 shadow-lg ring-1 transition-all hover:-translate-y-0.5 hover:shadow-xl ${
                                 a.destacado
-                                    ? 'bg-institucional-dorado text-rio-profundo hover:bg-institucional-dorado-oscuro'
-                                    : 'border border-white/20 bg-white/10 text-white backdrop-blur hover:bg-white/20'
+                                    ? 'bg-linear-to-br from-institucional-dorado to-institucional-dorado-oscuro text-rio-profundo ring-white/30 hover:brightness-105'
+                                    : 'bg-white/10 text-white ring-white/20 backdrop-blur hover:bg-white/15 hover:ring-rio-claro/60'
                             }`}
                         >
                             <span
-                                className={`flex size-12 shrink-0 items-center justify-center rounded-xl ${
-                                    a.destacado ? 'bg-rio-profundo/10' : 'bg-white/15'
+                                className={`flex size-12 shrink-0 items-center justify-center rounded-xl ring-1 ${
+                                    a.destacado
+                                        ? 'bg-rio-profundo/10 ring-rio-profundo/15'
+                                        : 'bg-linear-to-br from-rio-claro/40 to-rio/30 ring-white/20'
                                 }`}
                             >
                                 <a.icono className="size-6" />

@@ -15,6 +15,8 @@ use App\Services\EmitirFaenaService;
 use App\Services\EmitirGuiaService;
 use App\Services\RevisarCupoService;
 use App\Services\RevisarGuiaService;
+use App\Support\ExpedienteBeneficiario;
+use App\Support\ResumenPortal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\SirebFalso;
@@ -228,6 +230,17 @@ class DescuentoCupoTest extends TestCase
 
         $this->assertSame(700.0, (float) $faena->kilos_extraidos);
         $this->assertSame(700.0, $this->disponibles($this->autJuan), 'la faena no descontó');
+    }
+
+    public function test_el_portal_muestra_de_que_pescador_es_el_pescado_de_la_guia(): void
+    {
+        $this->registrar($this->autJuan, 300);
+
+        $guia = ExpedienteBeneficiario::guias($this->carnetNacho->beneficiario)->first();
+        $papel = ResumenPortal::guia($guia);
+
+        $this->assertSame($this->autJuan->beneficiario->nombreCompleto, $papel['pescado_de']);
+        $this->assertSame($this->autJuan->numeroLegible(), $papel['autorizacion_numero']);
     }
 
     //  Auxiliares

@@ -135,7 +135,7 @@ class GuiaController extends Controller
                 // se busca a mano.
                 'carnets_vigentes' => $beneficiario->carnets()
                     ->vigentes()
-                    ->with('codigo')
+                    ->with(['codigo', 'asociacion'])
                     ->get()
                     ->map(fn (Carnet $c): array => $c->resumenParaEmitir())
                     ->values()

@@ -90,19 +90,16 @@ export interface FaenaFila {
 /** La faena con el detalle que solo pinta la ficha. */
 export interface FaenaFicha extends FaenaFila {
     asociacion: string | null;
+    /** Negativo si ya desembarcó; null hasta la aprobación. */
+    dias_para_desembarque: number | null;
 
-
-    /**
-     * El cupo del que salieron los kilos.
-     *
-     * Va en la ficha porque es la pregunta que sigue: «¿le queda para otra
-     * salida?». Sin esto habría que ir al módulo de cupos a buscarlo.
-     */
+    /** La autorización de la que copió los kilos (no descuenta de ella): «¿le queda para otra salida?». */
     cupo: {
         id: number;
         descripcion: string | null;
         volumen_total_kg: number;
         kilos_disponibles: number;
+        ya_fue_aprobado: boolean;
     } | null;
 }
 

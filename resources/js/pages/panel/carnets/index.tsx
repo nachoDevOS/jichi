@@ -59,7 +59,7 @@ export default function IndiceCarnets({
                 puede('carnets.crear') && (
                     <Button onClick={() => router.visit(route('carnets.create'))}>
                         <Plus className="size-4" />
-                        Registra carnet
+                        Registrar carnet
                     </Button>
                 )
             }

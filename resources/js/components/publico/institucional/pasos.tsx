@@ -27,7 +27,7 @@ const REQUISITOS: { icono: LucideIcon; titulo: string; items: string[] }[] = [
     {
         icono: IdCard,
         titulo: 'Para cualquier carnet',
-        items: ['Cédula de identidad', 'Aval de su asociación', 'Boleta del depósito bancario'],
+        items: ['Cédula de identidad', 'Aval de su asociación'],
     },
     {
         icono: Fish,
@@ -35,7 +35,6 @@ const REQUISITOS: { icono: LucideIcon; titulo: string; items: string[] }[] = [
         items: [
             'Su carnet de pescador vigente',
             'Datos de la embarcación y del comandante',
-            'Kilos que va a extraer',
         ],
     },
     {
@@ -45,6 +44,7 @@ const REQUISITOS: { icono: LucideIcon; titulo: string; items: string[] }[] = [
             'Su carnet de comercializador vigente',
             'Origen, destino y vehículo',
             'Carga: producto y kilos',
+            'A qué pescador le compró (N° de su autorización)',
         ],
     },
 ];
@@ -54,7 +54,7 @@ export function Pasos() {
         <Seccion
             id="pasos"
             titulo="Cómo es el trámite en ventanilla"
-            bajada="Todos los documentos siguen los mismos cuatro pasos."
+            bajada="Todos los documentos siguen los mismos tres pasos."
             oscuro
         >
             <ol className="grid gap-4 sm:grid-cols-3">

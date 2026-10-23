@@ -47,7 +47,7 @@ export default function IndiceFaenas({
     return (
         <LayoutPanel
             titulo="Permisos de faena"
-            descripcion="Una por salida. Descuenta kilos de la bolsa madre del pescador recién cuando se aprueba."
+            descripcion="Una por salida. Sale con los kilos disponibles de la autorización y no los descuenta: los descuenta la guía."
             acciones={
                 puede('faenas.crear') && (
                     <Button onClick={() => router.visit(route('faenas.create'))}>

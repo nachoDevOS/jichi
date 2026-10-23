@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Panel;
 
+use App\Enums\EstadoAsociacion;
 use App\Enums\TipoActor;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -35,7 +36,7 @@ class EmitirCarnetRequest extends FormRequest
             'asociacion_id' => [
                 'required', 'integer',
                 Rule::exists('asociaciones', 'id')
-                    ->where('estado', 'activo')
+                    ->where('estado', EstadoAsociacion::Activo->value)
                     ->whereNull('deleted_at'),
             ],
 

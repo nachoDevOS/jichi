@@ -45,7 +45,7 @@ const CAMINOS: {
             },
             {
                 nombre: 'Permiso de Faena',
-                texto: 'Uno por cada salida de pesca. Los kilos del permiso se descuentan de su autorización.',
+                texto: 'Uno por cada salida de pesca. Sale con los kilos disponibles de su autorización, sin descontarlos.',
                 vigencia: 'Hasta 30 días',
             },
         ],
@@ -73,7 +73,7 @@ const CAMINOS: {
             },
             {
                 nombre: 'Guía Única de Transporte',
-                texto: 'Una por cada traslado: de dónde a dónde, en qué vehículo y qué carga. Se paga por kilo según el producto; si viene de piscicultura, la mitad.',
+                texto: 'Una por cada traslado: de dónde a dónde, en qué vehículo y qué carga, y a qué pescador le compró: esos kilos se descuentan de su autorización. Se paga por kilo según el producto; si viene de piscicultura, la mitad.',
                 vigencia: 'Hasta 5 días',
             },
         ],

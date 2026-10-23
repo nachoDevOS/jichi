@@ -39,24 +39,22 @@ class EmitirGuiaRequest extends FormRequest
     protected function reglasDelPapel(): array
     {
         return [
-            //  BLOQUE B — la ubicación. Solo el lugar es obligatorio: el resto
-            //  del papel se llena a mano y llega incompleto.
+            // Bloques B y C del papel: obligatorios desde el 23/10/2026 (decisión del responsable).
             'origen' => ['required', 'string', 'max:160'],
-            'origen_departamento' => ['nullable', 'string', 'max:100'],
-            'origen_provincia' => ['nullable', 'string', 'max:100'],
-            'origen_distrito' => ['nullable', 'string', 'max:100'],
+            'origen_departamento' => ['required', 'string', 'max:100'],
+            'origen_provincia' => ['required', 'string', 'max:100'],
+            'origen_distrito' => ['required', 'string', 'max:100'],
 
             'destino' => ['required', 'string', 'max:160'],
-            'destino_departamento' => ['nullable', 'string', 'max:100'],
-            'destino_provincia' => ['nullable', 'string', 'max:100'],
-            'destino_distrito' => ['nullable', 'string', 'max:100'],
+            'destino_departamento' => ['required', 'string', 'max:100'],
+            'destino_provincia' => ['required', 'string', 'max:100'],
+            'destino_distrito' => ['required', 'string', 'max:100'],
 
-            //  BLOQUE C — el medio y el vehículo
-            'medio_transporte' => ['nullable', Rule::enum(MedioTransporte::class)],
-            'tipo_transporte' => ['nullable', Rule::enum(TipoTransporte::class)],
-            'transporte_nombre' => ['nullable', 'string', 'max:150'],
-            'transporte_placa' => ['nullable', 'string', 'max:50'],
-            'transporte_capacidad_kg' => ['nullable', 'numeric', 'min:0', 'max:9999999999', 'decimal:0,2'],
+            'medio_transporte' => ['required', Rule::enum(MedioTransporte::class)],
+            'tipo_transporte' => ['required', Rule::enum(TipoTransporte::class)],
+            'transporte_nombre' => ['required', 'string', 'max:150'],
+            'transporte_placa' => ['required', 'string', 'max:50'],
+            'transporte_capacidad_kg' => ['required', 'numeric', 'gt:0', 'max:9999999999', 'decimal:0,2'],
 
             /*
              * La marca que vale plata: con ella el arancel se cobra al 50%.
@@ -98,6 +96,18 @@ class EmitirGuiaRequest extends FormRequest
             'carnet_id.exists' => 'Ese carnet no existe.',
             'origen.required' => 'Indique desde dónde sale la carga.',
             'destino.required' => 'Indique a dónde va la carga.',
+            'origen_departamento.required' => 'Indique el departamento de origen.',
+            'origen_provincia.required' => 'Indique la provincia de origen.',
+            'origen_distrito.required' => 'Indique el distrito o cuenca de origen.',
+            'destino_departamento.required' => 'Indique el departamento de destino.',
+            'destino_provincia.required' => 'Indique la provincia de destino.',
+            'destino_distrito.required' => 'Indique el distrito o cuenca de destino.',
+            'medio_transporte.required' => 'Elija por dónde viaja la carga.',
+            'tipo_transporte.required' => 'Elija en qué vehículo viaja.',
+            'transporte_nombre.required' => 'Indique el nombre o tipo del transporte.',
+            'transporte_placa.required' => 'Indique la placa.',
+            'transporte_capacidad_kg.required' => 'Indique la capacidad máxima en kg.',
+            'transporte_capacidad_kg.gt' => 'La capacidad tiene que ser mayor que cero.',
             'es_piscicultura.required' => 'Indique si el producto es de piscicultura.',
             'aprovechamiento_id.required' => 'Indique a qué pescador le compró el pescado.',
             'aprovechamiento_id.prohibited' => 'El producto de criadero no lleva pescador.',

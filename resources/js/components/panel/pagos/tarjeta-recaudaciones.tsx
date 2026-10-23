@@ -56,7 +56,8 @@ export function TarjetaRecaudaciones({
     const { puede } = usePermisos();
     const ofreceVerificar = puede(`${documento}.verificar-pago`) && puedeVerificar;
     const ofreceCarga = puede(`${documento}.cargar-pago`) && puedeCargar;
-    const ofreceRenovar = puede(`${documento}.renovar-liquidacion`) && Boolean(sireb?.puede_renovar) && Boolean(rutaRenovar);
+    const ofreceRenovar =
+        puede(`${documento}.renovar-liquidacion`) && Boolean(sireb?.puede_renovar) && Boolean(rutaRenovar);
     const verificacion = useForm({});
     const renovacion = useForm({});
     const [confirmandoRenovar, setConfirmandoRenovar] = useState(false);
@@ -104,18 +105,14 @@ export function TarjetaRecaudaciones({
             </CardHeader>
 
             <CardContent className="grid gap-6 text-sm @3xl:grid-cols-2">
-                <div className="space-y-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-muted-foreground">Monto</span>
-                        <span className="text-xl font-semibold tabular-nums">{bs(monto)}</span>
-                    </div>
-
-                    {sireb && (
-                        <div className="flex items-center justify-between gap-2">
-                            <span className="text-muted-foreground">Recaudaciones</span>
-                            <Badge color={sireb.estado_color}>{sireb.estado_etiqueta}</Badge>
+                <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3 rounded-xl bg-secondary/60 p-4">
+                        <div>
+                            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Monto</p>
+                            <p className="text-3xl font-semibold tabular-nums">{bs(monto)}</p>
                         </div>
-                    )}
+                        {sireb && <Badge color={sireb.estado_color}>{sireb.estado_etiqueta}</Badge>}
+                    </div>
 
                     {/* Con este código el titular paga en SIREB. */}
                     {sireb?.codigo_publico && (
@@ -136,32 +133,23 @@ export function TarjetaRecaudaciones({
                                 <AlertTriangle className="relative size-5" />
                             </span>
                             <div className="space-y-1">
-                                <p className="text-base font-bold">{sireb.caida === 'anulada' ? 'Cobro anulado' : 'Plazo de pago vencido'}</p>
+                                <p className="text-base font-bold">
+                                    {sireb.caida === 'anulada' ? 'Cobro anulado' : 'Plazo de pago vencido'}
+                                </p>
                                 <p className="font-medium">
-                                    {sireb.caida === 'anulada' ? 'Recaudaciones anuló el cobro.' : 'Venció el plazo de pago.'} El trámite sigue
-                                    pendiente: genere una nueva liquidación para cobrarlo.
+                                    {sireb.caida === 'anulada'
+                                        ? 'Recaudaciones anuló el cobro.'
+                                        : 'Venció el plazo de pago.'}{' '}
+                                    El trámite sigue pendiente: genere una nueva liquidación para cobrarlo.
                                 </p>
                             </div>
                         </div>
                     )}
 
-                    {/* Sin pago todavía: lo que se ve antes de cobrar. */}
                     {!recibo && !sireb?.pago && (
-                        <>
-                            {sireb?.codigo_publico && (
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="text-muted-foreground">Pago cargado</span>
-                                    {sireb.pago_consultado ? (
-                                        <Badge color="slate">No</Badge>
-                                    ) : (
-                                        <span className="text-muted-foreground">Sin verificar</span>
-                                    )}
-                                </div>
-                            )}
-                            <p className="text-muted-foreground">
-                                Se paga en Recaudaciones. Cuando lo validen allá, queda aprobado y se emite el recibo.
-                            </p>
-                        </>
+                        <p className="text-xs text-muted-foreground">
+                            Cuando Recaudaciones valide el pago, el trámite queda aprobado y se emite el recibo.
+                        </p>
                     )}
                 </div>
 
@@ -184,7 +172,9 @@ export function TarjetaRecaudaciones({
                             )}
                             <div className="flex justify-between gap-3">
                                 <span className="text-muted-foreground">Pagado</span>
-                                <span>{recibo.fecha_pago ? fecha(recibo.fecha_pago) : fechaHora(recibo.emitido_en)}</span>
+                                <span>
+                                    {recibo.fecha_pago ? fecha(recibo.fecha_pago) : fechaHora(recibo.emitido_en)}
+                                </span>
                             </div>
                             {sireb?.pago?.fecha_validacion && (
                                 <div className="flex justify-between gap-3">
@@ -241,7 +231,8 @@ export function TarjetaRecaudaciones({
                                 </div>
                             )}
                             <p className="text-xs text-muted-foreground">
-                                Lo cargaron en Recaudaciones. Cuando lo validen allá, queda aprobado y se emite el recibo.
+                                Lo cargaron en Recaudaciones. Cuando lo validen allá, queda aprobado y se emite el
+                                recibo.
                             </p>
                         </div>
                     ) : null}
@@ -275,7 +266,12 @@ export function TarjetaRecaudaciones({
                     {cargando && (
                         <form onSubmit={cargar} className="space-y-3 rounded-md border p-3">
                             <p className="font-medium">Cargar pago en Recaudaciones</p>
-                            <Campo etiqueta="N° de transacción" htmlFor="numero_transaccion" error={carga.errors.numero_transaccion} obligatorio>
+                            <Campo
+                                etiqueta="N° de transacción"
+                                htmlFor="numero_transaccion"
+                                error={carga.errors.numero_transaccion}
+                                obligatorio
+                            >
                                 <Input
                                     id="numero_transaccion"
                                     value={carga.data.numero_transaccion}
@@ -365,7 +361,9 @@ export function TarjetaRecaudaciones({
                 cotizacion={cotizacion}
                 procesando={renovacion.processing}
                 onCerrar={cerrarRenovar}
-                onConfirmar={() => rutaRenovar && renovacion.post(rutaRenovar, { preserveScroll: true, onFinish: cerrarRenovar })}
+                onConfirmar={() =>
+                    rutaRenovar && renovacion.post(rutaRenovar, { preserveScroll: true, onFinish: cerrarRenovar })
+                }
             />
 
             <ModalPagoQr
@@ -376,7 +374,9 @@ export function TarjetaRecaudaciones({
                 pago={pago}
                 puedeVerificar={ofreceVerificar}
                 verificando={verificacion.processing}
-                onVerificar={() => verificacion.post(rutaVerificar, { preserveScroll: true, onSuccess: () => setModo(null) })}
+                onVerificar={() =>
+                    verificacion.post(rutaVerificar, { preserveScroll: true, onSuccess: () => setModo(null) })
+                }
                 onCerrar={cerrarModal}
             />
         </Card>
@@ -394,13 +394,17 @@ const ESTADO_LIQUIDACION: Record<LiquidacionHistorial['estado'], { etiqueta: str
 function HistorialLiquidaciones({ historial }: { historial: LiquidacionHistorial[] }) {
     return (
         <details className="@3xl:col-span-2">
-            <summary className="cursor-pointer text-muted-foreground">Liquidaciones anteriores ({historial.length})</summary>
+            <summary className="cursor-pointer text-muted-foreground">
+                Liquidaciones anteriores ({historial.length})
+            </summary>
             <ul className="mt-3 space-y-2">
                 {[...historial].reverse().map((l) => (
                     <li key={l.liquidacion_id} className="space-y-1 rounded-md border p-3">
                         <div className="flex items-center justify-between gap-2">
                             <span className="font-mono">{l.codigo_publico ?? '—'}</span>
-                            <Badge color={ESTADO_LIQUIDACION[l.estado].color}>{ESTADO_LIQUIDACION[l.estado].etiqueta}</Badge>
+                            <Badge color={ESTADO_LIQUIDACION[l.estado].color}>
+                                {ESTADO_LIQUIDACION[l.estado].etiqueta}
+                            </Badge>
                         </div>
                         <div className="flex justify-between gap-3">
                             <span className="text-muted-foreground">Monto</span>
@@ -417,7 +421,12 @@ function HistorialLiquidaciones({ historial }: { historial: LiquidacionHistorial
                             </div>
                         )}
                         <p className="text-xs break-all text-muted-foreground">
-                            {l.items.map((i) => `${i.producto ? i.producto + ': ' : ''}tarifa ${i.tarifa_id} a ${bs(i.precio)}`).join(' · ')}
+                            {l.items
+                                .map(
+                                    (i) =>
+                                        `${i.producto ? i.producto + ': ' : ''}tarifa ${i.tarifa_id} a ${bs(i.precio)}`,
+                                )
+                                .join(' · ')}
                         </p>
                     </li>
                 ))}
@@ -470,7 +479,9 @@ function OpcionPago({
                 activa && estilo.activa,
             )}
         >
-            <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', estilo.icono)}>{icono}</span>
+            <span className={cn('flex size-8 shrink-0 items-center justify-center rounded-full', estilo.icono)}>
+                {icono}
+            </span>
             <span className="min-w-0 leading-tight">
                 <span className={cn('block text-sm font-semibold', estilo.titulo)}>{titulo}</span>
                 <span className="block text-xs text-muted-foreground">{detalle}</span>

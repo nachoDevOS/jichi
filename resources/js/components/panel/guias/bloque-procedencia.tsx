@@ -1,7 +1,8 @@
-import { ShieldAlert } from 'lucide-react';
+import { Check, ShieldAlert } from 'lucide-react';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
+import { BarraDisponible } from '@/components/panel/comunes/ficha';
 import { Campo } from '@/components/ui/campo';
-import { fecha } from '@/lib/utils';
+import { cn, fecha } from '@/lib/utils';
 import type { AutorizacionVendible, BeneficiarioSugerido } from '@/types/beneficiarios';
 
 /**
@@ -59,46 +60,51 @@ export function BloqueProcedencia({
             {pescador && autorizaciones.length === 0 && (
                 <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
                     <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-                    {pescador.nombreCompleto} no tiene una Autorización de Pesca aprobada y vigente: no se le
-                    puede comprar pescado.
+                    {pescador.nombreCompleto} no tiene una Autorización de Pesca aprobada y vigente: no se le puede
+                    comprar pescado.
                 </p>
             )}
 
             {autorizaciones.length > 0 && (
                 <Campo etiqueta="Autorización de la que sale el pescado" obligatorio>
-                    <ul className="space-y-2">
+                    <div role="radiogroup" aria-label="Autorización" className="grid gap-2 sm:grid-cols-2">
                         {autorizaciones.map((a) => {
                             const activa = a.id === autorizacionId;
 
                             return (
-                                <li key={a.id}>
-                                    <button
-                                        type="button"
-                                        onClick={() => onAutorizacion(a)}
-                                        className={[
-                                            'flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left transition-colors hover:bg-secondary',
-                                            activa ? 'border-primary bg-secondary' : 'border-border',
-                                        ].join(' ')}
-                                    >
-                                        <span className="min-w-0">
-                                            <span className="block text-sm font-medium">
-                                                N° {a.numero} · {a.escala ?? `${a.volumen_total_kg} kg`}
-                                            </span>
-                                            <span className="block text-xs text-muted-foreground">
-                                                vence {fecha(a.fecha_vencimiento)}
-                                            </span>
+                                <button
+                                    key={a.id}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={activa}
+                                    onClick={() => onAutorizacion(a)}
+                                    className={cn(
+                                        'relative space-y-2 rounded-lg border px-3 py-2.5 text-left transition-all',
+                                        activa
+                                            ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+                                            : 'border-border hover:border-primary/50 hover:shadow-md',
+                                    )}
+                                >
+                                    {activa && (
+                                        <Check className="absolute top-2 right-2 size-3.5 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                                    )}
+                                    <span className="block pr-5 text-sm">
+                                        <span className="font-semibold">Autorización N° {a.numero}</span>
+                                        <span className="text-muted-foreground">
+                                            {' '}
+                                            · vence {fecha(a.fecha_vencimiento)}
                                         </span>
-                                        <span className="shrink-0 text-right text-sm tabular-nums">
-                                            <span className="font-semibold">{a.kilos_disponibles} kg</span>
-                                            <span className="block text-xs text-muted-foreground">
-                                                disponibles de {a.volumen_total_kg}
-                                            </span>
-                                        </span>
-                                    </button>
-                                </li>
+                                    </span>
+                                    {/* Acá sí va el saldo: es lo que esta guía descuenta. */}
+                                    <BarraDisponible
+                                        disponible={a.kilos_disponibles}
+                                        total={a.volumen_total_kg}
+                                        aprobada
+                                    />
+                                </button>
                             );
                         })}
-                    </ul>
+                    </div>
                 </Campo>
             )}
         </div>

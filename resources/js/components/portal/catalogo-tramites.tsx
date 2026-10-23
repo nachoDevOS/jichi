@@ -24,7 +24,7 @@ const PESCADOR: Tramite[] = [
     {
         clase: 'aprovechamiento',
         titulo: 'Autorización de Pesca',
-        lleve: ['Cédula', 'Tipo de embarcación', 'Kilos que piensa pescar'],
+        lleve: ['Cédula', 'Tipo de embarcación', 'El tramo de la escala que va a pedir'],
         vale: 'todo el año',
     },
     {
@@ -37,7 +37,7 @@ const PESCADOR: Tramite[] = [
     {
         clase: 'faena',
         titulo: 'Permiso de faena',
-        lleve: ['Carnet de pescador al día', 'Datos de la embarcación', 'Kilos que va a sacar'],
+        lleve: ['Carnet de pescador al día', 'Datos de la embarcación'],
         vale: '30 días',
     },
 ];
@@ -53,7 +53,7 @@ const COMERCIALIZADOR: Tramite[] = [
     {
         clase: 'guia',
         titulo: 'Guía de transporte',
-        lleve: ['Carnet de comercializador al día', 'De dónde a dónde', 'En qué lo lleva', 'Qué pescado y cuántos kilos'],
+        lleve: ['Carnet de comercializador al día', 'De dónde a dónde', 'En qué lo lleva', 'Qué pescado y cuántos kilos', 'A qué pescador le compró (N° de su autorización)'],
         vale: '5 días',
     },
 ];

@@ -287,7 +287,7 @@
         </tr>
         <tr>
             <td class="ref">a</td>
-            <td class="rot">Producción u origen</td>
+            <td class="rot">origen</td>
             <td class="dato">{{ $origen['lugar'] }}</td>
             <td class="dato" colspan="2">{{ $origen['departamento'] }}</td>
             <td class="dato" colspan="2">{{ $origen['provincia'] }}</td>

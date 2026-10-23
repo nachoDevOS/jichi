@@ -115,6 +115,7 @@ class FaenaController extends Controller
                     ->with([
                         'codigo',
                         'aprovechamiento',
+                        'asociacion',
                     ])
                     ->get()
                     ->map(fn (Carnet $c): array => $c->resumenParaEmitir())
@@ -318,6 +319,9 @@ class FaenaController extends Controller
             'faena' => [
                 ...$this->resumir($faena),
                 'asociacion' => $faena->carnet?->asociacion?->sigla ?? $faena->carnet?->asociacion?->nombre,
+                // Negativo si ya desembarcó; null mientras no esté aprobada (la fecha la pone la aprobación).
+                'dias_para_desembarque' => $faena->fecha_desembarque === null ? null
+                    : (int) now()->startOfDay()->diffInDays($faena->fecha_desembarque->copy()->startOfDay(), false),
 
                 // La autorización de la que copió los kilos. No descuenta de ella.
                 'cupo' => $faena->cupo() ? [
@@ -325,10 +329,11 @@ class FaenaController extends Controller
                     'descripcion' => $faena->cupo()->escala,
                     'volumen_total_kg' => (float) $faena->cupo()->volumen_total_kg,
                     'kilos_disponibles' => (float) $faena->cupo()->kilos_disponibles,
+                    'ya_fue_aprobado' => $faena->cupo()->yaFueAprobado(),
                 ] : null,
             ],
 
-            // El recibo del trámite: uno solo, emitido al enviar a revisión.
+            // El recibo del trámite: uno solo, emitido cuando SIREB confirma el pago.
             'recibo' => $recibo ? [
                 'id' => $recibo->id,
                 'numero_recibo' => $recibo->numero_recibo,

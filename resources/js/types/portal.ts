@@ -74,6 +74,9 @@ export interface GuiaPortal extends PapelBase {
     numero: string;
     ruta: string;
     kilos: number;
+    /** El pescador que vendió: de su autorización se descontaron los kilos. */
+    pescado_de: string | null;
+    autorizacion_numero: string | null;
     /** Un MOMENTO, con hora: la guía vale por horas. */
     fecha_vencimiento: string | null;
 }

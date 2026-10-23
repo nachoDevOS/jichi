@@ -88,8 +88,9 @@ export function BarraSuperior({
             <div className="border-b border-border px-4 py-3 sm:px-6">
                 <Migas titulo={titulo} />
 
-                <div className="mt-1 flex items-start justify-between gap-4">
-                    <div className="min-w-0">
+                {/* Se envuelve: en el celular los botones bajan debajo del título en vez de salirse de la pantalla. */}
+                <div className="mt-1 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <div className="min-w-0 flex-1 basis-60">
                         {/* truncate corta con «...» los títulos largos en vez de
                             empujar los botones fuera de la pantalla. */}
                         <h1 className="truncate text-xl font-semibold tracking-tight">
@@ -104,7 +105,7 @@ export function BarraSuperior({
                     </div>
 
                     {acciones && (
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex max-w-full flex-wrap items-center gap-2">
                             {acciones}
                         </div>
                     )}

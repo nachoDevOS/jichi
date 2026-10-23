@@ -36,7 +36,7 @@ export function GraficoRecaudacionMensual({
                 <h3 className="text-base font-semibold tracking-tight">Recaudación del año</h3>
 
                 <p className="text-sm opacity-75">
-                    Últimos 12 meses en {moneda}, sumando todos los depósitos registrados.
+                    Últimos 12 meses en {moneda}, sumando lo cobrado en Recaudaciones (SIREB).
                 </p>
 
                 <div className="mt-4 h-64">

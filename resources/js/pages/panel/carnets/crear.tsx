@@ -1,21 +1,41 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { Info, TriangleAlert } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
+    CalendarClock,
+    Check,
+    Fish,
+    IdCard,
+    Info,
+    RefreshCw,
+    TriangleAlert,
+    Truck,
+    Users,
+    Wallet,
+    Waves,
+} from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { Aviso, BandaFormulario, kg, SeccionFormulario } from '@/components/panel/comunes/ficha';
 import { BuscadorBeneficiario } from '@/components/panel/comunes/buscador-beneficiario';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { SelectorArchivo } from '@/components/ui/selector-archivo';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, fecha } from '@/lib/utils';
+import { bs, cn, fecha } from '@/lib/utils';
 import type { OpcionEnum, PageProps, TipoActor } from '@/types';
 import type { BeneficiarioSugerido } from '@/types/beneficiarios';
 import type { AsociacionElegible, CupoVigente, PreciosCarnet, ReposicionDeCarnet } from '@/types/carnets';
 
+/** Qué habilita cada actividad: es lo que decide `TipoActor` en el servidor. */
+const ACTIVIDAD: Record<TipoActor, { icono: LucideIcon; habilita: string }> = {
+    pescador: { icono: Fish, habilita: 'Saca permisos de faena con los kilos de su autorización' },
+    comercializador: { icono: Truck, habilita: 'Saca guías de transporte; no lleva autorización' },
+};
+
 /**
- *  Emitir una credencial — paso 3 del flujo
+ *  Registrar un carnet (paso 3 del flujo): queda pendiente hasta que se pague en SIREB
  */
 export default function CrearCarnet({
     beneficiario,
@@ -29,7 +49,7 @@ export default function CrearCarnet({
     beneficiario: BeneficiarioSugerido | null;
     /** Llega de «Reponer»: los datos del carnet revocado, para no volver a elegirlos. */
     reposicion: ReposicionDeCarnet | null;
-    /** Llega de la ficha del cupo: la bolsa que se preselecciona. */
+    /** Llega de la ficha de la autorización: la que se preselecciona. */
     aprovechamientoId: number | null;
     asociaciones: AsociacionElegible[];
     actividades: OpcionEnum[];
@@ -45,21 +65,18 @@ export default function CrearCarnet({
         beneficiario_id: beneficiario?.id ?? null,
         asociacion_id: reposicion ? String(reposicion.asociacion_id) : '',
         tipo_actor: (reposicion?.tipo_actor ?? '') as TipoActor | '',
-        // De qué bolsa madre cuelga. Se manda explícito en vez de dejar que el
-        // servidor adivine: así la pantalla y lo guardado dicen lo mismo.
+        // Se manda explícito en vez de dejar que el servidor adivine: pantalla y base dicen lo mismo.
         aprovechamiento_id: (reposicion?.aprovechamiento_id ??
             beneficiario?.cupos_elegibles?.find((c) => c.id === aprovechamientoId)?.id ??
             beneficiario?.cupos_elegibles?.[0]?.id ??
             null) as number | null,
-
-        // Los dos papeles que respaldan la emisión. Suben con el formulario,
-        // así que el post va con `forceFormData`.
+        // Los dos respaldos suben con el formulario: el post va con `forceFormData`.
         archivo_ci: null as File | null,
         archivo_asociacion: null as File | null,
     });
 
     const actor = form.data.tipo_actor;
-    // La tarifa sale de la actividad: el servidor la busca por nombre en SIREB.
+    const esPescador = actor === 'pescador';
     const precio = actor !== '' ? (precios?.[actor] ?? null) : null;
     const sinPrecio =
         actor === ''
@@ -71,279 +88,294 @@ export default function CrearCarnet({
                 : precio === null
                   ? `Falta definir la tarifa del carnet de ${actor} en Catálogos › Aranceles › Definir tarifas, o SIREB la dio de baja.`
                   : null;
-    const esPescador = actor === 'pescador';
 
-    /*
-     * Sus bolsas madre en curso. Son las que el servidor acepta para respaldar
-     * el carnet —pendiente, en revisión o aprobada—, no solo las que ya
-     * autorizan a pescar: el plástico se emite con el cupo sin cobrar y los dos
-     * se pagan juntos.
-     */
+    // Sus autorizaciones en curso: pendiente o aprobada respaldan el carnet; se cobran juntos.
     const cupos: CupoVigente[] = persona?.cupos_elegibles ?? [];
     const cupo = cupos.find((c) => c.id === form.data.aprovechamiento_id) ?? null;
     const faltaCupo = esPescador && persona !== null && cupos.length === 0;
+    const asociacion = asociaciones.find((a) => String(a.id) === form.data.asociacion_id) ?? null;
+    const conArchivos = form.data.archivo_ci !== null && form.data.archivo_asociacion !== null;
+
+    const listo =
+        persona !== null &&
+        actor !== '' &&
+        precio !== null &&
+        (!esPescador || cupo !== null) &&
+        asociacion !== null &&
+        conArchivos;
+
+    // La sección de la autorización solo existe para el pescador: las demás se renumeran.
+    let n = 0;
+    const siguiente = () => ++n;
 
     function elegirPersona(elegida: BeneficiarioSugerido | null) {
         setPersona(elegida);
-
         form.setData((datos) => ({
             ...datos,
             beneficiario_id: elegida?.id ?? null,
-            /*
-             * El cupo es de la persona: cambiarla cambia de qué bolsa cuelga.
-             * Se propone la primera —la más reciente— y si hay más de una, el
-             * operador elige abajo. En un comercializador queda en null: no
-             * lleva volumen, y mandarlo hace que el servidor rechace.
-             */
-            aprovechamiento_id: esPescador ? (elegida?.cupos_elegibles?.[0]?.id ?? null) : null,
+            // La autorización es de la persona: se propone la más reciente.
+            aprovechamiento_id: datos.tipo_actor === 'pescador' ? (elegida?.cupos_elegibles?.[0]?.id ?? null) : null,
         }));
-        // Se limpia el error anterior: si venía de «ya tiene carnet vigente»,
-        // dejarlo colgado bajo otra persona diría una mentira.
+        // Un error de la persona anterior («ya tiene carnet vigente») mentiría bajo otra.
         form.clearErrors('beneficiario_id');
+    }
+
+    function elegirActividad(elegido: TipoActor) {
+        // Al comercializador se le limpia la autorización: el servidor la rechaza.
+        form.setData((datos) => ({
+            ...datos,
+            tipo_actor: elegido,
+            aprovechamiento_id:
+                elegido === 'comercializador'
+                    ? null
+                    : (datos.aprovechamiento_id ?? persona?.cupos_elegibles?.[0]?.id ?? null),
+        }));
     }
 
     function enviar(e: FormEvent) {
         e.preventDefault();
-        /*
-         * `forceFormData` es obligatorio: sin él Inertia manda el cuerpo como
-         * JSON y los dos archivos se pierden en el camino, sin ningún error.
-         */
-        /*
-         * La red por si algo quedó colgado del estado: el cupo solo viaja si
-         * el tipo elegido lo lleva. Es lo mismo que exige el servidor.
-         */
-        form.transform((datos) => ({
-            ...datos,
-            aprovechamiento_id: esPescador ? datos.aprovechamiento_id : null,
-        }));
-
+        // La autorización solo viaja si el carnet es de pescador: es lo que exige el servidor.
+        form.transform((datos) => ({ ...datos, aprovechamiento_id: esPescador ? datos.aprovechamiento_id : null }));
+        // Sin `forceFormData` Inertia manda JSON y los archivos se pierden sin ningún error.
         form.post(route('carnets.store'), { forceFormData: true });
     }
 
     return (
-        <LayoutPanel
-            titulo="Registrar carnet"
-            // descripcion="Paso 3 del flujo: queda PENDIENTE de cobro. Se imprime recién cuando esté aprobado."
-        >
+        <LayoutPanel titulo="Registrar carnet">
             <Head title="Registrar carnet" />
 
+            <BandaFormulario
+                icono={IdCard}
+                titulo={
+                    reposicion
+                        ? `Reposición del carnet N° ${reposicion.registro ?? '—'}`
+                        : 'Carnet de pescador o comercializador'
+                }
+                bajada="La credencial de la gestión. Queda pendiente hasta que se pague; se imprime aprobada."
+                pasos={[
+                    { texto: 'Titular', hecho: persona !== null },
+                    { texto: 'Actividad', hecho: actor !== '' },
+                    ...(esPescador ? [{ texto: 'Autorización', hecho: cupo !== null }] : []),
+                    { texto: 'Asociación', hecho: asociacion !== null },
+                    { texto: 'Respaldos', hecho: conArchivos },
+                ]}
+            />
+
             {reposicion && (
-                <p className="mb-6 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-                    <Info className="mt-0.5 size-4 shrink-0" />
-                    <span>
-                        <strong>Reposición del carnet N° {reposicion.registro ?? '—'}</strong> ({reposicion.codigo}),
-                        ya revocado. Tipo, asociación y Autorización de Pesca para Aprovechamiento Pesquero vienen del anterior; falta
-                        adjuntar los documentos y registrar.
-                    </span>
-                </p>
+                <div className="mt-4">
+                    <Aviso
+                        tono="aviso"
+                        icono={RefreshCw}
+                        titulo={`Reposición del carnet ${reposicion.codigo}, ya revocado`}
+                    >
+                        Actividad, asociación y autorización vienen del anterior; falta adjuntar los respaldos y
+                        registrar.
+                    </Aviso>
+                </div>
             )}
 
-            <form onSubmit={enviar} className="grid gap-6 lg:grid-cols-3">
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Datos de la credencial</CardTitle>
-                    </CardHeader>
+            <form onSubmit={enviar} className="mt-6 grid gap-6 lg:grid-cols-3">
+                <div className="min-w-0 space-y-6 lg:col-span-2">
+                    <SeccionFormulario
+                        obligatorio
+                        numero={siguiente()}
+                        titulo="¿Para quién es?"
+                        ayuda="Tiene que estar en el padrón. Si es la primera vez que viene, regístrelo antes."
+                        hecho={persona !== null}
+                    >
+                        <BuscadorBeneficiario seleccionado={persona} onSeleccionar={elegirPersona} />
+                        {form.errors.beneficiario_id && (
+                            <p className="text-sm text-destructive">{form.errors.beneficiario_id}</p>
+                        )}
+                    </SeccionFormulario>
 
-                    <CardContent className="space-y-5">
-                        <Campo etiqueta="Titular" obligatorio error={form.errors.beneficiario_id}>
-                            <BuscadorBeneficiario
-                                seleccionado={persona}
-                                onSeleccionar={elegirPersona}
-                                ayuda="Tiene que estar en el padrón. Si es la primera vez que viene, regístrelo antes."
-                            />
-                        </Campo>
-
-                        <Campo
-                            etiqueta="Actividad"
-                            htmlFor="tipo_actor"
-                            error={form.errors.tipo_actor}
-                            ayuda="Decide qué habilita el documento: el de pescador saca faenas y lleva volumen autorizado; el de comercializador saca guías."
-                            obligatorio
-                        >
-                            <Select
-                                id="tipo_actor"
-                                value={form.data.tipo_actor}
-                                onChange={(e) => {
-                                    // El cupo se limpia al pasar a comercializador: el servidor lo
-                                    // rechaza, y el error caería en un campo que ahí no se dibuja.
-                                    const elegido = e.target.value as TipoActor | '';
-
-                                    form.setData((datos) => ({
-                                        ...datos,
-                                        tipo_actor: elegido,
-                                        aprovechamiento_id:
-                                            elegido === 'comercializador'
-                                                ? null
-                                                : (datos.aprovechamiento_id ??
-                                                  persona?.cupos_elegibles?.[0]?.id ??
-                                                  null),
-                                    }));
-                                }}
-                                aria-invalid={Boolean(form.errors.tipo_actor)}
-                            >
-                                <option value="">Elija una actividad…</option>
-
-                                {actividades.map((a) => (
-                                    <option key={a.value} value={a.value}>
-                                        {a.label}
-                                    </option>
-                                ))}
-                            </Select>
-                        </Campo>
-
-                        {/* La lista sale de las tarifas definidas en Aranceles › Carnet. */}
-                        {actividades.length === 0 && (
-                            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                    <SeccionFormulario
+                        obligatorio
+                        numero={siguiente()}
+                        titulo="Actividad"
+                        ayuda="Decide qué habilita el carnet y cuánto se cobra."
+                        hecho={actor !== ''}
+                    >
+                        {actividades.length === 0 ? (
+                            <Aviso tono="peligro" icono={TriangleAlert}>
                                 Ninguna actividad tiene tarifa definida. Defínalas en Catálogos › Aranceles › Carnet ›
                                 Definir tarifas.
-                            </p>
-                        )}
+                            </Aviso>
+                        ) : (
+                            <div role="radiogroup" aria-label="Actividad" className="grid gap-2 sm:grid-cols-2">
+                                {actividades.map((a) => {
+                                    const clave = a.value as TipoActor;
+                                    const Icono = ACTIVIDAD[clave]?.icono ?? IdCard;
+                                    const elegida = actor === clave;
+                                    const suPrecio = precios?.[clave] ?? null;
 
+                                    return (
+                                        <button
+                                            key={a.value}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={elegida}
+                                            onClick={() => elegirActividad(clave)}
+                                            className={cn(
+                                                'relative flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-all',
+                                                elegida
+                                                    ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+                                                    : 'border-border hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md',
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'flex size-9 shrink-0 items-center justify-center rounded-full',
+                                                    elegida
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'bg-secondary text-primary',
+                                                )}
+                                            >
+                                                <Icono className="size-4.5" />
+                                            </span>
+                                            <span className="min-w-0 flex-1">
+                                                <span className="flex items-baseline justify-between gap-2">
+                                                    <span className="font-semibold">
+                                                        {/* «Carnet de» sobra: la sección ya dice que es un carnet. */}
+                                                        {a.label
+                                                            .replace(/^carnet de /i, '')
+                                                            .replace(/^./, (l) => l.toUpperCase())}
+                                                    </span>
+                                                    {suPrecio && (
+                                                        <span className="text-xs font-medium whitespace-nowrap text-primary tabular-nums">
+                                                            {bs(suPrecio.monto, institucion.moneda)}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    {ACTIVIDAD[clave]?.habilita}
+                                                </span>
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                         {sinPrecio && (
-                            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                            <Aviso tono="peligro" icono={TriangleAlert}>
                                 {sinPrecio}
-                            </p>
+                            </Aviso>
                         )}
+                        {form.errors.tipo_actor && <p className="text-sm text-destructive">{form.errors.tipo_actor}</p>}
+                    </SeccionFormulario>
 
-                        {/*
-                            DE QUÉ BOLSA MADRE CUELGA. El operador tiene que
-                            poder VERLO antes de emitir: el plástico imprime ese
-                            volumen, y hasta ahora el servidor elegía el cupo
-                            solo y la pantalla no decía cuál.
-                        */}
-                        {esPescador && cupos.length > 0 && (
-                            <Campo
-                                etiqueta="Autorización de Pesca para Aprovechamiento Pesquero que respalda el carnet"
-                                htmlFor="aprovechamiento_id"
-                                error={form.errors.aprovechamiento_id}
-                                ayuda={
-                                    cupos.length > 1
-                                        ? 'La persona tiene más de una en curso: elija cuál respalda este carnet.'
-                                        : 'Es el volumen que se imprime en el carnet.'
-                                }
-                                obligatorio
-                            >
-                                {/* Con una sola no se pregunta: se muestra. Un
-                                    desplegable de una opción es un clic que no
-                                    decide nada. Con dos o más, elige el
-                                    operador y no el servidor. */}
-                                {cupos.length > 1 ? (
-                                    <Select
-                                        id="aprovechamiento_id"
-                                        value={form.data.aprovechamiento_id ?? ''}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'aprovechamiento_id',
-                                                e.target.value === '' ? null : Number(e.target.value),
-                                            )
-                                        }
-                                        aria-invalid={Boolean(form.errors.aprovechamiento_id)}
-                                    >
-                                        {cupos.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.volumen_total_kg} kg ·{' '}
-                                                {c.descripcion ?? 'sin escala'} · {c.estado_etiqueta} ·
-                                                vence {fecha(c.fecha_vencimiento)}
-                                            </option>
-                                        ))}
-                                    </Select>
-                                ) : null}
-
-                                {cupo && (
-                                    <div className="rounded-md border border-border bg-secondary/40 p-3 text-sm">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="font-medium">
-                                                {cupo.volumen_total_kg} kg autorizados
-                                            </p>
-
-                                            <Badge color={cupo.estado_color}>
-                                                {cupo.estado_etiqueta}
-                                            </Badge>
-                                        </div>
-
-                                        <p className="tabular-nums text-muted-foreground">
-                                            {cupo.descripcion ?? '—'} · vence{' '}
-                                            {fecha(cupo.fecha_vencimiento)}
-                                        </p>
-
-                                        {/* Se puede emitir igual, y conviene
-                                            decirlo: el carnet y el cupo se
-                                            cobran juntos, pero hasta que el
-                                            cupo se firme no habilita faenas. */}
-                                        {!cupo.habilita_faenas && (
-                                            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                                                Este cupo todavía no autoriza a pescar. El carnet se
-                                                emite igual; las faenas salen recién cuando el
-                                                aprovechamiento quede aprobado.
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                            </Campo>
-                        )}
-
-                        {/*
-                            EL ERROR DEL CUPO, incluso cuando su campo no se
-                            dibuja: si no, el formulario se queda quieto sin
-                            decir nada y parece que el botón no anda.
-                        */}
-                        {form.errors.aprovechamiento_id && !esPescador && (
-                            <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                                {form.errors.aprovechamiento_id}
-                            </p>
-                        )}
-
-                        {faltaCupo && (
-                            <p className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-                                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                                <span>
-                                    Esta persona <strong>no tiene una Autorización de Pesca para Aprovechamiento Pesquero en
-                                    curso</strong>. El carnet de pescador imprime el volumen
-                                    autorizado, así que hay que registrarla antes. El servidor va a
-                                    rechazar la emisión.
-                                </span>
-                            </p>
-                        )}
-
-                        <Campo
-                            etiqueta="Asociación"
-                            htmlFor="asociacion_id"
-                            error={form.errors.asociacion_id}
-                            ayuda="La que certifica al titular. Se imprime en el carnet."
+                    {esPescador && (
+                        <SeccionFormulario
                             obligatorio
+                            numero={siguiente()}
+                            titulo="Autorización que lo respalda"
+                            ayuda={
+                                cupos.length > 1
+                                    ? 'Tiene más de una en curso: elija cuál respalda este carnet.'
+                                    : 'Su volumen se imprime en el carnet.'
+                            }
+                            hecho={cupo !== null}
                         >
-                            <Select
-                                id="asociacion_id"
-                                value={form.data.asociacion_id}
-                                onChange={(e) => form.setData('asociacion_id', e.target.value)}
-                                aria-invalid={Boolean(form.errors.asociacion_id)}
-                            >
-                                <option value="">Elija una asociación…</option>
-                                {/* Solo el nombre: la sigla se sigue guardando
-                                    y se sigue imprimiendo, pero acá alargaba
-                                    cada renglón sin ayudar a elegir. */}
-                                {asociaciones.map((a) => (
-                                    <option key={a.id} value={a.id}>
-                                        {a.nombre}
-                                    </option>
-                                ))}
-                            </Select>
-                        </Campo>
+                            {faltaCupo ? (
+                                <Aviso tono="aviso" icono={TriangleAlert} titulo="Sin autorización en curso">
+                                    El carnet de pescador imprime el volumen autorizado: registre antes su Autorización
+                                    de Pesca para Aprovechamiento Pesquero.
+                                </Aviso>
+                            ) : persona === null ? (
+                                <p className="text-sm text-muted-foreground">Elija primero al titular.</p>
+                            ) : (
+                                <div role="radiogroup" aria-label="Autorización" className="grid gap-2 sm:grid-cols-2">
+                                    {cupos.map((c) => {
+                                        const elegida = form.data.aprovechamiento_id === c.id;
 
-                        {/*
-                            LOS RESPALDOS. Son los papeles que la persona trae
-                            al mostrador y que después nadie encuentra: quedan
-                            adjuntos al carnet. El tope de 3 MB lo pone
-                            StorageController, que es el único que escribe.
-                        */}
+                                        return (
+                                            <button
+                                                key={c.id}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={elegida}
+                                                onClick={() => form.setData('aprovechamiento_id', c.id)}
+                                                className={cn(
+                                                    'relative rounded-lg border px-3 py-2.5 text-left transition-all',
+                                                    elegida
+                                                        ? 'border-primary bg-primary/5 ring-2 ring-primary/30'
+                                                        : 'border-border hover:border-primary/50 hover:shadow-md',
+                                                )}
+                                            >
+                                                {elegida && (
+                                                    <Check className="absolute top-2 right-2 size-3.5 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                                                )}
+                                                <span className="flex items-center gap-2 pr-5">
+                                                    <span className="text-lg font-semibold tabular-nums">
+                                                        {kg(c.volumen_total_kg)}
+                                                    </span>
+                                                    <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    Vence {fecha(c.fecha_vencimiento)}
+                                                </span>
+                                                {!c.habilita_faenas && (
+                                                    <span className="mt-1 block text-[11px] text-amber-700 dark:text-amber-400">
+                                                        Todavía no autoriza a pescar: las faenas salen cuando se
+                                                        apruebe.
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {form.errors.aprovechamiento_id && (
+                                <p className="text-sm text-destructive">{form.errors.aprovechamiento_id}</p>
+                            )}
+                        </SeccionFormulario>
+                    )}
+
+                    {/* El error de la autorización aunque su sección no se dibuje: si no, el botón parece no andar. */}
+                    {form.errors.aprovechamiento_id && !esPescador && (
+                        <Aviso tono="peligro" icono={TriangleAlert}>
+                            {form.errors.aprovechamiento_id}
+                        </Aviso>
+                    )}
+
+                    <SeccionFormulario
+                        obligatorio
+                        numero={siguiente()}
+                        titulo="Asociación"
+                        ayuda="La que certifica al titular. Se imprime en el carnet."
+                        hecho={asociacion !== null}
+                    >
+                        <Select
+                            id="asociacion_id"
+                            value={form.data.asociacion_id}
+                            onChange={(e) => form.setData('asociacion_id', e.target.value)}
+                            aria-invalid={Boolean(form.errors.asociacion_id)}
+                            aria-label="Asociación"
+                        >
+                            <option value="">Elija una asociación…</option>
+                            {asociaciones.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                    {a.nombre}
+                                </option>
+                            ))}
+                        </Select>
+                        {form.errors.asociacion_id && (
+                            <p className="text-sm text-destructive">{form.errors.asociacion_id}</p>
+                        )}
+                    </SeccionFormulario>
+
+                    <SeccionFormulario
+                        obligatorio
+                        numero={siguiente()}
+                        titulo="Respaldos"
+                        ayuda="Los papeles que trae al mostrador quedan adjuntos al carnet. Foto o PDF, hasta 3 MB."
+                        hecho={conArchivos}
+                    >
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Campo
                                 etiqueta="Cédula del titular"
                                 htmlFor="archivo_ci"
                                 error={form.errors.archivo_ci}
-                                ayuda="Foto o PDF, hasta 3 MB."
                                 obligatorio
                             >
                                 <SelectorArchivo
@@ -353,12 +385,10 @@ export default function CrearCarnet({
                                     error={form.errors.archivo_ci}
                                 />
                             </Campo>
-
                             <Campo
                                 etiqueta="Documento de la asociación"
                                 htmlFor="archivo_asociacion"
                                 error={form.errors.archivo_asociacion}
-                                ayuda="La carta o certificación del gremio. Foto o PDF, hasta 3 MB."
                                 obligatorio
                             >
                                 <SelectorArchivo
@@ -369,91 +399,92 @@ export default function CrearCarnet({
                                 />
                             </Campo>
                         </div>
+                    </SeccionFormulario>
+                </div>
 
-                    </CardContent>
-                </Card>
-
-                {/* ------------------------------------------------ Consecuencias */}
-                <Card className="h-fit">
-                    <CardHeader>
-                        <CardTitle>Lo que se va a emitir</CardTitle>
+                {/* El resumen acompaña al bajar: es lo que se confirma antes de registrar. */}
+                <Card className="h-fit overflow-hidden lg:sticky lg:top-40">
+                    <CardHeader className="border-b border-border">
+                        <CardTitle>Lo que se va a registrar</CardTitle>
                     </CardHeader>
 
-                    <CardContent className="space-y-4">
-                        {/* Solo se muestra: la fecha la pone el servidor al registrar. */}
-                        <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                Fecha de solicitud
+                    <CardContent className="space-y-4 pt-5 text-sm">
+                        <div className="rounded-lg bg-secondary/60 px-4 py-3">
+                            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                Habilita
                             </p>
-                            <p className="font-medium">{fecha(new Date())}</p>
+                            <p className={cn('font-semibold', actor ? 'text-primary' : 'text-muted-foreground')}>
+                                {actor === ''
+                                    ? 'Elija la actividad'
+                                    : esPescador
+                                      ? 'Permisos de faena'
+                                      : 'Guías de transporte'}
+                            </p>
+                            {esPescador && (
+                                <p className="text-xs text-muted-foreground">
+                                    {cupo
+                                        ? `${kg(cupo.volumen_total_kg)} autorizados`
+                                        : 'Necesita una autorización en curso'}
+                                </p>
+                            )}
                         </div>
 
-                        {actor === '' ? (
-                            <p className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <Info className="mt-0.5 size-4 shrink-0" />
-                                Elija el tipo de carnet para ver qué va a habilitar la credencial.
-                            </p>
-                        ) : (
-                            <div className="space-y-1 text-sm">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                    Habilita
-                                </p>
-                                <p className="font-medium">
-                                    {esPescador ? 'Emitir permisos de faena' : 'Emitir guías de movimiento'}
-                                </p>
-
-                                {/* La capacidad, no el número de la escala: el
-                                    tramo es un dato del catálogo interno, y lo
-                                    que dice cuánto autoriza el carnet son los
-                                    kilos. */}
-                                <p className="text-muted-foreground">
-                                    {esPescador
-                                        ? cupo
-                                            ? `Autoriza ${cupo.volumen_total_kg} kg${cupo.descripcion ? ` (${cupo.descripcion})` : ''}.`
-                                            : 'Necesita una Autorización de Pesca para Aprovechamiento Pesquero vigente: de ahí salen los kilos de cada faena.'
-                                        : 'No lleva volumen: la comercialización no se autoriza por kilos.'}
-                                </p>
-                            </div>
+                        <Renglon icono={IdCard} etiqueta="Titular" valor={persona?.nombreCompleto ?? null} />
+                        <Renglon
+                            icono={actor === 'comercializador' ? Truck : Fish}
+                            etiqueta="Actividad"
+                            valor={actividades.find((a) => a.value === actor)?.label ?? null}
+                        />
+                        {esPescador && (
+                            <Renglon
+                                icono={Waves}
+                                etiqueta="Autorización"
+                                valor={cupo ? kg(cupo.volumen_total_kg) : null}
+                            />
                         )}
+                        <Renglon
+                            icono={Users}
+                            etiqueta="Asociación"
+                            valor={asociacion?.sigla ?? asociacion?.nombre ?? null}
+                        />
+                        <Renglon icono={CalendarClock} etiqueta="Solicitud" valor={fecha(new Date())} />
 
-                        {precio && (
-                            <div>
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                    A cobrar
-                                </p>
-                                {/* De referencia: el que vale lo pide el servidor al guardar. */}
-                                <p className="text-3xl font-semibold tabular-nums">
-                                    {bs(precio.monto, institucion.moneda)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{precio.etiqueta}</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Se paga en Recaudaciones: el carnet queda PENDIENTE hasta que
-                                    el pago se valide allá, y entonces queda aprobado solo.
-                                </p>
-                            </div>
-                        )}
+                        <div className="flex items-baseline justify-between border-t border-border pt-4">
+                            <span className="flex items-center gap-2 text-muted-foreground">
+                                <Wallet className="size-4" />A cobrar
+                            </span>
+                            {/* De referencia: el que vale lo pide el servidor a SIREB al guardar. */}
+                            <span className="text-xl font-semibold tabular-nums">
+                                {precio ? bs(precio.monto, institucion.moneda) : '—'}
+                            </span>
+                        </div>
 
-                        <Button
-                            type="submit"
-                            disabled={
-                                form.processing ||
-                                persona === null ||
-                                form.data.tipo_actor === '' ||
-                                precio === null ||
-                                form.data.archivo_ci === null ||
-                                form.data.archivo_asociacion === null ||
-                                form.data.asociacion_id === ''
-                            }
-                            className="w-full"
-                        >
-                            {/* REGISTRAR y no «emitir»: lo que se crea es un
-                                expediente PENDIENTE, y el plástico sale al
-                                final del circuito. */}
-                            Registrar
+                        <p className="flex items-start gap-2 rounded-lg bg-sky-50 p-3 text-xs text-sky-900 dark:bg-sky-500/10 dark:text-sky-200">
+                            <Info className="mt-0.5 size-4 shrink-0" />
+                            Queda pendiente: se paga en Recaudaciones y, cuando lo validan, queda aprobado y se puede
+                            imprimir.
+                        </p>
+
+                        <Button type="submit" disabled={form.processing || !listo} className="w-full">
+                            Registrar carnet
                         </Button>
                     </CardContent>
                 </Card>
             </form>
         </LayoutPanel>
+    );
+}
+
+function Renglon({ icono: Icono, etiqueta, valor }: { icono: LucideIcon; etiqueta: string; valor: string | null }) {
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-muted-foreground">
+                <Icono className="size-4" />
+                {etiqueta}
+            </span>
+            <span className={cn('truncate text-right', valor ? 'font-medium' : 'text-muted-foreground')}>
+                {valor ?? '—'}
+            </span>
+        </div>
     );
 }

@@ -26,7 +26,12 @@ export function detalleDocumento(p: PapelPortal): string {
         case 'faena':
             return [kg(p.kilos), p.region ?? p.embarcacion].filter(Boolean).join(' · ');
         case 'guia':
-            return [kg(p.kilos), p.ruta, p.fecha_vencimiento && `vence ${fechaHora(p.fecha_vencimiento)}`]
+            return [
+                kg(p.kilos),
+                p.pescado_de && `de ${p.pescado_de} (Autorización N° ${p.autorizacion_numero})`,
+                p.ruta,
+                p.fecha_vencimiento && `vence ${fechaHora(p.fecha_vencimiento)}`,
+            ]
                 .filter(Boolean)
                 .join(' · ');
     }

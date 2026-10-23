@@ -336,8 +336,8 @@ class Carnet extends Model
 
     /**
      * El carnet como lo muestran el buscador y los formularios de faena y guía.
-     * Un solo lugar: con tres copias, una se queda vieja. Precargar `codigo` y
-     * `aprovechamiento`.
+     * Un solo lugar: con tres copias, una se queda vieja. Precargar `codigo`,
+     * `aprovechamiento` y `asociacion`.
      *
      * @return array<string, mixed>
      */
@@ -355,6 +355,9 @@ class Carnet extends Model
             'puede_emitir_faenas' => $this->puedeEmitirFaenas(),
             'puede_emitir_guias' => $this->puedeEmitirGuias(),
             'fecha_vencimiento' => $this->fecha_vencimiento?->toDateString(),
+            // Para reconocer el carnet al elegirlo: el gremio que lo avala.
+            'asociacion' => $this->asociacion?->sigla ?? $this->asociacion?->nombre,
+            'asociacion_nombre' => $this->asociacion?->nombre,
 
             // El cupo que respalda al pescador. Null en el comercializador.
             'capacidad' => $cupo?->escala,

@@ -194,8 +194,12 @@ dentro de una transacción deshecha con `rollBack()`.
 - **Calca el talonario «PERMISO POR FAENA».** El Área de Fiscalización y
   Control de la Actividad Pesquera autoriza a: la embarcación, de propiedad de,
   comandante de barco, matrícula naval N°, N° kardex, la región desde / hasta y
-  la cantidad autorizada de pescado extraído en kg. Todos texto libre y
-  opcionales menos los kilos. *(25/09/2026)*
+  la cantidad autorizada de pescado extraído en kg. Todos texto libre.
+  *(23/10/2026)* **Todos obligatorios** —embarcación, propietario, comandante,
+  matrícula naval, N° Kardex y región desde/hasta—, en el formulario y en
+  `EmitirFaenaRequest` (también al corregir). Si la embarcación es del propio
+  pescador, el propietario es su nombre (el formulario lo propone). Antes eran
+  opcionales menos los kilos *(25/09/2026)*.
 - **Las fechas NO las escribe ventanilla: las pone la aprobación.** La salida
   es el día en que se aprueba el permiso y el desembarque, al cumplirse la vigencia configurada. Así
   el plazo empieza a correr cuando el permiso realmente vale, no cuando se
@@ -220,6 +224,10 @@ dentro de una transacción deshecha con `rollBack()`.
   comercializador (`carnet_id`) y a su respectiva asociación (`asociacion_id`).
 - Controla las rutas especificando `origen`, `destino`, `peso_total_kg` y un
   indicador booleano de si proviene de **piscicultura**.
+- *(23/10/2026)* **La ruta y el transporte son obligatorios**: lugar, departamento,
+  provincia y distrito de origen y de destino, y medio, vehículo, nombre, placa y
+  capacidad (mayor que 0), en el formulario y en `EmitirGuiaRequest` (también al
+  corregir). Solo las observaciones son opcionales. Antes era obligatorio solo el lugar.
 - **La guía descuenta el cupo del pescador que vendió** *(decidido en reunión,
   13/10/2026)*. El comercializador declara **a qué pescador le compró** y de qué
   autorización (`aprovechamiento_id`). Reglas:

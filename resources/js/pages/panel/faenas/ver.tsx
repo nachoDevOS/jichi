@@ -1,39 +1,68 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { BadgeCheck, Ban, CalendarX, CheckCheck, Clock, IdCard, Pencil, Printer, Receipt, Trash2, User, Waves } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import { TextoCopiable } from '@/components/comunes/texto-copiable';
-import { Retrato } from '@/components/comunes/retrato';
+import {
+    Anchor,
+    BadgeCheck,
+    Ban,
+    CalendarClock,
+    CalendarX,
+    CheckCheck,
+    Clock,
+    Fish,
+    IdCard,
+    MapPin,
+    Pencil,
+    Printer,
+    Receipt,
+    Ship,
+    Trash2,
+    User,
+    Wallet,
+    Waves,
+} from 'lucide-react';
+import { useState } from 'react';
+import {
+    Aviso,
+    avisoVencimiento,
+    BandaTitular,
+    BarraDisponible,
+    Chip,
+    Cifra,
+    Conteo,
+    EnlacePdf,
+    EnlaceVer,
+    kg,
+    LineaTiempo,
+    nivelDisponible,
+    porcentaje,
+    TarjetaCodigo,
+} from '@/components/panel/comunes/ficha';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
-import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmarConMotivo } from '@/components/ui/confirmar-con-motivo';
 import { usePermisos } from '@/hooks/use-permisos';
 import LayoutPanel from '@/layouts/layout-panel';
-import { bs, cn, fecha } from '@/lib/utils';
+import { bs, fecha } from '@/lib/utils';
 import type { ReciboDelCupo } from '@/types/aprovechamientos';
 import type { FaenaFicha } from '@/types/faenas';
-import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 
 /**
- *  La ficha de una faena
- *
- * La salida se paga en SIREB como el carnet y la autorización —pendiente →
- * aprobada—, así que la tarjeta de pagos es la misma.
+ *  La ficha de una faena: se paga en SIREB como los otros tres trámites.
  */
-export default function VerFaena({
-    faena,
-    recibo,
-}: {
-    faena: FaenaFicha;
-    recibo: ReciboDelCupo | null;
-}) {
+export default function VerFaena({ faena, recibo }: { faena: FaenaFicha; recibo: ReciboDelCupo | null }) {
     const { puede } = usePermisos();
     const [eliminando, setEliminando] = useState(false);
     const [revocando, setRevocando] = useState(false);
-
     const borrado = useForm({ motivo: '' });
     const baja = useForm({ motivo: '' });
+
+    const desembarque = avisoVencimiento(faena.dias_para_desembarque, faena.ya_fue_aprobada, 5);
+    const cupo = faena.cupo;
+    const nivel = cupo
+        ? nivelDisponible(porcentaje(cupo.kilos_disponibles, cupo.volumen_total_kg), cupo.ya_fue_aprobado)
+        : null;
+    const region =
+        faena.region_desde || faena.region_hasta ? `${faena.region_desde ?? '—'} → ${faena.region_hasta ?? '—'}` : null;
 
     return (
         <LayoutPanel
@@ -49,254 +78,188 @@ export default function VerFaena({
                             Beneficiario
                         </Button>
                     )}
-
-                    {puede('carnets.ver') && faena.carnet_id !== null && (
-                        <Button
-                            variant="ver"
-                            onClick={() => router.visit(route('carnets.show', faena.carnet_id!))}
-                        >
+                    {puede('carnets.ver') && (
+                        <Button variant="ver" onClick={() => router.visit(route('carnets.show', faena.carnet_id))}>
                             <IdCard className="size-4" />
-                            Ver carnet
+                            Carnet
                         </Button>
                     )}
-
-                    {puede('aprovechamientos.ver') && faena.cupo && (
-                        <Button
-                            variant="ver"
-                            onClick={() => router.visit(route('aprovechamientos.show', faena.cupo!.id))}
-                        >
-                            <Waves className="size-4" />
-                            Autorización
-                        </Button>
+                    {puede('faenas.imprimir') && faena.puede_imprimirse && (
+                        <EnlacePdf href={route('faenas.imprimir', faena.id)} icono={Printer}>
+                            Faena
+                        </EnlacePdf>
                     )}
-
-                    {/* Corregir y eliminar solo sobre el borrador. Las dos
-                        banderas llegan resueltas: miran el estado Y que no
-                        haya entrado un peso. */}
+                    {puede('recibos.imprimir') && faena.recibo_id !== null && (
+                        <EnlacePdf href={route('recibos.imprimir', faena.recibo_id)} icono={Receipt}>
+                            Recibo
+                        </EnlacePdf>
+                    )}
                     {puede('faenas.editar') && faena.puede_editarse && (
-                        <Button
-                            variant="editar"
-                            onClick={() => router.visit(route('faenas.edit', faena.id))}
-                        >
+                        <Button variant="editar" onClick={() => router.visit(route('faenas.edit', faena.id))}>
                             <Pencil className="size-4" />
                             Editar
                         </Button>
                     )}
-
                     {puede('faenas.eliminar') && faena.puede_eliminarse && (
                         <Button variant="eliminar" onClick={() => setEliminando(true)}>
                             <Trash2 className="size-4" />
                             Eliminar
                         </Button>
                     )}
-
                     {puede('faenas.revocar') && faena.puede_revocarse && (
                         <Button variant="eliminar" onClick={() => setRevocando(true)}>
                             <Ban className="size-4" />
                             Revocar
                         </Button>
                     )}
-
-
-
-                    {/*
-                        EL PERMISO EN PAPEL sale recién con la faena aprobada:
-                        hasta la firma no hay nada que autorizar. `ya_fue_aprobada`
-                        llega resuelto del servidor.
-                    */}
-                    {puede('faenas.imprimir') && faena.puede_imprimirse && (
-                        <a
-                            href={route('faenas.imprimir', faena.id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={cn(buttonVariants({ variant: 'outline' }))}
-                        >
-                            <Printer className="size-4" />
-                            Faena
-                        </a>
-                    )}
-
-                    {/* El recibo existe desde el ENVÍO: antes no hay papel. */}
-                    {puede('recibos.imprimir') && faena.recibo_id !== null && (
-                        <a
-                            href={route('recibos.imprimir', faena.recibo_id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={cn(buttonVariants({ variant: 'outline' }))}
-                        >
-                            <Receipt className="size-4" />
-                            Recibo
-                        </a>
-                    )}
                 </div>
             }
         >
             <Head title={faena.etiqueta} />
 
-            {/* El titular, con su foto: mismo bloque que la autorización de pesca. */}
-            <Card className="mb-6 min-w-0">
-                <CardContent className="flex flex-wrap items-center gap-4 p-4">
-                    <Retrato url={faena.foto_url} nombre={faena.beneficiario ?? 'Sin nombre'} className="size-16" />
+            <BandaTitular
+                foto={faena.foto_url}
+                nombre={faena.beneficiario}
+                beneficiarioId={faena.beneficiario_id}
+                linea={`C.I. ${faena.documento ?? '—'} · Faena N° ${faena.numero_legible}`}
+                estado={{ color: faena.estado_color, etiqueta: faena.estado_etiqueta }}
+            >
+                {faena.embarcacion && <Chip icono={Ship}>{faena.embarcacion}</Chip>}
+                {region && <Chip icono={MapPin}>{region}</Chip>}
+                {faena.fecha_desembarque && (
+                    <Chip icono={CalendarClock} tono={desembarque.tono}>
+                        Desembarque {fecha(faena.fecha_desembarque)}
+                        {desembarque.texto && <span className="font-semibold">· {desembarque.texto}</span>}
+                    </Chip>
+                )}
+            </BandaTitular>
 
-                    <div className="min-w-0">
-                        {faena.beneficiario_id !== null ? (
-                            <EnlacePermitido
-                                permiso="beneficiarios.ver"
-                                href={route('beneficiarios.show', faena.beneficiario_id)}
-                                className="text-lg font-semibold text-primary hover:underline"
-                            >
-                                {faena.beneficiario ?? '—'}
-                            </EnlacePermitido>
-                        ) : (
-                            <p className="text-lg font-semibold">{faena.beneficiario ?? '—'}</p>
-                        )}
+            <div className="mt-4">
+                <Situacion faena={faena} />
+            </div>
 
-                        <p className="tabular-nums text-sm text-muted-foreground">C.I. {faena.documento ?? '—'}</p>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <div className="grid gap-6 lg:grid-cols-3">
-                <div className="space-y-6 lg:col-span-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>La salida</CardTitle>
-                        </CardHeader>
-
-                        <CardContent className="space-y-4">
-                            <Situacion faena={faena} />
-
-                            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                                <Dato etiqueta="Kilos" valor={`${faena.kilos_extraidos} kg`} />
-                                <Dato etiqueta="Asociación" valor={faena.asociacion ?? '—'} />
-                                {/* De qué carnet cuelga. El número del libro es
-                                    cómo se lo nombra; el código de 16 caracteres
-                                    va al lado porque es la llave con la que se
-                                    verifica el plástico. */}
-                                <Dato
-                                    etiqueta="Carnet"
-                                    valor={`N° ${faena.carnet_registro ?? '—'}`}
-                                />
-                                <Dato
-                                    etiqueta="Código del carnet"
-                                    valor={faena.carnet_codigo ? <TextoCopiable texto={faena.carnet_codigo} className="-ml-1.5" /> : '—'}
-                                />
-                            </dl>
-                        </CardContent>
-                    </Card>
-
-                    {/*
-                        LOS RENGLONES DEL TALONARIO. Se muestran aunque estén
-                        vacíos: el papel los tiene igual, y un hueco acá es la
-                        señal de que falta completarlo antes de imprimir.
-                    */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Datos del talonario</CardTitle>
-                        </CardHeader>
-
-                        <CardContent>
-                            <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
-                                <Dato etiqueta="La embarcación" valor={faena.embarcacion ?? '—'} />
-                                <Dato etiqueta="De propiedad de" valor={faena.propietario ?? '—'} />
-                                <Dato
-                                    etiqueta="Comandante de barco"
-                                    valor={faena.comandante_barco ?? '—'}
-                                />
-                                <Dato
-                                    etiqueta="Matrícula naval"
-                                    valor={faena.matricula_naval ?? '—'}
-                                />
-                                <Dato etiqueta="N° Kardex" valor={faena.nro_kardex ?? '—'} />
-                                <Dato
-                                    etiqueta="Región"
-                                    valor={
-                                        faena.region_desde || faena.region_hasta
-                                            ? `${faena.region_desde ?? '—'} → ${faena.region_hasta ?? '—'}`
-                                            : '—'
-                                    }
-                                />
-                            </dl>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Mismo bloque lateral que la ficha del carnet y la del cupo. */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Situación</CardTitle>
-                        </CardHeader>
-
-                        <CardContent className="space-y-3 text-sm">
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="text-muted-foreground">Estado</span>
-                                <Badge color={faena.estado_color}>{faena.estado_etiqueta}</Badge>
-                            </div>
-
-                            {/* La llave del QR del permiso impreso. */}
-                            <div className="flex items-center justify-between gap-3">
-                                <span className="text-muted-foreground">Código</span>
-                                {faena.codigo ? <TextoCopiable texto={faena.codigo} className="-mr-1.5" /> : <span>—</span>}
-                            </div>
-
-                            <Renglon etiqueta="N° de faena" valor={faena.numero_legible} />
-                            <Renglon etiqueta="Solicitada el" valor={fecha(faena.fecha_solicitud)} />
-                            {/* Las dos las escribe la aprobación: en «—» hasta la firma. */}
-                            <Renglon etiqueta="Salida el" valor={fecha(faena.fecha_salida)} />
-                            <Renglon etiqueta="Desembarque el" valor={fecha(faena.fecha_desembarque)} />
-                            <Renglon etiqueta="Arancel" valor={bs(faena.monto)} destacado />
-
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Cupo del que salió</CardTitle>
-                        </CardHeader>
-
-                        <CardContent className="space-y-3 text-sm">
-                            {faena.cupo === null ? (
-                                <p className="text-muted-foreground">Sin cupo asociado.</p>
-                            ) : (
-                                <>
-                                    <Renglon etiqueta="Otorgado" valor={`${faena.cupo.volumen_total_kg} kg`} />
-                                    <Renglon etiqueta="Esta faena" valor={`${faena.kilos_extraidos} kg`} />
-                                    <p className="text-xs text-muted-foreground">
-                                        Sale con los kilos disponibles de la autorización. Las faenas no descuentan.
-                                    </p>
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* El cobro: se paga en SIREB, igual que los otros tres documentos. */}
-                <TarjetaRecaudaciones
-                    className="lg:col-span-3"
-                    monto={faena.monto}
-                    pago={{
-                        concepto: 'Permiso de faena',
-                        numero: faena.numero_legible,
-                        titular: faena.beneficiario,
-                        documento: faena.documento,
-                        detalle: `${faena.kilos_extraidos} kg`,
-                    }}
-                    sireb={faena.sireb}
-                    recibo={recibo}
-                    puedeVerificar={faena.puede_verificar_pago}
-                    rutaVerificar={route('faenas.verificar-pago', faena.id)}
-                    puedeCargar={faena.puede_cargar_pago}
-                    rutaCargar={route('faenas.cargar-pago', faena.id)}
-                    rutaConsultarQr={route('faenas.consultar-qr', faena.id)}
-                    rutaRenovar={route('faenas.renovar-liquidacion', faena.id)}
-                    documento="faenas"
+            <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <Cifra
+                    icono={Fish}
+                    etiqueta="Kilos de la salida"
+                    valor={<Conteo valor={faena.kilos_extraidos} formato={kg} />}
+                    pie="Lo disponible al emitirla"
+                    destacada
+                />
+                {cupo ? (
+                    <Cifra
+                        icono={Waves}
+                        etiqueta="Disponible hoy"
+                        valor={<Conteo valor={cupo.kilos_disponibles} formato={kg} />}
+                        pie={`de ${kg(cupo.volumen_total_kg)}${nivel?.texto ? ` · ${nivel.texto}` : ''}`}
+                        tono={nivel?.tono}
+                    />
+                ) : (
+                    <Cifra icono={Waves} etiqueta="Disponible hoy" valor="—" pie="Sin autorización asociada" />
+                )}
+                <Cifra
+                    icono={IdCard}
+                    etiqueta="Carnet"
+                    valor={`N° ${faena.carnet_registro ?? '—'}`}
+                    pie={faena.asociacion ?? 'Sin asociación'}
+                />
+                <Cifra
+                    icono={Wallet}
+                    etiqueta="Arancel"
+                    valor={<Conteo valor={faena.monto} formato={(n) => bs(n)} />}
+                    pie={faena.recibo_numero ? `Recibo N° ${faena.recibo_numero}` : 'Sin recibo todavía'}
                 />
             </div>
 
+            <div className="mt-6 grid gap-6 lg:grid-cols-3">
+                <Card className="min-w-0 lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Datos del talonario</CardTitle>
+                        <p className="text-sm text-muted-foreground">Lo que va impreso en el permiso por faena.</p>
+                    </CardHeader>
 
+                    <CardContent className="space-y-5">
+                        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
+                            <Dato icono={Ship} etiqueta="Embarcación" valor={faena.embarcacion} />
+                            <Dato icono={User} etiqueta="De propiedad de" valor={faena.propietario} />
+                            <Dato icono={Anchor} etiqueta="Comandante" valor={faena.comandante_barco} />
+                            <Dato icono={BadgeCheck} etiqueta="Matrícula naval" valor={faena.matricula_naval} />
+                            <Dato icono={IdCard} etiqueta="N° Kardex" valor={faena.nro_kardex} />
+                            <Dato icono={MapPin} etiqueta="Región" valor={region} />
+                        </dl>
 
-            {/* ELIMINAR: la misma ventana que en el listado. */}
+                        {cupo && (
+                            <div className="space-y-3 rounded-xl border border-border p-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Waves className="size-4 shrink-0 text-primary" />
+                                    <span className="text-sm font-medium">Autorización de la que salió</span>
+                                    <span className="text-sm text-muted-foreground">{cupo.descripcion ?? ''}</span>
+                                    {puede('aprovechamientos.ver') && (
+                                        <span className="ml-auto">
+                                            <EnlaceVer href={route('aprovechamientos.show', cupo.id)} />
+                                        </span>
+                                    )}
+                                </div>
+                                <BarraDisponible
+                                    disponible={cupo.kilos_disponibles}
+                                    total={cupo.volumen_total_kg}
+                                    aprobada={cupo.ya_fue_aprobado}
+                                />
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="h-fit">
+                    <CardHeader>
+                        <CardTitle>El permiso</CardTitle>
+                    </CardHeader>
+
+                    <CardContent className="space-y-5 text-sm">
+                        <TarjetaCodigo
+                            titulo="Código del permiso"
+                            codigo={faena.codigo}
+                            numero={faena.numero_legible}
+                            ayuda="Va en el QR del permiso. Con él un control comprueba en el río si la salida está autorizada."
+                        />
+
+                        {/* La salida y el desembarque los escribe la aprobación. */}
+                        <LineaTiempo
+                            hitos={[
+                                { etiqueta: 'Solicitada', fecha: faena.fecha_solicitud, hecho: true },
+                                { etiqueta: 'Salida', fecha: faena.fecha_salida, hecho: faena.fecha_salida !== null },
+                                {
+                                    etiqueta: 'Desembarque',
+                                    fecha: faena.fecha_desembarque,
+                                    hecho: (faena.dias_para_desembarque ?? 0) < 0,
+                                },
+                            ]}
+                        />
+                    </CardContent>
+                </Card>
+            </div>
+
+            <TarjetaRecaudaciones
+                className="mt-6"
+                monto={faena.monto}
+                pago={{
+                    concepto: 'Permiso de faena',
+                    numero: faena.numero_legible,
+                    titular: faena.beneficiario,
+                    documento: faena.documento,
+                    detalle: kg(faena.kilos_extraidos),
+                }}
+                sireb={faena.sireb}
+                recibo={recibo}
+                puedeVerificar={faena.puede_verificar_pago}
+                rutaVerificar={route('faenas.verificar-pago', faena.id)}
+                puedeCargar={faena.puede_cargar_pago}
+                rutaCargar={route('faenas.cargar-pago', faena.id)}
+                rutaConsultarQr={route('faenas.consultar-qr', faena.id)}
+                rutaRenovar={route('faenas.renovar-liquidacion', faena.id)}
+                documento="faenas"
+            />
+
             <ConfirmarConMotivo
                 abierto={eliminando}
                 titulo="Eliminar este permiso de faena"
@@ -304,18 +267,16 @@ export default function VerFaena({
                     <div className="space-y-2">
                         <p>
                             Se da de baja la faena <strong>N° {faena.numero_legible}</strong> de{' '}
-                            <strong>{faena.beneficiario ?? 'el pescador'}</strong>:{' '}
-                            {faena.kilos_extraidos} kg.
+                            <strong>{faena.beneficiario ?? 'el pescador'}</strong>: {kg(faena.kilos_extraidos)}.
                         </p>
                         <p>
-                            Solo se puede porque está <strong>pendiente</strong> y sin ningún
-                            depósito cargado. Sus kilos vuelven a la bolsa madre, pero el número del
-                            talonario <strong>no se reutiliza</strong>.
+                            Solo se puede porque está <strong>pendiente de pago</strong>. El número del talonario{' '}
+                            <strong>no se reutiliza</strong>.
                         </p>
                     </div>
                 }
                 etiquetaMotivo="Motivo de la eliminación"
-                ayuda="Queda en la auditoría con su nombre, y es lo que va a explicar el hueco en la serie dentro de seis meses."
+                ayuda="Queda en la auditoría con su nombre: es lo que explica el hueco en la serie."
                 placeholder="Cargada por error: la salida corresponde a otro pescador."
                 textoConfirmar="Eliminar faena"
                 confirmacion="Entiendo que el número del talonario queda quemado y que esto no se deshace desde el panel."
@@ -337,15 +298,13 @@ export default function VerFaena({
                 }
             />
 
-            {/* REVOCAR: sobre una faena YA APROBADA. No es lo mismo que eliminar. */}
             <ConfirmarConMotivo
                 abierto={revocando}
                 titulo="¿Revocar el permiso de faena?"
                 descripcion={
                     <div className="space-y-2">
                         <p>
-                            La faena <strong>N° {faena.numero_legible}</strong> deja de autorizar la salida al
-                            instante.
+                            La faena <strong>N° {faena.numero_legible}</strong> deja de autorizar la salida al instante.
                         </p>
                         <p>Queda en el historial como revocada y no vuelve atrás. Si hace falta, se emite otra.</p>
                     </div>
@@ -377,107 +336,52 @@ export default function VerFaena({
     );
 }
 
-/**
- * En qué situación está la salida, en una frase.
- */
+/** En qué situación está la salida. El porqué de un pendiente llega resuelto del servidor. */
 function Situacion({ faena }: { faena: FaenaFicha }) {
-    /*
-     * Mientras nadie la firmó, la faena no autoriza nada, y el porqué llega
-     * RESUELTO del servidor —`motivo_sin_autorizar`—. React no vuelve a
-     * evaluar el estado: así nacieron los carteles que decían «venció» sobre
-     * un expediente que recién se estaba armando.
-     */
     if (faena.estado === 'pendiente') {
         return (
-            <Marco
-                clase="bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200"
-                icono={<Clock className="mt-0.5 size-5 shrink-0" />}
-                titulo={faena.estado_etiqueta}
-                texto={faena.motivo_sin_autorizar ?? 'Todavía no autoriza la salida.'}
-            />
+            <Aviso tono="info" icono={Clock} titulo="Pendiente de pago">
+                {faena.motivo_sin_autorizar ?? 'Todavía no autoriza la salida.'}
+            </Aviso>
         );
     }
-
-    if (faena.caducada) {
-        return (
-            <Marco
-                clase="bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
-                icono={<CalendarX className="mt-0.5 size-5 shrink-0" />}
-                titulo="Venció sin cerrarse"
-                texto="El pescador se llevó el papel y nadie registró la vuelta. El número del talonario queda ocupado igual."
-            />
-        );
-    }
-
-    if (faena.vigente) {
-        return (
-            <Marco
-                clase="bg-sky-50 text-sky-900 dark:bg-sky-500/10 dark:text-sky-200"
-                icono={<BadgeCheck className="mt-0.5 size-5 shrink-0" />}
-                titulo="En curso"
-                texto={`Autoriza a pescar hasta el ${fecha(faena.fecha_desembarque)}.`}
-            />
-        );
-    }
-
     if (faena.estado === 'revocado') {
         return (
-            <Marco
-                clase="bg-rose-50 text-rose-900 dark:bg-rose-500/10 dark:text-rose-200"
-                icono={<CalendarX className="mt-0.5 size-5 shrink-0" />}
-                titulo="Revocada"
-                texto={faena.motivo_sin_autorizar ?? 'Ya no autoriza la salida.'}
-            />
+            <Aviso tono="peligro" icono={Ban} titulo="Revocada">
+                {faena.motivo_sin_autorizar ?? 'Ya no autoriza la salida.'}
+            </Aviso>
+        );
+    }
+    if (faena.caducada) {
+        return (
+            <Aviso tono="aviso" icono={CalendarX} titulo="Desembarque cumplido">
+                Pasó la fecha de desembarque: el permiso ya no autoriza a pescar.
+            </Aviso>
+        );
+    }
+    if (faena.vigente) {
+        return (
+            <Aviso tono="ok" icono={CheckCheck} titulo="En curso">
+                Autoriza a pescar hasta el {fecha(faena.fecha_desembarque)}.
+            </Aviso>
         );
     }
 
     return (
-        <Marco
-            clase="bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
-            icono={<CheckCheck className="mt-0.5 size-5 shrink-0" />}
-            titulo={faena.estado_etiqueta}
-            texto="La salida ya no autoriza nada."
-        />
+        <Aviso tono="peligro" icono={Ban} titulo={faena.estado_etiqueta}>
+            {faena.motivo_sin_autorizar ?? 'La salida no está autorizada.'}
+        </Aviso>
     );
 }
 
-function Marco({
-    clase,
-    icono,
-    titulo,
-    texto,
-}: {
-    clase: string;
-    icono: React.ReactNode;
-    titulo: string;
-    texto: string;
-}) {
+function Dato({ icono: Icono, etiqueta, valor }: { icono: typeof Ship; etiqueta: string; valor: string | null }) {
     return (
-        <div className={`flex items-start gap-3 rounded-md p-4 text-sm ${clase}`}>
-            {icono}
-            <div>
-                <p className="font-medium">{titulo}</p>
-                <p className="opacity-80">{texto}</p>
+        <div className="flex min-w-0 items-start gap-2.5">
+            <Icono className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+                <dt className="text-xs tracking-wide text-muted-foreground uppercase">{etiqueta}</dt>
+                <dd className={valor ? 'truncate font-medium' : 'text-muted-foreground'}>{valor ?? '—'}</dd>
             </div>
-        </div>
-    );
-}
-
-/** Renglón «etiqueta ····· valor» de la columna lateral. */
-function Renglon({ etiqueta, valor, destacado = false }: { etiqueta: string; valor: string; destacado?: boolean }) {
-    return (
-        <div className="flex items-baseline justify-between gap-3">
-            <span className="text-muted-foreground">{etiqueta}</span>
-            <span className={destacado ? 'text-right text-base font-medium tabular-nums' : 'text-right font-medium tabular-nums'}>{valor}</span>
-        </div>
-    );
-}
-
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: ReactNode }) {
-    return (
-        <div>
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">{etiqueta}</dt>
-            <dd className="font-medium tabular-nums">{valor}</dd>
         </div>
     );
 }

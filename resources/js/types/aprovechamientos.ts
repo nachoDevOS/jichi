@@ -18,15 +18,13 @@ export interface CupoFila {
     /** La escala: la etiqueta de la tarifa de SIREB, copiada al otorgar. */
     descripcion: string | null;
 
-    /**
-     * Los kilos OTORGADOS, escritos por ventanilla al otorgar.
-     */
+    /** Los kilos otorgados: el `rango_hasta` de la escala de SIREB. */
     volumen_total_kg: number;
 
     /** Lo que el pescador declaró que navega: «canoa», «peque-peque», «bote». */
     tipo_embarcacion: string;
 
-    /** Los kilos que sale cada faena, fijos: las faenas no descuentan. */
+    /** El saldo: lo bajan las guías al registrarse. Cada faena sale con este número, sin descontarlo. */
     kilos_disponibles: number;
 
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
@@ -129,8 +127,15 @@ export interface CupoFicha extends CupoFila {
     /** El código de verificación, en grupos de cuatro. */
     codigo: string | null;
 
-    /** Firmado y en fecha: puede respaldar una cédula nueva. */
+    /** Firmado y en fecha: puede respaldar un carnet nuevo. */
     puede_emitir_carnet: boolean;
+
+    /** Kilos de guías pendientes de pago: ya bajaron el disponible, pero se devuelven si se eliminan. */
+    kilos_reservados: number;
+    /** Kilos de guías aprobadas o revocadas: no vuelven. */
+    kilos_vendidos: number;
+    /** Días hasta el vencimiento: negativo si ya venció, null sin fecha. */
+    dias_para_vencer: number | null;
 }
 
 /** El recibo de un documento: uno, emitido cuando SIREB confirmó el pago. Lo comparten los cuatro. */
@@ -147,7 +152,7 @@ export interface ReciboDelCupo {
     emitido_en: string | null;
 }
 
-/** Una cédula que se apoya en este cupo, en la ficha. */
+/** Un carnet emitido con esta autorización, en la ficha. */
 export interface CarnetDelCupo {
     id: number;
     codigo: string;
@@ -187,6 +192,15 @@ export interface FaenaDelCupo {
     fecha_desembarque: string | null;
 }
 
+/** Un punto de «Cómo bajó el disponible»: lo otorgado, una guía cada uno y hoy. */
+export interface PuntoDisponible {
+    etiqueta: string;
+    fecha: string | null;
+    disponible: number;
+    kilos: number | null;
+    comprador: string | null;
+    pendiente: boolean;
+}
 
 /** Una guía que le compró pescado a esta autorización: descontó sus kilos. */
 export interface GuiaDelCupo {

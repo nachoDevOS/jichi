@@ -34,6 +34,9 @@ export default function EditarFaena({
         region_hasta: faena.region_hasta ?? '',
     });
 
+    // Todos los renglones son obligatorios: sin uno vacío no se guarda.
+    const completo = Object.values(form.data).every((v) => String(v).trim() !== '');
+
     function enviar(e: FormEvent) {
         e.preventDefault();
         form.patch(route('faenas.update', faena.id));
@@ -60,17 +63,14 @@ export default function EditarFaena({
 
                             <div className="min-w-0">
                                 <p className="font-medium">{faena.beneficiario ?? '—'}</p>
-                                <p className="tabular-nums text-xs text-muted-foreground">
-                                    {faena.documento ?? '—'}
-                                </p>
+                                <p className="tabular-nums text-xs text-muted-foreground">{faena.documento ?? '—'}</p>
                                 <p className="font-mono text-xs text-muted-foreground">
                                     Carnet N° {faena.carnet_registro ?? '—'}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Los renglones del talonario. Ninguno obligatorio: el papel
-                            llega incompleto, y corregir es justamente completarlo. */}
+                        {/* Los renglones del talonario: obligatorios, igual que en EmitirFaenaRequest. */}
                         <div className="space-y-4 border-t border-border pt-5">
                             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                 El Área de Fiscalización y Control de la Actividad Pesquera autoriza a
@@ -81,6 +81,7 @@ export default function EditarFaena({
                                     etiqueta="La embarcación"
                                     htmlFor="embarcacion"
                                     error={form.errors.embarcacion}
+                                    obligatorio
                                 >
                                     <Input
                                         id="embarcacion"
@@ -94,7 +95,8 @@ export default function EditarFaena({
                                     etiqueta="De propiedad de"
                                     htmlFor="propietario"
                                     error={form.errors.propietario}
-                                    ayuda="Solo si la embarcación no es del propio pescador."
+                                    obligatorio
+                                    ayuda="Si es del propio pescador, va su nombre."
                                 >
                                     <Input
                                         id="propietario"
@@ -108,6 +110,7 @@ export default function EditarFaena({
                                     etiqueta="Comandante de barco"
                                     htmlFor="comandante_barco"
                                     error={form.errors.comandante_barco}
+                                    obligatorio
                                 >
                                     <Input
                                         id="comandante_barco"
@@ -121,6 +124,7 @@ export default function EditarFaena({
                                     etiqueta="Matrícula naval N°"
                                     htmlFor="matricula_naval"
                                     error={form.errors.matricula_naval}
+                                    obligatorio
                                 >
                                     <Input
                                         id="matricula_naval"
@@ -135,6 +139,7 @@ export default function EditarFaena({
                                     etiqueta="N° Kardex"
                                     htmlFor="nro_kardex"
                                     error={form.errors.nro_kardex}
+                                    obligatorio
                                 >
                                     <Input
                                         id="nro_kardex"
@@ -151,6 +156,7 @@ export default function EditarFaena({
                                     etiqueta="Pescar en la región desde"
                                     htmlFor="region_desde"
                                     error={form.errors.region_desde}
+                                    obligatorio
                                 >
                                     <Input
                                         id="region_desde"
@@ -164,6 +170,7 @@ export default function EditarFaena({
                                     etiqueta="Hasta"
                                     htmlFor="region_hasta"
                                     error={form.errors.region_hasta}
+                                    obligatorio
                                 >
                                     <Input
                                         id="region_hasta"
@@ -173,7 +180,6 @@ export default function EditarFaena({
                                     />
                                 </Campo>
                             </div>
-
                         </div>
                     </CardContent>
                 </Card>
@@ -186,9 +192,7 @@ export default function EditarFaena({
 
                     <CardContent className="space-y-4">
                         <div>
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                Kilos del permiso
-                            </p>
+                            <p className="text-xs uppercase tracking-wide text-muted-foreground">Kilos del permiso</p>
                             <p className="text-3xl font-semibold tabular-nums">
                                 {faena.kilos_extraidos}
                                 <span className="ml-1 text-base font-normal text-muted-foreground">kg</span>
@@ -200,15 +204,11 @@ export default function EditarFaena({
 
                         <p className="flex items-start gap-2 text-xs text-muted-foreground">
                             <Info className="mt-0.5 size-4 shrink-0" />
-                            El número del talonario no cambia. La salida y el desembarque los fija
-                            la aprobación: sale ese día y vale {vigencia}.
+                            El número del talonario no cambia. La salida y el desembarque los fija la aprobación: sale
+                            ese día y vale {vigencia}.
                         </p>
 
-                        <Button
-                            type="submit"
-                            disabled={form.processing}
-                            className="w-full"
-                        >
+                        <Button type="submit" disabled={form.processing || !completo} className="w-full">
                             Guardar corrección
                         </Button>
                     </CardContent>
