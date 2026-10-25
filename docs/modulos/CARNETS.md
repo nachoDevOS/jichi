@@ -440,6 +440,14 @@ Queda entonces el reparto que tiene cualquier documento de identidad: **el dato
 en negro fino sobre blanco, y el andamio —rótulos y `:`— en blanco perfilado
 sobre el verde**. Lo que se lee primero es el dato.
 
+> ✅ **(25/10/2026) Ya no se mide con un promedio**: `anchoEnUnPunto()` usa las
+> métricas reales de DomPDF. El 0,62 cortaba nombres en mayúsculas (miden 0,665).
+> Lo de abajo queda como historia; `ANCHO_POR_CARACTER` (0,67) es solo respaldo, y
+> el nombre en dos líneas va a 5,8 pt para que la segunda entre en los 18 pt de la caja.
+> Lo mismo con los datos (asociación, dirección, ciudad, provincia): en dos líneas van
+> a 4,2 pt, porque con 4,6 el segundo renglón no entraba en sus 13 pt y perdía la parte
+> de abajo. La cuenta es siempre **líneas × 1,53 × cuerpo ≤ alto de la caja**.
+>
 > ⚠️ **`ANCHO_POR_CARACTER` está atado a ese grueso de letra**, y hay que moverlo
 > si el grueso cambia. Medido sobre las DejaVu Sans que embebe DomPDF con los
 > textos que salen de verdad en un carnet: la **regular** promedia 0,539 em por

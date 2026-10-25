@@ -868,14 +868,20 @@ Los tres tienen que pasar.
   «PROVINCIA»: a 6,1 pt bold mide 33,2 pt en una caja de 32, y en el PDF salía
   «PROVINCIACercado» pegado. Se abrevia a «PROV.». Antes de agregar un rótulo al
   segundo par, medirlo: **caracteres × 0,605 × cuerpo**.
-- **`ANCHO_POR_CARACTER` del carnet está atado al GRUESO de la letra de la
-  tira.** Es el número con el que `CarnetImpresionController::texto()` decide si
-  un nombre entra o hay que achicarlo, y hay que moverlo si ese grueso cambia.
-  Medido sobre las DejaVu Sans que embebe DomPDF: la **regular** promedia 0,539
-  em por carácter, la **negrita** 0,605, y el peor caso —puras mayúsculas— 0,67.
-  Se deja un ~2% de margen sobre el promedio a propósito: quedarse corto es peor
-  que pasarse, porque lo que no entra lo recorta el `overflow: hidden` de la tira
-  y ahí se pierden apellidos.
+- **Un promedio por carácter NO sirve para medir el nombre del carnet, porque va
+  en MAYÚSCULAS** (25/10/2026). `texto()` calculaba con 0,62 em por carácter —el
+  promedio de la negrita con minúsculas— y el nombre se imprime con
+  `mb_strtoupper()`, que en DejaVu negrita mide **0,665**. «NATALIA ISMAEL DÍAZ
+  YBARRA DE PERALTA» daba «entra en una línea a 6 pt», medía 148 pt en una caja de
+  137 y el `overflow: hidden` se comía «PERALTA», sin ningún error. Hoy
+  `anchoEnUnPunto()` mide con las métricas reales de DomPDF
+  (`getFontMetrics()->getTextWidth()`); `ANCHO_POR_CARACTER` (0,67, el peor caso)
+  queda solo de respaldo. **Y el PDF ya guardado no se arregla solo**: se entrega
+  tal como salió, así que hay que regenerarlo con
+  `DocumentoEmitidoService::guardar($doc, $motivo)` (el viejo queda de historial).
+  **Y el alto de la caja tiene que alcanzar para las dos líneas**: cada una avanza
+  1,53 × cuerpo, así que nombre en dos líneas ≤ 5,8 pt (caja de 18) y dato en dos
+  líneas ≤ 4,2 pt (caja de 13). Con 6,6 y 4,6 el segundo renglón perdía la parte de abajo.
 - **Un correlativo por AÑO no sirve para un talonario de papel.**
   `CorrelativoService` lleva `(serie, anio)` y reinicia cada enero, que es lo
   incorrecto para una hoja preimpresa: el talonario del SEDAG va en `002190` y

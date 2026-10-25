@@ -162,23 +162,24 @@ class CarnetImpresionController extends Controller
     /** Los cuerpos: el nombre manda; los datos, debajo. */
     private const CUERPO_NOMBRE = 8.0;
 
-    private const CUERPO_NOMBRE_DOS_LINEAS = 6.6;
+    /** Dos líneas avanzan 2 × 1,53 × cuerpo y la caja tiene 18 pt: más de 5,8 y la segunda se corta. */
+    private const CUERPO_NOMBRE_DOS_LINEAS = 5.8;
 
     private const CUERPO_VALOR = 5.4;
 
     private const CUERPO_CEDULA = 5.6;
 
-    /** El cuerpo de un valor que pasó a dos líneas. */
-    private const CUERPO_DOS_LINEAS = 4.6;
+    /** Un valor en dos líneas: avanzan 2 × 1,53 × cuerpo y la caja tiene 13 pt; con 4,6 la segunda se cortaba. */
+    private const CUERPO_DOS_LINEAS = 4.2;
 
     /** A cuántos píxeles de lado se dibuja la foto redonda antes de embeberla. */
     private const PIXELES_FOTO = 360;
 
     /**
-     * Cuanto ocupa cada caracter, en fraccion del cuerpo. Medido sobre la DejaVu
-     * que embebe DomPDF: la negrita promedia 0,605; se deja margen hacia arriba.
+     * Respaldo si no se pueden leer las métricas de la fuente: el peor caso de la
+     * DejaVu negrita, puras mayúsculas (0,665). Con 0,62 se cortaban apellidos.
      */
-    private const ANCHO_POR_CARACTER = 0.62;
+    private const ANCHO_POR_CARACTER = 0.67;
 
     /** Hasta donde se puede achicar un texto que no entra, en fraccion de su cuerpo. */
     private const ENCOGIDO_MAXIMO = 0.7;
@@ -237,7 +238,7 @@ class CarnetImpresionController extends Controller
         $texto = trim((string) $valor);
         $dibujado = $texto !== '' ? $texto : $molde;
 
-        $porPunto = max(0.01, mb_strlen($dibujado) * self::ANCHO_POR_CARACTER);
+        $porPunto = max(0.01, $this->anchoEnUnPunto($dibujado));
         $minimo = $cuerpo * self::ENCOGIDO_MAXIMO;
 
         if ($porPunto * $cuerpo <= $disponible) {
@@ -260,6 +261,24 @@ class CarnetImpresionController extends Controller
             'cuerpo' => round(max($dosLineas * self::ENCOGIDO_MAXIMO, min($dosLineas, $paraDosLineas)), 1),
             'lineas' => 2,
         ];
+    }
+
+    /**
+     * Lo que mide el texto a 1 pt en la DejaVu Sans negrita de las tiras, con las
+     * métricas reales de DomPDF: un promedio por carácter falla con las mayúsculas.
+     */
+    private function anchoEnUnPunto(string $texto): float
+    {
+        static $metricas = null, $fuente = null;
+
+        try {
+            $metricas ??= Pdf::loadHTML('')->getDomPDF()->getFontMetrics();
+            $fuente ??= $metricas->getFont('DejaVu Sans', 'bold');
+
+            return (float) $metricas->getTextWidth($texto, $fuente, 1);
+        } catch (\Throwable) {
+            return mb_strlen($texto) * self::ANCHO_POR_CARACTER;
+        }
     }
 
     /**
