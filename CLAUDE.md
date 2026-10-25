@@ -743,6 +743,18 @@ Los tres tienen que pasar.
   Va `fontsource()`, que la lee de `@fontsource/instrument-sans` en `node_modules`.
   Probarlo borrando antes `node_modules/.cache/laravel-vite-plugin`: con la caché
   local el build anda aunque falte la red y no delata nada.
+- **Inertia 3 REUSA una prop que llega igual, y un `useEffect` sobre ella no
+  vuelve a correr.** `preserveEqualProps` deja el objeto viejo si el nuevo es
+  idéntico: el mismo flash dos veces seguidas («Verificar pago» → «falta que lo
+  validen») no mostraba el segundo toast. Por eso `flash.id` lleva un uuid por
+  mensaje (`HandleInertiaRequests`). Vale para cualquier prop que dispare un efecto.
+- **Playwright contra `composer run dev` saca la página EN BLANCO, sin error en
+  el servidor.** Chromium bloquea los assets de Vite (`127.0.0.1:5173`) por
+  «Local Network Access» y la consola dice `blocked by CORS policy ... loopback
+  address space`. Se lanza con `chromium.launch({ args:
+  ['--disable-features=LocalNetworkAccessChecks,PrivateNetworkAccessChecks'] })`.
+  Y el login local va detrás de «Acceso de emergencia», que solo responde
+  después de `waitForLoadState('networkidle')`.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **NADA AVISA SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Una tabla, un

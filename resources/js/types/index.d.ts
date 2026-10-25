@@ -57,6 +57,8 @@ export interface Flash {
     info: string | null;
     /** La clave temporal del portal, recién creada o reseteada. Llega UNA vez. */
     cuenta_portal: CredencialPortal | null;
+    /** Nuevo en cada mensaje: así el mismo texto repetido vuelve a disparar el toast. */
+    id: string | null;
 }
 
 export interface CredencialPortal {

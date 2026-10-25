@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Configuracion;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
 
@@ -78,6 +79,9 @@ class HandleInertiaRequests extends Middleware
                 'aviso' => fn () => $request->session()->get('aviso'),
                 // La clave temporal del portal: se muestra UNA vez, para dictarla o imprimirla.
                 'cuenta_portal' => fn () => $request->session()->get('cuenta_portal'),
+                // Inertia 3 reusa la prop si llega igual: sin esto, el mismo mensaje dos veces seguidas no salía.
+                'id' => fn () => collect(['exito', 'error', 'info', 'aviso'])->contains(fn ($c) => $request->session()->has($c))
+                    ? (string) Str::uuid() : null,
             ],
 
             'ziggy' => fn (): array => [

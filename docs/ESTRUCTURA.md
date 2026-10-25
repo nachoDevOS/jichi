@@ -145,7 +145,7 @@ resources/js/
 │   │                           toggle-apariencia
 │   ├── panel/
 │   │   ├── layout/                 barra-lateral, barra-superior, navegacion.ts (el menú)
-│   │   ├── pagos/                  tarjeta-recaudaciones: el cobro de las cuatro fichas
+│   │   ├── pagos/                  tarjeta-recaudaciones y sus ventanas (QR, cargar boleta)
 │   │   ├── beneficiarios/  aprovechamientos/  guias/  catalogos/  dashboard/  comunes/
 │   ├── portal/                 fila-papel, fila-tramite, visor-vista-previa, piezas
 │   └── publico/                hoja-oficial, ficha-documento, buscador-codigo,
