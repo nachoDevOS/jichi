@@ -37,6 +37,11 @@ class RevisarCarnetService
                 throw CarnetInvalidoException::cupoRevocado();
             }
 
+            // Ni sin pagar: un carnet de antes del 26/10/2026 pudo registrarse sobre una pendiente.
+            if ($bloqueado->aprovechamiento !== null && ! $bloqueado->aprovechamiento->estado->habilita()) {
+                throw CarnetInvalidoException::cupoSinAprobar();
+            }
+
             // La emisión se escribe ACÁ: hasta el pago había una solicitud. El
             // vencimiento se recalcula sobre ella con la vigencia configurada.
             $emision = now();

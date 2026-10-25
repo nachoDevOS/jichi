@@ -23,6 +23,12 @@ class TramitesDisponibles
         $comercializador = $beneficiario->carnetVigenteDe(TipoActor::Comercializador);
         // Una autorización a la vez: la que está pendiente, en revisión o aprobada en fecha ocupa el lugar.
         $autorizacion = $beneficiario->aprovechamientos()->enCurso()->latest('id')->first();
+        // El carnet de pescador pide la autorización APROBADA: pendiente de pago no alcanza.
+        $requisitoPescador = match (true) {
+            $autorizacion === null => 'Primero necesita la Autorización de Pesca.',
+            ! $autorizacion->estado->habilita() => 'Primero tiene que aprobarse su Autorización de Pesca: falta que se valide el pago.',
+            default => null,
+        };
 
         $lista = [
             self::faena($pescador),
@@ -30,8 +36,8 @@ class TramitesDisponibles
             $autorizacion === null
                 ? self::item('aprovechamiento', 'Autorización de Pesca', true, 'El cupo de kilos de la gestión, según la escala oficial.')
                 : null,
-            self::carnet($beneficiario, TipoActor::Pescador, $pescador, $autorizacion !== null),
-            self::carnet($beneficiario, TipoActor::Comercializador, $comercializador, true),
+            self::carnet($beneficiario, TipoActor::Pescador, $pescador, $requisitoPescador),
+            self::carnet($beneficiario, TipoActor::Comercializador, $comercializador, null),
         ];
 
         // Lo disponible primero: es lo que la persona viene a ver.
@@ -73,7 +79,7 @@ class TramitesDisponibles
      *
      * @return array{clase: string, titulo: string, disponible: bool, detalle: string}|null
      */
-    private static function carnet(Beneficiario $beneficiario, TipoActor $actor, ?Carnet $vigente, bool $requisito): ?array
+    private static function carnet(Beneficiario $beneficiario, TipoActor $actor, ?Carnet $vigente, ?string $falta): ?array
     {
         $enTramite = $beneficiario->carnets()
             ->where('tipo_actor', $actor->value)
@@ -87,9 +93,9 @@ class TramitesDisponibles
         $titulo = 'Carnet de '.mb_strtolower($actor->etiqueta());
 
         // El pescador no saca carnet sin autorización; el comercializador nunca la lleva.
-        return $requisito
+        return $falta === null
             ? self::item('carnet', $titulo, true, 'Con el aval de su asociación.')
-            : self::item('carnet', $titulo, false, 'Primero necesita la Autorización de Pesca.');
+            : self::item('carnet', $titulo, false, $falta);
     }
 
     /** @return array{clase: string, titulo: string, disponible: bool, detalle: string} */

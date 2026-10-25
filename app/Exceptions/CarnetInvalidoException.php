@@ -47,8 +47,16 @@ class CarnetInvalidoException extends RuntimeException
     public static function pescadorSinCupo(string $persona): self
     {
         return new self(
-            "{$persona} no tiene un cupo de pesca vigente. El carnet de pescador imprime el volumen ".
-            'autorizado, así que hay que otorgarle el aprovechamiento antes de emitirlo.',
+            "{$persona} no tiene una Autorización de Pesca para Aprovechamiento Pesquero aprobada y vigente. ".
+            'El carnet de pescador se emite recién cuando la autorización está pagada y aprobada.',
+        );
+    }
+
+    public static function cupoSinAprobar(): self
+    {
+        return new self(
+            'La Autorización de Pesca para Aprovechamiento Pesquero de este carnet todavía no está aprobada: '.
+            'el carnet se aprueba recién cuando se pague y apruebe la autorización.',
         );
     }
 

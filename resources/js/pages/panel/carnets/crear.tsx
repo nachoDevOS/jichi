@@ -89,7 +89,7 @@ export default function CrearCarnet({
                   ? `Falta definir la tarifa del carnet de ${actor} en Catálogos › Aranceles › Definir tarifas, o SIREB la dio de baja.`
                   : null;
 
-    // Sus autorizaciones en curso: pendiente o aprobada respaldan el carnet; se cobran juntos.
+    // Solo autorizaciones aprobadas y en fecha: una sin pagar no respalda el carnet (26/10/2026).
     const cupos: CupoVigente[] = persona?.cupos_elegibles ?? [];
     const cupo = cupos.find((c) => c.id === form.data.aprovechamiento_id) ?? null;
     const faltaCupo = esPescador && persona !== null && cupos.length === 0;
@@ -277,9 +277,9 @@ export default function CrearCarnet({
                             hecho={cupo !== null}
                         >
                             {faltaCupo ? (
-                                <Aviso tono="aviso" icono={TriangleAlert} titulo="Sin autorización en curso">
-                                    El carnet de pescador imprime el volumen autorizado: registre antes su Autorización
-                                    de Pesca para Aprovechamiento Pesquero.
+                                <Aviso tono="aviso" icono={TriangleAlert} titulo="Sin autorización aprobada">
+                                    El carnet de pescador se emite recién cuando su Autorización de Pesca para
+                                    Aprovechamiento Pesquero está pagada y aprobada.
                                 </Aviso>
                             ) : persona === null ? (
                                 <p className="text-sm text-muted-foreground">Elija primero al titular.</p>

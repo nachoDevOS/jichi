@@ -1966,7 +1966,12 @@
 
 ### Su bolsa madre de esta gestión, o null.
 
-   ACEPTA UN CUPO PENDIENTE DE PAGO, Y TIENE QUE ACEPTARLO
+   (26/10/2026: YA NO. Decidido con el responsable: el carnet de pescador pide
+   la autorización APROBADA —`vigentes()`—. El motivo de abajo era cobrar los
+   dos juntos, y desde el 02/10/2026 cada uno se paga aparte en SIREB. Lo de
+   abajo queda como historia.)
+
+   ACEPTABA UN CUPO PENDIENTE DE PAGO
    Lo único que el carnet necesita del cupo es el VOLUMEN que va impreso en
    el plástico, y eso ya está decidido desde que se otorgó. El carnet también
    nace sin pagar, y los dos se cobran juntos en el mismo recibo — así llega

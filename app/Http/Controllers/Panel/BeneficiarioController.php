@@ -439,19 +439,16 @@ class BeneficiarioController extends Controller
     /**
      * Las bolsas madre que pueden respaldar un carnet de pescador nuevo.
      *
-     * Las en curso —lo mismo que acepta `EmitirCarnetService`—, no solo las
-     * aprobadas. Estática porque la usan el buscador y `CarnetController`.
-     * Ver NOTAS-CODIGO.
+     * Solo las aprobadas y en fecha —lo mismo que acepta `EmitirCarnetService`
+     * desde el 26/10/2026—. Estática porque la usan el buscador y `CarnetController`.
      *
      * @return array<int, array<string, mixed>>
      */
     public static function cuposElegibles(Beneficiario $beneficiario): array
     {
         $cupos = $beneficiario->relationLoaded('aprovechamientos')
-            ? $beneficiario->aprovechamientos->filter(
-                fn (AprovechamientoPesq $a): bool => $a->estado->estaAbierto() || $a->estado->habilita(),
-            )->filter(fn (AprovechamientoPesq $a): bool => $a->estaEnFecha())
-            : $beneficiario->aprovechamientos()->enCurso()->get();
+            ? $beneficiario->aprovechamientos->filter(fn (AprovechamientoPesq $a): bool => $a->estaVigente())
+            : $beneficiario->aprovechamientos()->vigentes()->get();
 
         return $cupos
             ->sortByDesc('fecha_solicitud')
@@ -461,9 +458,6 @@ class BeneficiarioController extends Controller
                 'volumen_total_kg' => (float) $a->volumen_total_kg,
                 'kilos_disponibles' => (float) $a->kilos_disponibles,
                 'fecha_vencimiento' => $a->fecha_vencimiento?->toDateString(),
-                // El estado va a la pantalla: un cupo PENDIENTE respalda el
-                // carnet igual, pero todavía no autoriza a pescar, y quien
-                // emite tiene que verlo.
                 'estado_etiqueta' => $a->estado->etiqueta(),
                 'estado_color' => $a->estado->color(),
                 'habilita_faenas' => $a->estado->habilita(),

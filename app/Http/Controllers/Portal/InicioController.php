@@ -12,8 +12,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Lo que vale HOY y lo que puede pedir en ventanilla. Los trámites abiertos van
- * en «En curso»; acá, cuántos son.
+ * Lo que vale HOY, lo que tiene abierto (para decirle qué hacer ahora) y lo que
+ * puede pedir en ventanilla.
  */
 class InicioController extends Controller
 {
@@ -28,6 +28,7 @@ class InicioController extends Controller
         $faenas = ExpedienteBeneficiario::faenas($beneficiario)->load('codigo');
         $guias = ExpedienteBeneficiario::guias($beneficiario)->load('codigo');
 
+        $abierto = fn ($d): bool => $d->estado->estaAbierto();
         $vigentes = collect()
             ->merge($aprovechamientos->filter->estaVigente()->map(ResumenPortal::aprovechamiento(...)))
             ->merge($carnets->filter->estaVigente()->map(ResumenPortal::carnet(...)))
@@ -39,9 +40,13 @@ class InicioController extends Controller
             // Lo que vence antes, primero: es lo que hay que renovar.
             'vigentes' => $vigentes->sortBy('vence_el')->values()->all(),
             'tramites_disponibles' => TramitesDisponibles::para($beneficiario),
-            // Solo cuántos: el detalle está en «En curso».
-            'en_curso' => collect([$aprovechamientos, $carnets, $faenas, $guias])
-                ->sum(fn ($grupo) => $grupo->filter(fn ($d) => $d->estado->estaAbierto())->count()),
+            // Lo abierto, para «Qué hacer ahora»: el detalle completo sigue en «En curso».
+            'abiertos' => collect()
+                ->merge($aprovechamientos->filter($abierto)->map(ResumenPortal::aprovechamiento(...)))
+                ->merge($carnets->filter($abierto)->map(ResumenPortal::carnet(...)))
+                ->merge($faenas->filter($abierto)->map(ResumenPortal::faena(...)))
+                ->merge($guias->filter($abierto)->map(ResumenPortal::guia(...)))
+                ->values()->all(),
             'deuda' => $beneficiario->deudaTotal(),
         ]);
     }

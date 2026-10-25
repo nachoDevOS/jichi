@@ -68,7 +68,8 @@ para no equivocarse:
   definió para la actividad en Aranceles › Definir tarifas (`arancel_tarifas`,
   por id; 13/10/2026): ventanilla elige solo la actividad.
 - **Una autorización vigente por persona y un carnet vigente por actividad.** El
-  pescador no saca carnet sin autorización; el comercializador nunca lleva una.
+  pescador no saca carnet sin autorización **aprobada** (26/10/2026: una pendiente
+  de pago ya no alcanza); el comercializador nunca lleva una.
 - **El circuito es el mismo para los cuatro documentos**, y lo dictan los enums
   (`EstadoAprovechamiento`, `EstadoCarnet`, `EstadoFaena`, `EstadoGuia`):
 
@@ -585,7 +586,8 @@ Los tres tienen que pasar.
   sí fallaron —eso sí lo marca PHP—, pero lo caro fue lo otro: cada lugar que
   preguntaba `vigentes()` pasó a contestar «no» para el estado nuevo, en
   silencio. Dos ejemplos reales, los dos encontrados por un ensayo y no leyendo:
-  el carnet de pescador dejó de poder emitirse —exigía un cupo ya cobrado— y la
+  el carnet de pescador dejó de poder emitirse —exigía un cupo ya cobrado; desde
+  el 26/10/2026 eso es justamente la regla, decidido a propósito— y la
   regla de «una bolsa por persona» dejó de contar los cupos sin pagar, así que se
   podían otorgar cinco y quedarse con el mejor. **Al sumar un estado, buscar
   todos los scopes y helpers que enumeran estados y decidir uno por uno de qué

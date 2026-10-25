@@ -351,27 +351,26 @@ class EmitirCarnetService
     }
 
     /**
-     * El cupo ELEGIDO, si de verdad es de esta persona y sirve hoy.
+     * El cupo ELEGIDO, si de verdad es de esta persona y está aprobado y en fecha.
+     * Una autorización sin pagar no respalda un carnet (26/10/2026).
      */
     private function cupoUtilizable(Beneficiario $beneficiario, AprovechamientoPesq $cupo): ?AprovechamientoPesq
     {
         return AprovechamientoPesq::query()
             ->whereKey($cupo->id)
             ->deBeneficiario($beneficiario->id)
-            ->enCurso()
+            ->vigentes()
             ->first();
     }
 
     /**
-     * Su bolsa madre de esta gestión, o null.
+     * Su bolsa madre aprobada y en fecha, o null.
      */
     private function cupoVigenteDe(Beneficiario $beneficiario): ?AprovechamientoPesq
     {
         return AprovechamientoPesq::query()
             ->deBeneficiario($beneficiario->id)
-            ->enCurso()
-            // Por la SOLICITUD: un cupo en curso puede estar sin firmar, y
-            // entonces su `fecha_emision` es NULL.
+            ->vigentes()
             ->latest('fecha_solicitud')
             ->first();
     }

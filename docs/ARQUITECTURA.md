@@ -74,8 +74,8 @@ tipos de carnet (12/10/2026): el precio es la tarifa que la unidad definió para
   libera pasar su fecha, agotarse o ser revocada.
 - **Un carnet vigente por actividad**. Para reponer uno perdido se revoca y se
   emite otro con la misma autorización.
-- **El pescador no saca carnet sin autorización; el comercializador nunca lleva
-  una.**
+- **El pescador no saca carnet sin autorización APROBADA (pagada y en fecha);
+  el comercializador nunca lleva una.** (26/10/2026: antes alcanzaba una pendiente.)
 
 El detalle, con ejemplos, está en [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md).
 

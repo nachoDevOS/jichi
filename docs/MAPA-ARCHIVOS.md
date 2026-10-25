@@ -193,6 +193,9 @@ desconecta entero. Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `components/comunes/texto-copiable.tsx` | Copiar con un clic; respaldo con `execCommand` fuera de HTTPS |
 | `components/panel/beneficiarios/*` | La ficha del beneficiario por pestañas: pescador, comercializador, pagos |
 | `components/portal/*`, `pages/portal/*` | El portal: colores claros fijos, sin `dark:` |
+| `pages/portal/inicio.tsx` | Inicio del portal (26/10/2026): «Qué hacer ahora», tres cifras que llevan a su pestaña, lo vigente y el camino de trámites. Se refresca solo cada minuto (`usePoll`) |
+| `components/portal/que-hacer-ahora.tsx` | La tarjeta de lo más urgente, por orden: código vencido → pagar (con código y «Pagar con QR») → pago en revisión → algo vence en ≤ 30 días → todo en orden → sin documentos. Lee `pago`, `debe` y `dias_restantes` de `ResumenPortal` |
+| `components/portal/catalogo-tramites.tsx` | «Lo que puede tramitar» como camino: pestañas pescador/comercializador (recuerda la elegida en `localStorage`), un nodo por papel con su situación (lo tiene / en trámite / puede pedirlo / todavía no) y el detalle del elegido con «Qué llevar» para marcar |
 | `components/publico/*`, `pages/publico/*` | Portada institucional y verificación |
 | `components/ui/*` | Los únicos con vocabulario en inglés (`Button`, `Card`…). Un color nuevo va también a `badge.tsx` |
 | `lib/utils.ts` | `bs()`, `fecha()`, `fechaInput()`, `fechaHora()`, `hace()`. **Nunca `new Date(cadena)` directo**: una fecha suelta se corre un día en UTC-4 |

@@ -150,6 +150,13 @@ dentro de una transacción deshecha con `rollBack()`.
 - **Regla para el pescador:** su registro debe estar vinculado
   **obligatoriamente** a un `aprovechamiento_id`. A partir de una misma «Bolsa
   Madre» el sistema permite gestionar y emitir los carnets necesarios.
+- *(26/10/2026)* **La autorización tiene que estar APROBADA y en fecha** para
+  registrar el carnet de pescador: una pendiente de pago no lo respalda.
+  Ventanilla ni la ofrece para elegir, el portal dice «Primero tiene que
+  aprobarse su Autorización de Pesca» y un carnet registrado antes sobre una
+  pendiente no se aprueba hasta que se apruebe la autorización. Ver
+  `EmitirCarnetService::cupoUtilizable()`, `RevisarCarnetService::aprobar()` y
+  `TramitesDisponibles`.
 - **Regla para el comercializador:** su `aprovechamiento_id` se registra en
   **NULL**, porque no realiza actividades extractivas.
 - Todo carnet se clasifica según su **actividad** (`tipo_actor`: pescador o
