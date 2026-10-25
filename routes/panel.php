@@ -12,6 +12,7 @@ use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\FaenaController;
 use App\Http\Controllers\Panel\GuiaController;
 use App\Http\Controllers\Panel\GuiaImpresionController;
+use App\Http\Controllers\Panel\ManualController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
 use App\Http\Controllers\Panel\ReciboController;
 use App\Http\Controllers\Panel\RegistroSirebController;
@@ -479,6 +480,16 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         Route::get('/sireb/{dia}/descargar', [RegistroSirebController::class, 'descargar'])
             ->middleware('permiso:sireb.exportar')->where('dia', '\d{4}-\d{2}-\d{2}')->name('registro-sireb.descargar');
     });
+
+    /*
+    | Manual de usuario — videos tutoriales. Sin permiso propio: cada tutorial
+    | se ofrece a quien tiene el permiso del trámite que muestra.
+    */
+
+    Route::get('/manual', [ManualController::class, 'index'])->name('manual.index');
+    Route::get('/manual/{tutorial}.{extension}', [ManualController::class, 'archivo'])
+        ->where(['tutorial' => '[a-z0-9-]+', 'extension' => 'mp4|jpg'])
+        ->name('manual.archivo');
 
     /*
     | Módulos por construir

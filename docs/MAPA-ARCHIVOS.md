@@ -124,6 +124,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Panel/CuentaPortalController.php` | 68 | La clave temporal vuelve por flash una sola vez |
 | `Portal/*` | 25–80 | Solo lectura; nada recibe un id: todo sale de la cuenta con sesión. `VistaPreviaController` dibuja «NO VÁLIDO» sobre lo abierto |
 | `Publico/VerificacionController.php` | 335 | La única pantalla sin sesión. `datosPublicos()` decide qué se muestra: nada de datos personales completos |
+| `Panel/ManualController.php` | 55 | Manual de usuario: JSON de los tutoriales filtrados por permiso y el video con sesión (206 por rangos). Ver modulos/MANUAL.md |
 | `StorageController.php` | 75 | **El único que escribe archivos**: 3 MB, nombre aleatorio, disco |
 
 ## `app/Http/Requests/` y `app/Exceptions/`
@@ -149,6 +150,7 @@ funcionario; el controlador lo pone en el campo o en el aviso.
 | `Vigencia.php` | 60 | Hasta cuándo vale autorización, carnets (uno por actividad, `carnetDe()`), faena y guía | Lee `configuraciones` (`vigencia.{tramite}.modo/dias`); `hasta()` conserva la hora (la guía se cuenta con hora). Pantalla: `VigenciaController` |
 | `QrVerificacion.php`, `CodigoQr.php` | URL **relativa + `APP_URL`** (nunca el host de la petición); QR pintado con `gd` |
 | `ReciboImpreso.php`, `TextoVertical.php`, `MarcaAgua.php` | Piezas de los PDF: lo que DomPDF no sabe hacer va horneado en PNG |
+| `ManualUsuario.php` | Catálogo de los videos tutoriales: permiso del trámite que muestran y segundo de cada paso. Archivos en `resources/manual/` |
 | `Archivos.php`, `Paginacion.php`, `Sql.php` | `Sql` tiene lo que cambia entre PostgreSQL y SQLite |
 
 ## `app/AuthIbare/` — login con Ibare
@@ -196,6 +198,7 @@ desconecta entero. Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `pages/portal/inicio.tsx` | Inicio del portal (26/10/2026): «Qué hacer ahora», tres cifras que llevan a su pestaña, lo vigente y el camino de trámites. Se refresca solo cada minuto (`usePoll`) |
 | `components/portal/que-hacer-ahora.tsx` | La tarjeta de lo más urgente, por orden: código vencido → pagar (con código y «Pagar con QR») → pago en revisión → algo vence en ≤ 30 días → todo en orden → sin documentos. Lee `pago`, `debe` y `dias_restantes` de `ResumenPortal` |
 | `components/portal/catalogo-tramites.tsx` | «Lo que puede tramitar» como camino: pestañas pescador/comercializador (recuerda la elegida en `localStorage`), un nodo por papel con su situación (lo tiene / en trámite / puede pedirlo / todavía no) y el detalle del elegido con «Qué llevar» para marcar |
+| `components/panel/manual/*` | Botón «Manual» de la barra superior → ventana (portal a `<body>`) → reproductor con pasos que saltan al segundo |
 | `components/publico/*`, `pages/publico/*` | Portada institucional y verificación |
 | `components/ui/*` | Los únicos con vocabulario en inglés (`Button`, `Card`…). Un color nuevo va también a `badge.tsx` |
 | `lib/utils.ts` | `bs()`, `fecha()`, `fechaInput()`, `fechaHora()`, `hace()`. **Nunca `new Date(cadena)` directo**: una fecha suelta se corre un día en UTC-4 |

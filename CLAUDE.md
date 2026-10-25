@@ -757,6 +757,11 @@ Los tres tienen que pasar.
   ['--disable-features=LocalNetworkAccessChecks,PrivateNetworkAccessChecks'] })`.
   Y el login local va detrás de «Acceso de emergencia», que solo responde
   después de `waitForLoadState('networkidle')`.
+- **Un modal `fixed z-50` DENTRO del encabezado queda DEBAJO de la barra lateral.**
+  El encabezado es `sticky z-20` y crea su propio contexto de apilamiento: el
+  `z-50` vale solo adentro de él, y la barra (`z-40`) lo tapa. Un modal que se abre
+  desde la barra superior va con `createPortal(…, document.body)`. Ver
+  `components/panel/manual/boton-manual.tsx`.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
 - **NADA AVISA SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Una tabla, un

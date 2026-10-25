@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LogoJichi } from "@/components/comunes/logo-jichi";
 import { ToggleApariencia } from "@/components/comunes/toggle-apariencia";
 import { moduloActual, nombreDe } from "@/components/panel/layout/navegacion";
+import { BotonManual } from "@/components/panel/manual/boton-manual";
 import { usePermisos } from "@/hooks/use-permisos";
 import { cn, iniciales } from "@/lib/utils";
 import type { PageProps } from "@/types";
@@ -76,6 +77,8 @@ export function BarraSuperior({
                 </span>
 
                 <div className="flex-1" />
+
+                <BotonManual />
 
                 <ToggleApariencia />
 
