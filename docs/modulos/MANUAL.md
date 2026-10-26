@@ -1,13 +1,13 @@
 # Manual de usuario (videos tutoriales)
 
-> 25/10/2026. Botón **«Manual»** en la barra superior del panel: abre una ventana
+> 25/10/2026. Botón **«Ayuda»** (antes «Manual», 26/10/2026) en la barra superior del panel: abre una ventana
 > con videos que muestran, paso a paso, cómo hacer un trámite, sin salir de la
 > pantalla en la que se está trabajando.
 
 ## Cómo funciona
 
 ```
-Barra superior › «Manual» (BotonManual)
+Barra superior › «Ayuda» (BotonManual)
    └─ abre VentanaManual (createPortal a <body>)
         └─ GET /panel/manual  (JSON: solo los tutoriales que el rol puede hacer)
              └─ ReproductorTutorial: <video> + lista de pasos; un clic salta a ese segundo

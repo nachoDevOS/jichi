@@ -89,7 +89,7 @@ export function VentanaManual({ onCerrar }: { onCerrar: () => void }) {
                         )}
                         <div className="min-w-0 flex-1">
                             <h2 id="titulo-ventana-manual" className="text-lg leading-tight font-semibold">
-                                Manual de usuario
+                                Tutoriales en video
                             </h2>
                             <p className="mt-0.5 truncate text-sm text-white/70">
                                 {tutorial
