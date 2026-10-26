@@ -1,11 +1,24 @@
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronsLeft, ChevronsRight, X } from 'lucide-react';
-import { Fragment } from 'react';
+import { Fragment, type CSSProperties } from 'react';
 import { LogoJichi, MarcaJichi } from '@/components/comunes/logo-jichi';
 import { moduloActual, NAVEGACION, type ItemNavegacion } from '@/components/panel/layout/navegacion';
 import { usePermisos } from '@/hooks/use-permisos';
 import { cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
+
+/*
+ * En desarrollo (servidor de Vite) la barra va en ámbar con la franja «DESARROLLO»: que nadie
+ * cargue datos reales en la base de prueba. En producción se compila con `npm run build` y
+ * DEV es false: la barra queda con su color de siempre.
+ */
+const DESARROLLO = import.meta.env.DEV;
+const COLORES_DESARROLLO = {
+    '--sidebar': 'oklch(0.33 0.075 55)',
+    '--sidebar-foreground': 'oklch(0.95 0.025 80)',
+    '--sidebar-accent': 'oklch(0.43 0.085 58)',
+    '--sidebar-border': 'oklch(0.43 0.07 58)',
+} as CSSProperties;
 
 /**
  * Barra lateral azul institucional: la marca arriba y el menú debajo.
@@ -51,6 +64,7 @@ export function BarraLateral({
                 angosto ? 'w-64 lg:w-16' : 'w-64',
                 abierto ? 'translate-x-0' : '-translate-x-full',
             )}
+            style={DESARROLLO ? COLORES_DESARROLLO : undefined}
         >
             {/*
                 La franja de la marca mide lo mismo que el encabezado (h-14) y va
@@ -81,6 +95,19 @@ export function BarraLateral({
                     <X className="size-5" />
                 </button>
             </div>
+
+            {DESARROLLO && (
+                <div
+                    className="flex h-6 shrink-0 items-center justify-center"
+                    style={{ background: 'repeating-linear-gradient(-45deg, #f2c14e 0 10px, #e0a53a 10px 20px)' }}
+                    title="Entorno de desarrollo: los datos no son reales"
+                >
+                    <span className="rounded bg-slate-950/80 px-2 text-[10px] leading-4 font-bold tracking-[0.2em] text-white uppercase">
+                        {angosto ? <span className="lg:hidden">Desarrollo</span> : 'Desarrollo'}
+                        {angosto && <span className="hidden lg:inline">Dev</span>}
+                    </span>
+                </div>
+            )}
 
             <nav className="sin-barra-scroll flex-1 overflow-x-hidden overflow-y-auto py-2">
                 {items.map((item, i) => (
