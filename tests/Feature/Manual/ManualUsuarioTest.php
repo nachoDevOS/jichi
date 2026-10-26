@@ -29,15 +29,18 @@ class ManualUsuarioTest extends TestCase
             ->assertStatus(206);
     }
 
-    public function test_el_de_pescador_se_ofrece_a_quien_registra_autorizaciones(): void
+    public function test_cada_tramite_se_ofrece_a_quien_lo_puede_hacer(): void
     {
         $usuario = $this->usuario('aprovechamientos.crear');
 
         $this->actingAs($usuario)->getJson(route('manual.index'))
             ->assertOk()
-            ->assertJsonPath('0.clave', 'ser-pescador');
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.clave', 'autorizacion-pesca')
+            // El carnet sigue en el recorrido, pero este rol no lo puede ver: no se ofrece.
+            ->assertJsonPath('0.siguiente', null);
         $this->actingAs($usuario)
-            ->get(route('manual.archivo', ['ser-pescador', 'mp4']), ['Range' => 'bytes=0-99'])
+            ->get(route('manual.archivo', ['autorizacion-pesca', 'mp4']), ['Range' => 'bytes=0-99'])
             ->assertStatus(206);
     }
 
@@ -47,11 +50,22 @@ class ManualUsuarioTest extends TestCase
 
         $previa = $this->actingAs($usuario)->getJson(route('manual.index'))
             ->assertOk()
-            ->assertJsonPath('0.clave', 'ser-comercializador')
+            ->assertJsonPath('0.clave', 'guia-transporte')
             ->json('0.previa');
 
         $this->actingAs($usuario)->get($previa)->assertOk();
-        $this->actingAs($usuario)->get(route('manual.archivo', ['ser-pescador', 'previa.mp4']))->assertForbidden();
+        $this->actingAs($usuario)->get(route('manual.archivo', ['autorizacion-pesca', 'previa.mp4']))->assertForbidden();
+    }
+
+    public function test_la_pantalla_final_ofrece_el_siguiente_tramite_que_el_rol_puede_ver(): void
+    {
+        Permission::findOrCreate('carnets.crear', 'web');
+        $usuario = $this->usuario('aprovechamientos.crear');
+        $usuario->givePermissionTo('carnets.crear');
+
+        $this->actingAs($usuario)->getJson(route('manual.index'))
+            ->assertOk()
+            ->assertJsonPath('0.siguiente', ['clave' => 'carnet-pescador', 'titulo' => 'Carnet de pescador']);
     }
 
     public function test_sin_el_permiso_no_lo_ve_ni_lo_puede_bajar(): void

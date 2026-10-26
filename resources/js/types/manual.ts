@@ -15,4 +15,6 @@ export interface Tutorial {
     portada: string;
     /** Clip corto en bucle para la tarjeta; null si no se generó. */
     previa: string | null;
+    /** El trámite que sigue en el recorrido; la pantalla final lo ofrece. */
+    siguiente: { clave: string; titulo: string } | null;
 }

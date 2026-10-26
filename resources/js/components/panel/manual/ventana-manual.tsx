@@ -138,7 +138,7 @@ export function VentanaManual({ onCerrar }: { onCerrar: () => void }) {
                             key={tutorial.clave}
                             className="animate-in fade-in slide-in-from-right-4 duration-300 motion-reduce:animate-none"
                         >
-                            <ReproductorTutorial tutorial={tutorial} onVolver={volver} />
+                            <ReproductorTutorial tutorial={tutorial} onVolver={volver} onSiguiente={setElegido} />
                         </div>
                     ) : (
                         <Biblioteca tutoriales={tutoriales} onElegir={setElegido} />

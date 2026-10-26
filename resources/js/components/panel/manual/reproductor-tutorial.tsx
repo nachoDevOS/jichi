@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight, Gauge, LayoutGrid, PartyPopper, RotateCcw } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Gauge, LayoutGrid, PartyPopper, Play, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { guardarProgreso, leerProgreso, minutos, puntoParaContinuar } from '@/components/panel/manual/progreso-manual';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,15 @@ const VELOCIDADES = [0.75, 1, 1.25, 1.5];
  * El video con su barra de capítulos y, al costado, los pasos: un clic salta a ese momento.
  * Recuerda hasta dónde se vio (progreso-manual.ts) y retoma desde ahí.
  */
-export function ReproductorTutorial({ tutorial, onVolver }: { tutorial: Tutorial; onVolver?: () => void }) {
+export function ReproductorTutorial({
+    tutorial,
+    onVolver,
+    onSiguiente,
+}: {
+    tutorial: Tutorial;
+    onVolver?: () => void;
+    onSiguiente?: (clave: string) => void;
+}) {
     const video = useRef<HTMLVideoElement>(null);
     const lista = useRef<HTMLOListElement>(null);
     const [segundo, setSegundo] = useState(0);
@@ -128,13 +136,34 @@ export function ReproductorTutorial({ tutorial, onVolver }: { tutorial: Tutorial
                                     Ahora puede hacer el trámite usted mismo. Si se olvida de un paso, vuelva y tóquelo
                                     en la lista.
                                 </p>
-                                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                                {/* El recorrido sigue: el próximo trámite a un clic, lo más visible. */}
+                                {tutorial.siguiente && onSiguiente && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onSiguiente(tutorial.siguiente!.clave)}
+                                        className="group mt-5 flex w-full items-center gap-3 rounded-xl bg-primary p-3 text-left text-primary-foreground shadow-md transition-transform hover:-translate-y-0.5"
+                                    >
+                                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15">
+                                            <Play className="ml-0.5 size-5 fill-current" />
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-xs text-primary-foreground/75">
+                                                Siguiente trámite
+                                            </span>
+                                            <span className="block truncate font-semibold">
+                                                {tutorial.siguiente.titulo}
+                                            </span>
+                                        </span>
+                                        <ChevronRight className="size-5 transition-transform group-hover:translate-x-1" />
+                                    </button>
+                                )}
+                                <div className="mt-3 flex flex-wrap justify-center gap-2">
                                     <Button variant="outline" onClick={() => irA(0)}>
                                         <RotateCcw className="size-4" />
                                         Ver de nuevo
                                     </Button>
                                     {onVolver && (
-                                        <Button onClick={onVolver}>
+                                        <Button variant="outline" onClick={onVolver}>
                                             <LayoutGrid className="size-4" />
                                             Otros videos
                                         </Button>

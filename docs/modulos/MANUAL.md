@@ -49,11 +49,21 @@ Barra superior › «Ayuda» (BotonManual)
 
 ## Tutoriales
 
-| Clave | Muestra | Permiso |
-| --- | --- | --- |
-| `registrar-beneficiario` | Buscar y registrar un beneficiario (1:30) | `beneficiarios.crear` |
-| `ser-comercializador` | Carnet de comercializador → guía comprándole a un pescador, papeles impresos y cómo baja su cupo (4:28) | `guias.crear` |
-| `ser-pescador` | Autorización → carnet → faena, con el pago de cada uno validado en SIREB y el papel impreso de los tres (4:54) | `aprovechamientos.crear` |
+Un video por trámite (26/10/2026): se encuentra lo que se busca, cada uno pide el permiso
+de su trámite y se regraba uno sin tocar los demás. El recorrido no se pierde: cada tutorial
+declara `siguiente` y la pantalla final lo ofrece, si el rol lo puede ver.
+
+| Clave | Muestra | Permiso | Siguiente |
+| --- | --- | --- | --- |
+| `registrar-beneficiario` | Buscar y registrar un beneficiario (1:30) | `beneficiarios.crear` | `autorizacion-pesca` |
+| `autorizacion-pesca` | Pescador 1/3: registrar, pago e impresión (1:44) | `aprovechamientos.crear` | `carnet-pescador` |
+| `carnet-pescador` | Pescador 2/3 (1:27) | `carnets.crear` | `permiso-faena` |
+| `permiso-faena` | Pescador 3/3 (1:43) | `faenas.crear` | — |
+| `carnet-comercializador` | Comercializador 1/2 (1:45) | `carnets.crear` | `guia-transporte` |
+| `guia-transporte` | Comercializador 2/2: compra a un pescador, impresión y cómo baja su cupo (2:43) | `guias.crear` | — |
+
+Los cinco de los trámites salen de dos grabaciones de punta a punta (`grabar-ser-pescador.cjs`,
+`grabar-ser-comercializador.cjs`) cortadas por capítulo, con los subtítulos renumerados.
 
 ## Agregar un tutorial
 

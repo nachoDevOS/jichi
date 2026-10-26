@@ -19,8 +19,10 @@ class ManualController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $tutoriales = collect(ManualUsuario::TUTORIALES)
-            ->filter(fn (array $t): bool => $request->user()->can($t['permiso']))
+        $visibles = collect(ManualUsuario::TUTORIALES)
+            ->filter(fn (array $t): bool => $request->user()->can($t['permiso']));
+
+        $tutoriales = $visibles
             ->map(fn (array $t, string $clave): array => [
                 'clave' => $clave,
                 'titulo' => $t['titulo'],
@@ -33,7 +35,12 @@ class ManualController extends Controller
                 // El clip en bucle de la tarjeta (docs/manual/vista-previa.py); sin él, la portada quieta.
                 'previa' => is_file($previa = ManualUsuario::archivo($clave, 'previa.mp4'))
                     ? route('manual.archivo', [$clave, 'previa.mp4', 'v' => filemtime($previa)])
-                    : null,            ])
+                    : null,
+                // El trámite que viene después en el recorrido, si el rol lo puede ver.
+                'siguiente' => isset($t['siguiente'], $visibles[$t['siguiente']])
+                    ? ['clave' => $t['siguiente'], 'titulo' => $visibles[$t['siguiente']]['titulo']]
+                    : null,
+            ])
             ->values();
 
         return response()->json($tutoriales);
