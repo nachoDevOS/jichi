@@ -30,7 +30,10 @@ class ManualController extends Controller
                 // `v` cambia al regrabar: el navegador guarda el video un día y mostraría el viejo.
                 'video' => route('manual.archivo', [$clave, 'mp4', 'v' => filemtime(ManualUsuario::archivo($clave, 'mp4'))]),
                 'portada' => route('manual.archivo', [$clave, 'jpg', 'v' => filemtime(ManualUsuario::archivo($clave, 'jpg'))]),
-            ])
+                // El clip en bucle de la tarjeta (docs/manual/vista-previa.py); sin él, la portada quieta.
+                'previa' => is_file($previa = ManualUsuario::archivo($clave, 'previa.mp4'))
+                    ? route('manual.archivo', [$clave, 'previa.mp4', 'v' => filemtime($previa)])
+                    : null,            ])
             ->values();
 
         return response()->json($tutoriales);

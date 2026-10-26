@@ -426,6 +426,17 @@ Los tres tienen que pasar.
   casts. Pasó TRES veces en un día —el estado y el monto de la faena y
   el estado de la validación de un pago— y las tres las descubrió una prueba que preguntaba
   por el estado justo después de `create()`. Ver `PermisoFaena` y `Pago`.
+- **Un campo vacío del formulario llega como `null` y PISA el `default` de la
+  base.** `ConvertEmptyStringsToNull` convierte `""` en null, una regla `nullable`
+  lo deja pasar, y el INSERT con null explícito revienta el NOT NULL aunque la
+  columna tenga default (pasó con `beneficiarios.nacionalidad`, 26/10/2026). Se
+  completa en `prepareForValidation()`. Y los `max` de las reglas copian el largo
+  de la columna: pasarse es un 500 en PostgreSQL, no un error del formulario.
+- **En desarrollo, editar CUALQUIER archivo recarga la página abierta, también un PHP.**
+  `@tailwindcss/vite` revisa todos los archivos en busca de clases y manda un reload
+  completo: un formulario a medio llenar se vacía sin aviso. Mordió dos veces grabando
+  los videos del Manual (26/10/2026): mientras se graba o se prueba un formulario largo
+  con Playwright, no se toca nada. Ver `docs/manual/README.md`.
 - **Una relación polimórfica NO se puede precargar con `with('pagable.carnet')`.**
   Eloquent no sabe qué es `pagable` hasta que lee la fila, así que no puede
   resolver lo que cuelga de él: lo que se escribe así se ignora y el N+1 sigue

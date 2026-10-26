@@ -29,6 +29,31 @@ class ManualUsuarioTest extends TestCase
             ->assertStatus(206);
     }
 
+    public function test_el_de_pescador_se_ofrece_a_quien_registra_autorizaciones(): void
+    {
+        $usuario = $this->usuario('aprovechamientos.crear');
+
+        $this->actingAs($usuario)->getJson(route('manual.index'))
+            ->assertOk()
+            ->assertJsonPath('0.clave', 'ser-pescador');
+        $this->actingAs($usuario)
+            ->get(route('manual.archivo', ['ser-pescador', 'mp4']), ['Range' => 'bytes=0-99'])
+            ->assertStatus(206);
+    }
+
+    public function test_la_vista_previa_de_la_tarjeta_se_sirve_con_el_mismo_permiso(): void
+    {
+        $usuario = $this->usuario('guias.crear');
+
+        $previa = $this->actingAs($usuario)->getJson(route('manual.index'))
+            ->assertOk()
+            ->assertJsonPath('0.clave', 'ser-comercializador')
+            ->json('0.previa');
+
+        $this->actingAs($usuario)->get($previa)->assertOk();
+        $this->actingAs($usuario)->get(route('manual.archivo', ['ser-pescador', 'previa.mp4']))->assertForbidden();
+    }
+
     public function test_sin_el_permiso_no_lo_ve_ni_lo_puede_bajar(): void
     {
         $usuario = $this->usuario('beneficiarios.ver');

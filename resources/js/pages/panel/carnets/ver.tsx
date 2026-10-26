@@ -288,7 +288,8 @@ export default function VerCarnet({
                 className="mt-6"
                 monto={carnet.monto}
                 pago={{
-                    concepto: `Carnet de ${carnet.tipo_actor_etiqueta.toLowerCase()} · gestión ${carnet.gestion}`,
+                    // Pendiente no tiene gestión todavía: sale del año de emisión, al aprobarse.
+                    concepto: `Carnet de ${carnet.tipo_actor_etiqueta.toLowerCase()}${carnet.gestion ? ` · gestión ${carnet.gestion}` : ''}`,
                     numero: carnet.registro,
                     titular: carnet.beneficiario,
                     documento: carnet.documento,

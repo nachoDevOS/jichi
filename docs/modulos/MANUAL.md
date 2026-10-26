@@ -20,7 +20,9 @@ Barra superior › «Manual» (BotonManual)
 | JSON y archivos | `app/Http/Controllers/Panel/ManualController.php` |
 | Rutas `manual.index`, `manual.archivo` | `routes/panel.php`, al final |
 | Videos y portadas | `resources/manual/{clave}.mp4` y `.jpg` |
-| Botón, ventana, reproductor | `resources/js/components/panel/manual/` |
+| Botón, ventana (biblioteca de tarjetas), reproductor | `resources/js/components/panel/manual/` |
+| Vista previa en bucle de cada tarjeta (`{clave}.previa.mp4`, ruta `manual.archivo` con extensión `previa.mp4`) | `docs/manual/vista-previa.py` |
+| Hasta dónde vio cada video (`localStorage`, por computadora) | `components/panel/manual/progreso-manual.ts` |
 | Tipos | `resources/js/types/manual.ts` |
 | Script de grabación | `docs/manual/` (ver su README) |
 | Pruebas | `tests/Feature/Manual/ManualUsuarioTest.php` |
@@ -39,6 +41,19 @@ Barra superior › «Manual» (BotonManual)
 - **Modal en portal a `<body>`.** El encabezado es `sticky z-20`: un `fixed z-50`
   adentro queda atrapado en ese contexto de apilamiento y la barra lateral
   (`z-40`) lo tapa.
+
+- **El progreso va en `localStorage`, no en la base.** Es una ayuda de pantalla
+  («Continuar desde 2:15», «Visto»), no un registro de capacitación: no hace falta
+  tabla ni ruta. Si algún día la unidad quiere saber quién vio qué, eso sí va a la base.
+- **Con un solo video la biblioteca se salta** y abre directo el reproductor.
+
+## Tutoriales
+
+| Clave | Muestra | Permiso |
+| --- | --- | --- |
+| `registrar-beneficiario` | Buscar y registrar un beneficiario (1:30) | `beneficiarios.crear` |
+| `ser-comercializador` | Carnet de comercializador → guía comprándole a un pescador, papeles impresos y cómo baja su cupo (4:28) | `guias.crear` |
+| `ser-pescador` | Autorización → carnet → faena, con el pago de cada uno validado en SIREB y el papel impreso de los tres (4:54) | `aprovechamientos.crear` |
 
 ## Agregar un tutorial
 

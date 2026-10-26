@@ -47,7 +47,8 @@ class BeneficiarioController extends Controller
             // LIKE (SQLite). Ver app/Support/Sql.php.
             ->buscar($filtros['buscar'])
 
-            ->ordenAlfabetico()
+            // El último registrado arriba: es el que ventanilla acaba de cargar.
+            ->orderByDesc('id')
             ->paginate($filtros['por_pagina'])
 
             // Sin withQueryString(), al hacer clic en «página 2» se perderían

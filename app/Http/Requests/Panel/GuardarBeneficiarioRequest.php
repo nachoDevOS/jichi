@@ -61,16 +61,17 @@ class GuardarBeneficiarioRequest extends FormRequest
             // Obligatoria: la columna es NOT NULL y además se imprime en el
             // carnet. `before:today` descarta el error de tipeo más común, que
             // es escribir el año en curso en vez del de nacimiento.
-            'fechaNacimiento' => ['required', 'date', 'before:today'],
+            'fechaNacimiento' => ['required', 'date', 'before:today', 'after:1900-01-01'],
 
             'genero' => ['nullable', Rule::in(['masculino', 'femenino'])],
-            'nacionalidad' => ['nullable', 'string', 'max:255'],
+            'nacionalidad' => ['required', 'string', 'max:60'],
 
             'direccion' => ['nullable', 'string', 'max:1000'],
-            'ciudad' => ['nullable', 'string', 'max:255'],
+            // Los `max` copian el largo de la columna: pasarse es un 500 en PostgreSQL.
+            'ciudad' => ['nullable', 'string', 'max:80'],
             // Lista abierta a propósito: el beneficiario puede vivir fuera del
             // Beni y las ocho provincias son solo las de acá.
-            'provincia' => ['nullable', 'string', 'max:255'],
+            'provincia' => ['nullable', 'string', 'max:80'],
             'telefono' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
 
@@ -101,6 +102,9 @@ class GuardarBeneficiarioRequest extends FormRequest
             'apellidoPaterno.required' => 'El apellido paterno es obligatorio.',
             'fechaNacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'fechaNacimiento.before' => 'La fecha de nacimiento debe ser anterior a hoy.',
+            'fechaNacimiento.after' => 'La fecha de nacimiento no es válida.',
+            'nacionalidad.required' => 'La nacionalidad es obligatoria.',
+            '*.max' => 'El campo :attribute no puede tener más de :max caracteres.',
             'email.email' => 'El correo electrónico no tiene un formato válido.',
             'foto.image' => 'La foto debe ser una imagen.',
             'foto.max' => 'La foto no puede pesar más de '.round(config('jichi.archivos.max_kb') / 1024, 1).' MB.',
@@ -124,6 +128,10 @@ class GuardarBeneficiarioRequest extends FormRequest
             'email' => filled($this->input('email'))
                 ? strtolower(trim((string) $this->input('email')))
                 : null,
+            // La columna es NOT NULL: un null explícito pisa el default de la base.
+            'nacionalidad' => filled($this->input('nacionalidad'))
+                ? trim((string) $this->input('nacionalidad'))
+                : 'Boliviana',
             'quitar_foto' => $this->boolean('quitar_foto'),
         ]);
 

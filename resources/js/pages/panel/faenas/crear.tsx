@@ -61,7 +61,8 @@ export default function CrearFaena({
     const form = useForm({
         carnet_id: inicial?.id ?? (null as number | null),
         embarcacion: '',
-        propietario: '',
+        // Llegando desde la ficha el pescador ya viene elegido: se propone igual su nombre.
+        propietario: beneficiario?.nombreCompleto ?? '',
         comandante_barco: '',
         matricula_naval: '',
         nro_kardex: '',

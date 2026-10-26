@@ -488,7 +488,7 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
 
     Route::get('/manual', [ManualController::class, 'index'])->name('manual.index');
     Route::get('/manual/{tutorial}.{extension}', [ManualController::class, 'archivo'])
-        ->where(['tutorial' => '[a-z0-9-]+', 'extension' => 'mp4|jpg'])
+        ->where(['tutorial' => '[a-z0-9-]+', 'extension' => 'mp4|jpg|previa\.mp4'])
         ->name('manual.archivo');
 
     /*

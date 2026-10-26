@@ -514,3 +514,43 @@
         animation: none;
     }
 }
+
+/*
+| Las tarjetas del Manual: la portada se pasea despacio (cuando no hay vista previa)
+| y las barritas de «Vista previa» laten como un ecualizador. Se apagan con
+| `prefers-reduced-motion`.
+*/
+@keyframes paneo {
+    from {
+        transform: scale(1.04) translate(0, 0);
+    }
+    to {
+        transform: scale(1.16) translate(-3%, -2%);
+    }
+}
+
+@keyframes ecualizador {
+    0%,
+    100% {
+        transform: scaleY(0.3);
+    }
+    50% {
+        transform: scaleY(1);
+    }
+}
+
+.animar-paneo {
+    animation: paneo 14s ease-in-out infinite alternate;
+}
+
+.animar-ecualizador {
+    transform-origin: bottom;
+    animation: ecualizador 0.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animar-paneo,
+    .animar-ecualizador {
+        animation: none;
+    }
+}

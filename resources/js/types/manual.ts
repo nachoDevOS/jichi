@@ -13,4 +13,6 @@ export interface Tutorial {
     capitulos: CapituloTutorial[];
     video: string;
     portada: string;
+    /** Clip corto en bucle para la tarjeta; null si no se generó. */
+    previa: string | null;
 }
