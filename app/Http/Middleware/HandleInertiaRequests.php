@@ -90,6 +90,10 @@ class HandleInertiaRequests extends Middleware
             ],
 
             'apariencia' => fn (): string => $request->cookie('apariencia') ?? 'system',
+
+            // APP_ENV, solo al panel: fuera de `production` la barra lateral va en ámbar con la franja
+            // del entorno. Al público y al portal no se les da esa pista interna.
+            'entorno' => $usuario && ! $usuario->esBeneficiario() ? app()->environment() : null,
         ];
     }
 }

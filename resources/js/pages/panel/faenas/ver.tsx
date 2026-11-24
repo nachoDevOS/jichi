@@ -274,6 +274,8 @@ export default function VerFaena({
                 puedeCargar={faena.puede_cargar_pago}
                 rutaCargar={route('faenas.cargar-pago', faena.id)}
                 rutaConsultarQr={route('faenas.consultar-qr', faena.id)}
+                rutaEstadoQr={route('faenas.estado-qr', faena.id)}
+                rutaSimularQr={route('faenas.simular-pago-qr', faena.id)}
                 rutaRenovar={route('faenas.renovar-liquidacion', faena.id)}
                 documento="faenas"
             />

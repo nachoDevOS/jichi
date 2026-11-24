@@ -88,7 +88,10 @@ para no equivocarse:
 
   Al crearse registra su liquidación en SIREB; el pago se carga y se valida
   ALLÁ. Jichi pregunta (`ConfirmarPagoService`, botón «Verificar pago» y
-  `jichi:verificar-pagos` cada 10 min) y aprueba solo. **No hay `en_revision`,
+  `jichi:verificar-pagos` cada 10 min; desde el 23/11/2026 también el webhook de
+  SIREB, que dispara la misma consulta) y aprueba solo. **El QR de pago lo genera
+  SIREB** y Jichi lo muestra tal cual, real o de prueba: ver
+  [docs/modulos/PAGO-QR.md](docs/modulos/PAGO-QR.md). **No hay `en_revision`,
   ni firma, ni tabla `pagos`** (02/10/2026). Ver [docs/modulos/SIREB.md](docs/modulos/SIREB.md).
 - **Revocar la autorización NO reescribe sus carnets ni sus faenas: los deja
   «sin efecto»**, porque su vigencia se calcula mirando al padre. Ver la trampa
@@ -322,14 +325,14 @@ El procedimiento detallado está en
 ## Verificar antes de dar algo por terminado
 
 ```sh
-php artisan test        # las pruebas (29, solo la guía; SIREB simulado: ninguna sale a la red)
+php artisan test        # las pruebas (102; SIREB simulado: ninguna sale a la red)
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
 ```
 
-> **Las pruebas de hoy son 29 y cubren SOLO la guía** (13/10/2026): el descuento
-> del cupo y la búsqueda por código (`tests/Feature/Guias/`, `tests/Unit/`). Las
+> **Las pruebas de hoy son 102** (23/11/2026). Empezaron el 13/10/2026 con 29, solo
+> de la guía; el pago por QR y el webhook están en `tests/Feature/Pagos/`. Las
 > 92 del 12/10/2026 **nunca se commitearon y se perdieron**: la carpeta `tests/`
 > no existía. **`tests/` va en el commit, siempre.** Corren sobre SQLite en
 > memoria con **SIREB e Ibare simulados** (`tests/Concerns/SirebFalso.php`,
@@ -454,7 +457,7 @@ Los tres tienen que pasar.
   `Inertia::render(..., ['institucion' => ...])` deja a los componentes de esa
   pantalla leyendo otra cosa con `usePage()`. Antes de elegir el nombre de una
   prop, mirar la lista de `share()`: hoy son `auth`, `institucion`, `archivos`,
-  `flash`, `ziggy` y `apariencia`.
+  `flash`, `ziggy`, `apariencia` y `entorno`.
 - **Clases de Tailwind armadas juntando textos no funcionan.** Tailwind solo
   incluye en el CSS final las que puede leer literalmente en el código. Si se
   agrega un color a un enum de PHP, hay que agregarlo también al mapa de
@@ -713,9 +716,11 @@ Los tres tienen que pasar.
   `GET /liquidaciones/{id}` y, con `estado = pagada` y el pago `confirmado`,
   aprueba (los `Revisar*Service::aprobar()` conservan las reglas propias: cupo
   revocado, kilos libres, fechas, número de registro) y emite el recibo con la
-  boleta de SIREB, en una transacción. SIREB no avisa: lo disparan el botón de la
-  ficha y `jichi:verificar-pagos` cada 10 minutos, que **en producción necesita
-  el cron de Laravel** (`schedule:run`); sin él, nada se aprueba solo.
+  boleta de SIREB, en una transacción. Lo disparan el botón de la ficha,
+  `jichi:verificar-pagos` cada 10 minutos —que **en producción necesita el cron de
+  Laravel** (`schedule:run`)— y, desde el 23/11/2026, el **webhook firmado de SIREB**
+  (`POST /api/sireb/aviso`) y la ventana del QR abierta. El webhook es un atajo, no
+  el respaldo: puede no llegar, y sin cron nada se aprueba solo.
   **Y en desarrollo `composer run dev` NO traía el programador** (`artisan dev`
   levanta serve, queue y vite): había que apretar «Verificar pago» siempre, y
   parecía un bug de SIREB. Desde el 08/10/2026 lo registra `AppServiceProvider`
@@ -775,6 +780,27 @@ Los tres tienen que pasar.
   `components/panel/manual/boton-manual.tsx`.
 - **`->withQueryString()`** en todo paginador con filtros, o al cambiar de página
   se pierden.
+- **Que `jichi:sireb` dé el token NO quiere decir que SIREB atienda a Jichi**
+  (23/11/2026). Ibare entregó el token y test.sireb respondió
+  `403 SISTEMA_NO_HABILITADO` a todo lo demás: la credencial `sedag` estaba
+  inactiva del lado de SIREB. Peor: un `POST /liquidaciones/{id}/qr` con un id
+  inexistente respondió `404` igual, así que esa llamada no sirve para saber si
+  la credencial anda. Lo que lo prueba es el catálogo (`jichi:sireb` completo).
+- **Una consulta a SIREB que tarda puede escribir sobre una liquidación que ya no es la del
+  trámite** (23/11/2026). Corregir anula la liquidación y registra otra; si en el medio
+  termina una consulta de la vieja (el webhook de «anulada», el comando, el portal) y
+  escribe `sireb_envio` con su instancia, el trámite queda «caído» con su liquidación nueva
+  viva, y **el comando y el portal dejan de revisarlo**: el pago no se detecta solo. Todo
+  lo que anote una consulta va por `anotarEnvioSireb($liquidacionId, …)`, que relee la
+  fila bloqueada y escribe solo si la liquidación sigue siendo la misma.
+- **`import.meta.env.DEV` NO es `APP_ENV`** (24/11/2026). Dice si la pantalla la sirve el
+  servidor de Vite, así que con `composer run dev` es `true` aunque el `.env` diga
+  `production`: la franja «DESARROLLO» de la barra lateral no se iba nunca. Lo que dice
+  el entorno es la prop compartida `entorno` (`HandleInertiaRequests`, solo al panel).
+- **El webhook de SIREB se firma sobre el CUERPO CRUDO.** `$request->getContent()`,
+  nunca `json_encode($request->all())`: volver a serializar cambia espacios y
+  escapes y la firma deja de coincidir, en silencio. Y va en `routes/api.php`: en
+  `web` el CSRF lo rechaza con 419 antes de llegar al controlador.
 - **NADA AVISA SI FALTA CORRER UNA MIGRACIÓN O UN SEEDER.** Una tabla, un
   permiso o una clave de configuración nuevos existen en el código pero no en la
   base de trabajo hasta que alguien corre el comando. **Al agregar una

@@ -93,7 +93,10 @@ class ConfirmarPagoService
 
         $estado = $liquidacion['estado'] ?? null;
         $pago = $liquidacion['pago'] ?? null;
-        $this->anotarConsulta($documento, $estado, $pago);
+
+        if (! $this->anotarConsulta($documento, $documento->sireb_liquidacion_id, $estado, $pago)) {
+            return ['puede' => false, 'mensaje' => 'El cobro de este trámite acaba de cambiar. Cierre y vuelva a abrir el QR.'];
+        }
 
         return match (true) {
             $estado === 'pendiente' && $pago === null => ['puede' => true, 'mensaje' => null],
@@ -105,16 +108,20 @@ class ConfirmarPagoService
         };
     }
 
-    /** La ficha muestra la boleta y si venció. Solo si cambió: el comando corre cada 10 min y audita. */
-    private function anotarConsulta(Model $documento, ?string $estado, ?array $pago): void
+    /**
+     * La ficha muestra la boleta y si venció. Solo si cambió: el comando corre cada 10 min y audita.
+     * False si mientras se consultaba el trámite pasó a otra liquidación (una corrección).
+     */
+    private function anotarConsulta(Model $documento, string $liquidacionId, ?string $estado, ?array $pago): bool
     {
-        if (($documento->sireb_envio['pago'] ?? null) !== $pago || ($documento->sireb_envio['consulta']['estado'] ?? null) !== $estado) {
-            $documento->update(['sireb_envio' => [
-                ...($documento->sireb_envio ?? []),
-                'pago' => $pago,
-                'consulta' => ['estado' => $estado, 'en' => now()->toIso8601String()],
-            ]]);
+        if (($documento->sireb_envio['pago'] ?? null) === $pago && ($documento->sireb_envio['consulta']['estado'] ?? null) === $estado) {
+            return $documento->sireb_liquidacion_id === $liquidacionId;
         }
+
+        return $documento->anotarEnvioSireb($liquidacionId, [
+            'pago' => $pago,
+            'consulta' => ['estado' => $estado, 'en' => now()->toIso8601String()],
+        ]);
     }
 
     /**
@@ -143,7 +150,11 @@ class ConfirmarPagoService
 
         $pago = $liquidacion['pago'] ?? null;
         $estado = $liquidacion['estado'] ?? null;
-        $this->anotarConsulta($documento, $estado, $pago);
+
+        // Una corrección registró otra liquidación mientras se consultaba esta: lo consultado ya no vale.
+        if (! $this->anotarConsulta($documento, $documento->sireb_liquidacion_id, $estado, $pago)) {
+            return $this->no('cambió su cobro en Recaudaciones mientras se consultaba. Vuelva a verificar.');
+        }
 
         // Decide SOLO el estado de la liquidación: `pagada` aprueba; vencida, anulada y pendiente
         // no tocan el estado del trámite (08/10/2026).
@@ -214,12 +225,41 @@ class ConfirmarPagoService
             'numero_recibo' => CorrelativoService::rellenar($this->correlativos->siguienteContinuo(self::SERIE_RECIBO)),
             'monto_total' => (float) ($pago['monto_pagado'] ?? $liquidacion['monto']),
             'concepto' => $this->concepto($documento),
-            'numero_boleta' => $pago['numero_boleta'] ?? null,
-            'entidad_bancaria' => $pago['entidad_bancaria'] ?? null,
-            'fecha_pago' => isset($pago['fecha_pago']) ? Carbon::parse($pago['fecha_pago'])->timezone(config('app.timezone'))->toDateString() : null,
+            // Un pago QR no tiene boleta ni banco: va su transacción y «Pago por QR» (ver PAGO-QR.md).
+            'numero_boleta' => self::comprobante($pago),
+            'entidad_bancaria' => self::medio($pago),
+            'fecha_pago' => self::diaDelPago($pago),
         ]);
 
         $recibo->asignarCodigo();
+    }
+
+    /** La boleta del depósito o, en un pago QR, su transacción. */
+    public static function comprobante(array $pago): ?string
+    {
+        $numero = $pago['numero_boleta'] ?? $pago['transaccion_id'] ?? null;
+
+        return $numero === null ? null : mb_substr((string) $numero, 0, 60);
+    }
+
+    /** El banco del depósito o, en un pago QR, «Pago por QR» («de prueba» si fue simulado: no es dinero real). */
+    public static function medio(array $pago): ?string
+    {
+        if (($pago['medio'] ?? null) === 'QR') {
+            return 'Pago por QR'.(($pago['simulado'] ?? false) ? ' de prueba' : '');
+        }
+
+        return $pago['entidad_bancaria'] ?? null;
+    }
+
+    /** El DÍA del pago: el de la boleta (`fecha_deposito`) si viene; si no, cuándo se registró en SIREB. */
+    public static function diaDelPago(array $pago): ?string
+    {
+        if (! empty($pago['fecha_deposito'])) {
+            return Carbon::parse($pago['fecha_deposito'])->toDateString();
+        }
+
+        return isset($pago['fecha_pago']) ? Carbon::parse($pago['fecha_pago'])->timezone(config('app.timezone'))->toDateString() : null;
     }
 
     /** Cómo se nombra el documento en el recibo: «Cédula de Pescador - 300 Kg», «Permiso de Faena N° 0003 - 120 kg». */

@@ -20,6 +20,7 @@ use App\Models\Carnet;
 use App\Models\GuiaDetalle;
 use App\Models\GuiaMovimiento;
 use App\Services\CargarPagoService;
+use App\Services\CobroQrService;
 use App\Services\ConfirmarPagoService;
 use App\Services\DocumentoEmitidoService;
 use App\Services\EmitirGuiaService;
@@ -383,10 +384,24 @@ class GuiaController extends Controller
         return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
-    /** Antes de mostrar el QR: pregunta a SIREB si el cobro sigue pendiente y sin pago. */
-    public function consultarQr(GuiaMovimiento $guia, ConfirmarPagoService $pagos): JsonResponse
+    /** El QR de pago que genera SIREB, si el cobro sigue pendiente y sin pago. */
+    public function consultarQr(GuiaMovimiento $guia, CobroQrService $cobro): JsonResponse
     {
-        return response()->json($pagos->puedePagarPorQr($guia, desdeElPanel: true));
+        return response()->json($cobro->qr($guia, desdeElPanel: true));
+    }
+
+    /** Con el QR abierto, la ventana pregunta si ya se pagó; si sí, queda aprobado. */
+    public function estadoQr(GuiaMovimiento $guia, CobroQrService $cobro): JsonResponse
+    {
+        return response()->json($cobro->estado($guia));
+    }
+
+    /** Solo en test: paga el QR de prueba en SIREB y aprueba el trámite. */
+    public function simularPagoQr(GuiaMovimiento $guia, CobroQrService $cobro): RedirectResponse
+    {
+        $resultado = $cobro->simularPago($guia);
+
+        return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     //  Auxiliares

@@ -63,6 +63,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `CargarPagoService.php` | 77 | Carga en SIREB el pago de un trámite | **Solo carga.** Antes consulta: liquidación `pendiente` y sin pago, o no carga y corre `verificar()` para poner la ficha al día |
 | `DefinirTarifasService.php` | 100 | Las tarifas definidas de un arancel: etiqueta y tarifa de SIREB | Solo tarifas del servicio que SIREB tiene hoy. Carnet: una fila por clave fija. Los de la unidad: por id, y lo que no viene se da de baja una por una (auditoría) |
 | `CorrelativoService.php` | 78 | Números correlativos con la fila bloqueada | `siguienteContinuo()` (año 0, no reinicia) para lo impreso: recibo, autorización, faena, guía. `siguienteNumero()` por gestión: el registro del carnet. `rellenar()` → seis dígitos |
+| `CobroQrService.php` | — | El cobro por QR (23/11/2026) | `qr()` pide el QR a SIREB y lo muestra tal cual (real o de prueba; `503` → depósito); `estado()` pregunta si ya se pagó, como mucho cada 15 s por trámite; `simularPago()` solo con un QR `simulado`. Ver modulos/PAGO-QR.md |
 | `DocumentoEmitidoService.php` | — | El PDF guardado de cada papel (23/10/2026) | `respuesta()`/`contenido()` entregan el guardado (o lo arman si falta); `emitirAlAprobar()` lo llama `ConfirmarPagoService` con `defer()`; `resumen()` da a la ficha el enlace firmado para abrir S3 directo. Ver modulos/DOCUMENTOS-EMITIDOS.md |
 | `CodigoService.php` | 88 | El código de verificación de 16 caracteres | `asignar()` es idempotente: un reenvío no gasta otro código |
 | `CuentaPortalService.php` | 97 | Cuentas del portal | Clave temporal, obligatoria de cambiar. Esas cuentas nunca llevan roles |
@@ -72,7 +73,7 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 
 | Archivo | Ln | No obvio |
 | --- | --- | --- |
-| `SirebService.php` | 277 | Token de Ibare (client_credentials) en caché. `servicios()` en caché `SIREB_CACHE_MINUTOS` (2 min; «Actualizar desde SIREB» la borra); `tarifa()` sin caché. Liquidaciones: `registrarLiquidacion()`, `liquidacion()`, `registrarPagoManual()`, `anularLiquidacion()`. Las escrituras reintentan ante red o 5xx, nunca ante 4xx. `registrar()` anota cada pedido y el token en `storage/logs/sireb-*.log`, secretos tapados |
+| `SirebService.php` | 277 | Token de Ibare (client_credentials) en caché. `servicios()` en caché `SIREB_CACHE_MINUTOS` (2 min; «Actualizar desde SIREB» la borra); `tarifa()` sin caché. Liquidaciones: `registrarLiquidacion()`, `liquidacion()`, `registrarPagoManual()`, `anularLiquidacion()`; QR: `qrDePago()` (null con `503`, sin reintentos) y `simularPagoQr()` (solo test). Las escrituras reintentan ante red o 5xx, nunca ante 4xx. `registrar()` anota cada pedido y el token en `storage/logs/sireb-*.log`, secretos tapados |
 | `RegistroSireb.php` | 140 | Lee los `sireb-*.log` para la pantalla Registro SIREB. El día se valida con patrón: no sale de `storage/logs` |
 | `TarifarioSireb.php` | 210 | **Todo lo de tarifas en un archivo** (12/10/2026; absorbió `PrecioSireb` y `VistaSireb`): `servicioId()`, `tarifas()` del trámite y `tarifasDelServicio()` (aranceles de la unidad), `precio()` sin caché al emitir (solo la tarifa `activo`; de cada tarifa usa etiqueta, precio y si está activa), y `servicios()` / `historial()` para Aranceles |
 | `SirebException.php` | 75 | Códigos propios de Jichi `LIQUIDACION_PAGADA` y `PAGO_EN_REVISION` (`frenaPorPago()`). `paraVentanilla()` es lo que muestra el manejador de `bootstrap/app.php` |
@@ -114,6 +115,8 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Panel/AprovechamientoController.php` | 534 | `edit()` manda los datos fijos: solo se corrige la embarcación |
 | `Panel/CarnetController.php` | 615 | Revocar y reponer, además del CRUD |
 | `Panel/FaenaController.php`, `Panel/GuiaController.php` | 447 / 513 | `excede` y `bloquea` separados: el modo flexible tiene que llegar a la pantalla |
+| Los cuatro anteriores (QR) | — | `consultarQr()`, `estadoQr()` y `simularPagoQr()` llaman a `CobroQrService` (23/11/2026) |
+| `Sireb/AvisoSirebController.php` | 100 | **El webhook de SIREB** (`POST /api/sireb/aviso`): firma HMAC con el cuerpo crudo, rechaza avisos de más de 5 min y repetidos, y lanza `VerificarPagoJob` después de responder. No cree en el aviso: el job vuelve a consultar. Ver modulos/PAGO-QR.md |
 | Los cuatro anteriores | — | `verificarPago()`, `cargarPago()` y `destroy()` con la captura de `frenaPorPago()`: si al eliminar hay pago, vuelven a la ficha con el aviso |
 | `Panel/*ImpresionController.php`, `Panel/AutorizacionPescaController.php` | 160–516 | Devuelven bytes (DomPDF), no pantallas. `documento()` lo reusa el portal con la marca «NO VÁLIDO». `CarnetImpresionController::texto()` achica lo que no entra (una línea → dos → más chico) y `fotoRedonda()` recorta la foto en círculo con GD; carnet horizontal desde el 23/10/2026, ver CARNETS.md §0 |
 | `Panel/ReciboController.php` | 203 | Libro de recibos; `recibible` con `morphWith` |
@@ -173,6 +176,7 @@ desconecta entero. Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `panel.php` | Prefijo `/panel`, middleware `funcionario` en el grupo y `permiso:` en cada ruta. Cada documento tiene `verificar-pago` y `cargar-pago`, cada una con su permiso del mismo nombre. Las rutas literales (`crear`, `buscar`) van antes de `{id}` |
 | `portal.php` | `/mi-cuenta`, middleware `beneficiario` |
 | `publico.php` | Portada y verificación por código |
+| `api.php` | Lo que llaman OTROS SISTEMAS, sin sesión ni CSRF (prefijo `/api`): hoy solo el webhook de SIREB, autenticado con su firma (23/11/2026) |
 | `console.php` | El scheduler: `jichi:verificar-pagos` |
 
 ## `resources/js/` — frontend
@@ -186,7 +190,8 @@ desconecta entero. Ver [modulos/IBARE.md](modulos/IBARE.md).
 | `pages/panel/seguridad/roles-formulario.tsx` | Alta y edición: casillas por módulo (la del módulo queda a medias con `indeterminate`) y «Copiar permisos de» |
 | `components/panel/pagos/tarjeta-recaudaciones.tsx` | **La tarjeta de pago de las cuatro fichas** (26/10/2026): barra de tres pasos (Por pagar → Por validar → Aprobado; ámbar si venció) y en cada paso solo lo que hace falta: monto y código grandes, las dos formas de pago, la boleta cargada o el recibo. «Revisar ahora» chico en el paso 1 y botón en el 2. El paso lo deduce de `recibo` / `sireb.pago`, solo para pintar |
 | `components/panel/pagos/ventana-pago.tsx` | Armazón común de las ventanas de pago (`VentanaPago`: Escape, clic afuera, bloquea el fondo y no cierra mientras envía), `ResumenCobro` (monto, código y qué se paga) y `PasosNumerados`. Acá vive `DetallePago` |
-| `components/panel/pagos/modal-pago-qr.tsx` | «Pagar por QR»: pregunta a SIREB al abrirse, QR de muestra, los cuatro pasos del titular y «Ya pagó: verificar» |
+| `components/panel/pagos/modal-pago-qr.tsx` | «Pagar por QR»: muestra el QR que genera SIREB (23/11/2026), con cuenta regresiva y «Generar otro» al vencer; pregunta sola si ya se pagó; «Simular pago (prueba)» solo con un QR de prueba |
+| `components/comunes/qr-sireb.tsx` | Lo común del QR de SIREB para panel y portal: `ImagenQrSireb`, `useCuentaRegresiva` y `useEsperaDePago` (pregunta cada 10 s, no con la pestaña oculta) |
 | `components/panel/pagos/modal-cargar-pago.tsx` | «Cargar boleta del banco» (antes un formulario dentro de la tarjeta): aviso de monto y código, ayuda del N° de transacción, bancos frecuentes a un clic y «Qué pasa después» |
 | `components/panel/comunes/ficha.tsx` | **Las piezas de las cuatro fichas** (autorización, carnet, faena, guía; 23/10/2026): `BandaTitular`, `Chip` + `avisoVencimiento`, `Cifra` + `Conteo`, `BarraDisponible` + `nivelDisponible` (amarillo ≤ 50 %, rojo ≤ 20 %), `TarjetaCodigo`, `LineaTiempo`, `Aviso`, `Tabla`/`Td`, `EnlacePdf`, `EnlaceVer`. Una ficha nueva se arma con estas |
 | `hooks/use-movimiento.ts` | `useConteo` (cifras que cuentan), `useMontado` (barras que se llenan), `useReducirMovimiento`: todo se apaga con «reducir movimiento» |

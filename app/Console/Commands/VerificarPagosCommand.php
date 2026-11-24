@@ -17,8 +17,8 @@ use Illuminate\Console\Command;
 
 /**
  * Pregunta a SIREB por cada documento pendiente con su liquidación registrada y
- * aprueba los que ya están pagados. SIREB no avisa (no tiene webhooks): corre
- * cada 10 minutos, ver routes/console.php. En producción necesita el cron de Laravel.
+ * aprueba los que ya están pagados. Es el respaldo del webhook de SIREB (que puede no
+ * llegar): corre cada 10 minutos, ver routes/console.php. En producción necesita el cron.
  */
 class VerificarPagosCommand extends Command
 {

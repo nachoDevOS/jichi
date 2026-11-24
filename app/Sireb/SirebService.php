@@ -173,6 +173,48 @@ class SirebService
     }
 
     /**
+     * El QR con que se paga la liquidación (`imagen` PNG en base64, `vence_en`, `simulado`…).
+     * Mientras siga vigente SIREB devuelve el mismo. Null si el entorno no cobra por QR
+     * (`503 PAGO_QR_NO_DISPONIBLE`): se paga por depósito. Ver docs/modulos/PAGO-QR.md.
+     *
+     * @throws SirebException
+     */
+    public function qrDePago(string $liquidacionId): ?array
+    {
+        // Sin reintentos: un 503 es una respuesta («no hay QR»), no una caída.
+        $ruta = self::RUTA_LIQUIDACIONES.'/'.$this->id($liquidacionId).'/qr';
+        $respuesta = $this->enviar('post', $ruta);
+
+        if ($respuesta->status() === 503 && $respuesta->json('codigo') === 'PAGO_QR_NO_DISPONIBLE') {
+            return null;
+        }
+
+        if (in_array($respuesta->status(), [404, 422], true)) {
+            throw SirebException::liquidacionRechazada((string) $respuesta->json('codigo'));
+        }
+
+        return $this->cuerpo($respuesta, $ruta)['data'] ?? throw SirebException::noResponde();
+    }
+
+    /**
+     * Paga un QR de prueba (`simulado: true`), como hará la pasarela con uno real. Solo
+     * existe en test: en producción SIREB responde `404 QR_SIMULADO_DESHABILITADO`.
+     *
+     * @throws SirebException
+     */
+    public function simularPagoQr(string $liquidacionId, string $transaccionId): array
+    {
+        $ruta = self::RUTA_LIQUIDACIONES.'/'.$this->id($liquidacionId).'/qr/simular-pago';
+        $respuesta = $this->enviar('post', $ruta, ['transaccion_id' => $transaccionId]);
+
+        if (in_array($respuesta->status(), [404, 422], true)) {
+            throw SirebException::liquidacionRechazada((string) $respuesta->json('codigo'));
+        }
+
+        return $this->cuerpo($respuesta, $ruta)['data'] ?? [];
+    }
+
+    /**
      * Anula en SIREB una liquidación pendiente y sin pago. Anular dos veces no
      * falla: si SIREB dice que ya está anulada, se da por hecho.
      */

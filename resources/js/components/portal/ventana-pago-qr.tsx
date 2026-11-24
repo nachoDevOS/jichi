@@ -1,12 +1,18 @@
-import { Download, LoaderCircle, QrCode, TriangleAlert, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { QrSimulado } from '@/components/comunes/qr-simulado';
+import { router } from '@inertiajs/react';
+import { CircleCheck, Download, LoaderCircle, QrCode, RefreshCw, TriangleAlert, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+    formatoRestante,
+    ImagenQrSireb,
+    imagenQr,
+    useCuentaRegresiva,
+    useEsperaDePago,
+    type RespuestaQr,
+} from '@/components/comunes/qr-sireb';
 import { Dato } from '@/components/portal/piezas';
 import { bs } from '@/lib/utils';
 
-interface Respuesta {
-    puede: boolean;
-    mensaje: string | null;
+interface Respuesta extends RespuestaQr {
     monto: number | null;
     codigo_pago: string | null;
     titular?: string;
@@ -14,8 +20,8 @@ interface Respuesta {
 }
 
 /**
- * Pagar por QR desde el portal. Al abrirse pregunta al servidor, que consulta SIREB:
- * el QR sale solo con el cobro pendiente y sin pago cargado. Es de MUESTRA: todavía no cobra.
+ * Pagar por QR desde el portal. El QR lo genera SIREB —real o de prueba— y se muestra tal
+ * cual; con la ventana abierta se pregunta solo si ya se pagó. Ver docs/modulos/PAGO-QR.md.
  */
 export function VentanaPagoQr({
     codigo,
@@ -31,9 +37,12 @@ export function VentanaPagoQr({
 }) {
     const [respuesta, setRespuesta] = useState<Respuesta | null>(null);
     const [fallo, setFallo] = useState(false);
-    const lienzoQr = useRef<HTMLDivElement>(null);
+    const [intento, setIntento] = useState(0);
+    const [pagado, setPagado] = useState<string | null>(null);
 
     useEffect(() => {
+        setRespuesta(null);
+        setFallo(false);
         const peticion = new AbortController();
         fetch(route('portal.pagar-qr', { codigo }), { headers: { Accept: 'application/json' }, signal: peticion.signal })
             .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -41,7 +50,18 @@ export function VentanaPagoQr({
             .catch(() => !peticion.signal.aborted && setFallo(true));
 
         return () => peticion.abort();
-    }, [codigo]);
+    }, [codigo, intento]);
+
+    const qr = respuesta?.puede ? respuesta.qr : undefined;
+    const restantes = useCuentaRegresiva(qr);
+    const vencido = restantes === 0;
+
+    const alPagar = useCallback(() => {
+        setPagado('¡Pago recibido! Su trámite quedó aprobado.');
+        // La lista de atrás pasa el trámite a vigente.
+        router.reload();
+    }, []);
+    useEsperaDePago(route('portal.pagar-qr.estado', { codigo }), Boolean(qr) && !vencido && pagado === null, alPagar);
 
     useEffect(() => {
         const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar();
@@ -82,7 +102,7 @@ export function VentanaPagoQr({
                     {!respuesta && !fallo && (
                         <p className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
                             <LoaderCircle className="size-5 animate-spin" />
-                            Consultando su cobro en Recaudaciones…
+                            Preparando su QR de pago…
                         </p>
                     )}
 
@@ -93,14 +113,39 @@ export function VentanaPagoQr({
                         </p>
                     )}
 
-                    {respuesta?.puede && (
+                    {pagado !== null && (
+                        <p className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-3 text-sm font-medium text-emerald-900 ring-1 ring-emerald-200">
+                            <CircleCheck className="mt-0.5 size-5 shrink-0" />
+                            {pagado}
+                        </p>
+                    )}
+
+                    {respuesta?.puede && qr && pagado === null && (
                         <div className="flex flex-col items-center gap-4 text-center">
-                            <div ref={lienzoQr} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                                <QrSimulado texto={respuesta.codigo_pago ?? codigo} className="size-60" />
+                            <div className="relative rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                                <ImagenQrSireb qr={qr} vencido={vencido} className="size-60" />
+                                {vencido && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                                        <p className="text-sm font-bold text-slate-900">El QR venció</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIntento((n) => n + 1)}
+                                            className="flex items-center gap-1.5 rounded-full bg-rio px-4 py-2 text-sm font-bold text-white"
+                                        >
+                                            <RefreshCw className="size-4" />
+                                            Generar otro
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
-                                QR de muestra: todavía no cobra
-                            </span>
+                            {qr.simulado && (
+                                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
+                                    QR de prueba: no lo pague con su banco
+                                </span>
+                            )}
+                            {restantes !== null && !vencido && (
+                                <span className="text-xs text-slate-500">Vence en {formatoRestante(restantes)}</span>
+                            )}
                             <div>
                                 <p className="text-sm text-slate-500">Monto a pagar</p>
                                 <p className="text-3xl font-bold text-rio-profundo tabular-nums">{bs(respuesta.monto)}</p>
@@ -125,21 +170,22 @@ export function VentanaPagoQr({
                             </dl>
                             <button
                                 type="button"
-                                onClick={() => {
-                                    const svg = lienzoQr.current?.querySelector('svg');
-                                    if (svg)
-                                        void descargarQr(svg, respuesta.monto, respuesta.codigo_pago ?? codigo, [
-                                            titulo,
-                                            `${respuesta.titular ?? ''} · C.I. ${respuesta.documento ?? ''}`,
-                                        ]);
-                                }}
-                                className="flex items-center gap-1.5 rounded-full border border-rio/30 px-4 py-2 text-sm font-bold text-rio transition-colors hover:bg-rio-espuma"
+                                disabled={vencido}
+                                onClick={() =>
+                                    void descargarQr(imagenQr(qr), qr.simulado, respuesta.monto, respuesta.codigo_pago ?? codigo, [
+                                        titulo,
+                                        `${respuesta.titular ?? ''} · C.I. ${respuesta.documento ?? ''}`,
+                                        ...(qr.vence_en ? [`Vale hasta ${new Date(qr.vence_en).toLocaleString('es-BO')}`] : []),
+                                    ])
+                                }
+                                className="flex items-center gap-1.5 rounded-full border border-rio/30 px-4 py-2 text-sm font-bold text-rio transition-colors hover:bg-rio-espuma disabled:opacity-50"
                             >
                                 <Download className="size-4" />
                                 Descargar QR
                             </button>
                             <p className="text-xs leading-relaxed text-slate-500">
-                                Escanee el código con la aplicación de su banco. Cuando Recaudaciones valide el pago, el trámite queda aprobado solo.
+                                Escanee el código con la aplicación de su banco. Deje esta ventana abierta: cuando el pago entre se lo
+                                avisamos, y el trámite queda aprobado solo.
                             </p>
                         </div>
                     )}
@@ -150,53 +196,50 @@ export function VentanaPagoQr({
 }
 
 /** El QR en PNG, con el monto y el código debajo: para pagarlo después desde la aplicación del banco. */
-async function descargarQr(svg: SVGSVGElement, monto: number | null, codigoPago: string, renglones: string[]) {
+async function descargarQr(origen: string, simulado: boolean, monto: number | null, codigoPago: string, renglones: string[]) {
     const imagen = new Image();
-    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
-    try {
-        imagen.src = url;
-        await imagen.decode();
+    imagen.src = origen;
+    await imagen.decode();
 
-        const lado = 600;
-        const lienzo = document.createElement('canvas');
-        lienzo.width = lado;
-        lienzo.height = lado + 200;
-        const ctx = lienzo.getContext('2d');
-        if (!ctx) return;
+    const lado = 600;
+    const lienzo = document.createElement('canvas');
+    lienzo.width = lado;
+    lienzo.height = lado + 120 + renglones.length * 28 + (simulado ? 36 : 0);
+    const ctx = lienzo.getContext('2d');
+    if (!ctx) return;
 
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, lienzo.width, lienzo.height);
-        // Sin suavizado: los módulos del QR tienen que salir con bordes netos.
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(imagen, 0, 0, lado, lado);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+    // Al AGRANDAR, sin suavizado (bordes netos); al achicar, con: si no, se pierden módulos del QR.
+    ctx.imageSmoothingEnabled = imagen.naturalWidth > lado;
+    ctx.drawImage(imagen, 0, 0, lado, lado);
 
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 40px sans-serif';
-        ctx.fillText(bs(monto), lado / 2, lado + 50);
-        ctx.font = '26px monospace';
-        ctx.fillText(`Código de pago ${codigoPago}`, lado / 2, lado + 90);
-        ctx.fillStyle = '#475569';
-        ctx.font = '20px sans-serif';
-        // Qué se paga y de quién; un nombre largo se angosta en vez de cortarse.
-        renglones.forEach((r, i) => ctx.fillText(r, lado / 2, lado + 125 + i * 28, lado - 40));
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillText(bs(monto), lado / 2, lado + 50);
+    ctx.font = '26px monospace';
+    ctx.fillText(`Código de pago ${codigoPago}`, lado / 2, lado + 90);
+    ctx.fillStyle = '#475569';
+    ctx.font = '20px sans-serif';
+    // Qué se paga y de quién; un nombre largo se angosta en vez de cortarse.
+    renglones.forEach((r, i) => ctx.fillText(r, lado / 2, lado + 125 + i * 28, lado - 40));
+    if (simulado) {
         ctx.fillStyle = '#b45309';
-        ctx.font = '18px sans-serif';
-        ctx.fillText('QR de muestra: todavía no cobra', lado / 2, lado + 185);
-
-        // Blob y no data URL: en el celular una data URL larga a veces abre en vez de bajar.
-        const png = await new Promise<Blob | null>((listo) => lienzo.toBlob(listo, 'image/png'));
-        if (!png) return;
-        const destino = URL.createObjectURL(png);
-        const enlace = document.createElement('a');
-        enlace.href = destino;
-        enlace.download = `qr-pago-${codigoPago}.png`;
-        // Firefox solo descarga con el enlace dentro del documento.
-        document.body.appendChild(enlace);
-        enlace.click();
-        enlace.remove();
-        setTimeout(() => URL.revokeObjectURL(destino), 1000);
-    } finally {
-        URL.revokeObjectURL(url);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText('QR de prueba: no se paga con el banco', lado / 2, lado + 125 + renglones.length * 28 + 10);
     }
+
+    // Blob y no data URL: en el celular una data URL larga a veces abre en vez de bajar.
+    const png = await new Promise<Blob | null>((listo) => lienzo.toBlob(listo, 'image/png'));
+    if (!png) return;
+    const destino = URL.createObjectURL(png);
+    const enlace = document.createElement('a');
+    enlace.href = destino;
+    enlace.download = `qr-pago-${codigoPago}.png`;
+    // Firefox solo descarga con el enlace dentro del documento.
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(destino), 1000);
 }

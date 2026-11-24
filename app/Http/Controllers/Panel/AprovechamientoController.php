@@ -17,6 +17,7 @@ use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
+use App\Services\CobroQrService;
 use App\Services\ConfirmarPagoService;
 use App\Services\DocumentoEmitidoService;
 use App\Services\OtorgarCupoService;
@@ -196,10 +197,24 @@ class AprovechamientoController extends Controller
         return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
-    /** Antes de mostrar el QR: pregunta a SIREB si el cobro sigue pendiente y sin pago. */
-    public function consultarQr(AprovechamientoPesq $aprovechamiento, ConfirmarPagoService $pagos): JsonResponse
+    /** El QR de pago que genera SIREB, si el cobro sigue pendiente y sin pago. */
+    public function consultarQr(AprovechamientoPesq $aprovechamiento, CobroQrService $cobro): JsonResponse
     {
-        return response()->json($pagos->puedePagarPorQr($aprovechamiento, desdeElPanel: true));
+        return response()->json($cobro->qr($aprovechamiento, desdeElPanel: true));
+    }
+
+    /** Con el QR abierto, la ventana pregunta si ya se pagó; si sí, queda aprobado. */
+    public function estadoQr(AprovechamientoPesq $aprovechamiento, CobroQrService $cobro): JsonResponse
+    {
+        return response()->json($cobro->estado($aprovechamiento));
+    }
+
+    /** Solo en test: paga el QR de prueba en SIREB y aprueba el trámite. */
+    public function simularPagoQr(AprovechamientoPesq $aprovechamiento, CobroQrService $cobro): RedirectResponse
+    {
+        $resultado = $cobro->simularPago($aprovechamiento);
+
+        return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     /**

@@ -97,14 +97,17 @@ la misma página que abre el QR.
 
 ### El pago se hace en SIREB (02/10/2026)
 
-**Pagar por QR, de muestra (08/10/2026).** Los cuatro trámites (autorización,
-carnet, faena y guía) ofrecen «Pagar por QR» en «En curso» cuando la última
-consulta dice `sin_pago` (`puede_pagar_qr`, de `ResumenPortal`). Al abrirlo,
+**Pagar por QR (23/11/2026; de muestra desde el 08/10/2026).** Los cuatro trámites
+(autorización, carnet, faena y guía) ofrecen «Pagar por QR» en «En curso» cuando la
+última consulta dice `sin_pago` (`puede_pagar_qr`, de `ResumenPortal`). Al abrirlo,
 `GET /mi-cuenta/pagar-qr/{codigo}` (`Portal\PagoQrController`, `throttle:20,1`)
-**vuelve a preguntar a SIREB** con `ConfirmarPagoService::puedePagarPorQr()`: el QR sale
-solo con la liquidación `pendiente` y **sin ningún pago cargado**; si no, la ventana
-dice por qué. El QR es `components/comunes/qr-simulado.tsx`, el mismo del panel:
-**no se puede leer ni cobra**, es para probar el circuito. «Descargar QR» lo baja
+**vuelve a preguntar a SIREB** y le **pide el QR** (`CobroQrService::qr()`): sale solo
+con la liquidación `pendiente` y **sin ningún pago cargado**; si no, la ventana dice
+por qué. **El QR es el que genera SIREB**, mostrado tal cual: real con la pasarela,
+de prueba en test («QR de prueba: no lo pague con su banco»); sin pasarela, la
+ventana dice que se pague por depósito. Con la ventana abierta pregunta sola si ya
+se pagó (`…/estado`) y muestra «¡Pago recibido!». Todo el detalle en
+[PAGO-QR.md](PAGO-QR.md). «Descargar QR» lo baja
 en PNG con el monto y el código de pago debajo, armado en el navegador (canvas).
 
 Un trámite pendiente muestra además el **código de

@@ -29,6 +29,8 @@ export function TarjetaRecaudaciones({
     puedeCargar = false,
     rutaCargar,
     rutaConsultarQr,
+    rutaEstadoQr,
+    rutaSimularQr,
     rutaRenovar,
     documento,
     pago,
@@ -48,6 +50,10 @@ export function TarjetaRecaudaciones({
     rutaCargar?: string;
     /** `route('carnets.consultar-qr', id)`: la ventana del QR pregunta a SIREB al abrirse. */
     rutaConsultarQr?: string;
+    /** `route('carnets.estado-qr', id)`: con el QR abierto, ¿ya se pagó? */
+    rutaEstadoQr?: string;
+    /** `route('carnets.simular-pago-qr', id)`: solo con un QR de prueba (test). */
+    rutaSimularQr?: string;
     /** `route('carnets.renovar-liquidacion', id)`: se ofrece si la liquidación venció sin pago. */
     rutaRenovar?: string;
     /** Prefijo de los permisos `<documento>.verificar-pago` y `.cargar-pago`. */
@@ -315,6 +321,8 @@ export function TarjetaRecaudaciones({
                 monto={monto}
                 codigoPago={sireb?.codigo_publico ?? null}
                 rutaConsultar={rutaConsultarQr}
+                rutaEstado={rutaEstadoQr}
+                rutaSimular={rutaSimularQr}
                 pago={pago}
                 puedeVerificar={ofreceVerificar}
                 verificando={verificacion.processing}

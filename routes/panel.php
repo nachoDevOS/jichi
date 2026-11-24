@@ -128,6 +128,16 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware(['permiso:aprovechamientos.cargar-pago', 'throttle:20,1'])
         ->name('aprovechamientos.consultar-qr');
 
+    // Con el QR abierto: ¿ya pagó? Pregunta a SIREB como mucho cada 15 s (CobroQrService).
+    Route::get('/aprovechamientos/{aprovechamiento}/estado-qr', [AprovechamientoController::class, 'estadoQr'])
+        ->middleware(['permiso:aprovechamientos.cargar-pago', 'throttle:30,1'])
+        ->name('aprovechamientos.estado-qr');
+
+    // Solo test: SIREB paga el QR de prueba (en producción responde 404). Es cargar un pago.
+    Route::post('/aprovechamientos/{aprovechamiento}/simular-pago-qr', [AprovechamientoController::class, 'simularPagoQr'])
+        ->middleware(['permiso:aprovechamientos.cargar-pago', 'throttle:10,1'])
+        ->name('aprovechamientos.simular-pago-qr');
+
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/aprovechamientos/{aprovechamiento}/renovar-liquidacion', [AprovechamientoController::class, 'renovarLiquidacion'])
         ->middleware('permiso:aprovechamientos.renovar-liquidacion')
@@ -198,6 +208,16 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
         ->middleware(['permiso:carnets.cargar-pago', 'throttle:20,1'])
         ->name('carnets.consultar-qr');
 
+    // Con el QR abierto: ¿ya pagó? Pregunta a SIREB como mucho cada 15 s (CobroQrService).
+    Route::get('/carnets/{carnet}/estado-qr', [CarnetController::class, 'estadoQr'])
+        ->middleware(['permiso:carnets.cargar-pago', 'throttle:30,1'])
+        ->name('carnets.estado-qr');
+
+    // Solo test: SIREB paga el QR de prueba (en producción responde 404). Es cargar un pago.
+    Route::post('/carnets/{carnet}/simular-pago-qr', [CarnetController::class, 'simularPagoQr'])
+        ->middleware(['permiso:carnets.cargar-pago', 'throttle:10,1'])
+        ->name('carnets.simular-pago-qr');
+
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/carnets/{carnet}/renovar-liquidacion', [CarnetController::class, 'renovarLiquidacion'])
         ->middleware('permiso:carnets.renovar-liquidacion')
@@ -252,6 +272,16 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::get('/faenas/{faena}/consultar-qr', [FaenaController::class, 'consultarQr'])
         ->middleware(['permiso:faenas.cargar-pago', 'throttle:20,1'])
         ->name('faenas.consultar-qr');
+
+    // Con el QR abierto: ¿ya pagó? Pregunta a SIREB como mucho cada 15 s (CobroQrService).
+    Route::get('/faenas/{faena}/estado-qr', [FaenaController::class, 'estadoQr'])
+        ->middleware(['permiso:faenas.cargar-pago', 'throttle:30,1'])
+        ->name('faenas.estado-qr');
+
+    // Solo test: SIREB paga el QR de prueba (en producción responde 404). Es cargar un pago.
+    Route::post('/faenas/{faena}/simular-pago-qr', [FaenaController::class, 'simularPagoQr'])
+        ->middleware(['permiso:faenas.cargar-pago', 'throttle:10,1'])
+        ->name('faenas.simular-pago-qr');
 
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/faenas/{faena}/renovar-liquidacion', [FaenaController::class, 'renovarLiquidacion'])
@@ -316,6 +346,16 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
     Route::get('/guias/{guia}/consultar-qr', [GuiaController::class, 'consultarQr'])
         ->middleware(['permiso:guias.cargar-pago', 'throttle:20,1'])
         ->name('guias.consultar-qr');
+
+    // Con el QR abierto: ¿ya pagó? Pregunta a SIREB como mucho cada 15 s (CobroQrService).
+    Route::get('/guias/{guia}/estado-qr', [GuiaController::class, 'estadoQr'])
+        ->middleware(['permiso:guias.cargar-pago', 'throttle:30,1'])
+        ->name('guias.estado-qr');
+
+    // Solo test: SIREB paga el QR de prueba (en producción responde 404). Es cargar un pago.
+    Route::post('/guias/{guia}/simular-pago-qr', [GuiaController::class, 'simularPagoQr'])
+        ->middleware(['permiso:guias.cargar-pago', 'throttle:10,1'])
+        ->name('guias.simular-pago-qr');
 
     // Vencida sin pago: la pasa al historial y pide otra con la tarifa vigente del catálogo.
     Route::post('/guias/{guia}/renovar-liquidacion', [GuiaController::class, 'renovarLiquidacion'])

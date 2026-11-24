@@ -42,9 +42,10 @@ php artisan jichi:sireb
 
 Pide un token nuevo a Ibare y baja el catálogo sin caché (es el `curl` de
 `/oauth/token` más `GET /api/v1/catalogo/servicios`). Muestra el token, su
-vencimiento y el JSON del catálogo **tal como lo manda SIREB**. Con `--resumen`,
-en vez del JSON, una tabla con lo que Jichi entiende de cada servicio y si sirve
-para la escala: solo sirve con **una** tarifa general.
+vencimiento y el JSON del catálogo **tal como lo manda SIREB**. (No tiene opciones:
+el `--resumen` que se describía acá ya no existe.) **Que el token salga bien no
+alcanza**: si SIREB no tiene a `sedag` activo, el catálogo responde
+`403 SISTEMA_NO_HABILITADO` (pasó en test el 23/11/2026).
 Si falla, muestra el mismo mensaje que vería ventanilla al otorgar. Vive en
 `app/Console/Commands/ProbarSirebCommand.php`.
 
@@ -59,6 +60,10 @@ llegan servicios del SEDAG**, nunca los de otras dependencias.
 | `servicios($refrescar)` | El mismo, **una llamada por página** | **Todos** los servicios con sus tarifas, en una lista | 2 min | `SirebException` |
 | `serviciosSiResponde()` | Igual que `servicios()` | La lista, o `null` | 2 min | `null` |
 | `tarifa($servicio, $tarifa)` | `GET /api/v1/catalogo/servicios/{servicio}/tarifas/{tarifa}` | **Una** tarifa con su `estado`, `monto` y el `servicio` adentro, o `null` si SIREB responde 404 | No: estado y precio de ahora | `SirebException` |
+| `qrDePago($liquidacion)` | `POST /api/v1/liquidaciones/{id}/qr` | El QR (`imagen`, `transaccion_id`, `vence_en`, `simulado`), o `null` con `503 PAGO_QR_NO_DISPONIBLE` | No (SIREB devuelve el mismo mientras vale) | `SirebException` |
+| `simularPagoQr($liquidacion, $transaccion)` | `POST …/qr/simular-pago` | La liquidación `pagada`. Solo en test | No | `SirebException` |
+
+El cobro por QR está en [PAGO-QR.md](PAGO-QR.md) (23/11/2026).
 - **Mostrar** precios (escala, formularios) → `serviciosSiResponde()`: la
   pantalla abre igual con SIREB caído.
 - **Cobrar u otorgar** → `TarifarioSireb::precio()`, que pide `tarifa($servicio_sireb,
@@ -395,7 +400,9 @@ preguntó (`pago_consultado`: la clave `pago` existe en `sireb_envio`) o «Sin
 verificar» si nunca; con recibo suma «Validado el». **La imagen del comprobante
 NO se puede mostrar:** el contrato de SIREB (`/docs/api/openapi.yaml`) no la
 expone; el `Pago` trae solo `tipo_pago`, `monto_pagado`, `estado`, `fecha_pago`,
-`numero_boleta`, `entidad_bancaria` y `fecha_validacion`.
+`numero_boleta`, `entidad_bancaria` y `fecha_validacion`; desde noviembre de 2026,
+además, `fecha_deposito` (el día de la boleta: es la que va al recibo) y, en un pago
+QR, `medio`, `transaccion_id` y `simulado` (ver [PAGO-QR.md](PAGO-QR.md)).
 
 Si una regla de Jichi lo frena al aprobar (autorización revocada, kilos), queda
 pendiente con ese motivo. Lo disparan el botón **«Verificar pago»** de la ficha
@@ -407,6 +414,12 @@ mucho una vez cada 2 min por trámite (candado en caché)—, con `dispatchAfter
 corre en el mismo php-fpm después de mandar la página, sin trabajador de cola (en
 Coolify hay un solo contenedor). El refresco de «En curso» trae el resultado. En desarrollo, `composer run dev` levanta
 el programador (`schedule:work`, registrado en `AppServiceProvider`).
+
+*(23/11/2026)* **Dos caminos más, por el QR:** la ventana del QR abierta pregunta sola
+(`CobroQrService::estado()`, como mucho cada 15 s por trámite) y **SIREB avisa por
+webhook** (`POST /api/sireb/aviso`, firmado), que lanza el mismo `VerificarPagoJob`.
+Ninguno aprueba con lo que dice el aviso: los dos vuelven a consultar. Ver
+[PAGO-QR.md](PAGO-QR.md#el-webhook).
 
 **Para no cargar el servidor** (08/10/2026):
 
@@ -537,3 +550,11 @@ también su expresión regular, o las filas pasan a salir como «Aviso».
 - La guía de piscicultura: su 50% no viaja a SIREB.
 - Ver la imagen del comprobante: SIREB tiene que exponerla (un `comprobante_url`
   en el `Pago` o un endpoint de descarga). Pedirlo al equipo de Recaudaciones.
+- ~~*(23/11/2026)* Test rechazaba a `sedag` con `403 SISTEMA_NO_HABILITADO`~~ ✅ reactivada
+  el 24/11/2026.
+- *(23/11/2026)* El webhook (alta de la dirección y el secreto), las credenciales de
+  Paititi y la pasarela QR real: ver [PAGO-QR.md](PAGO-QR.md#lo-que-hay-que-pedirle-al-equipo-de-sireb).
+- *(23/11/2026)* Cosas nuevas del contrato que Jichi todavía no usa: mandar
+  `precio_unitario` al registrar (SIREB responde `422 PRECIO_DESACTUALIZADO` en vez
+  de cobrar otro monto) y cargar el depósito de una liquidación **vencida** si se
+  pagó hasta el día del vencimiento (hoy Jichi solo carga sobre una `pendiente`).

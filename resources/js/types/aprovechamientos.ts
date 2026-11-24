@@ -119,8 +119,12 @@ export interface LiquidacionHistorial {
 export interface PagoSireb {
     estado: 'pendiente' | 'confirmado' | null;
     monto_pagado: number;
+    /** La boleta, o la transacción si se pagó por QR. */
     numero_boleta: string | null;
+    /** El banco, o «Pago por QR». */
     entidad_bancaria: string | null;
+    /** `QR` si se pagó con el QR de SIREB; null en un depósito. */
+    medio: 'QR' | null;
     /** Un DÍA: se muestra con fecha(). */
     fecha_pago: string | null;
     /** Un instante: se muestra con fechaHora(). */

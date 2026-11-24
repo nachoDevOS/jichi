@@ -52,5 +52,10 @@ Route::prefix('mi-cuenta')->name('portal.')->group(function () {
         Route::get('/pagar-qr/{codigo}', PagoQrController::class)
             ->middleware('throttle:20,1')
             ->name('pagar-qr');
+
+        // Con el QR abierto: ¿ya pagó? Pregunta a SIREB como mucho cada 15 s (CobroQrService).
+        Route::get('/pagar-qr/{codigo}/estado', [PagoQrController::class, 'estado'])
+            ->middleware('throttle:30,1')
+            ->name('pagar-qr.estado');
     });
 });

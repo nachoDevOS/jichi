@@ -30,6 +30,15 @@ trait SirebFalso
     /** @var array<string, array<string, mixed>> Las liquidaciones de SIREB, por id. */
     protected array $liquidaciones = [];
 
+    /** false: el entorno no cobra por QR (hoy, Paititi): `503 PAGO_QR_NO_DISPONIBLE`. */
+    protected bool $qrDisponible = true;
+
+    /** true: el QR es de prueba y se puede simular su pago (test.sireb). */
+    protected bool $qrSimulado = true;
+
+    /** Cuántas veces se pidió pagar un QR de prueba. */
+    protected int $simulacionesDePago = 0;
+
     protected function simularSireb(): void
     {
         ArancelSireb::query()->create(['nombre' => 'Guía de transporte', 'concepto' => ConceptoArancel::Guia->value, 'servicio_sireb' => self::SERVICIO_GUIA]);
@@ -66,9 +75,19 @@ trait SirebFalso
 
             if ($request->method() === 'POST' && str_ends_with($ruta, '/liquidaciones')) {
                 $id = (string) Str::uuid();
-                $this->liquidaciones[$id] = ['id' => $id, 'codigo_publico' => 'PAGO-'.count($this->liquidaciones), 'estado' => 'pendiente', 'pago' => null];
+                $monto = collect($request->data()['items'] ?? [])->sum(fn ($i) => ($tarifas[$i['tarifa_id']]['monto'] ?? 0) * $i['cantidad']);
+                $this->liquidaciones[$id] = ['id' => $id, 'codigo_publico' => 'PAGO-'.count($this->liquidaciones),
+                    'monto' => number_format($monto, 2, '.', ''), 'estado' => 'pendiente', 'pago' => null];
 
                 return Http::response(['data' => $this->liquidaciones[$id]], 201);
+            }
+
+            if (preg_match('#/liquidaciones/([^/]+)/qr$#', $ruta, $m)) {
+                return $this->qrFalso($m[1]);
+            }
+
+            if (preg_match('#/liquidaciones/([^/]+)/qr/simular-pago$#', $ruta, $m)) {
+                return $this->simularPagoFalso($m[1], (string) ($request->data()['transaccion_id'] ?? ''));
             }
 
             if (preg_match('#/liquidaciones/([^/]+)/anular$#', $ruta, $m)) {
@@ -83,5 +102,70 @@ trait SirebFalso
 
             return Http::response(['error' => "Ruta no simulada: {$request->method()} {$url}"], 500);
         });
+    }
+
+    /** `POST /liquidaciones/{id}/qr` como lo contesta SIREB: el mismo QR mientras siga vigente. */
+    private function qrFalso(string $id)
+    {
+        if (! $this->qrDisponible) {
+            return Http::response(['codigo' => 'PAGO_QR_NO_DISPONIBLE', 'mensaje' => 'El pago por QR todavía no está disponible.'], 503);
+        }
+
+        $liquidacion = $this->liquidaciones[$id] ?? null;
+
+        if ($liquidacion === null) {
+            return Http::response(['codigo' => 'LIQUIDACION_NO_ENCONTRADO'], 404);
+        }
+
+        if ($liquidacion['estado'] !== 'pendiente') {
+            return Http::response(['codigo' => 'LIQUIDACION_NO_PAGABLE'], 422);
+        }
+
+        if ($liquidacion['pago'] !== null) {
+            return Http::response(['codigo' => 'PAGO_YA_EXISTE'], 422);
+        }
+
+        $nuevo = ! isset($liquidacion['qr']);
+        $this->liquidaciones[$id]['qr'] ??= [
+            'transaccion_id' => 'SIM-'.Str::upper(Str::random(12)),
+            'codigo_publico' => $liquidacion['codigo_publico'],
+            'monto' => $liquidacion['monto'],
+            'imagen' => base64_encode('png-de-prueba'),
+            'contenido' => $this->qrSimulado ? 'SIMULACION-NO-PAGAR' : 'qr-real',
+            'vence_en' => now()->addMinutes(30)->toIso8601String(),
+            'simulado' => $this->qrSimulado,
+        ];
+
+        return Http::response(['data' => $this->liquidaciones[$id]['qr']], $nuevo ? 201 : 200);
+    }
+
+    /** `POST /liquidaciones/{id}/qr/simular-pago`: deja la liquidación pagada con un pago QR de prueba. */
+    private function simularPagoFalso(string $id, string $transaccionId)
+    {
+        $this->simulacionesDePago++;
+
+        if (! $this->qrSimulado) {
+            return Http::response(['codigo' => 'QR_SIMULADO_DESHABILITADO'], 404);
+        }
+
+        $liquidacion = $this->liquidaciones[$id] ?? null;
+
+        if (($liquidacion['qr']['transaccion_id'] ?? null) !== $transaccionId) {
+            return Http::response(['codigo' => 'QR_INVALIDO'], 422);
+        }
+
+        if ($liquidacion['estado'] !== 'pendiente') {
+            return Http::response(['codigo' => 'LIQUIDACION_NO_PAGABLE'], 422);
+        }
+
+        $this->liquidaciones[$id]['estado'] = 'pagada';
+        $this->liquidaciones[$id]['pago'] = [
+            'tipo_pago' => 'electronico', 'monto_pagado' => $liquidacion['monto'], 'estado' => 'confirmado',
+            'fecha_pago' => now()->toIso8601String(), 'numero_boleta' => null, 'entidad_bancaria' => null,
+            'fecha_deposito' => null, 'fecha_validacion' => now()->toIso8601String(),
+            'medio' => 'QR', 'transaccion_id' => $transaccionId, 'simulado' => true,
+        ];
+
+        return Http::response(['data' => $this->liquidaciones[$id]], 201);
     }
 }

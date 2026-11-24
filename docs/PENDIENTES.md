@@ -6,6 +6,24 @@
 
 ---
 
+## 🔴 Pago por QR: hecho del lado de Jichi, falta SIREB — 23/11/2026
+
+Jichi pide el QR a SIREB, lo muestra (real o de prueba), se entera del pago y
+aprueba; el webhook está listo en `/api/sireb/aviso`. Ver
+[modulos/PAGO-QR.md](modulos/PAGO-QR.md). **Falta, todo del lado de SIREB:**
+
+1. ~~Reactivar la credencial `sedag` en test.sireb~~ ✅ 24/11/2026: reactivada, y el
+   pago simulado se probó de punta a punta (QR → «Simular pago» → aprobado con recibo).
+2. Dar de alta `{APP_URL}/api/sireb/aviso` y entregar el secreto
+   (`SIREB_WEBHOOK_SECRETO`), en test y en producción. Sin eso funciona igual, más
+   lento: espera al comando de cada 10 min.
+3. Credenciales de `sedag` en Paititi (`https://paititi.beni.gob.bo`).
+4. La pasarela real en Paititi: hasta entonces producción responde `503` y Jichi
+   ofrece el depósito. **En Jichi no hay que cambiar nada ese día.**
+
+Probado en test el 24/11/2026 por el responsable: QR, «Simular pago (prueba)» y
+aprobación. Falta probar el webhook cuando SIREB dé de alta la dirección.
+
 ## 🔴 PDF guardados: hay que migrar — 23/10/2026
 
 Tabla nueva `documentos_emitidos`. En la base de trabajo (el `RolPermisoSeeder` borra el permiso
@@ -205,7 +223,9 @@ contradicción, mandan REGLAS-NEGOCIO.md y MER.md.
 
 ## 🔴 Las pruebas cubren solo la guía — 13/10/2026
 
-Las 92 pruebas del 12/10/2026 **nunca se commitearon** y se perdieron. Hoy hay 29
+*(23/11/2026: hoy son 102; se sumaron, entre otras, las 14 del pago por QR y el
+webhook en `tests/Feature/Pagos/`.)* Las 92 pruebas del 12/10/2026 **nunca se
+commitearon** y se perdieron. El 13/10/2026 había 29
 (`php artisan test`), con SIREB e Ibare simulados (`tests/Concerns/SirebFalso.php`),
 y cubren solo la guía: descuento del cupo (registrar, frenar, corregir, cambiar de
 pescador, eliminar, revocar, autorización revocada, no vendibles, piscicultura,

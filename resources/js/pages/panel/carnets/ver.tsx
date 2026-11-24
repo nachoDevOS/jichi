@@ -302,6 +302,8 @@ export default function VerCarnet({
                 puedeCargar={carnet.puede_cargar_pago}
                 rutaCargar={route('carnets.cargar-pago', carnet.id)}
                 rutaConsultarQr={route('carnets.consultar-qr', carnet.id)}
+                rutaEstadoQr={route('carnets.estado-qr', carnet.id)}
+                rutaSimularQr={route('carnets.simular-pago-qr', carnet.id)}
                 rutaRenovar={route('carnets.renovar-liquidacion', carnet.id)}
                 documento="carnets"
             />

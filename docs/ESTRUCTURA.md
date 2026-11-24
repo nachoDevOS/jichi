@@ -51,6 +51,7 @@ app/
 │   │   │   └── Asociacion, ArancelSirebController.php   catálogos
 │   │   ├── Publico/               ← SIN SESIÓN: portada y verificación
 │   │   ├── Portal/                ← BENEFICIARIO: solo lectura
+│   │   ├── Sireb/                 ← OTRO SISTEMA: el webhook de SIREB (firma, sin sesión)
 │   │   └── StorageController.php  el ÚNICO que escribe archivos
 │   ├── Requests/{Auth,Panel,Portal}/   las reglas de cada formulario
 │   └── Middleware/                HandleInertiaRequests, SoloFuncionario, SoloBeneficiario
@@ -84,6 +85,7 @@ app/
 | Una lista de valores fijos o un estado | `app/Enums/` (columna `string`) |
 | Una regla de negocio | `app/Services/` — el formulario y un comando la comparten |
 | Una llamada a SIREB | `app/Sireb/SirebService.php` |
+| Algo que llama OTRO SISTEMA (un webhook) | `app/Http/Controllers/Sireb/` + `routes/api.php` (sin sesión ni CSRF) |
 | Un comando de consola | `app/Console/Commands/` (se programa en `routes/console.php`) |
 
 ---
@@ -97,6 +99,7 @@ routes/
 ├── auth.php       /login  /logout
 ├── panel.php      /panel/...           middleware funcionario + permiso: en cada ruta
 ├── portal.php     /mi-cuenta/...       middleware beneficiario, ninguna ruta recibe un id
+├── api.php        /api/...             otros sistemas; hoy el webhook de SIREB. Lo carga bootstrap/app.php
 └── console.php    el scheduler: jichi:verificar-pagos cada 10 minutos
 ```
 
@@ -145,7 +148,7 @@ resources/js/
 │   │                           toggle-apariencia
 │   ├── panel/
 │   │   ├── layout/                 barra-lateral, barra-superior, navegacion.ts (el menú)
-│   │   ├── pagos/                  tarjeta-recaudaciones y sus ventanas (QR, cargar boleta)
+│   │   ├── pagos/                  tarjeta-recaudaciones y sus ventanas (QR de SIREB, cargar boleta)
 │   │   ├── beneficiarios/  aprovechamientos/  guias/  catalogos/  dashboard/  comunes/
 │   ├── portal/                 fila-papel, fila-tramite, visor-vista-previa, piezas
 │   └── publico/                hoja-oficial, ficha-documento, buscador-codigo,

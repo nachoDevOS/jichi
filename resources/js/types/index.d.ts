@@ -80,6 +80,8 @@ export interface PageProps {
     archivos: LimitesArchivo;
     flash: Flash;
     apariencia: 'light' | 'dark' | 'system';
+    /** El APP_ENV del servidor (`production`, `local`…); null fuera del panel. */
+    entorno: string | null;
     /** Lista de rutas de Laravel que Ziggy publica para poder usar route(). */
     ziggy: ZiggyConfig & { location: string };
     // Inertia exige que las props de página sean indexables por clave.

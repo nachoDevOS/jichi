@@ -22,7 +22,7 @@ Tailwind 4 · PostgreSQL 18** (corre también en SQLite).
 | Dato | Valor |
 | --- | --- |
 | Líneas de código | ~37.000 (`app/` + `resources/js/`) |
-| Pruebas | 29, solo la guía (13/10/2026), con SIREB simulado: `php artisan test`. Las 92 del 12/10 se perdieron sin commitear (ver §9) |
+| Pruebas | 102 (23/11/2026; 29 de la guía el 13/10/2026), con SIREB simulado: `php artisan test`. Las 92 del 12/10 se perdieron sin commitear (ver §9) |
 | Idioma del código | Español, sin excepciones salvo `components/ui/` |
 | Pendiente | Reportes y Configuración (en gris en el menú) |
 
@@ -139,10 +139,17 @@ encargado de SIREB lo valida. Jichi pregunta con `GET /liquidaciones/{id}` —bo
 `vencida` → sigue pendiente, con aviso. La ficha muestra el pago informado («Por
 validar» / «Validado»). Ver [modulos/SIREB.md](modulos/SIREB.md).
 
+**Pago por QR** (23/11/2026): el QR lo **genera SIREB** (`POST /liquidaciones/{id}/qr`)
+y Jichi lo muestra tal cual, real o de prueba; sin pasarela (hoy Paititi responde
+`503`), se paga por depósito. Un QR pagado queda `pagada` sin validación manual, y
+Jichi se entera por la ventana abierta, por el **webhook firmado de SIREB**
+(`/api/sireb/aviso`) o por el comando. Cambiar de pasarela es cosa de SIREB: en Jichi
+no se toca nada. Ver [modulos/PAGO-QR.md](modulos/PAGO-QR.md).
+
 **El recibo** es una tabla (`recibos`), uno por documento (`recibible`), con
 correlativo continuo `000001` que Contabilidad audita por huecos. Se emite al
 aprobar y congela monto, concepto y el pago de SIREB (N° de transacción, banco,
-fecha).
+fecha del depósito). Un pago QR guarda su transacción y «Pago por QR».
 Ver [modulos/RECIBOS.md](modulos/RECIBOS.md).
 
 ### La verificación pública

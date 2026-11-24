@@ -87,6 +87,9 @@ return [
         'timeout' => (int) env('SIREB_TIMEOUT', 10),
         // Solo las listas de los formularios: el precio que se cobra se pide sin caché.
         'cache_minutos' => (int) env('SIREB_CACHE_MINUTOS', 2),
+        // Con el que SIREB firma sus avisos (webhook); lo entrega Recaudaciones, uno por entorno.
+        // Vacío: se rechaza todo aviso y los pagos se ven por consulta (botón, comando, portal).
+        'webhook_secreto' => env('SIREB_WEBHOOK_SECRETO'),
     ],
 
 ];

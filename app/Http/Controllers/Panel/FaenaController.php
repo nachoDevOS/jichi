@@ -15,6 +15,7 @@ use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\PermisoFaena;
 use App\Services\CargarPagoService;
+use App\Services\CobroQrService;
 use App\Services\ConfirmarPagoService;
 use App\Services\DocumentoEmitidoService;
 use App\Services\EmitirFaenaService;
@@ -391,10 +392,24 @@ class FaenaController extends Controller
         return back()->with($resultado['cargado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
-    /** Antes de mostrar el QR: pregunta a SIREB si el cobro sigue pendiente y sin pago. */
-    public function consultarQr(PermisoFaena $faena, ConfirmarPagoService $pagos): JsonResponse
+    /** El QR de pago que genera SIREB, si el cobro sigue pendiente y sin pago. */
+    public function consultarQr(PermisoFaena $faena, CobroQrService $cobro): JsonResponse
     {
-        return response()->json($pagos->puedePagarPorQr($faena, desdeElPanel: true));
+        return response()->json($cobro->qr($faena, desdeElPanel: true));
+    }
+
+    /** Con el QR abierto, la ventana pregunta si ya se pagó; si sí, queda aprobado. */
+    public function estadoQr(PermisoFaena $faena, CobroQrService $cobro): JsonResponse
+    {
+        return response()->json($cobro->estado($faena));
+    }
+
+    /** Solo en test: paga el QR de prueba en SIREB y aprueba el trámite. */
+    public function simularPagoQr(PermisoFaena $faena, CobroQrService $cobro): RedirectResponse
+    {
+        $resultado = $cobro->simularPago($faena);
+
+        return back()->with($resultado['aprobado'] ? 'exito' : 'aviso', $resultado['mensaje']);
     }
 
     /**

@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils';
 import type { PageProps } from '@/types';
 
 /*
- * En desarrollo (servidor de Vite) la barra va en ámbar con la franja «DESARROLLO»: que nadie
- * cargue datos reales en la base de prueba. En producción se compila con `npm run build` y
- * DEV es false: la barra queda con su color de siempre.
+ * Fuera de producción la barra va en ámbar con la franja del entorno: que nadie cargue datos
+ * reales en una base de prueba. Lo decide APP_ENV (prop `entorno`), NO `import.meta.env.DEV`:
+ * ese solo dice si corre el servidor de Vite, y con `composer run dev` es true aunque el .env diga production.
  */
-const DESARROLLO = import.meta.env.DEV;
+const NOMBRE_ENTORNO: Record<string, string> = { local: 'Desarrollo', staging: 'Pruebas', testing: 'Pruebas' };
 const COLORES_DESARROLLO = {
     '--sidebar': 'oklch(0.33 0.075 55)',
     '--sidebar-foreground': 'oklch(0.95 0.025 80)',
@@ -39,7 +39,9 @@ export function BarraLateral({
      * HandleInertiaRequests manda en todas las páginas (usuario, institución,
      * flash, ziggy). No hay que pasarlas de componente en componente.
      */
-    const { institucion, ziggy } = usePage<PageProps>().props;
+    const { institucion, ziggy, entorno } = usePage<PageProps>().props;
+    const fueraDeProduccion = entorno !== null && entorno !== 'production';
+    const nombreEntorno = entorno ? (NOMBRE_ENTORNO[entorno] ?? entorno) : '';
     const { puede } = usePermisos();
 
     // Filtro 1: se descartan los módulos para los que el usuario no tiene permiso.
@@ -64,7 +66,7 @@ export function BarraLateral({
                 angosto ? 'w-64 lg:w-16' : 'w-64',
                 abierto ? 'translate-x-0' : '-translate-x-full',
             )}
-            style={DESARROLLO ? COLORES_DESARROLLO : undefined}
+            style={fueraDeProduccion ? COLORES_DESARROLLO : undefined}
         >
             {/*
                 La franja de la marca mide lo mismo que el encabezado (h-14) y va
@@ -96,14 +98,14 @@ export function BarraLateral({
                 </button>
             </div>
 
-            {DESARROLLO && (
+            {fueraDeProduccion && (
                 <div
                     className="flex h-6 shrink-0 items-center justify-center"
                     style={{ background: 'repeating-linear-gradient(-45deg, #f2c14e 0 10px, #e0a53a 10px 20px)' }}
-                    title="Entorno de desarrollo: los datos no son reales"
+                    title={`Entorno «${entorno}»: los datos no son reales`}
                 >
                     <span className="rounded bg-slate-950/80 px-2 text-[10px] leading-4 font-bold tracking-[0.2em] text-white uppercase">
-                        {angosto ? <span className="lg:hidden">Desarrollo</span> : 'Desarrollo'}
+                        {angosto ? <span className="lg:hidden">{nombreEntorno}</span> : nombreEntorno}
                         {angosto && <span className="hidden lg:inline">Dev</span>}
                     </span>
                 </div>

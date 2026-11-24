@@ -5,8 +5,10 @@ namespace App\Traits;
 use App\Enums\EstadoLiquidacionSireb;
 use App\Models\Beneficiario;
 use App\Models\Recibo;
+use App\Services\ConfirmarPagoService;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Un documento que se paga en SIREB: autorización, carnet, faena y guía. Lleva
@@ -49,6 +51,41 @@ trait LiquidableSireb
     public function recibo(): MorphOne
     {
         return $this->morphOne(Recibo::class, 'recibible');
+    }
+
+    /**
+     * Suma claves a `sireb_envio` releyendo la fila BLOQUEADA, y solo si sigue siendo esa
+     * liquidación: una consulta vieja (webhook, comando, portal) no pisa la de una corrección
+     * que ya registró otra. False si la liquidación cambió. Ver docs/modulos/PAGO-QR.md.
+     */
+    public function anotarEnvioSireb(string $liquidacionId, array $claves): bool
+    {
+        $envio = DB::transaction(function () use ($liquidacionId, $claves): ?array {
+            $fila = $this->newQuery()->lockForUpdate()->find($this->getKey());
+
+            if ($fila === null || $fila->sireb_liquidacion_id !== $liquidacionId) {
+                return null;
+            }
+
+            $envio = [...($fila->sireb_envio ?? []), ...$claves];
+
+            // Sin cambios no se escribe: cada escritura audita.
+            if ($envio !== $fila->sireb_envio) {
+                $fila->update(['sireb_envio' => $envio]);
+            }
+
+            return $envio;
+        });
+
+        if ($envio === null) {
+            return false;
+        }
+
+        // La copia bloqueada es otra instancia: la de quien llamó se pone al día.
+        $this->sireb_envio = $envio;
+        $this->syncOriginalAttribute('sireb_envio');
+
+        return true;
     }
 
     /** ¿SIREB ya tiene registrada su liquidación? */
@@ -134,10 +171,12 @@ trait LiquidableSireb
         return $pago ? [
             'estado' => $pago['estado'] ?? null,
             'monto_pagado' => (float) ($pago['monto_pagado'] ?? 0),
-            'numero_boleta' => $pago['numero_boleta'] ?? null,
-            'entidad_bancaria' => $pago['entidad_bancaria'] ?? null,
+            // Igual que en el recibo: un pago QR muestra su transacción y «Pago por QR».
+            'numero_boleta' => ConfirmarPagoService::comprobante($pago),
+            'entidad_bancaria' => ConfirmarPagoService::medio($pago),
+            'medio' => $pago['medio'] ?? null,
             // Un DÍA, igual que en el recibo; la validación es un MOMENTO.
-            'fecha_pago' => isset($pago['fecha_pago']) ? Carbon::parse($pago['fecha_pago'])->timezone(config('app.timezone'))->toDateString() : null,
+            'fecha_pago' => ConfirmarPagoService::diaDelPago($pago),
             'fecha_validacion' => isset($pago['fecha_validacion']) ? Carbon::parse($pago['fecha_validacion'])->toIso8601String() : null,
         ] : null;
     }
