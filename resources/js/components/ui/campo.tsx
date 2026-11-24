@@ -25,7 +25,7 @@ export function Campo({
     children: ReactNode;
 }) {
     return (
-        <div className={cn('space-y-2', className)}>
+        <div className={cn('space-y-1.5', className)}>
             <Label htmlFor={htmlFor}>
                 {etiqueta}
                 {obligatorio && (
@@ -40,7 +40,7 @@ export function Campo({
             {/* role="alert" hace que los lectores de pantalla anuncien el error
                 apenas aparece, sin que el usuario tenga que ir a buscarlo. */}
             {error ? (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="text-xs text-destructive" role="alert">
                     {error}
                 </p>
             ) : (

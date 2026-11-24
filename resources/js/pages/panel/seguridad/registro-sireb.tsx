@@ -264,7 +264,7 @@ export default function RegistroSireb({
                         ) : (
                             <>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-[13px]">
                                         <thead className="border-y border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
                                             <tr>
                                                 <th className="w-8 px-3 py-2.5" />

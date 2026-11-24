@@ -347,7 +347,7 @@ function TarjetaCupo({ cupo }: { cupo: CupoResumen }) {
                     ['Otorgada', cupo.fecha_emision],
                     ['Vence', cupo.fecha_vencimiento],
                 ].map(([rotulo, valor], i) => (
-                    <div key={rotulo} className={cn('px-5 py-2.5', i > 0 && 'border-l border-border')}>
+                    <div key={rotulo} className={cn('px-3 py-2', i > 0 && 'border-l border-border')}>
                         <dt className="text-muted-foreground">{rotulo}</dt>
                         <dd className="font-medium tabular-nums">{fecha(valor) || '—'}</dd>
                     </div>

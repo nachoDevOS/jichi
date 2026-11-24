@@ -129,7 +129,7 @@ export default function Reportes({
                         ) : (
                             <>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-[13px]">
                                         <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                             <tr>
                                                 {columnas.map((c) => (

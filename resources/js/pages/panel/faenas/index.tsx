@@ -141,31 +141,31 @@ export default function IndiceFaenas({
                     ) : (
                         <>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-[13px]">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">N°</th>
-                                            <th className="px-5 py-2.5 font-medium">Beneficiario</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
-                                            <th className="px-5 py-2.5 font-medium">Salida</th>
-                                            <th className="px-5 py-2.5 font-medium">Desembarque</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
+                                            <th className="px-3 py-2 font-medium">ID</th>
+                                            <th className="px-3 py-2 font-medium">Beneficiario</th>
+                                            <th className="px-3 py-2 text-right font-medium">Kilos</th>
+                                            <th className="px-3 py-2 font-medium">Salida</th>
+                                            <th className="px-3 py-2 font-medium">Desembarque</th>
+                                            <th className="px-3 py-2 text-right font-medium">Arancel</th>
                                             {/* Registrado y Estado pegados a los botones, como en carnets y cupos. */}
-                                            <th className="px-5 py-2.5 font-medium">Registrado</th>
-                                            <th className="px-5 py-2.5 font-medium">Estado</th>
-                                            <th className="px-5 py-2.5" />
+                                            <th className="px-3 py-2 font-medium">Registrado</th>
+                                            <th className="px-3 py-2 font-medium">Estado</th>
+                                            <th className="px-3 py-2" />
                                         </tr>
                                     </thead>
 
                                     <tbody className="divide-y divide-border">
                                         {faenas.data.map((f) => (
                                             <tr key={f.id} className="hover:bg-secondary/50">
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Link
                                                         href={route('faenas.show', f.id)}
-                                                        className="font-mono font-medium tabular-nums text-primary hover:underline"
+                                                        className="font-medium tabular-nums text-primary hover:underline"
                                                     >
-                                                        {f.numero_legible}
+                                                        {f.id}
                                                     </Link>
                                                 </td>
 
@@ -173,7 +173,7 @@ export default function IndiceFaenas({
                                                     Mismo bloque que en carnets y aprovechamientos:
                                                     el hueco de la silueta se dibuja igual sin foto,
                                                     así las filas no cambian de alto. */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <div className="flex items-center gap-3">
                                                         <Retrato
                                                             url={f.foto_url}
@@ -201,32 +201,32 @@ export default function IndiceFaenas({
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                <td className="px-3 py-2 text-right tabular-nums">
                                                     {f.kilos_extraidos} kg
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {fecha(f.fecha_salida)}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {fecha(f.fecha_desembarque)}
                                                 </td>
 
                                                 {/* El arancel; mientras está pendiente, falta pagarlo en SIREB. */}
-                                                <td className="px-5 py-2.5 text-right text-base tabular-nums">
+                                                <td className="px-3 py-2 text-right text-base tabular-nums">
                                                     {bs(f.monto, institucion.moneda)}
                                                     {f.puede_verificar_pago && (
                                                         <p className="text-xs text-amber-700 dark:text-amber-300">por pagar</p>
                                                     )}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-xs text-muted-foreground">
+                                                <td className="px-3 py-2 text-xs text-muted-foreground">
                                                     {fechaHora(f.registrado_en)}
                                                     <span className="block">{hace(f.registrado_en)}</span>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Badge color={f.estado_color}>{f.estado_etiqueta}</Badge>
                                                     {f.caducada && (
                                                         <Badge color="amber" className="ml-1">
@@ -235,7 +235,7 @@ export default function IndiceFaenas({
                                                     )}
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
                                                         {/* El recibo existe desde el ENVÍO.
                                                             Mismo estilo que en el listado de

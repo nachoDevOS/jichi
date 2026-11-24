@@ -110,7 +110,7 @@ export default function LayoutPanel({
                     onAlternarAngosto={alternarAngosto}
                 />
 
-                <main className="p-4 sm:p-6">{children}</main>
+                <main className="p-3 sm:p-5">{children}</main>
             </div>
         </div>
     );

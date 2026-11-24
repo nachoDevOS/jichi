@@ -127,22 +127,22 @@ export default function IndiceRecibos({
                         ) : (
                             <>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-[13px]">
                                         <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                             <tr>
-                                                <th className="px-5 py-2.5 font-medium">N°</th>
-                                                <th className="px-5 py-2.5 font-medium">A nombre de</th>
-                                                <th className="px-5 py-2.5 font-medium">Concepto</th>
-                                                <th className="px-5 py-2.5 text-right font-medium">Total</th>
-                                                <th className="px-5 py-2.5 font-medium">Emitido</th>
-                                                <th className="px-5 py-2.5" />
+                                                <th className="px-3 py-2 font-medium">N°</th>
+                                                <th className="px-3 py-2 font-medium">A nombre de</th>
+                                                <th className="px-3 py-2 font-medium">Concepto</th>
+                                                <th className="px-3 py-2 text-right font-medium">Total</th>
+                                                <th className="px-3 py-2 font-medium">Emitido</th>
+                                                <th className="px-3 py-2" />
                                             </tr>
                                         </thead>
 
                                         <tbody className="divide-y divide-border">
                                             {recibos.data.map((r) => (
                                                 <tr key={r.id} className="hover:bg-secondary/50">
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <Link
                                                             href={route('recibos.show', r.id)}
                                                             className="font-mono font-medium text-primary hover:underline"
@@ -156,25 +156,25 @@ export default function IndiceRecibos({
                                                         )}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <p className="font-medium">{r.beneficiario ?? '—'}</p>
                                                         <p className="font-mono text-xs text-muted-foreground">
                                                             {r.documento ?? '—'}
                                                         </p>
                                                     </td>
 
-                                                    <td className="max-w-xs truncate px-5 py-2.5 text-muted-foreground">
+                                                    <td className="max-w-xs truncate px-3 py-2 text-muted-foreground">
                                                         {r.concepto}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    <td className="px-3 py-2 text-right tabular-nums">
                                                         <span className="font-medium">
                                                             {bs(r.monto_total, institucion.moneda)}
                                                         </span>
 
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-muted-foreground">
+                                                    <td className="px-3 py-2 text-muted-foreground">
                                                         {fechaHora(r.emitido_en)}
                                                     </td>
 
@@ -182,7 +182,7 @@ export default function IndiceRecibos({
                                                         lo que vuelve es un PDF y
                                                         el visor del navegador es
                                                         desde donde se imprime. */}
-                                                    <td className="px-5 py-2.5 text-right">
+                                                    <td className="px-3 py-2 text-right">
                                                         {puede('recibos.imprimir') && (
                                                             <a
                                                                 href={route('recibos.imprimir', r.id)}

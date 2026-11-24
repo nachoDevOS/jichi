@@ -100,7 +100,7 @@ export function BandaTitular({
 }) {
     return (
         <section
-            className="relative overflow-hidden rounded-xl px-5 py-4 text-white shadow-sm sm:px-6"
+            className="relative overflow-hidden rounded-lg px-4 py-3 text-white shadow-xs sm:px-5"
             style={{
                 background:
                     'radial-gradient(500px 160px at 95% 0%, color-mix(in oklch, var(--rio-claro) 30%, transparent), transparent 70%),' +
@@ -108,19 +108,19 @@ export function BandaTitular({
             }}
         >
             <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-                <Retrato url={foto} nombre={nombre ?? 'Sin nombre'} className="size-14 ring-2 ring-white/25" />
+                <Retrato url={foto} nombre={nombre ?? 'Sin nombre'} className="size-12 ring-2 ring-white/25" />
 
                 <div className="min-w-[16rem] flex-1">
                     {beneficiarioId !== null ? (
                         <EnlacePermitido
                             permiso="beneficiarios.ver"
                             href={route('beneficiarios.show', beneficiarioId)}
-                            className="block truncate text-xl leading-tight font-semibold hover:underline"
+                            className="block truncate text-lg leading-tight font-semibold hover:underline"
                         >
                             {nombre ?? '—'}
                         </EnlacePermitido>
                     ) : (
-                        <p className="truncate text-xl leading-tight font-semibold">{nombre ?? '—'}</p>
+                        <p className="truncate text-lg leading-tight font-semibold">{nombre ?? '—'}</p>
                     )}
                     <p className="mt-0.5 text-sm text-white/65 tabular-nums">{linea}</p>
                 </div>
@@ -179,14 +179,14 @@ export function Cifra({
 
     return (
         <Card className={cn('min-w-0', destacada && 'ring-2 ring-primary/20', estilo.tarjeta)}>
-            <CardContent className="p-4">
+            <CardContent className="p-3.5">
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{etiqueta}</p>
                     <Icono className={cn('size-4', destacada ? 'text-primary' : 'text-muted-foreground')} />
                 </div>
                 <p
                     className={cn(
-                        'mt-2 truncate text-2xl font-semibold tabular-nums',
+                        'mt-1 truncate text-xl font-semibold tabular-nums',
                         destacada && 'text-primary',
                         estilo.valor,
                     )}
@@ -383,13 +383,13 @@ export function Tabla({
 }) {
     return (
         <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[13px]">
                 <thead className="border-b border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
                     <tr>
                         {columnas.map((c, i) => (
                             <th
                                 key={`${c}-${i}`}
-                                className={cn('px-5 py-2.5 font-medium', c.startsWith('>') && 'text-right')}
+                                className={cn('px-3 py-2 font-medium', c.startsWith('>') && 'text-right')}
                             >
                                 {c.replace(/^>/, '')}
                             </th>
@@ -417,7 +417,7 @@ export function Td({
     return (
         <td
             colSpan={colSpan}
-            className={cn('px-5 py-3', apagada && 'text-muted-foreground', derecha && 'text-right tabular-nums')}
+            className={cn('px-3 py-2', apagada && 'text-muted-foreground', derecha && 'text-right tabular-nums')}
         >
             {children}
         </td>
@@ -502,7 +502,7 @@ export function BandaFormulario({
 }) {
     return (
         <section
-            className="relative overflow-hidden rounded-xl px-5 py-4 text-white shadow-sm sm:px-6"
+            className="relative overflow-hidden rounded-lg px-4 py-3 text-white shadow-xs sm:px-5"
             style={{
                 background:
                     'radial-gradient(500px 160px at 95% 0%, color-mix(in oklch, var(--rio-claro) 30%, transparent), transparent 70%),' +
@@ -511,7 +511,7 @@ export function BandaFormulario({
         >
             <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
                 <div className="flex min-w-[16rem] flex-1 items-center gap-4">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 ring-2 ring-white/20">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-2 ring-white/20">
                         <Icono className="size-5 text-institucional-dorado" />
                     </span>
                     <div className="min-w-0">

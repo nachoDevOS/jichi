@@ -163,54 +163,46 @@ export default function IndiceCarnets({
                     ) : (
                         <>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-[13px]">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            {/* El número del libro, primero: es por donde se
-                                                busca un carnet en papel. Se llama «N° Registro»
-                                                y no «Registro» para no confundirlo con la
-                                                columna «Registrado», que es una fecha. */}
-                                            <th className="px-5 py-2.5 font-medium">N° Registro</th>
-                                            <th className="px-5 py-2.5 font-medium">Beneficiario</th>
-                                            <th className="px-5 py-2.5 font-medium">Actividad</th>
-                                            <th className="px-5 py-2.5 font-medium">Asociación</th>
-                                            <th className="px-5 py-2.5 font-medium">Solicitado</th>
+                                            {/* El ID, como en los otros listados; el N° de registro está en la ficha. */}
+                                            <th className="px-3 py-2 font-medium">ID</th>
+                                            <th className="px-3 py-2 font-medium">Beneficiario</th>
+                                            <th className="px-3 py-2 font-medium">Actividad</th>
+                                            <th className="px-3 py-2 font-medium">Asociación</th>
+                                            <th className="px-3 py-2 font-medium">Solicitado</th>
                                             {/* Vacío mientras no lo firmen. */}
-                                            <th className="px-5 py-2.5 font-medium">Emitido</th>
-                                            <th className="px-5 py-2.5 font-medium">Vence</th>
+                                            <th className="px-3 py-2 font-medium">Emitido</th>
+                                            <th className="px-3 py-2 font-medium">Vence</th>
 
                                             {/* Cuándo se cargó y en qué ESTADO quedó, juntos y
                                                 pegados a los botones: el estado decide cuáles
                                                 aparecen, y leerlo al lado explica por qué falta
                                                 alguno. */}
-                                            <th className="px-5 py-2.5 font-medium">Registrado</th>
-                                            <th className="px-5 py-2.5 font-medium">Estado</th>
+                                            <th className="px-3 py-2 font-medium">Registrado</th>
+                                            <th className="px-3 py-2 font-medium">Estado</th>
 
                                             {/* Sin rótulo: los iconos se explican solos y un
                                                 encabezado «Acciones» solo gasta ancho. */}
-                                            <th className="px-5 py-2.5" />
+                                            <th className="px-3 py-2" />
                                         </tr>
                                     </thead>
 
                                     <tbody className="divide-y divide-border">
                                         {carnets.data.map((c) => (
                                             <tr key={c.id} className="hover:bg-secondary/50">
-                                                {/* Foto, nombre y cédula en la misma celda,
-                                                    igual que en el listado de cupos: el hueco de
-                                                    la silueta se dibuja también sin foto, así las
-                                                    filas no cambian de alto. */}
-                                                {/* Vacío hasta que lo firman: el número se
-                                                    asigna al aprobar, para no gastar uno en un
-                                                    carnet que se rechaza. */}
-                                                <td className="px-5 py-2.5 font-mono tabular-nums">
-                                                    {c.registro ?? (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            sin asignar
-                                                        </span>
-                                                    )}
+                                                <td className="px-3 py-2">
+                                                    <Link
+                                                        href={route('carnets.show', c.id)}
+                                                        className="font-medium tabular-nums text-primary hover:underline"
+                                                    >
+                                                        {c.id}
+                                                    </Link>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                {/* El hueco de la silueta se dibuja también sin foto: las filas no cambian de alto. */}
+                                                <td className="px-3 py-2">
                                                     <div className="flex items-center gap-3">
                                                         <Retrato
                                                             url={c.foto_url}
@@ -246,7 +238,7 @@ export default function IndiceCarnets({
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Badge color={c.tipo_actor_color}>
                                                         {c.tipo_actor_etiqueta}
                                                     </Badge>
@@ -255,7 +247,7 @@ export default function IndiceCarnets({
                                                 {/* El nombre completo, con la sigla debajo
                                                     cuando la tiene: es lo que se dicta y lo que
                                                     va impreso en el carnet. */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <p>{c.asociacion ?? '—'}</p>
 
                                                     {c.asociacion_sigla && (
@@ -267,24 +259,24 @@ export default function IndiceCarnets({
 
 
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {fecha(c.fecha_solicitud)}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {c.fecha_emision ? fecha(c.fecha_emision) : '—'}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {fecha(c.fecha_vencimiento)}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-xs text-muted-foreground">
+                                                <td className="px-3 py-2 text-xs text-muted-foreground">
                                                     {fechaHora(c.registrado_en)}
                                                     <span className="block">{hace(c.registrado_en)}</span>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
                                                 </td>
 
@@ -295,7 +287,7 @@ export default function IndiceCarnets({
                                                     solo aparecen sobre el borrador: las banderas
                                                     llegan resueltas del servidor.
                                                 */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
                                                         {/* EL RECIBO, desde que el trámite se
                                                             presentó: existe a partir del envío,

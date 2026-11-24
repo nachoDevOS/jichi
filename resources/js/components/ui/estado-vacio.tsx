@@ -17,9 +17,9 @@ export function EstadoVacio({
     accion?: ReactNode;
 }) {
     return (
-        <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-            <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Icono className="size-6" />
+        <div className="flex flex-col items-center justify-center gap-2.5 px-6 py-10 text-center">
+            <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Icono className="size-5" />
             </div>
 
             <div className="space-y-1">

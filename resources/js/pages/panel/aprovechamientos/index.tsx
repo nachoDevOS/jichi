@@ -162,42 +162,43 @@ export default function IndiceCupos({
                     ) : (
                         <>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-[13px]">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">N°</th>
-                                            <th className="px-5 py-2.5 font-medium">Beneficiario</th>
-                                            <th className="px-5 py-2.5 font-medium">Capacidad</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Kilos</th>
-                                            <th className="px-5 py-2.5 font-medium">Solicitado</th>
+                                            {/* El ID, como en Beneficiarios: el «000003» de seis dígitos es el correlativo del papel. */}
+                                            <th className="px-3 py-2 font-medium">ID</th>
+                                            <th className="px-3 py-2 font-medium">Beneficiario</th>
+                                            <th className="px-3 py-2 font-medium">Capacidad</th>
+                                            <th className="px-3 py-2 text-right font-medium">Kilos</th>
+                                            <th className="px-3 py-2 font-medium">Solicitado</th>
                                             {/* Vacío mientras no lo firmen: ver
                                                 `fecha_emision` en el MER. */}
-                                            <th className="px-5 py-2.5 font-medium">Otorgado</th>
-                                            <th className="px-5 py-2.5 font-medium">Vence</th>
+                                            <th className="px-3 py-2 font-medium">Otorgado</th>
+                                            <th className="px-3 py-2 font-medium">Vence</th>
                                             {/* Cuándo se cargó, antes del estado: es lo que
                                                 ordena el trabajo del día —qué entró recién y qué
                                                 está esperando desde ayer—. */}
-                                            <th className="px-5 py-2.5 font-medium">Registrado</th>
+                                            <th className="px-3 py-2 font-medium">Registrado</th>
                                             {/* Estado al final, pegado a los botones: es lo que
                                                 decide cuáles aparecen, y leerlo al lado de ellos
                                                 explica por qué falta el de imprimir. */}
-                                            <th className="px-5 py-2.5 font-medium">Estado</th>
+                                            <th className="px-3 py-2 font-medium">Estado</th>
                                             {/* Sin rótulo: los iconos se explican
                                                 solos y un encabezado «Acciones»
                                                 solo gasta ancho. */}
-                                            <th className="px-5 py-2.5" />
+                                            <th className="px-3 py-2" />
                                         </tr>
                                     </thead>
 
                                     <tbody className="divide-y divide-border">
                                         {cupos.data.map((c) => (
                                             <tr key={c.id} className="hover:bg-secondary/50">
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Link
                                                         href={route('aprovechamientos.show', c.id)}
-                                                        className="font-mono font-medium tabular-nums text-primary hover:underline"
+                                                        className="font-medium tabular-nums text-primary hover:underline"
                                                     >
-                                                        {c.numero}
+                                                        {c.id}
                                                     </Link>
                                                 </td>
 
@@ -206,7 +207,7 @@ export default function IndiceCupos({
                                                     hueco de la silueta se dibuja igual cuando no hay
                                                     foto, así las filas no cambian de alto y la
                                                     columna del nombre no se corre entre una y otra. */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <div className="flex items-center gap-3">
                                                         <Retrato
                                                             url={c.foto_url}
@@ -234,33 +235,33 @@ export default function IndiceCupos({
                                                     un dato interno del catálogo y en la columna
                                                     se leía como un id. «201 Kg Hasta 300 Kg» dice
                                                     lo mismo y se entiende sin la tabla al lado. */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     {c.descripcion ?? '—'}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-right tabular-nums">
+                                                <td className="px-3 py-2 text-right tabular-nums">
                                                     {c.volumen_total_kg} kg
                                                 </td>
 
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {fecha(c.fecha_solicitud)}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {c.fecha_emision ? fecha(c.fecha_emision) : '—'}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-muted-foreground">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {fecha(c.fecha_vencimiento)}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-xs text-muted-foreground">
+                                                <td className="px-3 py-2 text-xs text-muted-foreground">
                                                     {fechaHora(c.registrado_en)}
                                                     <span className="block">{hace(c.registrado_en)}</span>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Badge color={c.estado_color}>{c.estado_etiqueta}</Badge>
                                                 </td>
 
@@ -270,7 +271,7 @@ export default function IndiceCupos({
                                                     nada—, el lápiz en ámbar es MODIFICAR y el
                                                     tacho en rojo es DESTRUIR.
                                                 */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
                                                         {/* EL RECIBO, desde que el trámite se
                                                             presentó: existe a partir del envío, así

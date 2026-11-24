@@ -52,7 +52,7 @@ export function BuscadorCodigo({ codigoInicial, claro = false }: { codigoInicial
                     aria-invalid={Boolean(errors.codigo)}
                     // font-mono: no se confunden 0 con O. 26ch = los 19 caracteres con guiones, el espaciado y el relleno.
                     className={cn(
-                        'w-[26ch] min-w-0 flex-initial text-center font-mono tracking-wider',
+                        'h-10 w-[26ch] min-w-0 flex-initial text-center font-mono text-sm tracking-wider',
                         claro && 'h-12 w-full border-slate-300 bg-white text-base text-slate-900 placeholder:text-slate-400',
                     )}
                 />
@@ -60,7 +60,7 @@ export function BuscadorCodigo({ codigoInicial, claro = false }: { codigoInicial
                 <Button
                     type="submit"
                     disabled={processing}
-                    className={cn(claro && 'h-11 w-full bg-institucional-azul text-base text-white hover:bg-institucional-azul-claro')}
+                    className={cn('h-10', claro && 'h-11 w-full bg-institucional-azul text-base text-white hover:bg-institucional-azul-claro')}
                 >
                     {processing ? (
                         <LoaderCircle className="size-4 animate-spin" />

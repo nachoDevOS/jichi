@@ -48,21 +48,21 @@ export default function Roles({ roles, totalPermisos }: { roles: RolFila[]; tota
                         />
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="w-full text-[13px]">
                                 <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                     <tr>
-                                        <th className="px-5 py-2.5 font-medium">Rol</th>
-                                        <th className="px-5 py-2.5 font-medium">Descripción</th>
-                                        <th className="px-5 py-2.5 text-right font-medium">Permisos</th>
-                                        <th className="px-5 py-2.5 text-right font-medium">Usuarios</th>
-                                        <th className="px-5 py-2.5" />
+                                        <th className="px-3 py-2 font-medium">Rol</th>
+                                        <th className="px-3 py-2 font-medium">Descripción</th>
+                                        <th className="px-3 py-2 text-right font-medium">Permisos</th>
+                                        <th className="px-3 py-2 text-right font-medium">Usuarios</th>
+                                        <th className="px-3 py-2" />
                                     </tr>
                                 </thead>
 
                                 <tbody className="divide-y divide-border">
                                     {roles.map((r) => (
                                         <tr key={r.id} className="hover:bg-secondary/50">
-                                            <td className="px-5 py-2.5">
+                                            <td className="px-3 py-2">
                                                 <span className="font-medium">{r.etiqueta}</span>
                                                 {r.del_sistema && (
                                                     <Badge color="amber" className="ml-2">
@@ -72,15 +72,15 @@ export default function Roles({ roles, totalPermisos }: { roles: RolFila[]; tota
                                                 )}
                                             </td>
 
-                                            <td className="px-5 py-2.5 text-muted-foreground">{r.descripcion ?? '—'}</td>
+                                            <td className="px-3 py-2 text-muted-foreground">{r.descripcion ?? '—'}</td>
 
-                                            <td className="px-5 py-2.5 text-right tabular-nums">
+                                            <td className="px-3 py-2 text-right tabular-nums">
                                                 {r.permisos} <span className="text-muted-foreground">de {totalPermisos}</span>
                                             </td>
 
-                                            <td className="px-5 py-2.5 text-right tabular-nums">{r.usuarios || '—'}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{r.usuarios || '—'}</td>
 
-                                            <td className="px-5 py-2.5">
+                                            <td className="px-3 py-2">
                                                 <div className="flex justify-end gap-2">
                                                     {puede('roles.editar') && r.puede_editarse && (
                                                         <Link

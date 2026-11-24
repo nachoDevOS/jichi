@@ -150,20 +150,20 @@ export default function CatalogoAsociaciones({
                         ) : (
                             <>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-[13px]">
                                         <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                             <tr>
-                                                <th className="px-5 py-2.5 font-medium">Asociación</th>
-                                                <th className="px-5 py-2.5 font-medium">Estado</th>
-                                                <th className="px-5 py-2.5 text-right font-medium">En uso</th>
-                                                <th className="px-5 py-2.5" />
+                                                <th className="px-3 py-2 font-medium">Asociación</th>
+                                                <th className="px-3 py-2 font-medium">Estado</th>
+                                                <th className="px-3 py-2 text-right font-medium">En uso</th>
+                                                <th className="px-3 py-2" />
                                             </tr>
                                         </thead>
 
                                         <tbody className="divide-y divide-border">
                                             {asociaciones.data.map((a) => (
                                                 <tr key={a.id} className="hover:bg-secondary/50">
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <p className="font-medium">{a.nombre}</p>
 
                                                         <p className="text-xs text-muted-foreground">
@@ -176,7 +176,7 @@ export default function CatalogoAsociaciones({
                                                         </p>
                                                     </td>
 
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <Badge color={a.estado_color}>{a.estado_etiqueta}</Badge>
                                                     </td>
 
@@ -184,7 +184,7 @@ export default function CatalogoAsociaciones({
                                                         Los dos conteos juntos: es lo que
                                                         explica por qué no hay papelera.
                                                     */}
-                                                    <td className="px-5 py-2.5 text-right tabular-nums text-muted-foreground">
+                                                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                                                         {a.carnets_count + a.guias_count === 0 ? (
                                                             <span className="opacity-60">—</span>
                                                         ) : (
@@ -198,7 +198,7 @@ export default function CatalogoAsociaciones({
                                                         )}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-right">
+                                                    <td className="px-3 py-2 text-right">
                                                         {puede('asociaciones.editar') && (
                                                             <Link
                                                                 href={route('asociaciones.edit', a.id)}

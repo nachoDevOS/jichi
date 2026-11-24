@@ -90,13 +90,13 @@ export default function CatalogoAranceles({
                             />
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-[13px]">
                                     <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">Documento</th>
-                                            <th className="px-5 py-2.5 font-medium">Servicio SIREB</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Tarifas</th>
-                                            <th className="px-5 py-2.5" />
+                                            <th className="px-3 py-2 font-medium">Documento</th>
+                                            <th className="px-3 py-2 font-medium">Servicio SIREB</th>
+                                            <th className="px-3 py-2 text-right font-medium">Tarifas</th>
+                                            <th className="px-3 py-2" />
                                         </tr>
                                     </thead>
 
@@ -104,7 +104,7 @@ export default function CatalogoAranceles({
                                         {aranceles.map((a) => (
                                             <Fragment key={a.id}>
                                                 <tr className="hover:bg-secondary/50">
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <p className="font-medium">{a.etiqueta}</p>
                                                         <p className="text-xs text-muted-foreground">{a.descripcion}</p>
                                                         {a.usa_tarifas_definidas && (
@@ -116,7 +116,7 @@ export default function CatalogoAranceles({
                                                         )}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5" title={a.servicio_sireb ?? undefined}>
+                                                    <td className="px-3 py-2" title={a.servicio_sireb ?? undefined}>
                                                         {a.servicio_sireb === null ? (
                                                             <Badge color="amber">Sin servicio</Badge>
                                                         ) : a.servicio !== null ? (
@@ -134,11 +134,11 @@ export default function CatalogoAranceles({
                                                         )}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-right tabular-nums">
+                                                    <td className="px-3 py-2 text-right tabular-nums">
                                                         {a.servicio !== null ? a.servicio.tarifas : '—'}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-right">
+                                                    <td className="px-3 py-2 text-right">
                                                         <div className="flex justify-end gap-2">
                                                             <Button
                                                                 type="button"
@@ -229,7 +229,7 @@ function TablaTarifas({ arancel, moneda }: { arancel: ArancelFila; moneda: strin
 
     return (
         <div className="min-w-0 overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[13px]">
                 <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                         <th className="py-1.5 pr-4 font-medium">Tarifa</th>

@@ -154,37 +154,37 @@ export default function IndiceGuias({
                     ) : (
                         <>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full text-[13px]">
                                     <thead className="border-y border-border text-left text-xs tracking-wide text-muted-foreground uppercase">
                                         <tr>
-                                            <th className="px-5 py-2.5 font-medium">N°</th>
-                                            <th className="px-5 py-2.5 font-medium">Comercializador</th>
-                                            <th className="px-5 py-2.5 font-medium">Ruta</th>
-                                            <th className="px-5 py-2.5 font-medium">Pescado de</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Carga</th>
-                                            <th className="px-5 py-2.5 text-right font-medium">Arancel</th>
-                                            <th className="px-5 py-2.5 font-medium">Vence</th>
+                                            <th className="px-3 py-2 font-medium">ID</th>
+                                            <th className="px-3 py-2 font-medium">Comercializador</th>
+                                            <th className="px-3 py-2 font-medium">Ruta</th>
+                                            <th className="px-3 py-2 font-medium">Pescado de</th>
+                                            <th className="px-3 py-2 text-right font-medium">Carga</th>
+                                            <th className="px-3 py-2 text-right font-medium">Arancel</th>
+                                            <th className="px-3 py-2 font-medium">Vence</th>
                                             {/* Registrado y Estado pegados a los botones, como en faenas y carnets. */}
-                                            <th className="px-5 py-2.5 font-medium">Registrado</th>
-                                            <th className="px-5 py-2.5 font-medium">Estado</th>
-                                            <th className="px-5 py-2.5" />
+                                            <th className="px-3 py-2 font-medium">Registrado</th>
+                                            <th className="px-3 py-2 font-medium">Estado</th>
+                                            <th className="px-3 py-2" />
                                         </tr>
                                     </thead>
 
                                     <tbody className="divide-y divide-border">
                                         {guias.data.map((g) => (
                                             <tr key={g.id} className="hover:bg-secondary/50">
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Link
                                                         href={route('guias.show', g.id)}
-                                                        className="font-mono font-medium text-primary tabular-nums hover:underline"
+                                                        className="font-medium text-primary tabular-nums hover:underline"
                                                     >
-                                                        {g.numero_legible}
+                                                        {g.id}
                                                     </Link>
                                                 </td>
 
                                                 {/* Foto, nombre, cédula y carnet: el mismo bloque que en faenas y carnets. */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <div className="flex items-center gap-3">
                                                         <Retrato
                                                             url={g.foto_url}
@@ -203,7 +203,7 @@ export default function IndiceGuias({
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                                                         {g.origen ?? '—'}
                                                         <ArrowRight className="size-3.5 text-muted-foreground" />
@@ -212,7 +212,7 @@ export default function IndiceGuias({
                                                 </td>
 
                                                 {/* Su autorización es la que descontó los kilos; sin pescador, es de criadero. */}
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     {g.pescador ? (
                                                         <span className="inline-flex items-center gap-1.5">
                                                             <Fish className="size-3.5 shrink-0 text-primary" />
@@ -224,7 +224,7 @@ export default function IndiceGuias({
                                                 </td>
 
                                                 {/* Piscicultura va junto a la carga: explica por qué cobró la mitad. */}
-                                                <td className="px-5 py-2.5 text-right whitespace-nowrap tabular-nums">
+                                                <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                                                     <span className="font-medium">{g.peso_total_kg} kg</span>
                                                     {g.es_piscicultura && (
                                                         <Badge color="sky" className="ml-2">
@@ -233,7 +233,7 @@ export default function IndiceGuias({
                                                     )}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-right text-base tabular-nums">
+                                                <td className="px-3 py-2 text-right text-base tabular-nums">
                                                     {bs(g.monto, institucion.moneda)}
                                                     {g.puede_verificar_pago ? (
                                                         <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -247,7 +247,7 @@ export default function IndiceGuias({
                                                 </td>
 
                                                 {/* En NULL mientras es borrador: el vencimiento lo escribe la aprobación. */}
-                                                <td className="px-5 py-2.5 whitespace-nowrap">
+                                                <td className="px-3 py-2 whitespace-nowrap">
                                                     {g.fecha_vencimiento ? fechaHora(g.fecha_vencimiento) : '—'}
                                                     {g.vigente && (
                                                         <p className="text-xs text-emerald-700 dark:text-emerald-400">
@@ -256,12 +256,12 @@ export default function IndiceGuias({
                                                     )}
                                                 </td>
 
-                                                <td className="px-5 py-2.5 text-xs text-muted-foreground">
+                                                <td className="px-3 py-2 text-xs text-muted-foreground">
                                                     {fechaHora(g.registrado_en)}
                                                     <span className="block">{hace(g.registrado_en)}</span>
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <Badge color={g.estado_color}>{g.estado_etiqueta}</Badge>
                                                     {g.caducada && (
                                                         <Badge color="amber" className="ml-1">
@@ -270,7 +270,7 @@ export default function IndiceGuias({
                                                     )}
                                                 </td>
 
-                                                <td className="px-5 py-2.5">
+                                                <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
                                                         {puede('recibos.imprimir') && g.recibo_id !== null && (
                                                             <a

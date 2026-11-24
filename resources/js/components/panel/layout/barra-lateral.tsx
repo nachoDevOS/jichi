@@ -73,7 +73,7 @@ export function BarraLateral({
                 un tono más oscura: así las dos barras arrancan a la misma altura
                 y la esquina superior izquierda se lee como una sola pieza.
             */}
-            <div className="flex h-14 shrink-0 items-center justify-between bg-black/15 px-4">
+            <div className="flex h-12 shrink-0 items-center justify-between bg-black/15 px-4">
                 {/* Angosta queda solo el escudo; el nombre no entra en 64 px. */}
                 <span className={cn(angosto && 'lg:hidden')}>
                     <MarcaJichi sigla={institucion?.sigla} />
@@ -150,7 +150,7 @@ function RotuloGrupo({ titulo, angosto }: { titulo: string; angosto: boolean }) 
         <>
             <p
                 className={cn(
-                    'px-4 pt-5 pb-1.5 text-[11px] font-semibold tracking-wider uppercase opacity-50',
+                    'px-4 pt-4 pb-1 text-[10.5px] font-semibold tracking-wider uppercase opacity-50',
                     angosto && 'lg:hidden',
                 )}
             >
@@ -190,7 +190,7 @@ function ItemMenu({
     // igual de perdido.
     const rotulo = angosto ? (item.tituloCompleto ?? item.titulo) : undefined;
 
-    const base = 'flex items-center gap-3 border-l-[3px] px-4 py-2.5 text-sm font-medium';
+    const base = 'flex items-center gap-2.5 border-l-[3px] px-4 py-2 text-[13px] font-medium';
 
     if (!habilitado) {
         return (

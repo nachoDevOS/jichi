@@ -120,16 +120,16 @@ export default function IndiceBeneficiarios({
                     />
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="w-full text-[13px]">
                             <thead className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                 <tr>
-                                    <th className="px-5 py-3 font-medium">ID</th>
-                                    <th className="px-5 py-3 font-medium">Beneficiario</th>
-                                    <th className="px-5 py-3 font-medium">Género</th>
-                                    <th className="px-5 py-3 font-medium">Celular</th>
-                                    <th className="px-5 py-3 font-medium">Nacimiento</th>
-                                    <th className="px-5 py-3 font-medium">Registrado</th>
-                                    <th className="px-5 py-3 text-right font-medium">Acciones</th>
+                                    <th className="px-3 py-2 font-medium">ID</th>
+                                    <th className="px-3 py-2 font-medium">Beneficiario</th>
+                                    <th className="px-3 py-2 font-medium">Género</th>
+                                    <th className="px-3 py-2 font-medium">Celular</th>
+                                    <th className="px-3 py-2 font-medium">Nacimiento</th>
+                                    <th className="px-3 py-2 font-medium">Registrado</th>
+                                    <th className="px-3 py-2 text-right font-medium">Acciones</th>
                                 </tr>
                             </thead>
 
@@ -137,12 +137,12 @@ export default function IndiceBeneficiarios({
                                 {beneficiarios.data.map((b) => (
                                     <tr key={b.id} className="hover:bg-secondary/50">
                                         {/* --- ID */}
-                                        <td className="px-5 py-3 tabular-nums text-muted-foreground">
+                                        <td className="px-3 py-2 tabular-nums text-muted-foreground">
                                             {b.id}
                                         </td>
 
                                         {/* --- Foto, nombre y cédula, juntos */}
-                                        <td className="px-5 py-3">
+                                        <td className="px-3 py-2">
                                             <div className="flex items-center gap-3">
                                                 <Retrato url={b.foto_url} nombre={b.nombreCompleto} />
 
@@ -163,7 +163,7 @@ export default function IndiceBeneficiarios({
                                         </td>
 
                                         {/* --- Género */}
-                                        <td className="px-5 py-3">
+                                        <td className="px-3 py-2">
                                             {/* capitalize: en la base se guarda en minúscula
                                                 ('femenino') porque así lo valida el enum del
                                                 formulario, pero en pantalla se lee mejor con
@@ -173,12 +173,12 @@ export default function IndiceBeneficiarios({
                                         </td>
 
                                         {/* --- Celular */}
-                                        <td className="px-5 py-3 tabular-nums text-muted-foreground">
+                                        <td className="px-3 py-2 tabular-nums text-muted-foreground">
                                             {b.telefono ?? '—'}
                                         </td>
 
                                         {/* --- Nacimiento, con la edad debajo */}
-                                        <td className="px-5 py-3">
+                                        <td className="px-3 py-2">
                                             <p className="tabular-nums">{fecha(b.fechaNacimiento)}</p>
 
                                             {/*
@@ -196,13 +196,13 @@ export default function IndiceBeneficiarios({
                                         </td>
 
                                         {/* --- Registrado: mismo formato que carnets y cupos */}
-                                        <td className="px-5 py-3 text-xs text-muted-foreground">
+                                        <td className="px-3 py-2 text-xs text-muted-foreground">
                                             {fechaHora(b.registrado_en)}
                                             <span className="block">{hace(b.registrado_en)}</span>
                                         </td>
 
                                         {/* --- Ver y editar */}
-                                        <td className="px-5 py-3">
+                                        <td className="px-3 py-2">
                                             <div className="flex justify-end gap-1">
                                                 <Button
                                                     variant="ver"

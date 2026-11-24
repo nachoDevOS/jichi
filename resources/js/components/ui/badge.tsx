@@ -22,7 +22,7 @@ export function Badge({ color = 'slate', className, ...props }: BadgeProps) {
     return (
         <span
             className={cn(
-                'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset',
+                'inline-flex items-center rounded-full px-2 py-px text-[11px] font-medium ring-1 ring-inset',
                 COLORES[color] ?? COLORES.slate,
                 className,
             )}

@@ -144,22 +144,22 @@ export default function Usuarios({
                         ) : (
                             <>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-[13px]">
                                         <thead className="border-y border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                                             <tr>
-                                                <th className="px-5 py-2.5 font-medium">Usuario</th>
-                                                <th className="px-5 py-2.5 font-medium">Rol</th>
-                                                <th className="px-5 py-2.5 font-medium">Estado</th>
-                                                <th className="px-5 py-2.5 font-medium">Último ingreso</th>
-                                                <th className="px-5 py-2.5 font-medium">Cuenta desde</th>
-                                                <th className="px-5 py-2.5" />
+                                                <th className="px-3 py-2 font-medium">Usuario</th>
+                                                <th className="px-3 py-2 font-medium">Rol</th>
+                                                <th className="px-3 py-2 font-medium">Estado</th>
+                                                <th className="px-3 py-2 font-medium">Último ingreso</th>
+                                                <th className="px-3 py-2 font-medium">Cuenta desde</th>
+                                                <th className="px-3 py-2" />
                                             </tr>
                                         </thead>
 
                                         <tbody className="divide-y divide-border">
                                             {usuarios.data.map((c) => (
                                                 <tr key={c.id} className="hover:bg-secondary/50">
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <div className="flex items-center gap-3">
                                                             <Retrato url={c.foto_url} nombre={c.nombre} className="size-9" />
                                                             <div className="min-w-0">
@@ -179,16 +179,16 @@ export default function Usuarios({
                                                         </div>
                                                     </td>
 
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <Badge color={c.beneficiario_id !== null ? 'sky' : 'indigo'} className="whitespace-nowrap">{c.rol}</Badge>
                                                     </td>
 
-                                                    <td className="px-5 py-2.5">
+                                                    <td className="px-3 py-2">
                                                         <Badge color={c.estado_color} className="whitespace-nowrap">{c.estado_etiqueta}</Badge>
                                                     </td>
 
                                                     {/* Nunca entró = la clave temporal sigue sin estrenar. */}
-                                                    <td className="px-5 py-2.5 text-xs text-muted-foreground">
+                                                    <td className="px-3 py-2 text-xs text-muted-foreground">
                                                         {c.ultimo_acceso ? (
                                                             <>
                                                                 {fechaHora(c.ultimo_acceso)}
@@ -199,9 +199,9 @@ export default function Usuarios({
                                                         )}
                                                     </td>
 
-                                                    <td className="px-5 py-2.5 text-xs text-muted-foreground">{fechaHora(c.creada)}</td>
+                                                    <td className="px-3 py-2 text-xs text-muted-foreground">{fechaHora(c.creada)}</td>
 
-                                                    <td className="px-5 py-2.5 text-right">
+                                                    <td className="px-3 py-2 text-right">
                                                         {c.beneficiario_id === null && puede('usuarios.editar') && (
                                                             <Link
                                                                 href={route('usuarios.edit', c.id)}

@@ -13,20 +13,20 @@ export function Retrato({
     /** Va en el `alt`: es lo que lee un lector de pantalla y lo que se muestra
      *  si la imagen no carga. */
     nombre: string;
-    /** Para cambiar el tamaño donde haga falta. Por defecto, `size-10`. */
+    /** Para cambiar el tamaño donde haga falta. Por defecto, `size-8`. */
     className?: string;
 }) {
     return (
         <div
             className={cn(
-                'flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted',
+                'flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted',
                 className,
             )}
         >
             {url ? (
                 <img src={url} alt={nombre} className="size-full object-cover" />
             ) : (
-                <User className="size-5 text-muted-foreground" aria-hidden />
+                <User className="size-4 text-muted-foreground" aria-hidden />
             )}
         </div>
     );

@@ -18,8 +18,8 @@ export function Paginacion<T>({ paginado }: { paginado: Paginado<T> }) {
     const numeros = enlaces.slice(1, -1);
 
     return (
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-border px-5 py-3 sm:flex-row">
-            <p className="text-sm text-muted-foreground">
+        <div className="flex flex-col items-center justify-between gap-2 border-t border-border px-3 py-2 sm:flex-row">
+            <p className="text-xs text-muted-foreground">
                 Mostrando <span className="font-medium text-foreground">{paginado.from ?? 0}</span>
                 {' – '}
                 <span className="font-medium text-foreground">{paginado.to ?? 0}</span>
@@ -68,11 +68,11 @@ function BotonPagina({
     titulo: string;
     children: React.ReactNode;
 }) {
-    // Mismo alto que los botones del sistema (`h-8` en button.tsx). Se repite
+    // Mismo alto que los botones chicos (`sm` en button.tsx). Se repite
     // acá y no se usa buttonVariants porque estos no son botones: son enlaces de
     // navegación y necesitan su propio estado «activo» y «deshabilitado».
     const estilo = cn(
-        'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2.5 text-[13px] transition-colors',
+        'inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-xs transition-colors',
         activo
             ? 'bg-primary font-medium text-primary-foreground'
             : 'text-muted-foreground hover:bg-secondary hover:text-foreground',

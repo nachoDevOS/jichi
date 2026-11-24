@@ -40,7 +40,7 @@ export function BarraSuperior({
     return (
         <header className="sticky top-0 z-20 bg-card">
             {/* ------------------------------------------- Franja de sesión */}
-            <div className="flex h-14 items-center gap-3 border-b border-border px-4 sm:px-6">
+            <div className="flex h-12 items-center gap-3 border-b border-border px-4 sm:px-5">
                 {/*
                     DOS BOTONES Y NO UNO. El mismo dibujo hace cosas distintas
                     según el tamaño de la pantalla —en celular despliega la barra,
@@ -88,7 +88,7 @@ export function BarraSuperior({
             </div>
 
             {/* ------------------------------------------- Franja de página */}
-            <div className="border-b border-border px-4 py-3 sm:px-6">
+            <div className="border-b border-border px-4 py-2.5 sm:px-5">
                 <Migas titulo={titulo} />
 
                 {/* Se envuelve: en el celular los botones bajan debajo del título en vez de salirse de la pantalla. */}
@@ -96,12 +96,12 @@ export function BarraSuperior({
                     <div className="min-w-0 flex-1 basis-60">
                         {/* truncate corta con «...» los títulos largos en vez de
                             empujar los botones fuera de la pantalla. */}
-                        <h1 className="truncate text-xl font-semibold tracking-tight">
+                        <h1 className="truncate text-lg font-semibold tracking-tight">
                             {titulo}
                         </h1>
 
                         {descripcion && (
-                            <p className="truncate text-sm text-muted-foreground">
+                            <p className="truncate text-xs text-muted-foreground">
                                 {descripcion}
                             </p>
                         )}

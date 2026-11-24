@@ -13,7 +13,7 @@ export const Textarea = React.forwardRef<
         ref={ref}
         rows={rows}
         className={cn(
-            'flex w-full rounded-md border border-input bg-card px-3 py-2 text-sm shadow-sm transition-colors',
+            'flex w-full rounded-md border border-input bg-card px-2.5 py-1.5 text-[13px] shadow-xs transition-colors',
             'placeholder:text-muted-foreground',
             'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
             'disabled:cursor-not-allowed disabled:opacity-50',

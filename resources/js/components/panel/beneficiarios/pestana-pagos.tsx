@@ -43,7 +43,7 @@ export function PestanaPagos({
                 </div>
             ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-[13px]">
                         <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2.5 font-medium">N°</th>
