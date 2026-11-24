@@ -434,8 +434,10 @@ portada desde Blade.
 
 ### Reportes
 
-Aparece en gris en el menú. No existe ni la ruta ni el controlador. Debería
-tener:
+✅ **Por tipo de servicio y rango de fechas (24/11/2026)**, con Excel y PDF. Ver
+[modulos/REPORTES.md](modulos/REPORTES.md). 🟠 **Sin permiso propio**, a pedido del responsable.
+
+De lo que se había listado, queda:
 
 - Recaudación por tipo de documento y por período, exportable a Excel.
 - Padrón de carnets vigentes de una gestión, para imprimir.

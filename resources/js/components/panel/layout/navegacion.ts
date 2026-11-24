@@ -122,7 +122,7 @@ export const NAVEGACION: ItemNavegacion[] = [
         titulo: "Reportes",
         ruta: "reportes.index",
         icono: BarChart3,
-        permiso: "reportes.ver",
+        // Sin permiso a pedido del responsable (24/11/2026): lo ve todo funcionario.
         grupo: "Administración",
     },
     {

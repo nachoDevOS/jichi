@@ -16,6 +16,7 @@ use App\Http\Controllers\Panel\ManualController;
 use App\Http\Controllers\Panel\PermisoFaenaImpresionController;
 use App\Http\Controllers\Panel\ReciboController;
 use App\Http\Controllers\Panel\RegistroSirebController;
+use App\Http\Controllers\Panel\ReporteController;
 use App\Http\Controllers\Panel\RolController;
 use App\Http\Controllers\Panel\UsuarioController;
 use App\Http\Controllers\Panel\VigenciaController;
@@ -472,6 +473,21 @@ Route::middleware(['auth', 'funcionario'])->prefix('panel')->group(function () {
                 ->name('aranceles.update');
         });
     });
+
+    /*
+    | Reportes — el detalle de un tipo de servicio en un rango de fechas. SIN permiso propio, a
+    | pedido del responsable (24/11/2026): el grupo ya exige `funcionario`. Ver docs/modulos/REPORTES.md.
+    */
+
+    Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
+
+    Route::get('/reportes/excel', [ReporteController::class, 'excel'])
+        ->middleware('throttle:30,1')
+        ->name('reportes.excel');
+
+    Route::get('/reportes/pdf', [ReporteController::class, 'pdf'])
+        ->middleware('throttle:10,1')
+        ->name('reportes.pdf');
 
     /*
     | Configuración — hasta cuándo vale cada trámite

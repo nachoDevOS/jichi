@@ -325,13 +325,13 @@ El procedimiento detallado está en
 ## Verificar antes de dar algo por terminado
 
 ```sh
-php artisan test        # las pruebas (102; SIREB simulado: ninguna sale a la red)
+php artisan test        # las pruebas (107; SIREB simulado: ninguna sale a la red)
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
 ```
 
-> **Las pruebas de hoy son 102** (23/11/2026). Empezaron el 13/10/2026 con 29, solo
+> **Las pruebas de hoy son 107** (24/11/2026). Empezaron el 13/10/2026 con 29, solo
 > de la guía; el pago por QR y el webhook están en `tests/Feature/Pagos/`. Las
 > 92 del 12/10/2026 **nunca se commitearon y se perdieron**: la carpeta `tests/`
 > no existía. **`tests/` va en el commit, siempre.** Corren sobre SQLite en
@@ -1029,8 +1029,10 @@ Los tres tienen que pasar.
 
 ## Lo que falta
 
-Tres módulos: Reportes, Configuración y Usuarios (hoy se crean por consola).
-Los dos primeros aparecen en gris en el menú lateral. La lista completa, con los
+Dos módulos: Configuración y Usuarios (hoy se crean por consola); el primero aparece en
+gris en el menú lateral. Los reportes por tipo de servicio están desde el 24/11/2026
+([docs/modulos/REPORTES.md](docs/modulos/REPORTES.md)), **sin permiso propio a pedido del
+responsable**: no agregarle `permiso:` sin que lo pidan. La lista completa, con los
 problemas conocidos que siguen abiertos, está en
 [docs/PENDIENTES.md](docs/PENDIENTES.md).
 

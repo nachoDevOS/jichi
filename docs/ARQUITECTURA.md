@@ -24,7 +24,7 @@ Tailwind 4 · PostgreSQL 18** (corre también en SQLite).
 | Líneas de código | ~37.000 (`app/` + `resources/js/`) |
 | Pruebas | 102 (23/11/2026; 29 de la guía el 13/10/2026), con SIREB simulado: `php artisan test`. Las 92 del 12/10 se perdieron sin commitear (ver §9) |
 | Idioma del código | Español, sin excepciones salvo `components/ui/` |
-| Pendiente | Reportes y Configuración (en gris en el menú) |
+| Pendiente | Configuración (en gris en el menú) |
 
 ---
 
@@ -446,12 +446,12 @@ permiso.
 | Catálogos | ✅ | `AsociacionController`, `ArancelSirebController`, `TarifarioSireb` | [modulos/SIREB.md](modulos/SIREB.md) |
 | Verificación pública | ✅ | `VerificacionController` | [REGLAS-NEGOCIO.md](REGLAS-NEGOCIO.md), paso 7 |
 | Portal del beneficiario (`/mi-cuenta`) | ✅ | `Controllers/Portal/`, `CuentaPortalService` | [modulos/PORTAL.md](modulos/PORTAL.md) |
-| Reportes | ❌ No existe | — | [PENDIENTES.md](PENDIENTES.md) |
+| Reportes por tipo de servicio | ✅ (24/11/2026, sin permiso propio) | `ReporteController`, `ReportePorServicioService` | [modulos/REPORTES.md](modulos/REPORTES.md) |
 | Configuración | ❌ No existe (la tabla sí) | — | [PENDIENTES.md](PENDIENTES.md) |
 
 El menú lateral agrupa: **Ventanilla** (Beneficiarios, Aprov. Pesquero, Carnets,
 Faenas, Guías), **Pagos** (Recibos), **Catálogos** (Asociaciones,
-Aranceles) y **Administración** (Reportes, en gris).
+Aranceles) y **Administración** (Reportes, Vigencias).
 Vive en `components/panel/layout/navegacion.ts`.
 
 ### El patrón a copiar
