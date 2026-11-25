@@ -370,6 +370,34 @@ boletas en Jichi y la firma de supervisión.)*
 - **Solo consulta:** papeles vigentes y en trámite (con el código para pagar en
   SIREB), recibos y lo que falta pagar, y sus datos.
   No hace trámites ni corrige datos (se hace en ventanilla con la cédula).
+  *(19/11/2026 — **cambia**, ver abajo: faena y guía pasan a pedirse en línea.)*
+- **Qué se tramita en línea y qué en ventanilla** *(decidido por el responsable,
+  19/11/2026)*. El portal web y la app BeniDigital (que entra con la misma
+  cuenta, por `/api/v1/portal`) dejan pedir:
+
+  | Trámite | Dónde |
+  | --- | --- |
+  | Autorización de Pesca para Aprovechamiento Pesquero | **Solo en ventanilla** |
+  | Carnet de pescador | **Solo en ventanilla** |
+  | Carnet de comercializador | **Solo en ventanilla** |
+  | Permiso de faena | En línea (portal web y app) y en ventanilla |
+  | Guía Única de Transporte | En línea (portal web y app) y en ventanilla |
+
+  Lo pedido en línea sigue el mismo circuito que en ventanilla y las mismas reglas
+  (`EmitirFaenaService`, `EmitirGuiaService`): queda `pendiente` con su liquidación
+  en SIREB y se aprueba solo al validarse el pago. Los datos personales se siguen
+  corrigiendo solo en ventanilla. **Pendiente de implementar** (ver «Estado de la
+  implementación»).
+
+  **En línea valen las mismas reglas que en el panel** *(decidido por el
+  responsable, 19/11/2026)*:
+  1. **Sin tope de pendientes.** La guía descuenta los kilos del pescador al
+     registrarse, como en ventanilla (Paso 5); si nunca se paga, ventanilla la
+     elimina y los kilos vuelven.
+  2. **El titular no elimina ni corrige** lo que pidió: eliminar (con motivo, que
+     queda en la auditoría) y corregir siguen siendo de ventanilla, con sus permisos.
+  3. **Sin revisión previa:** queda `pendiente` con su liquidación en SIREB y se
+     aprueba sola al validarse el pago (Paso 6).
 - **Descarga en PDF lo que está vigente hoy** —autorización, faena y guía—, el
   mismo documento que sale en ventanilla. **El carnet no:** si se pierde, se hace la
   reposición en ventanilla. Lo fuera de fecha, revocado, no pagado o sin efecto no se
@@ -454,7 +482,14 @@ el formulario solo si ese carnet ya está revocado.
 ## Estado de la implementación
 
 **Los ocho pasos están implementados tal como se describen arriba** (al
-03/10/2026). Dónde se hace cumplir cada regla que no se ve en el esquema:
+03/10/2026). **Faena y guía en línea** (Paso 8, decidido el 19/11/2026) están implementadas
+desde el 19/11/2026:
+- `PedirFaenaService` (portal web `/mi-cuenta/faena/pedir`, API `POST /api/v1/portal/faenas`):
+  emite con `EmitirFaenaService` y el carnet de pescador vigente de la cuenta.
+- `PedirGuiaService` (portal web `/mi-cuenta/guia/pedir`, API `POST /api/v1/portal/guias`):
+  emite con `EmitirGuiaService` y el carnet de comercializador vigente; el pescador se busca
+  por el código de su autorización (`AprovechamientoPesq::porCodigo()`) y su nombre se
+  muestra abreviado. Dónde se hace cumplir cada regla que no se ve en el esquema:
 
 | Regla | Dónde se hace cumplir |
 | --- | --- |

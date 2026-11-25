@@ -63,4 +63,23 @@ trait Codificable
     {
         return Str::upper(preg_replace('/[^A-Za-z0-9]/', '', $codigo) ?? '');
     }
+
+    /**
+     * El código de lo que «tipea» un lector de QR: la URL de hoy (`/verificar?code=X`, 25/11/2026),
+     * la de los papeles viejos (`/verificar/X`) o el código solo, con o sin guiones.
+     */
+    public static function codigoDeTermino(string $termino): string
+    {
+        $consulta = parse_url(trim($termino), PHP_URL_QUERY);
+
+        if (is_string($consulta)) {
+            parse_str($consulta, $parametros);
+
+            if (is_string($parametros['code'] ?? null)) {
+                return self::normalizarCodigo($parametros['code']);
+            }
+        }
+
+        return self::normalizarCodigo(Str::afterLast($termino, '/'));
+    }
 }

@@ -12,14 +12,12 @@ use App\Models\Departamento;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
-use App\Services\CodigoService;
 use App\Services\DocumentoEmitidoService;
 use App\Support\Archivos;
 use App\Support\ExpedienteBeneficiario;
 use App\Support\Paginacion;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -346,7 +344,7 @@ class BeneficiarioController extends Controller
         }
 
         // En «Procedencia del pescado» también vale el código de la autorización (o la URL de su QR).
-        $porCodigo = $request->boolean('autorizacion') ? self::autorizacionPorCodigo($termino) : null;
+        $porCodigo = $request->boolean('autorizacion') ? AprovechamientoPesq::porCodigo($termino) : null;
 
         return Beneficiario::query()
             ->when(
@@ -415,26 +413,6 @@ class BeneficiarioController extends Controller
                 'autorizacion_buscada_id' => $porCodigo?->id,
             ])
             ->all();
-    }
-
-    /**
-     * La autorización cuyo código de verificación es el término. `codigos` guarda
-     * los de los cinco documentos: `whereHas('codigo')` filtra por el tipo, así que
-     * el código de un carnet o de un recibo no encuentra nada. Solo el código
-     * COMPLETO: es una llave, no se busca por partes.
-     */
-    private static function autorizacionPorCodigo(string $termino): ?AprovechamientoPesq
-    {
-        // Un lector de QR «tipea» la URL de verificación: el código es lo último.
-        $codigo = AprovechamientoPesq::normalizarCodigo(Str::afterLast($termino, '/'));
-
-        if (strlen($codigo) !== CodigoService::LARGO) {
-            return null;
-        }
-
-        return AprovechamientoPesq::query()
-            ->whereHas('codigo', fn ($q) => $q->where('codigo', $codigo))
-            ->first();
     }
 
     /**

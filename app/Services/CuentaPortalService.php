@@ -64,6 +64,8 @@ class CuentaPortalService
                 'activo' => true,
                 'debe_cambiar_password' => true,
             ]);
+            // La app BeniDigital sale: entra de nuevo con la clave temporal.
+            $cuenta->tokens()->delete();
 
             return $clave;
         });
@@ -78,16 +80,21 @@ class CuentaPortalService
                 ?? throw CuentaPortalException::sinCuenta($beneficiario->nombreCompleto);
 
             $cuenta->update(['activo' => false]);
+            $cuenta->tokens()->delete();
         });
     }
 
-    /** La que elige el propio beneficiario al entrar: deja de ser temporal. */
-    public function cambiarClave(User $cuenta, string $nueva): void
+    /**
+     * La que elige el propio beneficiario al entrar: deja de ser temporal. Los
+     * celulares con la clave vieja salen, salvo el que la cambió (`$tokenQueQueda`).
+     */
+    public function cambiarClave(User $cuenta, string $nueva, ?int $tokenQueQueda = null): void
     {
         $cuenta->update([
             'password' => $nueva,
             'debe_cambiar_password' => false,
         ]);
+        $cuenta->tokens()->when($tokenQueQueda, fn ($q) => $q->whereKeyNot($tokenQueQueda))->delete();
     }
 
     private function claveTemporal(): string

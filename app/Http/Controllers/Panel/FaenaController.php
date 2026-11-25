@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Panel;
 
-use App\Enums\ConceptoArancel;
 use App\Enums\EstadoFaena;
 use App\Enums\TramiteConVigencia;
 use App\Exceptions\PermisoOperativoException;
@@ -21,7 +20,6 @@ use App\Services\DocumentoEmitidoService;
 use App\Services\EmitirFaenaService;
 use App\Services\RenovarLiquidacionService;
 use App\Sireb\SirebException;
-use App\Sireb\TarifarioSireb;
 use App\Support\Paginacion;
 use App\Support\Vigencia;
 use Illuminate\Http\JsonResponse;
@@ -90,7 +88,7 @@ class FaenaController extends Controller
      * Acepta `?beneficiario=7` para llegar desde la ficha de la persona con el
      * buscador ya resuelto.
      */
-    public function create(Request $request, TarifarioSireb $tarifario): Response
+    public function create(Request $request): Response
     {
         // `?carnet=` llega desde la ficha del cupo: resuelve también a la persona.
         $carnetElegido = $request->integer('carnet')
@@ -131,32 +129,8 @@ class FaenaController extends Controller
             'vigencia' => Vigencia::texto(TramiteConVigencia::Faena),
 
             // El arancel de referencia (el que vale lo congela la emisión), o el motivo de por qué no hay.
-            ...$this->arancelDeReferencia($tarifario),
+            ...$this->servicio->arancelDeReferencia(),
         ]);
-    }
-
-    /**
-     * La tarifa del permiso, para mostrar (la misma regla que al cobrar): `arancel`
-     * {etiqueta, monto} si se puede cobrar; si no, `sinArancel` con el motivo.
-     */
-    private function arancelDeReferencia(TarifarioSireb $tarifario): array
-    {
-        $tarifas = $tarifario->tarifas(ConceptoArancel::Faena);
-        $id = $this->servicio->tarifaDeLaFaena();
-        $tarifa = collect($tarifas ?? [])->firstWhere('id', $id);
-
-        $motivo = match (true) {
-            $tarifario->servicioId(ConceptoArancel::Faena) === null => 'Falta elegir el servicio de la faena en Catálogos › Aranceles.',
-            $tarifas === null => 'Recaudaciones (SIREB) no responde: no se puede saber el arancel. Intente en unos minutos.',
-            $id === null => 'El servicio de la faena tiene varias tarifas activas (o ninguna): defina cuál en Catálogos › Aranceles › Permiso de faena › Definir tarifas.',
-            $tarifa === null || ! $tarifa['activa'] => 'La tarifa definida del permiso ya no está activa en SIREB: vuelva a definirla en Catálogos › Aranceles.',
-            default => null,
-        };
-
-        return [
-            'arancel' => $motivo === null ? ['etiqueta' => $tarifa['etiqueta'], 'monto' => $tarifa['monto']] : null,
-            'sinArancel' => $motivo,
-        ];
     }
 
     /**

@@ -815,8 +815,9 @@ historial: por eso el único es parcial. Ver [modulos/DOCUMENTOS-EMITIDOS.md](mo
 | `configuraciones` | `clave` (única), `valor`, `tipo`, `grupo`, `etiqueta`, `descripcion`, `publico` | Lo que la unidad cambia sin tocar código: datos de la portada, firmante del carnet. Las siembra `ConfiguracionSeeder` |
 | `auditorias` | `user_id`, `evento`, `auditable_type`/`_id`, `valores_anteriores`, `valores_nuevos`, `descripcion`, `ip`, `user_agent`, `url` | La escribe el trait `Auditable` (alta, cambio, baja). El motivo de una baja va en `descripcion` vía `motivoAuditoria` |
 | `accesos` | `user_id`, `email`, `evento`, `ip`, `user_agent`, `session_id` | Bitácora de ingresos y salidas, también los fallidos |
+| `personal_access_tokens` *(19/11/2026)* | `tokenable_type`/`_id`, `name`, `token` (único, hash SHA-256), `abilities`, `last_used_at`, `expires_at` (índice) | Los de Sanctum: **una fila por celular** con la app BeniDigital abierta. Solo cuentas del portal; `name` es el dispositivo y `abilities` `["portal"]`. Sin soft delete a propósito: revocar es **borrar la fila** (salir, resetear, desactivar o cambiar la clave, en `CuentaPortalService`). Migración `2026_11_19_084048`. Ver [api/README.md](api/README.md) § 4 |
 
-Más las de Laravel (`cache`, `jobs`, `sessions`…) y las de `spatie/laravel-permission`.
+Más las de Laravel (`cache`, `jobs`, `sessions`…), las de `spatie/laravel-permission` y la de Sanctum (`personal_access_tokens`, arriba).
 
 ## 3. Borrado lógico: todas las tablas del dominio lo tienen
 

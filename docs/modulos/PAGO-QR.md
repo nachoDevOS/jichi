@@ -3,6 +3,11 @@
 > 23/11/2026. Reemplaza al QR «de muestra» (`qr-simulado.tsx`, 08/10/2026), que no
 > se podía leer ni cobraba. Ver también [SIREB.md](SIREB.md) (liquidaciones y
 > confirmación del pago) y [PORTAL.md](PORTAL.md).
+>
+> **La app BeniDigital no usa este QR** (25/11/2026): paga directo con la API pública de SIREB
+> (`/api/v1/publico`, con el `codigo_pago` del trámite) y después pregunta
+> `GET /api/v1/portal/tramites/{codigo}/estado`, que usa el mismo `CobroQrService::estado()` de
+> esta página para aprobar. Ver [api/README.md](../api/README.md) § 2.1.
 
 ## La idea
 
@@ -103,12 +108,12 @@ una caída, y reintentarlo solo demoraría el aviso.
 | `App\Sireb\SirebService::qrDePago()` / `simularPagoQr()` | El HTTP, por el mismo `enviar()` de siempre (token, reintento ante 401, registro en `sireb-AAAA-MM-DD.log`) |
 | `App\Services\CobroQrService` | `qr()` (pide y anota), `estado()` (¿ya se pagó?, con espera de 15 s por trámite en caché) y `simularPago()` |
 | `Panel\{Aprovechamiento,Carnet,Faena,Guia}Controller` | `consultarQr()`, `estadoQr()` y `simularPagoQr()` |
-| `Portal\PagoQrController` | `__invoke()` (el QR) y `estado()`, con el trámite buscado por código **y** titular (`DocumentoDelPortal`) |
+| `Portal\PagoQrController` | `__invoke()` (el QR), `estado()` y `simular()` (25/11/2026: el pago de prueba, en JSON), con el trámite buscado por código **y** titular (`DocumentoDelPortal`) |
 | `Sireb\AvisoSirebController` + `routes/api.php` | El webhook |
 | `ConfirmarPagoService::comprobante()` / `medio()` / `diaDelPago()` | Cómo se copia un pago al recibo y a la ficha, sea depósito o QR |
 | `components/comunes/qr-sireb.tsx` | La imagen, la cuenta regresiva (`useCuentaRegresiva`) y la espera del pago (`useEsperaDePago`) |
 | `components/panel/pagos/modal-pago-qr.tsx` | La ventana del panel, con «Simular pago (prueba)» si el QR es de prueba |
-| `components/portal/ventana-pago-qr.tsx` | La ventana del portal, con «Descargar QR» (la imagen de SIREB con monto y código debajo) |
+| `components/portal/ventana-pago-qr.tsx` | La ventana del portal, con «Descargar QR» (la imagen de SIREB con monto y código debajo) y, con un QR de prueba, «Simular pago (prueba)» (`fetch` con `X-XSRF-TOKEN` de la cookie) |
 
 ### Rutas y permisos
 
@@ -129,7 +134,7 @@ cargar un pago. Así no hace falta volver a correr `RolPermisoSeeder`.
 | | `simulado: true` (test) | `simulado: false` (pasarela real) |
 |---|---|---|
 | Panel | Insignia «QR de prueba: no se paga con el banco» y botón **«Simular pago (prueba)»** | Insignia «Vence en m:ss», sin botón de simular |
-| Portal | «QR de prueba: no lo pague con su banco» | Solo «Vence en m:ss» |
+| Portal | «QR de prueba: no lo pague con su banco» y botón **«Simular pago (prueba)»** (25/11/2026) | Solo «Vence en m:ss» |
 | QR descargado | Lleva la leyenda de prueba | Sin leyenda |
 | Recibo | Banco: **«Pago por QR de prueba»** | Banco: **«Pago por QR»** |
 
@@ -197,10 +202,11 @@ llama una máquina y no una persona. No es del panel, ni del público, ni del po
 3. En la ficha, «Pagar por QR»: aparece el QR con «QR de prueba».
 4. «Simular pago (prueba)»: SIREB lo da por pagado, Jichi aprueba y emite el recibo
    con la transacción y «Pago por QR de prueba».
-5. Para probar la ventana sola: abrir el QR en el portal y simular el pago desde el
-   panel en otra pestaña. En menos de 25 s el portal muestra «¡Pago recibido!».
+5. En el portal (25/11/2026) el mismo botón: «Pagar con QR» → «Simular pago (prueba)», y la
+   ventana muestra «¡Pago recibido!» al instante. Para probar que la ventana se entera SOLA,
+   simular desde el panel en otra pestaña: en menos de 25 s el portal lo muestra.
 
-Las pruebas automáticas están en `tests/Feature/Pagos/PagoQrTest.php` (14, con
+Las pruebas automáticas están en `tests/Feature/Pagos/PagoQrTest.php` (16 —dos del botón del portal: solo el titular, y nunca con un QR real—, con
 SIREB simulado en `tests/Concerns/SirebFalso.php`: `$qrDisponible`, `$qrSimulado`).
 Se comprobó que fallan rompiendo el código a propósito: la firma del webhook, el
 descarte de repetidos, el freno de la simulación con un QR real, la fecha del recibo,

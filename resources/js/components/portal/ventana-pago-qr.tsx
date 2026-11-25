@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { CircleCheck, Download, LoaderCircle, QrCode, RefreshCw, TriangleAlert, X } from 'lucide-react';
+import { CircleCheck, Download, FlaskConical, LoaderCircle, QrCode, RefreshCw, TriangleAlert, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
     formatoRestante,
@@ -62,6 +62,30 @@ export function VentanaPagoQr({
         router.reload();
     }, []);
     useEsperaDePago(route('portal.pagar-qr.estado', { codigo }), Boolean(qr) && !vencido && pagado === null, alPagar);
+
+    const [simulando, setSimulando] = useState(false);
+    const [avisoSimulacion, setAvisoSimulacion] = useState<string | null>(null);
+
+    // Solo con un QR de prueba de SIREB; en producción SIREB lo rechaza igual.
+    async function simular() {
+        setSimulando(true);
+        setAvisoSimulacion(null);
+        try {
+            const r = await fetch(route('portal.pagar-qr.simular', { codigo }), {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-XSRF-TOKEN': tokenXsrf() },
+            });
+            const resultado: { aprobado: boolean; mensaje: string } = r.ok
+                ? await r.json()
+                : { aprobado: false, mensaje: 'No se pudo simular el pago. Intente de nuevo.' };
+            if (resultado.aprobado) alPagar();
+            else setAvisoSimulacion(resultado.mensaje);
+        } catch {
+            setAvisoSimulacion('No se pudo simular el pago. Intente de nuevo.');
+        } finally {
+            setSimulando(false);
+        }
+    }
 
     useEffect(() => {
         const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar();
@@ -143,6 +167,23 @@ export function VentanaPagoQr({
                                     QR de prueba: no lo pague con su banco
                                 </span>
                             )}
+                            {qr.simulado && !vencido && (
+                                <button
+                                    type="button"
+                                    disabled={simulando}
+                                    onClick={() => void simular()}
+                                    className="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                                >
+                                    <FlaskConical className="size-4" />
+                                    {simulando ? 'Simulando…' : 'Simular pago (prueba)'}
+                                </button>
+                            )}
+                            {avisoSimulacion && (
+                                <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-left text-xs text-amber-900 ring-1 ring-amber-200">
+                                    <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                                    {avisoSimulacion}
+                                </p>
+                            )}
                             {restantes !== null && !vencido && (
                                 <span className="text-xs text-slate-500">Vence en {formatoRestante(restantes)}</span>
                             )}
@@ -193,6 +234,13 @@ export function VentanaPagoQr({
             </div>
         </div>
     );
+}
+
+/** El token CSRF que Laravel deja en la cookie XSRF-TOKEN: `fetch` no lo manda solo. */
+function tokenXsrf(): string {
+    const valor = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='));
+
+    return valor ? decodeURIComponent(valor.slice('XSRF-TOKEN='.length)) : '';
 }
 
 /** El QR en PNG, con el monto y el código debajo: para pagarlo después desde la aplicación del banco. */

@@ -24,6 +24,30 @@ aprueba; el webhook está listo en `/api/sireb/aviso`. Ver
 Probado en test el 24/11/2026 por el responsable: QR, «Simular pago (prueba)» y
 aprobación. Falta probar el webhook cuando SIREB dé de alta la dirección.
 
+---
+
+## 🟠 App BeniDigital: lista del lado del sistema, falta probar y configurar — 25/11/2026
+
+La API de la app (`/api/v1/portal`, ver [api/README.md](api/README.md)) vive en carpetas
+`ApiApp/`: ingreso, inicio, en curso, faena y guía en línea, `GET /tramites/{codigo}/estado` y
+«Mi perfil». **Alcance:** pedir faena y guía, pagarlas por QR y ver su perfil. **El QR la app lo paga directo en SIREB**
+(API pública); este sistema solo aprueba cuando SIREB dice «pagada». Con `Idempotency-Key`,
+tokens que vencen a los 90 días sin uso y 60 pedidos por minuto por cuenta. Falta:
+
+- **Probar en test** que la API pública de SIREB cobra las liquidaciones que registra el SEDAG
+  (un `codigo_pago` de una faena pedida en línea, en la pantalla de pago de la app).
+- **Que SIREB dé de alta el webhook** (`/api/sireb/aviso`): sin él, si el titular cierra la app
+  después de pagar, el trámite espera la consulta de cada 10 minutos.
+- **Antes de producción** ([api/seguridad.md](api/seguridad.md) § 2): HTTPS, `APP_DEBUG=false`,
+  no usar `SERVER_HOST=0.0.0.0` fuera de desarrollo, actualizar `symfony/filesystem` (aviso de
+  `composer audit`).
+- **Migrar** la tabla `personal_access_tokens` en cada base
+  (`2026_11_19_084048_create_personal_access_tokens_table`).
+- **Decidir con el responsable:** un comercializador puede reservar kilos de un pescador con
+  guías que nunca paga (sin tope de pendientes, solo ventanilla las elimina).
+
+---
+
 ## 🔴 PDF guardados: hay que migrar — 23/10/2026
 
 Tabla nueva `documentos_emitidos`. En la base de trabajo (el `RolPermisoSeeder` borra el permiso
@@ -341,7 +365,7 @@ Medido en la ficha de la autorización: a 390 px, `scrollWidth` = 390.
 ## 🟠 Antes de imprimir un lote: `APP_URL`
 
 El carnet, la autorización, la faena y el recibo llevan el QR con
-`<APP_URL>/verificar/<codigo>`, y `APP_URL` es la única fuente del dominio. En
+`<APP_URL>/verificar?code=<codigo>` (antes del 25/11/2026, `/verificar/<codigo>`), y `APP_URL` es la única fuente del dominio. En
 desarrollo es `http://127.0.0.1:8000` a propósito; **al pasar a producción hay
 que poner el dominio público** y correr `php artisan config:clear`. Lo impreso
 con la dirección local sale con un QR que no abre (el código escrito al lado

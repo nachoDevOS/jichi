@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoAprovechamiento;
 use App\Exceptions\PermisoOperativoException;
+use App\Services\CodigoService;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
 use App\Traits\Codificable;
@@ -125,6 +126,26 @@ class AprovechamientoPesq extends Model
     public function numeroLegible(): string
     {
         return CorrelativoService::rellenar($this->nro);
+    }
+
+    /**
+     * La autorización cuyo código de verificación es el término (tipeado, con guiones o
+     * la URL que «tipea» un lector de QR). `codigos` guarda los de cinco documentos:
+     * `whereHas('codigo')` filtra por el tipo, así que el código de un carnet no
+     * encuentra nada. Solo el código COMPLETO: es una llave, no se busca por partes.
+     * La usan el buscador del panel y la guía pedida en línea.
+     */
+    public static function porCodigo(string $termino): ?self
+    {
+        $codigo = self::codigoDeTermino($termino);
+
+        if (strlen($codigo) !== CodigoService::LARGO) {
+            return null;
+        }
+
+        return self::query()
+            ->whereHas('codigo', fn ($q) => $q->where('codigo', $codigo))
+            ->first();
     }
 
     /**

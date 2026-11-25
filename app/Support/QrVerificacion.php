@@ -32,7 +32,8 @@ class QrVerificacion
 
         // Ruta relativa + APP_URL: `route()` absoluta usaría el host de la petición
         // y el QR saldría impreso con la IP del operador. Ver «Trampas» en CLAUDE.md.
-        $url = rtrim((string) config('app.url'), '/').route('verificar.show', $codigo, false);
+        // `/verificar?code=X` (25/11/2026); `/verificar/X`, la de lo ya impreso, sigue andando.
+        $url = rtrim((string) config('app.url'), '/').route('verificar.show', ['code' => $codigo], false);
 
         return [
             'qr' => self::png($url),

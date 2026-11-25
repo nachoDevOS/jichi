@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support;
+namespace App\Support\ApiApp;
 
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
@@ -10,6 +10,8 @@ use App\Models\PermisoFaena;
 use Illuminate\Database\Eloquent\Model;
 
 /**
+ * ApiApp · COMPARTIDO con el portal web: cambiarlo cambia la app y la web (docs/api/README.md § 4).
+ *
  * El documento del portal que se pide por su código público: solo uno de los
  * cuatro que se cobran y se imprimen, y solo si es del beneficiario con sesión.
  * Lo ajeno devuelve null igual que lo inexistente: no confirma que el código exista.

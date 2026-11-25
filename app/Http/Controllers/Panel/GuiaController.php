@@ -417,17 +417,8 @@ class GuiaController extends Controller
     private function catalogosDelFormulario(array $ademas = []): array
     {
         // Los productos son las tarifas del servicio de la guía en SIREB. null = SIREB no responde.
-        $tarifas = app(TarifarioSireb::class)->tarifas(ConceptoArancel::Guia);
-
-        $productos = collect($tarifas ?? [])
-            ->map(fn (array $t): array => [
-                'id' => $t['id'],
-                'nombre' => $t['etiqueta'],
-                // De referencia: el que vale lo congela la emisión.
-                'precio_kg' => $t['monto'],
-                'estado' => $t['activa'],
-            ])
-            ->sortBy('nombre');
+        $tarifas = $this->servicio->productos();
+        $productos = collect($tarifas ?? []);
 
         foreach ($ademas as $tarifaId => $especie) {
             if (! $productos->contains('id', $tarifaId)) {

@@ -156,8 +156,8 @@ Ver [modulos/RECIBOS.md](modulos/RECIBOS.md).
 
 Los cinco documentos que se entregan —autorización, carnet, faena, guía y
 recibo— tienen un **código de 16 caracteres** al azar en la tabla polimórfica
-`codigos`, único global, y lo llevan impreso en un QR. `/verificar/{codigo}`
-muestra, sin sesión, el tipo de documento, el titular, la cédula enmascarada, el
+`codigos`, único global, y lo llevan impreso en un QR. `/verificar?code={codigo}`
+(25/11/2026; lo ya impreso trae `/verificar/{codigo}`, que sigue andando) muestra, sin sesión, el tipo de documento, el titular, la cédula enmascarada, el
 estado de hoy y la vigencia.
 
 El código **no reemplaza** a los correlativos —la columna `nro` de autorización,
@@ -318,7 +318,10 @@ exponer datos personales completos ni ids internos: ver
 
 ## 5. Cómo viaja una petición
 
-No hay API REST: no se escribe `fetch()` ni `axios`.
+No hay API REST para las pantallas: no se escribe `fetch()` ni `axios`. La única
+API es la de la **app BeniDigital** (`routes/api-app.php`, `/api/v1/portal`, token de
+Sanctum): la cuenta del portal desde el celular, para pedir faena y guía y pagarlas por QR.
+Todo lo suyo vive en carpetas `ApiApp/`. Contrato y carpetas: [api/README.md](api/README.md).
 
 ```
 1. Navegador      GET /panel/faenas

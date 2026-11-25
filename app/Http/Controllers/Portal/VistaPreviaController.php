@@ -11,7 +11,7 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
-use App\Support\DocumentoDelPortal;
+use App\Support\ApiApp\DocumentoDelPortal;
 use App\Support\MarcaAgua;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;

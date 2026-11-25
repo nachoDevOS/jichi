@@ -261,7 +261,7 @@ export function TarjetaCodigo({
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{ayuda}</p>
             {codigo && (
                 <a
-                    href={route('verificar.show', codigo.replace(/-/g, ''))}
+                    href={route('verificar.show', { code: codigo.replace(/-/g, '') })}
                     target="_blank"
                     rel="noreferrer"
                     className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"

@@ -52,6 +52,8 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 
 | Archivo | Ln | Qué hace | No obvio |
 | --- | --- | --- | --- |
+| `ApiApp/PedirGuiaService.php` (compartido app + web) | La guía pedida por el titular (portal web y app): su carnet de comercializador, el pescador por el código de su autorización (`AprovechamientoPesq::porCodigo()`, que salió de `Panel\BeneficiarioController`), nombre abreviado y emite con `EmitirGuiaService`. `EmitirGuiaService::productos()` salió de `Panel\GuiaController` |
+| `ApiApp/PedirFaenaService.php` (compartido app + web) | El permiso de faena pedido por el titular (portal web y app): elige su carnet de pescador vigente, dice por qué no puede en sus palabras y emite con `EmitirFaenaService`. `EmitirFaenaService::arancelDeReferencia()` salió de `Panel\FaenaController` para usarlo acá |
 | `OtorgarCupoService.php` | 231 | Otorgar, corregir y eliminar la autorización | Una autorización en curso por persona (`enCurso()`). Recibe la tarifa de SIREB elegida: `verificarEscala()` saca de ella precio, etiqueta (`escala`) y `rango_hasta` (`volumen_total_kg`). **Corregir cambia solo la embarcación**: la escala no se toca nunca. El N° (`nro`) es correlativo continuo |
 | `EmitirCarnetService.php` | 383 | Emitir, corregir, eliminar, revocar y reponer el carnet | Un carnet vigente por actividad. Pescador exige autorización; comercializador la prohíbe. El precio sale de la actividad (`precioDeActividad()`: la tarifa definida en `arancel_tarifas`, `ArancelTarifa::idDe()`), al emitir, corregir y renovar. Adjuntos SUBIDOS antes de la transacción |
 | `EmitirFaenaService.php` | 295 | Emitir, corregir y eliminar la faena | Copia `kilos_disponibles` de la autorización en `kilos_extraidos`; no descuenta. Ver `PermisoFaena::cupo` |
@@ -126,7 +128,11 @@ servicio pregunta y el controlador manda la respuesta en los `puede_*`.
 | `Panel/RolController.php` | 175 | Seguridad › Roles: lista y CRUD de roles. Lee la base (lo que hace cumplir el middleware); los módulos, nombres y secciones salen de `RolSistema::CATALOGO`. Las reglas, en `GestionarRolService` |
 | Catálogos: `Asociacion`, `ArancelSireb` | 85–198 | Aranceles elige el servicio de SIREB de cada trámite con `TarifarioSireb` |
 | `Panel/CuentaPortalController.php` | 68 | La clave temporal vuelve por flash una sola vez |
+| `Portal/FaenaController.php`, `Portal/GuiaController.php` | 45 / 55 | «Pedir permiso de faena» y «Pedir guía de transporte» (19/11/2026): lo único que el portal escribe, junto con la clave. Usan `PedirFaenaService` y `PedirGuiaService` |
 | `Portal/*` | 25–80 | Solo lectura; nada recibe un id: todo sale de la cuenta con sesión. `VistaPreviaController` dibuja «NO VÁLIDO» sobre lo abierto |
+| `ApiApp/SesionController.php`, `CuentaController.php`, `EnCursoController.php`, `EstadoTramiteController.php`, `FaenaController.php`, `GuiaController.php` | 45 / 35 / 25 / 40 / 45 / 50 | La app BeniDigital (25/11/2026: carpeta `ApiApp/`): token de Sanctum en vez de sesión. El ingreso reusa `IngresarRequest::cuentaValida()`; el JSON lo arman `Resources/ApiApp/`. Faena y guía usan los mismos `PedirFaenaService` y `PedirGuiaService` que la web. **El QR lo paga la app directo en SIREB**: `EstadoTramiteController` solo pregunta a SIREB (`CobroQrService::estado()`) y aprueba. Ver docs/api/ |
+| `../Middleware/ApiApp/Idempotente.php` | 85 | `Idempotency-Key` obligatoria en `POST /faenas` y `/guias`: la misma clave con los mismos datos devuelve lo ya registrado (cache 24 h, por cuenta y ruta, con candado). Solo guarda los 2xx: con un 422 se reintenta con la misma clave |
+| `../Middleware/ApiApp/SoloBeneficiarioApp.php` | 70 | Además de las reglas del portal, renueva el `expires_at` del token a 90 días cuando le quedan menos de 83 (vencimiento deslizante, una escritura por semana) |
 | `Publico/VerificacionController.php` | 335 | La única pantalla sin sesión. `datosPublicos()` decide qué se muestra: nada de datos personales completos |
 | `Panel/ManualController.php` | 55 | Manual de usuario: JSON de los tutoriales filtrados por permiso y el video con sesión (206 por rangos). Ver modulos/MANUAL.md |
 | `StorageController.php` | 75 | **El único que escribe archivos**: 3 MB, nombre aleatorio, disco |
@@ -147,10 +153,11 @@ funcionario; el controlador lo pone en el campo o en el aviso.
 | Archivo | No obvio |
 | --- | --- |
 | `ExpedienteBeneficiario.php` | Las consultas del expediente compartidas por la ficha y el portal: los `with()` se escriben una vez |
-| `ResumenPortal.php` | Lo que el portal muestra de cada documento. `situacion`: vigente / vencido (por fecha) / revocado (incluye sin efecto y no pagado) |
+| `ApiApp/ResumenPortal.php` (compartido app + web) | Lo que el portal muestra de cada documento. `situacion`: vigente / vencido (por fecha) / revocado (incluye sin efecto y no pagado) |
 | `../Jobs/VerificarPagoJob.php` | Consulta en SIREB el pago de un trámite, después de mandar la página | Lo dispara el portal (inicio y «En curso») con `dispatchAfterResponse()`: sin trabajador de cola. `encolarDe()` usa la reserva de 2 min por trámite. Saltea lo vencido o anulado, como el comando |
+| `ApiApp/PantallaPortal.php`, `ApiApp/PerfilPortal.php` (compartidos app + web) | Los datos de Inicio, En curso, Mis papeles, Pagos y Mis datos del portal. Los usa la web (`Portal\*Controller`); la app pide «En curso» (`ApiApp\EnCursoController`) y «Mi perfil» (`ApiApp\PerfilController`, 25/11/2026). La API les quita las URLs web en `Resources/ApiApp/DocumentoResource` y `PerfilResource` |
 | `TramitesDisponibles.php` | Qué puede pedir la persona (el sello «Usted puede pedirlo» de la vitrina del portal): pregunta a los mismos métodos del modelo |
-| `DocumentoDelPortal.php` | Busca por código público, solo lo propio: lo ajeno da 404 igual que lo inexistente |
+| `ApiApp/DocumentoDelPortal.php` (compartido app + web) | Busca por código público, solo lo propio: lo ajeno da 404 igual que lo inexistente. La usan la descarga, la vista previa y el QR de la web, y el estado del trámite de la app |
 | `Vigencia.php` | 60 | Hasta cuándo vale autorización, carnets (uno por actividad, `carnetDe()`), faena y guía | Lee `configuraciones` (`vigencia.{tramite}.modo/dias`); `hasta()` conserva la hora (la guía se cuenta con hora). Pantalla: `VigenciaController` |
 | `QrVerificacion.php`, `CodigoQr.php` | URL **relativa + `APP_URL`** (nunca el host de la petición); QR pintado con `gd` |
 | `ReciboImpreso.php`, `TextoVertical.php`, `MarcaAgua.php` | Piezas de los PDF: lo que DomPDF no sabe hacer va horneado en PNG |
@@ -176,8 +183,9 @@ desconecta entero. Ver [modulos/IBARE.md](modulos/IBARE.md).
 | --- | --- |
 | `panel.php` | Prefijo `/panel`, middleware `funcionario` en el grupo y `permiso:` en cada ruta. Cada documento tiene `verificar-pago` y `cargar-pago`, cada una con su permiso del mismo nombre. Las rutas literales (`crear`, `buscar`) van antes de `{id}` |
 | `portal.php` | `/mi-cuenta`, middleware `beneficiario` |
+| `api-app.php` | `/api/v1/portal`, la app BeniDigital: `auth:sanctum` + `beneficiario.app` (`Middleware/ApiApp/SoloBeneficiarioApp`) + `throttle:60,1,app`. **Cada throttle lleva prefijo**: sin él, todos los de una cuenta comparten contador. Los POST que cobran llevan `idempotente`. La incluye `api.php`. Contrato en docs/api/ |
 | `publico.php` | Portada y verificación por código |
-| `api.php` | Lo que llaman OTROS SISTEMAS, sin sesión ni CSRF (prefijo `/api`): hoy solo el webhook de SIREB, autenticado con su firma (23/11/2026) |
+| `api.php` | Lo que llaman OTROS SISTEMAS, sin sesión ni CSRF (prefijo `/api`): hoy solo el webhook de SIREB, autenticado con su firma (23/11/2026). Al final incluye `api-app.php` |
 | `console.php` | El scheduler: `jichi:verificar-pagos` |
 
 ## `resources/js/` — frontend

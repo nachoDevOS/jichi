@@ -89,6 +89,51 @@ export interface TramiteDisponible {
     titulo: string;
     disponible: boolean;
     detalle: string;
+    /** Dónde se pide: `en_linea` (portal y app) o `ventanilla`. Ver TramitesDisponibles::EN_LINEA. */
+    canal: 'en_linea' | 'ventanilla';
+}
+
+/** Una opción de los enums de la guía (medio, tipo de transporte, condición). */
+export interface OpcionPortal {
+    value: string;
+    label: string;
+}
+
+/** Lo que muestra «Pedir guía de transporte» (PedirGuiaService::datos). */
+export interface PedidoGuia {
+    puede: boolean;
+    motivo: string | null;
+    carnet: { numero: string | null; asociacion: string | null; vence: string | null } | null;
+    /** Solo los activos en SIREB; el precio es de referencia. */
+    productos: { id: string; nombre: string; precio_kg: number }[];
+    condiciones: OpcionPortal[];
+    medios: OpcionPortal[];
+    tipos_transporte: OpcionPortal[];
+    vigencia: string;
+}
+
+/** El pescador que le vendió, buscado por el código de su autorización. */
+export interface AutorizacionVendedor {
+    numero: string;
+    /** Abreviado: «Juan Carlos P. R.». */
+    pescador: string;
+    kilos_disponibles: number;
+    vence: string | null;
+    vendible: boolean;
+    motivo: string | null;
+}
+
+/** Lo que muestra «Pedir permiso de faena» (PedirFaenaService::datos). */
+export interface PedidoFaena {
+    puede: boolean;
+    /** Por qué hoy no puede, dicho para el titular. */
+    motivo: string | null;
+    carnet: { numero: string | null; asociacion: string | null; vence: string | null } | null;
+    /** Los kilos libres de su autorización: con esos sale la faena. */
+    kilos: number | null;
+    arancel: { etiqueta: string; monto: number } | null;
+    vigencia: string;
+    propietario_sugerido: string;
 }
 
 export interface ReciboPortal {

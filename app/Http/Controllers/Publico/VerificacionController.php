@@ -29,8 +29,10 @@ class VerificacionController extends Controller
      */
     private const LARGO_MINIMO = 6;
 
-    public function show(?string $codigo = null): Response
+    /** `/verificar?code=X` es la del QR de hoy; `/verificar/X`, la de lo ya impreso. */
+    public function show(Request $request, ?string $codigo = null): Response
     {
+        $codigo ??= is_string($request->query('code')) ? $request->query('code') : null;
         $normalizado = $codigo === null ? null : Carnet::normalizarCodigo($codigo);
         $documento = $normalizado === null ? null : $this->buscar($normalizado);
 
@@ -59,7 +61,7 @@ class VerificacionController extends Controller
     public function buscarPorFormulario(Request $request): RedirectResponse
     {
         $request->merge([
-            'codigo' => Carnet::normalizarCodigo((string) $request->input('codigo')),
+            'codigo' => Carnet::codigoDeTermino((string) $request->input('codigo')),
         ]);
 
         $validado = $request->validate([
@@ -70,7 +72,7 @@ class VerificacionController extends Controller
             'codigo.alpha_num' => 'El código solo lleva letras y números.',
         ]);
 
-        return redirect()->route('verificar.show', $validado['codigo']);
+        return redirect()->route('verificar.show', ['code' => $validado['codigo']]);
     }
 
     /**

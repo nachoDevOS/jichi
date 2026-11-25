@@ -10,7 +10,7 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
-use App\Support\DocumentoDelPortal;
+use App\Support\ApiApp\DocumentoDelPortal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;

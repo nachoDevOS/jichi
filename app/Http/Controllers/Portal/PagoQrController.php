@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Services\CobroQrService;
-use App\Support\DocumentoDelPortal;
+use App\Support\ApiApp\DocumentoDelPortal;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +36,12 @@ class PagoQrController extends Controller
     public function estado(Request $request, string $codigo, CobroQrService $cobro): JsonResponse
     {
         return response()->json($cobro->estado($this->documento($request, $codigo)));
+    }
+
+    /** Paga el QR de PRUEBA: solo si SIREB lo dio por `simulado` (lo controla el servicio). */
+    public function simular(Request $request, string $codigo, CobroQrService $cobro): JsonResponse
+    {
+        return response()->json($cobro->simularPago($this->documento($request, $codigo)));
     }
 
     private function documento(Request $request, string $codigo): Model

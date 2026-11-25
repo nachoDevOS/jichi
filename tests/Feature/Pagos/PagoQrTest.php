@@ -9,8 +9,10 @@ use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
 use App\Models\Carnet;
+use App\Models\User;
 use App\Services\CobroQrService;
 use App\Services\ConfirmarPagoService;
+use App\Services\CuentaPortalService;
 use App\Services\EmitirCarnetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -92,6 +94,37 @@ class PagoQrTest extends TestCase
         $this->assertSame($qr['transaccion_id'], $carnet->recibo->numero_boleta);
         $this->assertSame('Pago por QR de prueba', $carnet->recibo->entidad_bancaria);
         $this->assertEquals(15, $carnet->recibo->monto_total);
+    }
+
+    public function test_el_titular_simula_el_pago_desde_el_portal_y_otro_no_puede(): void
+    {
+        $carnet = $this->carnetPendiente();
+        $cuenta = $this->cuentaDe($carnet->beneficiario);
+        $codigo = $carnet->codigo_legible;
+        $this->actingAs($cuenta)->getJson(route('portal.pagar-qr', ['codigo' => $codigo]))->assertOk();
+
+        $ajeno = $this->cuentaDe(Beneficiario::factory()->create());
+        $this->actingAs($ajeno)->postJson(route('portal.pagar-qr.simular', ['codigo' => $codigo]))->assertNotFound();
+        $this->assertSame(0, $this->simulacionesDePago);
+
+        $this->actingAs($cuenta)->postJson(route('portal.pagar-qr.simular', ['codigo' => $codigo]))
+            ->assertOk()
+            ->assertJson(['aprobado' => true]);
+        $this->assertSame(EstadoCarnet::Aprobado, $carnet->refresh()->estado);
+    }
+
+    public function test_desde_el_portal_un_qr_real_no_se_simula(): void
+    {
+        $this->qrSimulado = false;
+        $carnet = $this->carnetPendiente();
+        $cuenta = $this->cuentaDe($carnet->beneficiario);
+        $this->actingAs($cuenta)->getJson(route('portal.pagar-qr', ['codigo' => $carnet->codigo_legible]))->assertOk();
+
+        $this->actingAs($cuenta)->postJson(route('portal.pagar-qr.simular', ['codigo' => $carnet->codigo_legible]))
+            ->assertOk()
+            ->assertJson(['aprobado' => false]);
+        $this->assertSame(0, $this->simulacionesDePago, 'pidió simular el pago de un QR real');
+        $this->assertSame(EstadoCarnet::Pendiente, $carnet->refresh()->estado);
     }
 
     public function test_la_ventana_abierta_se_entera_del_pago(): void
@@ -234,6 +267,17 @@ class PagoQrTest extends TestCase
         $this->liquidaciones[$id]['estado'] = 'pagada';
         $this->liquidaciones[$id]['pago'] = ['tipo_pago' => 'electronico', 'monto_pagado' => '15.00', 'estado' => 'confirmado',
             'fecha_pago' => now()->toIso8601String(), 'medio' => 'QR', 'transaccion_id' => 'QR-REAL-1', 'simulado' => false];
+    }
+
+    private function cuentaDe(Beneficiario $persona): User
+    {
+        $servicio = app(CuentaPortalService::class);
+        $servicio->darAcceso($persona);
+        $cuenta = $persona->cuenta()->firstOrFail();
+        // Sin esto el portal manda a cambiar la clave inicial (302).
+        $servicio->cambiarClave($cuenta, 'pesca2026');
+
+        return $cuenta;
     }
 
     private function carnetPendiente(): Carnet

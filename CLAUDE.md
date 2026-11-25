@@ -27,6 +27,7 @@ PostgreSQL 18** (corre también en SQLite).
 > | [docs/ESTRUCTURA.md](docs/ESTRUCTURA.md) | Dónde va un archivo **nuevo** |
 > | [docs/modulos/](docs/modulos/) | Un módulo en profundidad |
 > | [docs/PENDIENTES.md](docs/PENDIENTES.md) | Qué falta y qué está roto |
+> | [docs/api/](docs/api/README.md) | La API de la app BeniDigital: arquitectura, tokens, contrato y seguridad |
 > | [docs/NOTAS-CODIGO.md](docs/NOTAS-CODIGO.md) | El porqué largo de una decisión puntual, por archivo |
 >
 > Recién después abrí código, y abrí **el archivo que vas a cambiar**, no el
@@ -146,6 +147,15 @@ controlador ni en React.**
    | Pantallas | `resources/js/pages/panel/` | `resources/js/pages/publico/` | `resources/js/pages/portal/` |
    | Componentes | `components/panel/` | `components/publico/` | `components/portal/` |
    | Layout | `layouts/layout-panel.tsx` | `layouts/layout-publico.tsx` | `layouts/layout-portal.tsx` |
+
+   **Todo lo de la app BeniDigital va aparte, en carpetas `ApiApp/`** (25/11/2026):
+   `routes/api-app.php`, `Http/{Controllers,Requests,Resources,Middleware}/ApiApp/`,
+   `Services/ApiApp/`, `Support/ApiApp/` y `tests/Feature/ApiApp/`. Adentro hay lo
+   SOLO de la app y lo COMPARTIDO con el portal web (lo dice el comentario de cada
+   clase): **tocar algo en `ApiApp/` puede cambiar lo que ve el celular**. Alcance de
+   la app: el inicio (como la web), pedir faena y guía, pagarlas por QR y «Mi perfil». **El QR la app lo paga directo en
+   SIREB** (API pública): acá no hay `/pagar-qr` para la app, solo
+   `/tramites/{codigo}/estado`, que consulta SIREB y aprueba. Mapa: [docs/api/](docs/api/README.md).
 
    **Una cuenta de `users` con `beneficiario_id` es del portal y NUNCA entra al
    panel.** Lo sostienen los middleware `funcionario` y `beneficiario` en el

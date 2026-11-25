@@ -106,7 +106,9 @@ con la liquidación `pendiente` y **sin ningún pago cargado**; si no, la ventan
 por qué. **El QR es el que genera SIREB**, mostrado tal cual: real con la pasarela,
 de prueba en test («QR de prueba: no lo pague con su banco»); sin pasarela, la
 ventana dice que se pague por depósito. Con la ventana abierta pregunta sola si ya
-se pagó (`…/estado`) y muestra «¡Pago recibido!». Todo el detalle en
+se pagó (`…/estado`) y muestra «¡Pago recibido!». Con un QR de prueba ofrece además
+**«Simular pago (prueba)»** (25/11/2026; `POST …/simular`, `throttle:10,1`), igual que el
+panel: solo el titular, y con un QR real `simularPago()` ni llama a SIREB. Todo el detalle en
 [PAGO-QR.md](PAGO-QR.md). «Descargar QR» lo baja
 en PNG con el monto y el código de pago debajo, armado en el navegador (canvas).
 
@@ -116,7 +118,7 @@ de qué falta; cuando Recaudaciones valida el pago, el documento se aprueba solo
 
 **Las consultas son las del panel:** `App\Support\ExpedienteBeneficiario` tiene
 los `with()` que usa también `BeneficiarioController::show()`. Lo que se muestra
-lo arma `App\Support\ResumenPortal`: sin ids y sin banderas de funcionario. La
+lo arma `App\Support\ApiApp\ResumenPortal` (compartido con la app): sin ids y sin banderas de funcionario. La
 vigencia (`estaVigente()`, «sin efecto») sale de los mismos métodos del modelo.
 
 ## Diseño
@@ -174,9 +176,23 @@ cuentas —los funcionarios y, con rol «Beneficiario», los beneficiarios—: e
 desde cuándo, con filtro por estado. Es solo para controlar quién tiene acceso; cada fila lleva a la pestaña Datos de
 la ficha, donde se resetea o desactiva. La pantalla no dice «portal»: se llama Usuarios.
 
+## App BeniDigital — `/api/v1/portal` (19/11/2026)
+
+La app móvil del GAD entra con **la misma cuenta** (C.I. + clave de ventanilla), por
+token de Sanctum en vez de sesión. Lo que se cambia en la app vale en la web, y al revés.
+«Resetear contraseña», «Desactivar acceso» y cambiar la clave le cortan la sesión.
+
+**Alcance de la app (25/11/2026):** su inicio (los mismos datos que este inicio), pedir faena y
+guía, ver lo que debe («En curso»), pagarlo por QR y ver «Mi perfil» (los mismos datos que «Mis
+datos»). Papeles y pagos se ven solo en esta web. Lo que comparten la app y el portal (`PedirFaenaService`,
+`PedirGuiaService`, `PantallaPortal`, `PerfilPortal`, `ResumenPortal`, `DocumentoDelPortal` y
+los Requests de faena y guía) vive en carpetas `ApiApp/`: tocarlo cambia las dos.
+
+El contrato (endpoints, JSON, errores) y dónde está cada archivo: **[docs/api/](../api/README.md)**.
+
 ## Lo que falta
 
-- Trámites desde el portal (pedir una faena, subir una boleta).
+- Subir una boleta desde el portal (pedir faena y guía ya se puede desde el 19/11/2026).
 - Marcar la copia impresa desde el portal (por ejemplo «COPIA DEL TITULAR»), si
   la unidad quiere distinguirla del papel entregado en ventanilla.
 

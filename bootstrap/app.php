@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\ApiApp\Idempotente;
+use App\Http\Middleware\ApiApp\SoloBeneficiarioApp;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SoloBeneficiario;
 use App\Http\Middleware\SoloFuncionario;
@@ -33,6 +35,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'permiso' => PermissionMiddleware::class,
             'funcionario' => SoloFuncionario::class,
             'beneficiario' => SoloBeneficiario::class,
+            'beneficiario.app' => SoloBeneficiarioApp::class,
+            'idempotente' => Idempotente::class,
         ]);
 
         // Sin sesión en /mi-cuenta va al login del portal, no al de funcionarios.

@@ -12,3 +12,6 @@ use Illuminate\Support\Facades\Route;
 Route::post('/sireb/aviso', AvisoSirebController::class)
     ->middleware('throttle:120,1')
     ->name('sireb.aviso');
+
+// La app BeniDigital (/api/v1/portal) vive aparte, para ver de un vistazo qué es de la app.
+require __DIR__.'/api-app.php';

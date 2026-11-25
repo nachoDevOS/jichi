@@ -526,8 +526,14 @@ Va abajo a la izquierda del dorso (§6 bis), y lleva adentro la dirección de la
 pantalla pública con el código del carnet:
 
 ```
-https://<dominio>/verificar/PES26K2RUBM22MVR
+https://<dominio>/verificar?code=PES26K2RUBM22MVR
 ```
+
+Desde el 25/11/2026 el código va como parámetro GET (`?code=`), como
+`youtube.com/watch?v=`, a pedido del responsable. Los plásticos ya impresos traen
+`/verificar/PES26K2RUBM22MVR`, y esa forma sigue andando (`VerificacionController::show()`
+atiende `/verificar?code=` y `/verificar/{codigo}`; `Codificable::codigoDeTermino()` las lee
+cuando un lector de QR «tipea» la URL en un buscador).
 
 **El dominio sale de `APP_URL`, y de ningún otro lado.** Hubo una clave aparte
 —`jichi.url_verificacion`, más una `sistema.url_verificacion` en la tabla— y las

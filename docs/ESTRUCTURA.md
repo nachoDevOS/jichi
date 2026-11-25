@@ -69,7 +69,7 @@ app/
 │   ├── CorrelativoService.php, CodigoService.php, CuentaPortalService.php
 ├── Sireb/                  El cliente de Recaudaciones (SirebService: la conexión; TarifarioSireb: tarifas y precios)
 ├── AuthIbare/              El login con Ibare, módulo cerrado
-├── Support/                Piezas sin estado: Sql, Archivos, CodigoQr, ResumenPortal…
+├── Support/                Piezas sin estado: Sql, Archivos, CodigoQr… (lo de la app, en Support/ApiApp/)
 ├── Traits/                 Auditable, Codificable, LiquidableSireb, HistorialSireb
 └── Console/Commands/       jichi:verificar-pagos, jichi:sireb
 ```
@@ -81,7 +81,8 @@ app/
 | Una pantalla del panel | `app/Http/Controllers/Panel/` |
 | Algo que ve el ciudadano sin sesión | `app/Http/Controllers/Publico/` |
 | Algo del portal del beneficiario | `app/Http/Controllers/Portal/` |
-| Las reglas de un formulario | `app/Http/Requests/{Panel,Portal}/` |
+| Algo de la app BeniDigital (JSON), o lógica que comparten la app y el portal web | Carpetas `ApiApp/`: `app/Http/{Controllers,Requests,Resources,Middleware}/ApiApp/`, `app/Services/ApiApp/`, `app/Support/ApiApp/`; rutas en `routes/api-app.php`; pruebas en `tests/Feature/ApiApp/`; contrato en `docs/api/` |
+| Las reglas de un formulario | `app/Http/Requests/{Panel,Portal}/` (lo de la app, en `Requests/ApiApp/`) |
 | Una lista de valores fijos o un estado | `app/Enums/` (columna `string`) |
 | Una regla de negocio | `app/Services/` — el formulario y un comando la comparten |
 | Una llamada a SIREB | `app/Sireb/SirebService.php` |
@@ -95,11 +96,12 @@ app/
 ```
 routes/
 ├── web.php        Solo incluye a publico, auth, panel y portal. Laravel carga ESTE.
-├── publico.php    /  y  /verificar/{codigo?}                       sin sesión
+├── publico.php    /  y  /verificar[/{codigo}] (?code=)      sin sesión
 ├── auth.php       /login  /logout
 ├── panel.php      /panel/...           middleware funcionario + permiso: en cada ruta
 ├── portal.php     /mi-cuenta/...       middleware beneficiario, ninguna ruta recibe un id
 ├── api.php        /api/...             otros sistemas; hoy el webhook de SIREB. Lo carga bootstrap/app.php
+├── api-app.php    /api/v1/portal/...   la app BeniDigital: token de Sanctum + beneficiario.app. Lo incluye api.php
 └── console.php    el scheduler: jichi:verificar-pagos cada 10 minutos
 ```
 
@@ -298,6 +300,8 @@ docs/
 ├── PENDIENTES.md       qué falta y qué problemas siguen abiertos
 ├── NOTAS-CODIGO.md     el porqué largo de una decisión puntual, por archivo
 ├── modulos/            SIREB, PAGOS, RECIBOS, CARNETS, PERMISOS-OPERATIVOS, PORTAL, IBARE
+├── api/               la API de la app BeniDigital: README (arquitectura, tokens, cómo agregar
+│                      un endpoint), portal.md (el contrato) y seguridad.md
 ├── diagramas/          los flujos del pescador y del comercializador (HTML)
 └── sesiones/           bitácora: _plantilla.md y MM-AAAA/AAAA-MM-DD.md
 ```

@@ -15,7 +15,13 @@ use App\Models\Carnet;
 class TramitesDisponibles
 {
     /**
-     * @return list<array{clase: string, titulo: string, disponible: bool, detalle: string}>
+     * Lo que se pide en línea, desde el portal web y la app (REGLAS-NEGOCIO Paso 8,
+     * 19/11/2026). Lo demás, solo en ventanilla.
+     */
+    public const EN_LINEA = ['faena', 'guia'];
+
+    /**
+     * @return list<array{clase: string, titulo: string, disponible: bool, detalle: string, canal: string}>
      */
     public static function para(Beneficiario $beneficiario): array
     {
@@ -98,10 +104,13 @@ class TramitesDisponibles
             : self::item('carnet', $titulo, false, $falta);
     }
 
-    /** @return array{clase: string, titulo: string, disponible: bool, detalle: string} */
+    /** @return array{clase: string, titulo: string, disponible: bool, detalle: string, canal: string} */
     private static function item(string $clase, string $titulo, bool $disponible, string $detalle): array
     {
-        return compact('clase', 'titulo', 'disponible', 'detalle');
+        // `en_linea`: se pide desde el portal o la app; `ventanilla`: en la oficina.
+        $canal = in_array($clase, self::EN_LINEA, true) ? 'en_linea' : 'ventanilla';
+
+        return compact('clase', 'titulo', 'disponible', 'detalle', 'canal');
     }
 
     private static function kg(float $kilos): string

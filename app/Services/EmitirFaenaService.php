@@ -185,6 +185,30 @@ class EmitirFaenaService
     }
 
     /**
+     * La tarifa del permiso, para mostrar (la misma regla que al cobrar): `arancel`
+     * {etiqueta, monto} si se puede cobrar; si no, `sinArancel` con el motivo.
+     */
+    public function arancelDeReferencia(): array
+    {
+        $tarifas = $this->tarifario->tarifas(ConceptoArancel::Faena);
+        $id = $this->tarifaDeLaFaena();
+        $tarifa = collect($tarifas ?? [])->firstWhere('id', $id);
+
+        $motivo = match (true) {
+            $this->tarifario->servicioId(ConceptoArancel::Faena) === null => 'Falta elegir el servicio de la faena en Catálogos › Aranceles.',
+            $tarifas === null => 'Recaudaciones (SIREB) no responde: no se puede saber el arancel. Intente en unos minutos.',
+            $id === null => 'El servicio de la faena tiene varias tarifas activas (o ninguna): defina cuál en Catálogos › Aranceles › Permiso de faena › Definir tarifas.',
+            $tarifa === null || ! $tarifa['activa'] => 'La tarifa definida del permiso ya no está activa en SIREB: vuelva a definirla en Catálogos › Aranceles.',
+            default => null,
+        };
+
+        return [
+            'arancel' => $motivo === null ? ['etiqueta' => $tarifa['etiqueta'], 'monto' => $tarifa['monto']] : null,
+            'sinArancel' => $motivo,
+        ];
+    }
+
+    /**
      * El precio del permiso: la tarifa definida en Aranceles › Permiso de faena, por
      * su id de SIREB, al precio de ahora. Ventanilla no elige tarifa.
      *

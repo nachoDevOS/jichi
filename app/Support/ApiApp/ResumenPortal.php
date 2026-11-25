@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support;
+namespace App\Support\ApiApp;
 
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
@@ -12,10 +12,13 @@ use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
+use App\Support\ExpedienteBeneficiario;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 /**
+ * ApiApp · COMPARTIDO con el portal web: cambiarlo cambia la app y la web (docs/api/README.md § 4).
+ *
  * Lo que el portal /mi-cuenta muestra de cada documento. Sin ids ni banderas de
  * funcionario: el beneficiario solo consulta. Estado, vigencia y kilos salen de
  * los mismos métodos del modelo que usa el panel.
@@ -173,6 +176,22 @@ class ResumenPortal
     }
 
     /**
+     * Uno solo de los cuatro documentos, con lo que su resumen lee precargado: lo usa
+     * la app al preguntar por el estado de un trámite (ApiApp\EstadoTramiteController).
+     *
+     * @return array<string, mixed>
+     */
+    public static function de(Model $documento): array
+    {
+        return match (true) {
+            $documento instanceof AprovechamientoPesq => self::aprovechamiento($documento->loadMissing('codigo')),
+            $documento instanceof Carnet => self::carnet($documento->loadMissing(['codigo', 'asociacion:id,nombre,sigla', 'aprovechamiento'])),
+            $documento instanceof PermisoFaena => self::faena($documento->loadMissing(['codigo', 'carnet.aprovechamiento:id,estado', 'documentoEmitido'])),
+            $documento instanceof GuiaMovimiento => self::guia($documento->loadMissing(['codigo', 'aprovechamiento:id,nro,beneficiario_id', 'aprovechamiento.beneficiario'])),
+        };
+    }
+
+    /**
      * Los trámites abiertos de la persona —pendientes de pago—, del más
      * nuevo al más viejo dentro de cada tipo. Los usan «En curso» y el inicio.
      *
@@ -325,6 +344,6 @@ class ResumenPortal
     /** Relativa: el mismo sitio del portal, sin depender del host de la petición. */
     private static function urlVerificar(?string $codigo): ?string
     {
-        return $codigo === null ? null : route('verificar.show', ['codigo' => $codigo], false);
+        return $codigo === null ? null : route('verificar.show', ['code' => $codigo], false);
     }
 }

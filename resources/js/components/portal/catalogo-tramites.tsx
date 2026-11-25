@@ -1,4 +1,5 @@
-import { CalendarClock, Check, CheckCircle2, Clock, Fish, IdCard, Lock, Smartphone, Truck, Wallet } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { CalendarClock, Check, CheckCircle2, Clock, Fish, IdCard, Lock, Send, Smartphone, Truck, Wallet } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ICONO_DOCUMENTO } from '@/components/portal/documento';
 import { cn } from '@/lib/utils';
@@ -296,6 +297,11 @@ function DetalleTramite({
     const listos = marcados.filter(Boolean).length;
     // Faena y guía traen un dato propio (los kilos o por qué no); los demás, solo el motivo si hoy no puede.
     const nota = suyo && (t.clase === 'faena' || t.clase === 'guia' || !suyo.disponible) ? suyo.detalle : null;
+    // Se pide desde aquí mismo (19/11/2026). La ruta, solo si hoy puede pedirlo.
+    const enLinea = suyo?.canal === 'en_linea';
+    const formulario = { faena: 'portal.faenas.create', guia: 'portal.guias.create' } as const;
+    const pedir =
+        enLinea && situacion === 'puede' && (t.clase === 'faena' || t.clase === 'guia') ? route(formulario[t.clase]) : null;
 
     return (
         <div className="mt-4 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300">
@@ -389,7 +395,7 @@ function DetalleTramite({
                     {listos === t.lleve.length && (
                         <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-emerald-700 motion-safe:animate-in motion-safe:fade-in">
                             <CheckCircle2 className="size-4" />
-                            ¡Listo! Ya puede venir a ventanilla.
+                            {enLinea ? '¡Listo! Ya puede pedirlo aquí mismo.' : '¡Listo! Ya puede venir a ventanilla.'}
                         </p>
                     )}
                 </div>
@@ -397,8 +403,8 @@ function DetalleTramite({
                 <div className="rounded-xl bg-rio-profundo p-4 text-white">
                     <p className="mb-3 font-bold">Cómo se pide</p>
                     <ol className="space-y-3 text-sm">
-                        <PasoComo numero={1} icono={<IdCard className="size-4" />}>
-                            Venga a ventanilla con lo de la lista
+                        <PasoComo numero={1} icono={enLinea ? <Smartphone className="size-4" /> : <IdCard className="size-4" />}>
+                            {enLinea ? 'Pídalo aquí mismo o desde la app, sin venir a ventanilla' : 'Venga a ventanilla con lo de la lista'}
                         </PasoComo>
                         <PasoComo numero={2} icono={<Wallet className="size-4" />}>
                             Pague en el banco o con QR, con el código que le dan
@@ -407,6 +413,15 @@ function DetalleTramite({
                             Sígalo aquí: se aprueba solo al validarse el pago
                         </PasoComo>
                     </ol>
+                    {pedir && (
+                        <Link
+                            href={pedir}
+                            className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-institucional-dorado px-3 py-2.5 text-sm font-extrabold text-rio-profundo transition-opacity hover:opacity-90"
+                        >
+                            <Send className="size-4" />
+                            Pedir en línea
+                        </Link>
+                    )}
                 </div>
             </div>
         </div>

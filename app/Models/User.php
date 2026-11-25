@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Route;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['beneficiario_id', 'name', 'ci', 'mamore_id', 'email', 'password', 'activo', 'debe_cambiar_password'])]
@@ -20,8 +21,9 @@ class User extends Authenticatable
 {
     /*
      * NO LLEVA HasFactory, y su UserFactory se borró.
+     * HasApiTokens: solo las cuentas del portal sacan token (app BeniDigital, routes/api.php).
      */
-    use Auditable, HasRoles, Notifiable, SoftDeletes;
+    use Auditable, HasApiTokens, HasRoles, Notifiable, SoftDeletes;
 
     /** Ver PermisoFaena::$attributes: los defaults de la base no llegan al create(). */
     protected $attributes = [

@@ -4,6 +4,8 @@ use App\Http\Controllers\Portal\AccesoController;
 use App\Http\Controllers\Portal\DescargarController;
 use App\Http\Controllers\Portal\DescargarReciboController;
 use App\Http\Controllers\Portal\EnCursoController;
+use App\Http\Controllers\Portal\FaenaController;
+use App\Http\Controllers\Portal\GuiaController;
 use App\Http\Controllers\Portal\InicioController;
 use App\Http\Controllers\Portal\PagoQrController;
 use App\Http\Controllers\Portal\PagosController;
@@ -41,6 +43,21 @@ Route::prefix('mi-cuenta')->name('portal.')->group(function () {
         Route::get('/pagos', PagosController::class)->name('pagos');
         Route::get('/mis-datos', [PerfilController::class, 'show'])->name('perfil');
 
+        // Trámites en línea (19/11/2026): faena y guía; lo demás, en ventanilla.
+        Route::get('/faena/pedir', [FaenaController::class, 'create'])->name('faenas.create');
+        Route::post('/faena', [FaenaController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('faenas.store');
+
+        Route::get('/guia/pedir', [GuiaController::class, 'create'])->name('guias.create');
+        // El código es una llave de 16 caracteres: throttle para que no se pruebe al azar.
+        Route::get('/guia/autorizacion/{codigo}', [GuiaController::class, 'autorizacion'])
+            ->middleware('throttle:20,1')
+            ->name('guias.autorizacion');
+        Route::post('/guia', [GuiaController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('guias.store');
+
         // El PDF del panel, solo de lo vigente hoy, y solo si es suyo.
         Route::get('/descargar/{codigo}', DescargarController::class)->name('descargar');
         Route::get('/recibos/{codigo}/descargar', DescargarReciboController::class)->name('recibos.descargar');
@@ -57,5 +74,10 @@ Route::prefix('mi-cuenta')->name('portal.')->group(function () {
         Route::get('/pagar-qr/{codigo}/estado', [PagoQrController::class, 'estado'])
             ->middleware('throttle:30,1')
             ->name('pagar-qr.estado');
+
+        // Solo test: SIREB paga el QR de prueba (en producción responde 404). Como en el panel.
+        Route::post('/pagar-qr/{codigo}/simular', [PagoQrController::class, 'simular'])
+            ->middleware('throttle:10,1')
+            ->name('pagar-qr.simular');
     });
 });

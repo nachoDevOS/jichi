@@ -51,6 +51,18 @@ class IngresarRequest extends FormRequest
 
     public function authenticate(): void
     {
+        $cuenta = $this->cuentaValida();
+
+        Auth::guard('web')->login($cuenta);
+        $this->registrarAcceso('login', $cuenta->id);
+    }
+
+    /**
+     * Tope de intentos, C.I. y clave, sin abrir sesión: lo comparten el portal web
+     * y la app BeniDigital (que recibe un token). El tope es el mismo para los dos.
+     */
+    public function cuentaValida(): User
+    {
         $this->ensureIsNotRateLimited();
 
         $cuenta = $this->cuenta();
@@ -63,10 +75,9 @@ class IngresarRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
-
-        Auth::guard('web')->login($cuenta);
         $cuenta->forceFill(['ultimo_acceso_at' => now()])->saveQuietly();
-        $this->registrarAcceso('login', $cuenta->id);
+
+        return $cuenta;
     }
 
     /** La cuenta activa del beneficiario con esa C.I., o null. */
@@ -115,7 +126,7 @@ class IngresarRequest extends FormRequest
     }
 
     // `accesos.email` guarda lo que se tipeó para entrar: acá, la C.I.
-    private function registrarAcceso(string $evento, ?int $userId = null): void
+    protected function registrarAcceso(string $evento, ?int $userId = null): void
     {
         Acceso::create([
             'user_id' => $userId,

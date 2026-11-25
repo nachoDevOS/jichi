@@ -364,6 +364,29 @@ class EmitirGuiaService
     }
 
     /**
+     * Los productos del cuadro D: las tarifas del servicio de la guía en SIREB, por
+     * nombre. El precio es de referencia: el que vale lo congela la emisión. Null si
+     * SIREB no responde. Lo usan el panel y la guía pedida en línea.
+     *
+     * @return list<array{id: string, nombre: string, precio_kg: float, estado: bool}>|null
+     */
+    public function productos(): ?array
+    {
+        $tarifas = $this->tarifario->tarifas(ConceptoArancel::Guia);
+
+        return $tarifas === null ? null : collect($tarifas)
+            ->map(fn (array $t): array => [
+                'id' => $t['id'],
+                'nombre' => $t['etiqueta'],
+                'precio_kg' => $t['monto'],
+                'estado' => $t['activa'],
+            ])
+            ->sortBy('nombre')
+            ->values()
+            ->all();
+    }
+
+    /**
      * El precio por kilo de un producto —una tarifa del servicio de la guía—
      * según SIREB, el de ahora. `$especie` solo nombra el renglón en el error.
      *

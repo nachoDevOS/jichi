@@ -36,7 +36,8 @@ class BuscarPorCodigoTest extends TestCase
         $codigo = $this->vigente->codigo_legible;
         $plano = str_replace('-', '', $codigo);
 
-        foreach ([$codigo, $plano, mb_strtolower($codigo), " {$codigo} ", "https://jichi.beni.gob.bo/verificar/{$plano}"] as $termino) {
+        foreach ([$codigo, $plano, mb_strtolower($codigo), " {$codigo} ", "https://jichi.beni.gob.bo/verificar/{$plano}",
+            "https://jichi.beni.gob.bo/verificar?code={$plano}", "https://jichi.beni.gob.bo/verificar?code={$codigo}"] as $termino) {
             $r = $this->buscar($termino);
 
             $this->assertCount(1, $r, "con «{$termino}»");

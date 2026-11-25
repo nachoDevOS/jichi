@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\VerificarPagoJob;
-use App\Support\ResumenPortal;
+use App\Support\ApiApp\PantallaPortal;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,10 +19,9 @@ class EnCursoController extends Controller
     {
         // Mientras mira, sus pagos se consultan en SIREB en segundo plano; el refresco de la página trae el resultado.
         VerificarPagoJob::encolarDe($request->user()->beneficiario);
-        $abiertos = ResumenPortal::abiertos($request->user()->beneficiario);
 
         return Inertia::render('portal/en-curso', [
-            'tramites' => $abiertos->all(),
+            'tramites' => PantallaPortal::enCurso($request->user()->beneficiario),
         ]);
     }
 }
