@@ -6,7 +6,9 @@ use App\Http\Controllers\ApiApp\EstadoTramiteController;
 use App\Http\Controllers\ApiApp\FaenaController;
 use App\Http\Controllers\ApiApp\GuiaController;
 use App\Http\Controllers\ApiApp\InicioController;
+use App\Http\Controllers\ApiApp\PagosController;
 use App\Http\Controllers\ApiApp\PerfilController;
+use App\Http\Controllers\ApiApp\ReciboPdfController;
 use App\Http\Controllers\ApiApp\SesionController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 |
 | La misma cuenta del portal /mi-cuenta (C.I. + clave de ventanilla), con token de
 | Sanctum. Alcance (25/11/2026): el inicio (como el de la web), pedir faena y guía,
-| saber cuándo quedaron aprobadas y ver «Mi perfil».
+| saber cuándo quedaron aprobadas, ver «Mi perfil» y «Mis pagos» (sus recibos).
 | El QR lo paga la app directo en SIREB (API pública); acá no se cobra. Contrato en
 | docs/api/portal.md; todo lo de la app vive en carpetas ApiApp/ (docs/api/README.md).
 |
@@ -43,6 +45,12 @@ Route::prefix('v1/portal')->name('api.portal.')->group(function () {
         // El inicio, como el del portal web: vigente hoy, qué hacer ahora y la deuda.
         Route::get('/inicio', InicioController::class)->name('inicio');
 
+        // «Mis pagos» (25/11/2026): sus recibos de una gestión, como en la web.
+        Route::get('/pagos', PagosController::class)->name('pagos');
+        // El PDF de un recibo suyo (26/11/2026): un enlace firmado de 5 minutos, no los bytes.
+        Route::get('/recibos/{codigo}/pdf', ReciboPdfController::class)
+            ->middleware('throttle:20,1,recibos')
+            ->name('recibos.pdf');
         // Lo pendiente de pago, con su codigo_pago para pagar el QR en SIREB.
         Route::get('/en-curso', EnCursoController::class)->name('en-curso');
 

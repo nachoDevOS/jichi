@@ -24,6 +24,7 @@ class InicioController extends Controller
         // Como la web: al entrar se consultan sus pagos en SIREB, en segundo plano.
         VerificarPagoJob::encolarDe($beneficiario);
         $inicio = PantallaPortal::inicio($beneficiario);
+        $pagos = PantallaPortal::pagos($beneficiario, null);
 
         return response()->json(['inicio' => [
             'nombre' => $inicio['nombre'],
@@ -32,6 +33,12 @@ class InicioController extends Controller
             'abiertos' => DocumentoResource::collection($inicio['abiertos']),
             // Ya trae su `canal` (TramitesDisponibles::EN_LINEA): no lleva nada de la web.
             'tramites_disponibles' => $inicio['tramites_disponibles'],
+            // La entrada a «Mis pagos» del inicio: lo pagado en la gestión actual.
+            'pagado' => [
+                'gestion' => $pagos['gestion'],
+                'total' => $pagos['total_pagado'],
+                'recibos' => count($pagos['recibos']),
+            ],
         ]]);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Publico\EnlaceDocumentoController;
 use App\Http\Controllers\Publico\InicioController;
 use App\Http\Controllers\Publico\VerificacionController;
 use Illuminate\Support\Facades\Route;
@@ -29,3 +30,12 @@ Route::get('/verificar/{codigo?}', [VerificacionController::class, 'show'])
 Route::post('/verificar', [VerificacionController::class, 'buscarPorFormulario'])
     ->middleware('throttle:20,1')
     ->name('verificar.buscar');
+
+/*
+ * El PDF guardado en el disco LOCAL, por un enlace firmado que vence a los 5 minutos
+ * (DocumentoEmitidoService::enlaceDescarga, 26/11/2026). Sin firma válida, 403. En s3 no se
+ * usa: ahí el enlace firmado es el del bucket.
+ */
+Route::get('/documentos/enlace/{emitido}', EnlaceDocumentoController::class)
+    ->middleware(['signed', 'throttle:30,1'])
+    ->name('documentos.enlace');

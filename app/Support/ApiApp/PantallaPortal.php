@@ -2,9 +2,14 @@
 
 namespace App\Support\ApiApp;
 
+use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
+use App\Models\Carnet;
+use App\Models\GuiaMovimiento;
+use App\Models\PermisoFaena;
 use App\Models\Recibo;
 use App\Support\ExpedienteBeneficiario;
+use App\Support\QrVerificacion;
 use App\Support\TramitesDisponibles;
 use Illuminate\Support\Collection;
 
@@ -13,7 +18,7 @@ use Illuminate\Support\Collection;
  *
  * Lo que muestran Inicio, En curso, Mis papeles y Pagos del portal /mi-cuenta.
  * Lo usan las pantallas web (Portal\*Controller) y la app BeniDigital
- * (ApiApp\EnCursoController, solo «En curso»): las dos ven exactamente lo mismo.
+ * (ApiApp\InicioController, EnCursoController y PagosController): las dos ven exactamente lo mismo.
  */
 class PantallaPortal
 {
@@ -106,6 +111,8 @@ class PantallaPortal
             'total_pagado' => (float) $recibos->sum('monto_total'),
             'recibos' => $recibos->map(fn (Recibo $r): array => [
                 'numero' => $r->numero_recibo,
+                // De qué trámite es, con los nombres de ResumenPortal: la app elige el ícono.
+                'clase' => self::claseDe($r),
                 'concepto' => $r->concepto,
                 'monto_total' => (float) $r->monto_total,
                 'numero_boleta' => $r->numero_boleta,
@@ -113,11 +120,26 @@ class PantallaPortal
                 // Un DÍA, el de la boleta: no un instante (ver «Trampas» en CLAUDE.md).
                 'fecha_pago' => $r->fecha_pago?->toDateString(),
                 'emitido_en' => $r->created_at?->toIso8601String(),
+                // El código y la dirección de su QR de verificación: los mismos del PDF.
+                'codigo' => $r->codigo_legible,
+                'verificar' => $r->codigo?->codigo === null ? null : QrVerificacion::url($r->codigo->codigo),
                 'descargar' => $r->codigo?->codigo === null
                     ? null
                     : route('portal.recibos.descargar', ['codigo' => $r->codigo->codigo], false),
             ])->all(),
         ];
+    }
+
+    /** De qué trámite es el recibo; null si es de algo que la app no conoce. */
+    private static function claseDe(Recibo $recibo): ?string
+    {
+        return match ($recibo->recibible_type) {
+            (new AprovechamientoPesq)->getMorphClass() => 'aprovechamiento',
+            (new Carnet)->getMorphClass() => 'carnet',
+            (new PermisoFaena)->getMorphClass() => 'faena',
+            (new GuiaMovimiento)->getMorphClass() => 'guia',
+            default => null,
+        };
     }
 
     /** @return Collection<int, int> Las gestiones con recibos, y la actual; la más nueva primero. */

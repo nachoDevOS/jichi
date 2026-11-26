@@ -30,16 +30,25 @@ class QrVerificacion
             return null;
         }
 
-        // Ruta relativa + APP_URL: `route()` absoluta usaría el host de la petición
-        // y el QR saldría impreso con la IP del operador. Ver «Trampas» en CLAUDE.md.
-        // `/verificar?code=X` (25/11/2026); `/verificar/X`, la de lo ya impreso, sigue andando.
-        $url = rtrim((string) config('app.url'), '/').route('verificar.show', ['code' => $codigo], false);
+        $url = self::url($codigo);
 
         return [
             'qr' => self::png($url),
             'codigo' => (string) $documento->codigo_legible,
             'url' => $url,
         ];
+    }
+
+    /**
+     * La dirección pública que verifica un código: la que va dentro del QR impreso
+     * y la que la app dibuja en el recibo digital (25/11/2026), para que sean la misma.
+     */
+    public static function url(string $codigo): string
+    {
+        // Ruta relativa + APP_URL: `route()` absoluta usaría el host de la petición
+        // y el QR saldría impreso con la IP del operador. Ver «Trampas» en CLAUDE.md.
+        // `/verificar?code=X` (25/11/2026); `/verificar/X`, la de lo ya impreso, sigue andando.
+        return rtrim((string) config('app.url'), '/').route('verificar.show', ['code' => $codigo], false);
     }
 
     /**

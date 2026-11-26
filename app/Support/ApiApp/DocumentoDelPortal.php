@@ -7,6 +7,7 @@ use App\Models\Carnet;
 use App\Models\Codigo;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
+use App\Models\Recibo;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -30,6 +31,23 @@ class DocumentoDelPortal
         }
 
         return self::titular($documento) === $beneficiarioId ? $documento : null;
+    }
+
+    /**
+     * Un recibo suyo por su código público (26/11/2026: lo comparten «Descargar» del
+     * portal web y la descarga de la app). Lo ajeno o borrado, null, como lo inexistente.
+     */
+    public static function recibo(string $codigo, int $beneficiarioId): ?Recibo
+    {
+        $recibo = Codigo::query()
+            ->where('codigo', Carnet::normalizarCodigo($codigo))
+            ->where('codigable_type', (new Recibo)->getMorphClass())
+            ->first()
+            ?->codigable;
+
+        return $recibo instanceof Recibo && ! $recibo->trashed() && $recibo->beneficiario_id === $beneficiarioId
+            ? $recibo
+            : null;
     }
 
     /** La faena y la guía llegan a la persona por su carnet. Un recibo no entra. */

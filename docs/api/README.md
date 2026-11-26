@@ -43,6 +43,8 @@ consulta en el portal web o se hace en ventanilla.
 | Ver su inicio, como el de la web: vigente hoy, qué hacer ahora, por pagar | `GET /inicio` | ✅ |
 | Ver lo que tiene por pagar | `GET /en-curso` | ✅ |
 | **Ver «Mi perfil»**: sus datos, actividades y la foto del carnet (§ 2.3) | `GET /perfil`, `GET /perfil/foto` | ✅ |
+| **Ver «Mis pagos»**: sus recibos por gestión, con el código y el QR de verificación de cada uno | `GET /pagos?gestion=` | ✅ |
+| **Bajar el PDF oficial de un recibo** (el guardado en S3): un enlace firmado de 5 minutos | `GET /recibos/{codigo}/pdf` | ✅ |
 | **Pedir un permiso de faena** (pescador) | `GET /faenas/nueva`, `POST /faenas` | ✅ |
 | **Pedir una guía de transporte** (comercializador) | `GET /guias/nueva`, `GET /autorizaciones/{codigo}`, `POST /guias` | ✅ |
 | **Pagar por QR** lo que pidió | **No pasa por acá**: la app paga directo en SIREB (§ 2.1) | ✅ (en SIREB) |
@@ -111,9 +113,11 @@ Son **sus propios datos**, los mismos que ve en la web con la misma cuenta. Lo q
 token cifrado en el celular, que vence a los 90 días sin uso, el tope de 60 pedidos por minuto y
 que ninguna ruta reciba un id (solo ve lo suyo: `PerfilTest::test_solo_ve_lo_suyo`).
 
-**Fuera del alcance (sin ruta en la API):** mis papeles, pagos y recibos, y descargar PDF.
-`/papeles` y `/pagos` existieron del 19 al 25/11/2026 y se quitaron porque la app no los usa
-(`/inicio` también, y volvió ese mismo día para el inicio de la app, como el de la web). Están en la rama `rescate/api-portal` por si se vuelven a necesitar. Una prueba controla
+**Fuera del alcance (sin ruta en la API):** mis papeles y el PDF de los papeles (el del **recibo** sí, desde el 26/11/2026).
+`/papeles` y `/pagos` existieron del 19 al 25/11/2026 y se quitaron porque la app no los usaba
+(`/inicio` también, y volvió ese mismo día para el inicio de la app, como el de la web).
+`/pagos` volvió el 25/11/2026 para «Mis pagos» de la app; el recibo se ve como recibo digital con
+su QR de verificación, sin PDF. Están en la rama `rescate/api-portal` por si se vuelven a necesitar. Una prueba controla
 que den 404 (`EnCursoTest::test_fuera_del_alcance_de_la_app_no_hay_ruta`).
 
 **Qué no puede hacer**, igual que en el portal web (REGLAS-NEGOCIO, Paso 8): sacar la
@@ -174,7 +178,9 @@ routes/api-app.php                       Las 14 rutas de la app. La incluye rout
 app/Http/Controllers/ApiApp/             SOLO APP — reciben el pedido, llaman a la lógica, responden JSON
   ├── SesionController.php               POST /sesion (entrar) · DELETE /sesion (salir)
   ├── CuentaController.php               GET /yo · PUT /clave
-  ├── InicioController.php               GET /inicio (como el inicio de la web)
+  ├── InicioController.php               GET /inicio (como el inicio de la web, + lo pagado en el año)
+  ├── PagosController.php                GET /pagos?gestion= («Mis pagos», sin `descargar`)
+  ├── ReciboPdfController.php            GET /recibos/{codigo}/pdf (enlace firmado de 5 min al PDF de S3)
   ├── EnCursoController.php              GET /en-curso
   ├── EstadoTramiteController.php        GET /tramites/{codigo}/estado (después de pagar en SIREB)
   ├── FaenaController.php                GET /faenas/nueva · POST /faenas
@@ -431,6 +437,8 @@ todos los de una cuenta compartirían el mismo contador.
 | B | Seguridad: `Idempotency-Key` en los dos POST, tokens que vencen a los 90 días sin uso, 60 pedidos por minuto por cuenta | ✅ 25/11/2026 |
 | C | «Mi perfil» vuelve: `GET /perfil` y `GET /perfil/foto` (pedido del responsable) | ✅ 25/11/2026 |
 | C | El inicio vuelve: `GET /inicio`, para que la app se parezca al portal web | ✅ 25/11/2026 |
+| C | «Mis pagos» vuelve: `GET /pagos`, con `clase`, `codigo` y `verificar` por recibo; `inicio.pagado` | ✅ 25/11/2026 |
+| C | Descargar el PDF del recibo: `GET /recibos/{codigo}/pdf` → enlace firmado de 5 minutos (S3 o ruta firmada local) | ✅ 26/11/2026 |
 
 **Falta:**
 - Configurar producción ([seguridad.md](seguridad.md) § 2): HTTPS, `APP_DEBUG=false`, etc.

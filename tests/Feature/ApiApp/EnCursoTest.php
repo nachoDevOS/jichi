@@ -109,8 +109,9 @@ class EnCursoTest extends TestCase
 
     public function test_fuera_del_alcance_de_la_app_no_hay_ruta(): void
     {
-        // Alcance del 25/11/2026: inicio, pedir faena y guía, pagar por QR y «Mi perfil». Lo demás, en la web.
-        foreach (['/papeles', '/pagos'] as $ruta) {
+        // Alcance del 25/11/2026: inicio, pedir faena y guía, pagar por QR, «Mi perfil» y «Mis pagos».
+        // «Mis papeles» sigue solo en la web.
+        foreach (['/papeles'] as $ruta) {
             $this->pedir($ruta)->assertNotFound();
         }
     }

@@ -52,6 +52,12 @@ la ficha del recibo y las pestañas del beneficiario mandan `pdf_enlace` /
 Jichi y se veía el salto de URL, aunque el PDF ya estaba guardado y no se
 generaba otro.
 
+**La app BeniDigital** (26/11/2026): «Descargar PDF» del recibo digital pide
+`GET /api/v1/portal/recibos/{codigo}/pdf` y recibe un enlace de **5 minutos**
+(`DocumentoEmitidoService::enlaceDescarga()`, con `attachment`). En s3 es el enlace firmado del
+bucket; en el disco local, la ruta firmada `documentos.enlace` (`Publico\EnlaceDocumentoController`),
+que sin firma o vencida da 403. Pruebas: `tests/Feature/ApiApp/ReciboPdfTest.php`.
+
 ## Sin «Regenerar»
 
 Se probó un botón «Regenerar PDF» y **se quitó a pedido** (23/10/2026): lo emitido

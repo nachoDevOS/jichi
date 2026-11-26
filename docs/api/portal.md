@@ -30,6 +30,8 @@ Todo lo que pide token tiene además un tope de **60 pedidos por minuto por cuen
 | `GET` | [`/perfil/foto`](#get-perfilfoto--la-foto-del-carnet) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/inicio`](#get-inicio--el-inicio-de-la-app-vuelve-el-25112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/en-curso`](#get-en-curso--lo-pendiente-de-pago) | ✔ | ✘ `403 clave_temporal` |
+| `GET` | [`/pagos`](#get-pagos--mis-pagos-vuelve-el-25112026) | ✔ | ✘ `403 clave_temporal` |
+| `GET` | [`/recibos/{codigo}/pdf`](#get-reciboscodigopdf--bajar-el-pdf-del-recibo-26112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/tramites/{codigo}/estado`](#get-tramitescodigoestado--ya-quedó-aprobado) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/faenas/nueva`](#get-faenasnueva--antes-de-pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
 | `POST` | [`/faenas`](#post-faenas--pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
@@ -223,19 +225,81 @@ encola la consulta de sus pagos a SIREB (`VerificarPagoJob`).
     "tramites_disponibles": [
       { "clase": "faena", "titulo": "Permiso de Faena", "disponible": true,
         "detalle": "Cada permiso sale por 1.000 kg.", "canal": "en_linea" }
-    ]
+    ],
+    "pagado": { "gestion": 2026, "total": 530, "recibos": 2 }
   }
 }
 ```
 
 - `vigentes`: lo que vale hoy, lo que vence antes primero.
 - `abiertos`: lo pendiente de pago («Qué hacer ahora»).
+- `pagado`: lo pagado en la gestión actual (de `PantallaPortal::pagos`), para la entrada «Mis pagos».
 - `tramites_disponibles.canal`: `en_linea` o `ventanilla`, de `App\Support\TramitesDisponibles::EN_LINEA`
   (la misma lista para la web y la app). Hoy: `faena` y `guia` en línea.
 
 - La app arma con esto su inicio, como el de la web: cifras, «Qué hacer ahora», «Vigente hoy»
   (la autorización con `kilos_disponibles` y `volumen_total_kg`) y «Por pagar». Las tarjetas de
   «Pedir en línea» siguen preguntando a `/faenas/nueva` y `/guias/nueva`, que dan el motivo exacto.
+
+## `GET /pagos` — «Mis pagos» (vuelve el 25/11/2026)
+
+Sus recibos de una gestión: `App\Support\ApiApp\PantallaPortal::pagos()`, lo mismo que «Mis pagos»
+del portal web. `?gestion=2025` elige el año; una gestión sin recibos, inválida o ausente da la
+actual. Solo los suyos (`PagosTest::test_solo_ve_sus_recibos`).
+
+```json
+{
+  "pagos": {
+    "gestion": 2026,
+    "gestiones": [2026, 2025],
+    "total_pagado": 530,
+    "recibos": [
+      {
+        "numero": "000009",
+        "clase": "aprovechamiento",
+        "concepto": "Autorización de Pesca para Aprovechamiento Pesquero - 2000 kg",
+        "monto_total": 500,
+        "numero_boleta": "SIM-AOHOKFXKPCGS",
+        "entidad_bancaria": "Pago por QR de prueba",
+        "fecha_pago": "2026-11-25",
+        "emitido_en": "2026-11-25T14:30:37-04:00",
+        "codigo": "R7KQ-2M9X-ABCD-EFGH",
+        "verificar": "https://pescador.beni.gob.bo/verificar?code=R7KQ2M9XABCDEFGH"
+      }
+    ]
+  }
+}
+```
+
+- El más nuevo primero. `fecha_pago` es un **día** (el de la boleta), no un instante.
+- `clase`: `aprovechamiento`, `carnet`, `faena` o `guia` (de qué trámite es); `null` si es otro.
+- `codigo` y `verificar`: el código legible y la dirección del QR de verificación, **los mismos del
+  PDF** (`QrVerificacion::url`). La app dibuja con ellos el recibo digital.
+- No lleva `descargar`: la descarga del PDF pide sesión de navegador (`/mi-cuenta`).
+
+## `GET /recibos/{codigo}/pdf` — bajar el PDF del recibo (26/11/2026)
+
+El **PDF oficial** del recibo, el que se guardó en S3 al emitirse (el mismo que imprime ventanilla).
+No viajan los bytes: devuelve un **enlace firmado que vence a los 5 minutos** y la app lo abre fuera
+(Chrome lo baja; en el celular, el navegador o el visor de PDF). `{codigo}` es el código del recibo
+(`codigo` de `GET /pagos`). Tope: **20 por minuto**.
+
+```json
+{
+  "pdf": {
+    "url": "https://gadbeni.sfo3.digitaloceanspaces.com/jichi/dev/documentos/recibos/…?X-Amz-Signature=…",
+    "vence_en": "2026-11-26T10:05:00-04:00",
+    "nombre": "recibo-000009.pdf"
+  }
+}
+```
+
+- `DocumentoEmitidoService::enlaceDescarga()`: en s3, el enlace firmado del bucket (privado) con
+  `Content-Disposition: attachment`; en el disco local (desarrollo), una ruta firmada de este sistema
+  (`/documentos/enlace/{id}?signature=…`, middleware `signed`): sin firma o vencida, `403`.
+- Si el PDF todavía no estaba guardado, se arma y se guarda en ese momento.
+- El token **no** va en el enlace. Recibo ajeno o inexistente: `404` con el mismo mensaje
+  (`DocumentoDelPortal::recibo`, la misma búsqueda que «Descargar» del portal web).
 
 ## `GET /en-curso` — lo pendiente de pago
 
@@ -472,7 +536,7 @@ ventanilla con el código.
 
 ## Fuera del alcance (sin ruta)
 
-`GET /papeles` y `GET /pagos` existieron del 19 al 25/11/2026. Se quitaron porque la app no los
-usa (`/inicio`, `/perfil` y `/perfil/foto` también se quitaron ese día y volvieron a pedido del
+`GET /papeles` existió del 19 al 25/11/2026. Se quitó porque la app no lo usa (`/inicio`,
+`/perfil`, `/perfil/foto` y `/pagos` también se quitaron ese día y volvieron a pedido del
 responsable).
 Su código está en la rama `rescate/api-portal`. El PDF (`/descargar`) no se hace.

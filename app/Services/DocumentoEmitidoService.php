@@ -21,6 +21,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Throwable;
 
 /**
@@ -62,6 +63,41 @@ class DocumentoEmitidoService
         return response(Storage::disk($emitido->disco)->get($emitido->ruta), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => $disposicion,
+        ]);
+    }
+
+    /**
+     * Un enlace para bajar el PDF guardado, que vale MINUTOS_ENLACE (26/11/2026, la app
+     * BeniDigital): lo abre fuera de la app, sin el token. En s3, el enlace firmado del
+     * bucket (privado), igual que respuesta(); en el disco local, una ruta firmada de Jichi
+     * (`documentos.enlace`), para poder probarlo sin s3.
+     *
+     * @return array{url: string, vence_en: string, nombre: string}
+     */
+    public function enlaceDescarga(Model $documento): array
+    {
+        $emitido = $this->vigenteConArchivo($documento);
+        $vence = now()->addMinutes(self::MINUTOS_ENLACE);
+        $nombre = self::nombre($documento);
+
+        $url = $emitido->disco === 's3'
+            ? Storage::disk('s3')->temporaryUrl($emitido->ruta, $vence, [
+                'ResponseContentType' => 'application/pdf',
+                'ResponseContentDisposition' => 'attachment; filename="'.$nombre.'"',
+            ])
+            : URL::temporarySignedRoute('documentos.enlace', $vence, ['emitido' => $emitido->id]);
+
+        return ['url' => $url, 'vence_en' => $vence->toIso8601String(), 'nombre' => $nombre];
+    }
+
+    /** Lo que entrega la ruta firmada del disco local: el archivo tal cual, para bajar. */
+    public function archivoLocal(DocumentoEmitido $emitido): Response
+    {
+        abort_if($emitido->disco === 's3' || ! Storage::disk($emitido->disco)->exists($emitido->ruta), 404);
+
+        return response(Storage::disk($emitido->disco)->get($emitido->ruta), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.self::nombre($emitido->emitible).'"',
         ]);
     }
 
