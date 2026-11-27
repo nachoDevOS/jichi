@@ -246,6 +246,22 @@ class GuiaTest extends TestCase
         $this->assertSame(0, GuiaMovimiento::query()->count());
     }
 
+    public function test_las_guias_en_linea_no_tienen_tope(): void
+    {
+        // A diferencia de la faena (27/11/2026, decisión del responsable): con una
+        // sin pagar y otra aprobada en fecha, pide otra igual.
+        $this->api('post', '/guias', $this->guia(100))->assertCreated();
+        $this->api('post', '/guias', $this->guia(100))->assertCreated();
+        GuiaMovimiento::query()->oldest('id')->firstOrFail()->update([
+            'estado' => EstadoGuia::Aprobada,
+            'fecha_vencimiento' => now()->addDays(3),
+        ]);
+
+        $this->api('get', '/guias/nueva')->assertJsonPath('guia.puede', true);
+        $this->api('post', '/guias', $this->guia(100))->assertCreated();
+        $this->assertSame(3, GuiaMovimiento::query()->count());
+    }
+
     public function test_despues_aparece_en_curso_listo_para_pagar(): void
     {
         $this->api('post', '/guias', $this->guia(100))->assertCreated();

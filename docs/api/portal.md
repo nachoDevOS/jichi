@@ -362,9 +362,12 @@ el mismo que la página web «Pedir permiso de faena». **Las reglas son las del
 - `kilos`: los libres de su autorización; con esos sale la faena (Paso 4: **no descuenta**).
 - `propietario_sugerido`: como el panel, si la embarcación es suya va su nombre.
 
-- **Una faena en línea a la vez** (26/11/2026): con un permiso de faena pendiente de pago,
+- **Una faena en línea a la vez**: con un permiso de faena **pendiente de pago** (26/11/2026)
   `puede: false` y `motivo: "Tiene el permiso de faena N° 000013 sin pagar. Páguelo primero;
-  después puede pedir otro."`; `POST /faenas` responde `422` con ese motivo en `errors.faena`.
+  después puede pedir otro."`; con uno **aprobado y vigente** (27/11/2026, `PermisoFaena::vigentes`)
+  `motivo: "Tiene el permiso de faena N° 000013 vigente hasta el 15/12/2026. Puede pedir otro cuando
+  venza."`. Vencido o revocado, vuelve a poder. `POST /faenas` responde `422` con el motivo en
+  `errors.faena`. Las guías **no** tienen tope.
 
 ## `POST /faenas` — pedir un permiso de faena
 

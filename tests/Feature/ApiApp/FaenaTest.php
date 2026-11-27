@@ -135,9 +135,53 @@ class FaenaTest extends TestCase
         $this->assertStringContainsString('sin pagar', $respuesta->json('errors.faena.0'));
         $this->assertSame(1, PermisoFaena::query()->count());
 
-        // Pagada (aprobada), vuelve a poder.
-        $primera->update(['estado' => EstadoFaena::Aprobado]);
+        // Pagada y ya vencida, vuelve a poder.
+        $primera->update([
+            'estado' => EstadoFaena::Aprobado,
+            'fecha_salida' => now()->subDays(40)->toDateString(),
+            'fecha_desembarque' => now()->subDays(10)->toDateString(),
+        ]);
         $this->api('get', '/faenas/nueva')->assertJsonPath('faena.puede', true);
+    }
+
+    public function test_con_una_faena_aprobada_vigente_no_pide_otra_hasta_que_venza(): void
+    {
+        $this->pescadorListo($this->ignacio);
+        $this->api('post', '/faenas', self::TALONARIO)->assertCreated();
+        $primera = PermisoFaena::query()->sole();
+        $hasta = now()->addDays(20);
+        $primera->update([
+            'estado' => EstadoFaena::Aprobado,
+            'fecha_salida' => now()->toDateString(),
+            'fecha_desembarque' => $hasta->toDateString(),
+        ]);
+
+        $this->api('get', '/faenas/nueva')
+            ->assertJsonPath('faena.puede', false)
+            ->assertJsonPath('faena.motivo', "Tiene el permiso de faena N° {$primera->numero_legible} vigente hasta el "
+                .$hasta->format('d/m/Y').'. Puede pedir otro cuando venza.');
+
+        $respuesta = $this->api('post', '/faenas', [...self::TALONARIO, 'embarcacion' => 'Otra canoa'])->assertUnprocessable();
+        $this->assertStringContainsString('vigente hasta', $respuesta->json('errors.faena.0'));
+        $this->assertSame(1, PermisoFaena::query()->count());
+
+        // El último día todavía vale.
+        $primera->update(['fecha_desembarque' => now()->toDateString()]);
+        $this->api('get', '/faenas/nueva')->assertJsonPath('faena.puede', false);
+    }
+
+    public function test_revocada_por_ventanilla_vuelve_a_poder(): void
+    {
+        $this->pescadorListo($this->ignacio);
+        $this->api('post', '/faenas', self::TALONARIO)->assertCreated();
+        PermisoFaena::query()->sole()->update([
+            'estado' => EstadoFaena::Revocado,
+            'fecha_salida' => now()->toDateString(),
+            'fecha_desembarque' => now()->addDays(20)->toDateString(),
+        ]);
+
+        $this->api('get', '/faenas/nueva')->assertJsonPath('faena.puede', true);
+        $this->api('post', '/faenas', [...self::TALONARIO, 'embarcacion' => 'Otra canoa'])->assertCreated();
     }
 
     public function test_exige_los_siete_renglones_con_los_mensajes_de_ventanilla(): void

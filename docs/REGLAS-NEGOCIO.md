@@ -391,10 +391,13 @@ boletas en Jichi y la firma de supervisión.)*
 
   **En línea valen las mismas reglas que en el panel** *(decidido por el
   responsable, 19/11/2026)*:
-  0. **Faena en línea: una a la vez** *(26/11/2026, pedido del responsable)*. Con un
-     permiso de faena **pendiente de pago**, el pescador no pide otro en línea (app ni
-     portal web): «Tiene el permiso de faena N° … sin pagar. Páguelo primero; después
-     puede pedir otro.» (`PedirFaenaService::datos()` / `pedir()`). Ventanilla, sin tope.
+  0. **Faena en línea: una a la vez** *(26/11/2026 y 27/11/2026, pedido del responsable)*.
+     Con un permiso de faena **pendiente de pago** o **aprobado y vigente**, el pescador no
+     pide otro en línea (app ni portal web) hasta que venza o ventanilla lo revoque:
+     «Tiene el permiso de faena N° … sin pagar. Páguelo primero; después puede pedir otro.»
+     o «Tiene el permiso de faena N° … vigente hasta el dd/mm/aaaa. Puede pedir otro cuando
+     venza.» (`PedirFaenaService::datos()` / `pedir()`). Ventanilla, sin tope. **Las guías en
+     línea, sin tope** (27/11/2026).
   1. **Sin tope de pendientes** (salvo la faena en línea, arriba). La guía descuenta los kilos del pescador al
      registrarse, como en ventanilla (Paso 5); si nunca se paga, ventanilla la
      elimina y los kilos vuelven.

@@ -42,11 +42,12 @@ class PedirFaenaService
         $carnet = $this->carnet($beneficiario);
         $motivo = $carnet === null ? self::SIN_CARNET : $carnet->motivoSinPermisos();
 
-        // En línea, una faena a la vez (26/11/2026, pedido del responsable): con una
-        // sin pagar, primero esa. Ventanilla (el panel) no tiene este tope.
-        if ($motivo === null && ($sinPagar = $this->faenaSinPagar($beneficiario)) !== null) {
-            $motivo = "Tiene el permiso de faena N° {$sinPagar->numero_legible} sin pagar. "
-                .'Páguelo primero; después puede pedir otro.';
+        // En línea, una faena a la vez (pedido del responsable): con una sin pagar
+        // (26/11/2026) o una aprobada que todavía no venció (27/11/2026), no pide
+        // otra hasta que venza o ventanilla la revoque. Ventanilla (el panel) no
+        // tiene este tope. Las guías, tampoco.
+        if ($motivo === null) {
+            $motivo = $this->motivoFaenaAbierta($beneficiario);
         }
         $arancel = $motivo === null ? $this->faenas->arancelDeReferencia()['arancel'] : null;
 
@@ -95,13 +96,31 @@ class PedirFaenaService
         return $this->faenas->emitir($this->carnet($beneficiario), $origen, $papel);
     }
 
-    /** La faena suya que todavía espera el pago (la más vieja), o null. */
-    private function faenaSinPagar(Beneficiario $beneficiario): ?PermisoFaena
+    /**
+     * Por qué no puede pedir otra faena en línea, o null: tiene una sin pagar
+     * (la más vieja) o una aprobada que todavía autoriza (`PermisoFaena::vigentes`:
+     * en fecha, sin revocar, con su carnet y su autorización vigentes).
+     */
+    private function motivoFaenaAbierta(Beneficiario $beneficiario): ?string
     {
-        return $beneficiario->faenas()
+        $sinPagar = $beneficiario->faenas()
             ->where('permisos_faena.estado', EstadoFaena::Pendiente)
             ->orderBy('permisos_faena.nro')
             ->first();
+
+        if ($sinPagar !== null) {
+            return "Tiene el permiso de faena N° {$sinPagar->numero_legible} sin pagar. "
+                .'Páguelo primero; después puede pedir otro.';
+        }
+
+        $vigente = $beneficiario->faenas()
+            ->vigentes()
+            ->orderByDesc('permisos_faena.fecha_desembarque')
+            ->first();
+
+        return $vigente === null ? null
+            : "Tiene el permiso de faena N° {$vigente->numero_legible} vigente hasta el "
+                .$vigente->fecha_desembarque->format('d/m/Y').'. Puede pedir otro cuando venza.';
     }
 
     /** Su carnet de pescador vigente; si no tiene, el último (para decir por qué no sirve). */
