@@ -13,6 +13,7 @@ use App\Services\ApiApp\PedirGuiaService;
 use App\Services\CuentaPortalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -94,6 +95,45 @@ class GuiaTest extends TestCase
                 ->assertJsonPath('autorizacion.vendible', true)
                 ->assertJsonMissingPath('autorizacion.id');
         }
+    }
+
+    //  La foto del pescador (27/11/2026)
+
+    public function test_la_foto_del_pescador_va_por_el_codigo_y_el_token(): void
+    {
+        Storage::fake('public');
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+        Storage::disk('public')->put('beneficiarios/juan.png', $png);
+        $this->autJuan->beneficiario->forceFill(['foto' => 'beneficiarios/juan.png'])->save();
+        $codigo = $this->autJuan->codigo_legible;
+
+        $this->api('get', '/autorizaciones/'.$codigo)
+            ->assertJsonPath('autorizacion.tiene_foto', true)
+            ->assertJsonMissingPath('autorizacion.foto_url');
+        $this->withToken($this->token)
+            ->get('/api/v1/portal/autorizaciones/'.$codigo.'/foto', ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png');
+    }
+
+    public function test_sin_foto_o_con_un_codigo_que_no_existe_da_404(): void
+    {
+        $this->api('get', '/autorizaciones/'.$this->autJuan->codigo_legible)
+            ->assertJsonPath('autorizacion.tiene_foto', false);
+        $this->api('get', '/autorizaciones/'.$this->autJuan->codigo_legible.'/foto')->assertNotFound();
+        $this->api('get', '/autorizaciones/AAAABBBBCCCCDDDD/foto')->assertNotFound();
+    }
+
+    public function test_la_foto_solo_con_carnet_de_comercializador_y_token(): void
+    {
+        $this->getJson('/api/v1/portal/autorizaciones/'.$this->autJuan->codigo_legible.'/foto')
+            ->assertUnauthorized();
+
+        $this->carnet->delete();
+
+        $this->api('get', '/autorizaciones/'.$this->autJuan->codigo_legible.'/foto')
+            ->assertForbidden()
+            ->assertJsonPath('message', PedirGuiaService::SIN_CARNET);
     }
 
     public function test_un_codigo_que_no_existe_da_404(): void

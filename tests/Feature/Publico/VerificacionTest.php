@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Publico;
 
+use App\Enums\OrigenTramite;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
 use App\Support\QrVerificacion;
@@ -27,6 +28,7 @@ class VerificacionTest extends TestCase
 
         $persona = Beneficiario::factory()->create();
         $this->autorizacion = AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $persona->id, 'nro' => 1, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 1000, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => 'aprobado', 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),

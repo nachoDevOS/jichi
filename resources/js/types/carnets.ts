@@ -1,6 +1,6 @@
 import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
 
-import type { EstadoCarnet, TipoActor } from '@/types';
+import type { EstadoCarnet, OrigenTramite, TipoActor } from '@/types';
 import type { VentaSireb } from '@/types/aprovechamientos';
 
 /**
@@ -42,6 +42,9 @@ export interface CarnetFila {
 
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
     registrado_en: string | null;
+    /** Desde dónde se registró: ventanilla, portal web o app. */
+    origen_tramite: OrigenTramite | null;
+    origen_tramite_etiqueta: string | null;
 
     /** El recibo. Existe desde que SIREB confirmó el pago; null mientras está pendiente. */
     recibo_id: number | null;

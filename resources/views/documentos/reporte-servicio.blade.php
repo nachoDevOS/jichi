@@ -42,7 +42,7 @@
         </td>
         <td style="text-align: right;">
             <div class="titulo">Reporte de {{ $servicio }}</div>
-            <div class="sub">{{ $rango }}{{ $estado ? ' · Estado: '.$estado : '' }}</div>
+            <div class="sub">{{ $rango }}{{ $estado ? ' · Estado: '.$estado : '' }}{{ $origen ? ' · Origen: '.$origen : '' }}</div>
         </td>
     </tr>
 </table>

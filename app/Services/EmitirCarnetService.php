@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Enums\TramiteConVigencia;
 use App\Exceptions\CarnetInvalidoException;
@@ -35,6 +36,8 @@ class EmitirCarnetService
         Beneficiario $beneficiario,
         Asociacion $asociacion,
         TipoActor $actor,
+        // Obligatorio, sin default: un camino que se olvide de decirlo no queda marcado «ventanilla».
+        OrigenTramite $origen,
         ?Carbon $emision = null,
         ?AprovechamientoPesq $cupoElegido = null,
         // Llegan como RUTA, ya escritos ANTES de la transacción: un rollback
@@ -46,7 +49,7 @@ class EmitirCarnetService
         // Fuera de la transacción: una llamada a SIREB no debe tener filas bloqueadas.
         $precio = $this->precioDeActividad($actor);
 
-        $carnet = DB::transaction(function () use ($beneficiario, $asociacion, $actor, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
+        $carnet = DB::transaction(function () use ($beneficiario, $asociacion, $actor, $origen, $emision, $cupoElegido, $archivoCi, $archivoAsociacion, $precio): Carnet {
             // Releer con lockForUpdate() devuelve OTRA instancia: acá solo sirve
             // para tomar el candado, no se escribe sobre ella.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
@@ -110,6 +113,7 @@ class EmitirCarnetService
                 'fecha_emision' => null,
                 // Provisoria: la aprobación la recalcula.
                 'fecha_vencimiento' => Vigencia::hasta(TramiteConVigencia::carnetDe($actor), $emision)->toDateString(),
+                'origen_tramite' => $origen,
             ]);
 
             // Su llave pública, en la misma transacción: sin código, el documento

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Portal;
 
+use App\Enums\OrigenTramite;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ApiApp\PedirGuiaRequest;
@@ -39,7 +40,7 @@ class GuiaController extends Controller
     public function store(PedirGuiaRequest $request): RedirectResponse
     {
         try {
-            $guia = $this->servicio->pedir($request->user()->beneficiario, $request->validated());
+            $guia = $this->servicio->pedir($request->user()->beneficiario, $request->validated(), OrigenTramite::PortalWeb);
         } catch (PermisoOperativoException $e) {
             return back()->withInput()->withErrors(['guia' => $e->getMessage()]);
         }

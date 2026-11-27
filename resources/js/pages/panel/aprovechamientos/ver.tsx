@@ -37,6 +37,7 @@ import {
     Tabla,
     TarjetaCodigo,
     Td,
+    OrigenRegistro,
 } from '@/components/panel/comunes/ficha';
 import { EnlacePermitido } from '@/components/panel/comunes/enlace-permitido';
 import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
@@ -298,6 +299,8 @@ export default function VerCupo({
                             numero={cupo.numero}
                             ayuda="Va en el QR del papel. Con él se verifica la autorización y el comercializador declara a quién le compró."
                         />
+
+                        <OrigenRegistro origen={cupo.origen_tramite} etiqueta={cupo.origen_tramite_etiqueta} />
 
                         <LineaTiempo
                             hitos={[

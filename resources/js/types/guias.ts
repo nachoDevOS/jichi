@@ -1,6 +1,6 @@
 import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
 import type { AutorizacionVendible, BeneficiarioSugerido } from '@/types/beneficiarios';
-import type { EstadoGuia } from '@/types';
+import type { EstadoGuia, OrigenTramite } from '@/types';
 import type { VentaSireb } from '@/types/aprovechamientos';
 
 /**
@@ -149,6 +149,9 @@ export interface GuiaFila extends RenglonesGuia {
     fecha_emision: string | null;
     fecha_vencimiento: string | null;
     registrado_en: string | null;
+    /** Desde dónde se registró: ventanilla, portal web o app. */
+    origen_tramite: OrigenTramite | null;
+    origen_tramite_etiqueta: string | null;
 }
 
 /** La guía con el detalle que solo pinta la ficha. */

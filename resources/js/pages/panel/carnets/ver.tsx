@@ -33,6 +33,7 @@ import {
     Tabla,
     TarjetaCodigo,
     Td,
+    OrigenRegistro,
 } from '@/components/panel/comunes/ficha';
 import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
@@ -261,6 +262,8 @@ export default function VerCarnet({
                             numero={numero}
                             ayuda="Va en el QR del plástico. Con él cualquiera comprueba si el carnet está vigente."
                         />
+
+                        <OrigenRegistro origen={carnet.origen_tramite} etiqueta={carnet.origen_tramite_etiqueta} />
 
                         <LineaTiempo
                             hitos={[

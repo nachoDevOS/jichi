@@ -118,6 +118,28 @@ class FaenaTest extends TestCase
             ->assertJsonPath('tramites.0.puede_pagar_qr', true);
     }
 
+    public function test_con_una_faena_sin_pagar_no_pide_otra_hasta_pagarla(): void
+    {
+        $this->pescadorListo($this->ignacio);
+        $this->api('post', '/faenas', self::TALONARIO)->assertCreated();
+        $primera = PermisoFaena::query()->sole();
+
+        // La tarjeta de la app ya lo dice, con el número de la que falta pagar.
+        $this->api('get', '/faenas/nueva')
+            ->assertOk()
+            ->assertJsonPath('faena.puede', false)
+            ->assertJsonPath('faena.motivo', "Tiene el permiso de faena N° {$primera->numero_legible} sin pagar. Páguelo primero; después puede pedir otro.");
+
+        // Y si igual la piden, no se registra otra.
+        $respuesta = $this->api('post', '/faenas', [...self::TALONARIO, 'embarcacion' => 'Otra canoa'])->assertUnprocessable();
+        $this->assertStringContainsString('sin pagar', $respuesta->json('errors.faena.0'));
+        $this->assertSame(1, PermisoFaena::query()->count());
+
+        // Pagada (aprobada), vuelve a poder.
+        $primera->update(['estado' => EstadoFaena::Aprobado]);
+        $this->api('get', '/faenas/nueva')->assertJsonPath('faena.puede', true);
+    }
+
     public function test_exige_los_siete_renglones_con_los_mensajes_de_ventanilla(): void
     {
         $this->pescadorListo($this->ignacio);

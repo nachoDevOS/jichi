@@ -95,6 +95,12 @@ ventanilla ──[Resetear]──▶ clave temporal nueva (también reactiva)
 Cada documento lleva su código y un enlace a `/verificar` (en pestaña aparte),
 la misma página que abre el QR.
 
+**Desde dónde se registró** (26/11/2026): cada fila de «En curso» y de «Mis papeles»
+dice «Registrado desde Ventanilla SEDAG / Portal web / App BeniDigital», debajo del
+detalle. Lo pidió el responsable; sale de `origen_tramite` vía `ResumenPortal`
+(`origen_tramite_etiqueta`). Una faena o guía pedida en esta web queda `portal_web`: lo
+pone `Portal\FaenaController` / `Portal\GuiaController`, no el formulario.
+
 ### El pago se hace en SIREB (02/10/2026)
 
 **Pagar por QR (23/11/2026; de muestra desde el 08/10/2026).** Los cuatro trámites
@@ -187,6 +193,10 @@ guía, ver lo que debe («En curso»), pagarlo por QR y ver «Mi perfil» (los m
 datos»). Papeles y pagos se ven solo en esta web. Lo que comparten la app y el portal (`PedirFaenaService`,
 `PedirGuiaService`, `PantallaPortal`, `PerfilPortal`, `ResumenPortal`, `DocumentoDelPortal` y
 los Requests de faena y guía) vive en carpetas `ApiApp/`: tocarlo cambia las dos.
+
+Lo pedido desde la app queda con `origen_tramite = app` (lo pone `ApiApp\FaenaController` /
+`ApiApp\GuiaController`, 26/11/2026), y el JSON de cada trámite trae `origen_tramite` y
+`origen_tramite_etiqueta`.
 
 El contrato (endpoints, JSON, errores) y dónde está cada archivo: **[docs/api/](../api/README.md)**.
 

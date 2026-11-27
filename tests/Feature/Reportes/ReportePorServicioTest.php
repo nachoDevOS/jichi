@@ -4,6 +4,7 @@ namespace Tests\Feature\Reportes;
 
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
@@ -32,6 +33,7 @@ class ReportePorServicioTest extends TestCase
         $this->funcionario = User::create(['name' => 'Ventanilla', 'email' => 'v@jichi.test', 'password' => 'x', 'activo' => true]);
 
         $autorizacion = AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => Beneficiario::factory()->create()->id, 'nro' => 1, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 1000, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => 'aprobado', 'fecha_solicitud' => '2026-11-05', 'fecha_emision' => '2026-11-05', 'fecha_vencimiento' => '2026-12-31',
@@ -95,8 +97,8 @@ class ReportePorServicioTest extends TestCase
             ->assertDownload('reporte-carnet_2026-11-01_2026-11-30.csv')
             ->streamedContent();
 
-        $this->assertStringStartsWith("\xEF\xBB\xBFFecha;N°;Titular;C.I.;Actividad;Asociación;\"Monto (Bs)\";Estado;\"N° recibo\"", $csv);
-        $this->assertStringContainsString('15,00;Aprobado;000002', $csv);
+        $this->assertStringStartsWith("\xEF\xBB\xBFFecha;N°;Titular;C.I.;Actividad;Asociación;\"Monto (Bs)\";Origen;Estado;\"N° recibo\"", $csv);
+        $this->assertStringContainsString('15,00;"Ventanilla SEDAG";Aprobado;000002', $csv);
         $this->assertSame(3, substr_count(trim($csv), "\n") + 1, 'encabezado y dos carnets: el de octubre no entra');
     }
 
@@ -122,6 +124,7 @@ class ReportePorServicioTest extends TestCase
     private function carnet(Asociacion $asociacion, EstadoCarnet $estado, string $fecha, int $nro): Carnet
     {
         return Carnet::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => Beneficiario::factory()->create()->id, 'asociacion_id' => $asociacion->id,
             'tipo_actor' => 'comercializador', 'monto' => 15, 'estado' => $estado, 'nro' => $nro,
             'fecha_solicitud' => $fecha, 'fecha_emision' => $estado === EstadoCarnet::Aprobado ? $fecha : null,

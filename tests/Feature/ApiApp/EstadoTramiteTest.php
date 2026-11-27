@@ -3,6 +3,7 @@
 namespace Tests\Feature\ApiApp;
 
 use App\Enums\EstadoFaena;
+use App\Enums\OrigenTramite;
 use App\Jobs\VerificarPagoJob;
 use App\Models\PermisoFaena;
 use App\Models\User;
@@ -80,7 +81,7 @@ class EstadoTramiteTest extends TestCase
     public function test_lo_ajeno_y_lo_inexistente_dan_el_mismo_404(): void
     {
         $otra = $this->beneficiarioConCuenta('1111111', 'Otro');
-        $faenaAjena = app(EmitirFaenaService::class)->emitir($this->pescadorListo($otra->beneficiario), self::TALONARIO);
+        $faenaAjena = app(EmitirFaenaService::class)->emitir($this->pescadorListo($otra->beneficiario), OrigenTramite::App, self::TALONARIO);
 
         $ajeno = $this->estado($faenaAjena->codigo_legible)->assertNotFound();
         $inexistente = $this->estado('ZZZZ-ZZZZ-ZZZZ-ZZZZ')->assertNotFound();

@@ -1,6 +1,6 @@
 import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
 
-import type { EstadoAprovechamiento, EstadoFaena } from '@/types';
+import type { EstadoAprovechamiento, EstadoFaena, OrigenTramite } from '@/types';
 
 /**
  * Tipos del módulo Aprovechamientos — la BOLSA MADRE del pescador.
@@ -31,6 +31,9 @@ export interface CupoFila {
 
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
     registrado_en: string | null;
+    /** Desde dónde se registró: ventanilla, portal web o app. */
+    origen_tramite: OrigenTramite | null;
+    origen_tramite_etiqueta: string | null;
 
     estado: EstadoAprovechamiento;
     estado_etiqueta: string;

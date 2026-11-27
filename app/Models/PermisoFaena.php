@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Enums\TramiteConVigencia;
 use App\Services\CorrelativoService;
@@ -40,6 +41,7 @@ use Illuminate\Support\Carbon;
     'fecha_salida',
     'fecha_desembarque',
     'estado',
+    'origen_tramite',
 ])]
 class PermisoFaena extends Model
 {
@@ -70,6 +72,7 @@ class PermisoFaena extends Model
             'fecha_salida' => 'date',
             'fecha_desembarque' => 'date',
             'estado' => EstadoFaena::class,
+            'origen_tramite' => OrigenTramite::class,
         ];
     }
 

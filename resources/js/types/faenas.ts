@@ -1,6 +1,6 @@
 import type { EnlaceDirecto } from '@/components/panel/comunes/ficha';
 
-import type { EstadoFaena } from '@/types';
+import type { EstadoFaena, OrigenTramite } from '@/types';
 import type { VentaSireb } from '@/types/aprovechamientos';
 
 /**
@@ -84,6 +84,9 @@ export interface FaenaFila {
 
     /** Cuándo se cargó la fila. Un MOMENTO: se muestra con fechaHora() y hace(). */
     registrado_en: string | null;
+    /** Desde dónde se registró: ventanilla, portal web o app. */
+    origen_tramite: OrigenTramite | null;
+    origen_tramite_etiqueta: string | null;
 
     /** Un DÍA, no un instante: llega como 'AAAA-MM-DD' y se muestra con fecha(). */
     fecha_solicitud: string | null;

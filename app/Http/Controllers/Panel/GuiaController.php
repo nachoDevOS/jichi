@@ -6,6 +6,7 @@ use App\Enums\ConceptoArancel;
 use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
 use App\Enums\MedioTransporte;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoTransporte;
 use App\Enums\TramiteConVigencia;
 use App\Exceptions\PermisoOperativoException;
@@ -169,6 +170,7 @@ class GuiaController extends Controller
                 Carnet::query()->findOrFail($datos['carnet_id']),
                 $datos,
                 $datos['detalles'],
+                OrigenTramite::Ventanilla,
                 // La fecha de solicitud es hoy: la pone el servidor, no el formulario.
                 now(),
             );
@@ -621,6 +623,9 @@ class GuiaController extends Controller
             'fecha_vencimiento' => $guia->fecha_vencimiento?->toIso8601String(),
 
             'registrado_en' => $guia->created_at?->toIso8601String(),
+            // Desde dónde se registró: ventanilla, portal web o app.
+            'origen_tramite' => $guia->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $guia->origen_tramite?->etiqueta(),
         ];
     }
 }

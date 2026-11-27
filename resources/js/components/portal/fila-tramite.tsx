@@ -39,6 +39,9 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
                 <div className="min-w-0 flex-1 leading-tight">
                     <p className="text-base leading-snug font-bold text-rio-profundo">{tramite.tipo}</p>
                     <p className="truncate text-sm text-slate-500">{detalleDocumento(tramite)}</p>
+                    {tramite.origen_tramite_etiqueta && (
+                        <p className="truncate text-xs text-slate-400">Registrado desde {tramite.origen_tramite_etiqueta}</p>
+                    )}
                 </div>
                 <EstadoChip color={tramite.estado_color}>{tramite.estado_etiqueta}</EstadoChip>
             </div>

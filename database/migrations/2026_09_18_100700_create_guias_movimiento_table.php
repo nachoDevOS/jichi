@@ -80,6 +80,8 @@ return new class extends Migration
              */
             $table->dateTime('fecha_emision')->nullable();
             $table->dateTime('fecha_vencimiento')->nullable()->comment('Máximo 5 días desde la emisión');
+            // Desde dónde se registró: ventanilla, portal web o app. Sin default: lo dice quien lo crea.
+            $table->string('origen_tramite', 20)->comment('OrigenTramite: ventanilla | portal_web | app');
 
             $table->index(['carnet_id', 'estado']);
 

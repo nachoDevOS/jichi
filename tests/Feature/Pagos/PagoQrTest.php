@@ -4,6 +4,7 @@ namespace Tests\Feature\Pagos;
 
 use App\Enums\EstadoCarnet;
 use App\Enums\EstadoLiquidacionSireb;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
@@ -285,13 +286,14 @@ class PagoQrTest extends TestCase
         $persona = Beneficiario::factory()->create();
         $asociacion = Asociacion::query()->create(['nombre' => 'Asociación '.Str::random(6), 'sigla' => Str::upper(Str::random(4))]);
         AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $persona->id, 'nro' => (int) AprovechamientoPesq::query()->max('nro') + 1, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 1000, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => 'aprobado', 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),
             'fecha_vencimiento' => now()->endOfYear()->toDateString(),
         ]);
 
-        $carnet = app(EmitirCarnetService::class)->emitir($persona, $asociacion, TipoActor::Pescador);
+        $carnet = app(EmitirCarnetService::class)->emitir($persona, $asociacion, TipoActor::Pescador, OrigenTramite::Ventanilla);
         $this->assertNotNull($carnet->refresh()->sireb_liquidacion_id, 'el carnet no registró su liquidación en SIREB');
 
         return $carnet;

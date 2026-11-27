@@ -35,6 +35,7 @@ import {
     nivelDisponible,
     porcentaje,
     TarjetaCodigo,
+    OrigenRegistro,
 } from '@/components/panel/comunes/ficha';
 import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
@@ -237,6 +238,8 @@ export default function VerFaena({
                             numero={faena.numero_legible}
                             ayuda="Va en el QR del permiso. Con él un control comprueba en el río si la salida está autorizada."
                         />
+
+                        <OrigenRegistro origen={faena.origen_tramite} etiqueta={faena.origen_tramite_etiqueta} />
 
                         {/* La salida y el desembarque los escribe la aprobación. */}
                         <LineaTiempo

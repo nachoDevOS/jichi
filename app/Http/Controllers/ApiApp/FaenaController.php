@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\ApiApp;
 
+use App\Enums\OrigenTramite;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ApiApp\PedirFaenaRequest;
@@ -30,7 +31,7 @@ class FaenaController extends Controller
     public function store(PedirFaenaRequest $request): JsonResponse
     {
         try {
-            $faena = $this->servicio->pedir($request->user()->beneficiario, $request->validated());
+            $faena = $this->servicio->pedir($request->user()->beneficiario, $request->validated(), OrigenTramite::App);
         } catch (PermisoOperativoException $e) {
             // Como un error del formulario: la app lo muestra arriba del botón.
             return response()->json(['message' => $e->getMessage(), 'errors' => ['faena' => [$e->getMessage()]]], 422);

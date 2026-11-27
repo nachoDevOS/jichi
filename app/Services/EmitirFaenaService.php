@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoFaena;
+use App\Enums\OrigenTramite;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\ArancelTarifa;
@@ -37,6 +38,8 @@ class EmitirFaenaService
      */
     public function emitir(
         Carnet $carnet,
+        // Obligatorio, sin default: un camino que se olvide de decirlo no queda marcado «ventanilla».
+        OrigenTramite $origen,
         array $papel = [],
     ): PermisoFaena {
         if (! $carnet->tipo_actor->emiteFaenas()) {
@@ -67,7 +70,7 @@ class EmitirFaenaService
         // Fuera de la transacción: una llamada a SIREB no debe tener filas bloqueadas.
         $precio = $this->precioDeLaFaena();
 
-        $faena = DB::transaction(function () use ($carnet, $cupo, $papel, $precio): PermisoFaena {
+        $faena = DB::transaction(function () use ($carnet, $origen, $cupo, $papel, $precio): PermisoFaena {
             $faena = PermisoFaena::create([
                 'carnet_id' => $carnet->id,
                 // El número lo pone el sistema: correlativo global y continuo, como el talonario.
@@ -81,6 +84,7 @@ class EmitirFaenaService
                 // Salida y desembarque quedan en NULL: los escribe la aprobación.
                 'estado' => EstadoFaena::Pendiente,
                 'fecha_solicitud' => now()->toDateString(),
+                'origen_tramite' => $origen,
             ]);
 
             // Su llave pública, en la misma transacción: sin código no se puede verificar.

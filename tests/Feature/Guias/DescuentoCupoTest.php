@@ -5,6 +5,7 @@ namespace Tests\Feature\Guias;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Enums\EstadoGuia;
+use App\Enums\OrigenTramite;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
@@ -93,7 +94,7 @@ class DescuentoCupoTest extends TestCase
         $this->expectException(PermisoOperativoException::class);
         $this->expectExceptionMessage('a qué pescador le compró');
 
-        $this->guias->emitir($this->carnetNacho, $this->papel(null), $this->detalle(100));
+        $this->guias->emitir($this->carnetNacho, $this->papel(null), $this->detalle(100), OrigenTramite::Ventanilla);
     }
 
     /** @return array<string, array{0: string, 1: string, 2: string}> */
@@ -128,6 +129,7 @@ class DescuentoCupoTest extends TestCase
             $this->carnetNacho,
             [...$this->papel(null), 'es_piscicultura' => true],
             $this->detalle(200),
+            OrigenTramite::Ventanilla,
         );
 
         $this->assertNull($guia->aprovechamiento_id);
@@ -226,7 +228,7 @@ class DescuentoCupoTest extends TestCase
         $this->registrar($this->autJuan, 300);
         $carnetJuan = $this->carnet($this->autJuan->beneficiario, 'pescador', $this->autJuan);
 
-        $faena = app(EmitirFaenaService::class)->emitir($carnetJuan, []);
+        $faena = app(EmitirFaenaService::class)->emitir($carnetJuan, OrigenTramite::Ventanilla, []);
 
         $this->assertSame(700.0, (float) $faena->kilos_extraidos);
         $this->assertSame(700.0, $this->disponibles($this->autJuan), 'la faena no descontó');
@@ -247,7 +249,7 @@ class DescuentoCupoTest extends TestCase
 
     private function registrar(AprovechamientoPesq $autorizacion, float $kilos): GuiaMovimiento
     {
-        return $this->guias->emitir($this->carnetNacho, $this->papel($autorizacion->id), $this->detalle($kilos));
+        return $this->guias->emitir($this->carnetNacho, $this->papel($autorizacion->id), $this->detalle($kilos), OrigenTramite::Ventanilla);
     }
 
     /** @return array<string, mixed> */
@@ -272,6 +274,7 @@ class DescuentoCupoTest extends TestCase
         static $nro = 0;
 
         return AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $b->id, 'nro' => ++$nro, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => $kilos, 'kilos_disponibles' => $kilos, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => $estado, 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),
@@ -285,6 +288,7 @@ class DescuentoCupoTest extends TestCase
         $asociacion = Asociacion::query()->firstOrCreate(['nombre' => 'Asociación de prueba'], ['sigla' => 'ADP']);
 
         return Carnet::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $b->id, 'asociacion_id' => $asociacion->id, 'aprovechamiento_id' => $cupo?->id,
             'tipo_actor' => $actor, 'monto' => 15, 'estado' => EstadoCarnet::Aprobado, 'nro' => ++$nro,
             'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Panel;
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Exceptions\CupoInvalidoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Panel\CargarPagoRequest;
@@ -123,6 +124,7 @@ class AprovechamientoController extends Controller
                 $datos['tarifa_sireb'],
                 // La fecha de solicitud es hoy: la pone el servidor, no el formulario.
                 $datos['tipo_embarcacion'],
+                OrigenTramite::Ventanilla,
             );
         } catch (CupoInvalidoException $e) {
             if ($e->avisoGeneral) {
@@ -513,6 +515,9 @@ class AprovechamientoController extends Controller
             // Cuándo se cargó, que no es la fecha de solicitud. Es un MOMENTO:
             // va con toIso8601String().
             'registrado_en' => $cupo->created_at?->toIso8601String(),
+            // Desde dónde se registró: ventanilla, portal web o app.
+            'origen_tramite' => $cupo->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $cupo->origen_tramite?->etiqueta(),
 
             'estado' => $cupo->estado->value,
             'estado_etiqueta' => $cupo->estado->etiqueta(),

@@ -242,6 +242,7 @@ propia bolsa madre: el doble de cupo del que le corresponde.
 | `fecha_solicitud` | date | El día que la persona lo pidió |
 | `fecha_emision` | date **null** | El día que se aprobó (pago confirmado). NULL hasta aprobar |
 | `fecha_vencimiento` | date | Vence con la gestión |
+| `origen_tramite` | string(20), **sin default** | *(26/11/2026)* `OrigenTramite`: desde dónde se registró — `ventanilla`, `portal_web` o `app`. Hoy siempre `ventanilla`: la autorización solo se saca en ventanilla. Ver [§ 4.1](#41-origen-del-trámite-26112026) |
 
 ```
 PENDIENTE ──(pagada en SIREB)──▶ APROBADO ──▶ AGOTADO
@@ -347,6 +348,7 @@ bajo su nombre.
 | `fecha_solicitud` | date | El día que se pidió |
 | `fecha_emision` | date **null** | El día que se aprobó |
 | `fecha_vencimiento` | date, índice | Desde la aprobación, según Administración › Vigencias para su actividad (de inicio el 31/12; configurable el 13/10/2026). **Es la vigencia: no hay estado `vencido`** |
+| `origen_tramite` | string(20), **sin default** | *(26/11/2026)* `OrigenTramite`: desde dónde se registró — `ventanilla`, `portal_web` o `app`. Hoy siempre `ventanilla`. Ver [§ 4.1](#41-origen-del-trámite-26112026) |
 
 **EL CÓDIGO YA NO ES UNA COLUMNA DE ESTA TABLA.** Vivía en `codigo_carnet` y se
 mudó a **`codigos`** el 22/09/2026, cuando los otros cuatro documentos pasaron a
@@ -454,6 +456,7 @@ las dos del carnet con los ids de test.sireb.
 | `fecha_solicitud` | date | El día que se pidió |
 | `fecha_salida` | date, null | La escribe la APROBACIÓN: el día en que se aprobó |
 | `fecha_desembarque` | date, null, index | La escribe la APROBACIÓN: salida + la vigencia configurada (`App\Support\Vigencia`). Es el techo |
+| `origen_tramite` | string(20), **sin default** | *(26/11/2026)* `OrigenTramite`: desde dónde se registró — `ventanilla`, `portal_web` o `app`. Los tres valores: la faena se pide también en línea. Ver [§ 4.1](#41-origen-del-trámite-26112026) |
 | `estado` | string(20) | `EstadoFaena`; nace `pendiente` |
 
 **LA TABLA CALCA EL TALONARIO «PERMISO POR FAENA»** —completado el 21/09/2026—.
@@ -577,6 +580,7 @@ salida no ocurrió.
 | `estado` | string(20) | `EstadoGuia`, nace `pendiente` |
 | `fecha_solicitud` | date | El día que la persona vino al mostrador |
 | `fecha_emision` / `fecha_vencimiento` | **dateTime**, nullable | Vigencia configurable (de inicio **5 días**), los escribe la APROBACIÓN |
+| `origen_tramite` | string(20), **sin default** | *(26/11/2026)* `OrigenTramite`: desde dónde se registró — `ventanilla`, `portal_web` o `app`. Los tres valores. **No confundir con `origen`**, el lugar de partida del viaje: por eso no se llama así. Ver [§ 4.1](#41-origen-del-trámite-26112026) |
 
 **LA GUÍA CALCA EL TALONARIO, BLOQUE POR BLOQUE** —rehecha el 22/09/2026—. Antes
 guardaba cuatro datos sueltos: código tipeado, origen, destino y un peso. El
@@ -876,6 +880,45 @@ sin poder recibir otro nunca más.
 | **El orden del `Schema::create()` es siempre el mismo**: `id` → claves foráneas → datos → estado → fechas del negocio → índices → `timestamps()` → `softDeletes()` | Las diez tablas terminan iguales. No cambia el esquema: es convención de lectura |
 | **Lo copiado se congela** (`escala`, `volumen_total_kg`, `monto`, `monto_total`, `concepto`, la boleta del recibo) | Los catálogos cambian por resolución; lo ya emitido no puede cambiar retroactivamente |
 | **Lo calculable NO se guarda** (saldo en Bs). `kilos_disponibles` es un dato copiado de la escala, no un saldo | Una columna derivada se desfasa en cuanto alguien corrige un dato, y no avisa |
+| **Los cuatro trámites guardan su `origen_tramite`**, justo antes de `created_at`, `NOT NULL` y sin default | Dice desde dónde se registró, al lado de cuándo. Ver § 4.1 |
+
+### 4.1 Origen del trámite *(26/11/2026)*
+
+`aprovechamientos_pesq`, `carnets`, `permisos_faena` y `guias_movimiento` tienen la
+columna **`origen_tramite`**: desde dónde se REGISTRÓ el trámite.
+
+| Valor | Etiqueta (`OrigenTramite::etiqueta()`) | Quién lo pone |
+| --- | --- | --- |
+| `ventanilla` | Ventanilla SEDAG | Los controladores de `Http/Controllers/Panel/` (lo registra un funcionario) |
+| `portal_web` | Portal web | `Portal\FaenaController` y `Portal\GuiaController` (`/mi-cuenta`) |
+| `app` | App BeniDigital | `ApiApp\FaenaController` y `ApiApp\GuiaController` (`/api/v1/portal`) |
+
+Las decisiones, y por qué:
+
+- **Va justo antes de `created_at`**: dice *desde dónde* al lado de *cuándo*. En la
+  migración se declara después de la última fecha del negocio y antes del bloque de
+  índices; los índices no ocupan lugar entre las columnas.
+- **`NOT NULL` y sin `default`.** Con un default `ventanilla`, un camino nuevo que se
+  olvide de decirlo marcaría como de ventanilla, sin avisar, un trámite de la app. Sin
+  default revienta en el `INSERT`, y lo atrapan las pruebas. Por lo mismo **no** va en
+  `$attributes` del modelo.
+- **Lo decide el CONTROLADOR, nunca el formulario.** Los servicios lo reciben como
+  parámetro obligatorio (`OtorgarCupoService::otorgar()`, `Emitir*Service::emitir()`,
+  `PedirFaenaService::pedir()`, `PedirGuiaService::pedir()`); ninguna lista de
+  renglones del papel lo deja pasar desde la petición. `Pedir*Service` comparten el
+  portal web y la app, así que solo el controlador de cada uno sabe cuál fue, y
+  rechazan `ventanilla` (`InvalidArgumentException`): un pedido en línea no es de
+  ventanilla.
+- **No se llama `origen`**: `guias_movimiento.origen` ya es el lugar de partida del
+  viaje («origen → destino»).
+- **Corregir no lo cambia**: es de dónde *nació* el trámite. Reponer un carnet revoca
+  el viejo y el nuevo se emite con el formulario de ventanilla: queda `ventanilla`.
+- **Sin índice propio**: con tres valores, un índice solo sobre esta columna no le sirve
+  al motor. Si un reporte lo filtra mucho, va un compuesto.
+- **Lo que ya estaba registrado** se puede completar desde `auditorias`: la fila
+  `creado` de cada trámite guarda la `url` (`/panel/…`, `/mi-cuenta/…` o
+  `/api/v1/portal/…`). Es una deducción, por eso no es la fuente.
+- `guia_detalles` y `recibos` no la llevan: dependen de su trámite.
 
 **Tablas de soporte**, fuera del dominio: `users`, `correlativos`,
 `configuraciones`, `auditorias`, `accesos`. Más las de Laravel y las de

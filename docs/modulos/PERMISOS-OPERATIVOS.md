@@ -131,6 +131,7 @@ entraba. Está en el historial de git.
 | El número no se repite | `CorrelativoService::siguienteContinuo()` dentro de la transacción, y el índice único |
 | El arancel no cambia después de emitido | `monto` copiado al crear; `montoACobrar()` lee la columna, no `config()` |
 | El descuento de piscicultura | `GuiaMovimiento::factorArancel()`, en un solo lugar |
+| Desde dónde se registró (`origen_tramite`, 26/11/2026) | El **controlador** de cada entrada lo pasa a `emitir()` / `pedir()`: `Panel\` → `ventanilla`, `Portal\` → `portal_web`, `ApiApp\` → `app`. Los `Pedir*Service` rechazan `ventanilla`. En la guía no confundir con `origen`, el lugar de partida. Ver [MER.md](../MER.md#41-origen-del-trámite-26112026) |
 
 **Ninguna está en el controlador ni en React.** Los modelos contestan
 `Carnet::puedeEmitirFaenas()` y `motivoSinPermisos()` —sí o no, y por qué, para

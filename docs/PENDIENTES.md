@@ -6,6 +6,29 @@
 
 ---
 
+## 🔴 Origen del trámite: hay que rearmar la base de trabajo — 26/11/2026
+
+Columna nueva **`origen_tramite`** (ventanilla / portal web / app) en las migraciones de
+`aprovechamientos_pesq`, `carnets`, `permisos_faena` y `guias_movimiento` (regla 12). Ver
+[MER.md](MER.md#41-origen-del-trámite-26112026). **Hasta rearmar la base, registrar
+cualquier trámite revienta** con `column "origen_tramite" … does not exist`:
+
+```sh
+php artisan migrate:fresh --seed
+```
+
+Verificado sobre SQLite descartable: mismos 66 índices, columna justo antes de
+`created_at`. **Las filas que ya existen se pierden**; si hay que conservarlas, el origen
+de cada una se deduce de su auditoría de creación (`auditorias.url`: `/panel/…`,
+`/mi-cuenta/…` o `/api/v1/portal/…`). En la base de trabajo del 26/11/2026 eran 23: 8
+autorizaciones y 2 carnets de ventanilla, 13 faenas de la app.
+
+Queda abierto: **filtrar por origen en los listados** del panel (hoy solo en Reportes; en
+los listados se ve, debajo de «Registrado»), y que la app BeniDigital lo **muestre** (ya
+le llega en el JSON).
+
+---
+
 ## 🔴 Pago por QR: hecho del lado de Jichi, falta SIREB — 23/11/2026
 
 Jichi pide el QR a SIREB, lo muestra (real o de prueba), se entera del pago y

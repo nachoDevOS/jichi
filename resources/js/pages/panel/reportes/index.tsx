@@ -29,6 +29,8 @@ interface Filtros {
     desde: string;
     hasta: string;
     estado: string | null;
+    /** Desde dónde se registró: ventanilla, portal web o app. */
+    origen: string | null;
 }
 
 type Fila = Record<string, string | number | null> & { _url: string; estado_color: string };
@@ -40,6 +42,7 @@ type Fila = Record<string, string | number | null> & { _url: string; estado_colo
 export default function Reportes({
     servicios,
     estados,
+    origenes,
     filtros,
     columnas,
     totales,
@@ -47,6 +50,7 @@ export default function Reportes({
 }: {
     servicios: Opcion[];
     estados: Opcion[];
+    origenes: Opcion[];
     filtros: Filtros;
     columnas: Columna[];
     totales: { cantidad: number; monto: number; cobrado: number; por_cobrar: number };
@@ -93,6 +97,17 @@ export default function Reportes({
                                 {estados.map((e) => (
                                     <option key={e.valor} value={e.valor}>
                                         {e.etiqueta}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="origen">Origen</Label>
+                            <Select id="origen" className="w-44" value={filtros.origen ?? ''} onChange={(e) => filtrar({ origen: e.target.value || null })}>
+                                <option value="">Todos</option>
+                                {origenes.map((o) => (
+                                    <option key={o.valor} value={o.valor}>
+                                        {o.etiqueta}
                                     </option>
                                 ))}
                             </Select>

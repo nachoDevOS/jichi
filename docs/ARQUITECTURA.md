@@ -22,7 +22,7 @@ Tailwind 4 · PostgreSQL 18** (corre también en SQLite).
 | Dato | Valor |
 | --- | --- |
 | Líneas de código | ~37.000 (`app/` + `resources/js/`) |
-| Pruebas | 102 (23/11/2026; 29 de la guía el 13/10/2026), con SIREB simulado: `php artisan test`. Las 92 del 12/10 se perdieron sin commitear (ver §9) |
+| Pruebas | 224 (26/11/2026; 29 de la guía el 13/10/2026), con SIREB simulado: `php artisan test`. Las 92 del 12/10 se perdieron sin commitear (ver §9) |
 | Idioma del código | Español, sin excepciones salvo `components/ui/` |
 | Pendiente | Configuración (en gris en el menú) |
 
@@ -201,6 +201,9 @@ Infraestructura: `auditorias` (trait `Auditable`), `accesos`, `configuraciones`,
   tiene además `aprovechamiento_id`, pero es OTRA persona: el pescador que vendió.
 - **El código de un documento no es una columna suya**: vive en `codigos`. Se
   lee con `codigo_legible` y necesita `with('codigo')` para no hacer N+1.
+- **Cada trámite guarda desde dónde se registró** (26/11/2026): `origen_tramite`
+  (`ventanilla`, `portal_web` o `app`) en las cuatro tablas, justo antes de
+  `created_at`, sin default. Ver §4.8 y [MER.md](MER.md#41-origen-del-trámite-26112026).
 
 ---
 
@@ -316,6 +319,32 @@ exponer datos personales completos ni ids internos: ver
 
 ---
 
+### 4.8 Desde dónde se registró cada trámite *(26/11/2026)*
+
+Los cuatro trámites guardan **`origen_tramite`** (enum `OrigenTramite`). Lo pone el
+**controlador de la entrada**, que es el único que lo sabe; el servicio lo recibe como
+parámetro obligatorio y lo escribe en el `create()`:
+
+```
+Panel\*Controller          ── OrigenTramite::Ventanilla ──▶ OtorgarCupoService / Emitir*Service
+Portal\{Faena,Guia}Controller ── OrigenTramite::PortalWeb ──▶ PedirFaenaService / PedirGuiaService ──▶ Emitir*Service
+ApiApp\{Faena,Guia}Controller ── OrigenTramite::App ───────▶ (los mismos Pedir*Service)
+```
+
+| Trámite | Ventanilla SEDAG | Portal web | App BeniDigital |
+| --- | :-: | :-: | :-: |
+| Autorización de pesca | ✔ | — | — |
+| Carnet (pescador y comercializador) | ✔ | — | — |
+| Permiso de faena | ✔ | ✔ | ✔ |
+| Guía de transporte | ✔ | ✔ | ✔ |
+
+**Dónde se ve:** en la ficha y el listado de los cuatro módulos del panel («Registrado
+desde», componente `OrigenRegistro` de `components/panel/comunes/ficha.tsx`), en
+Reportes (columna y filtro «Origen», también en Excel y PDF), en el portal web («En
+curso» y «Mis papeles») y en el JSON de la app (`origen_tramite` y
+`origen_tramite_etiqueta` en cada trámite, vía `ResumenPortal`). La app BeniDigital no
+necesitó cambios. Detalle en [MER.md](MER.md#41-origen-del-trámite-26112026).
+
 ## 5. Cómo viaja una petición
 
 No hay API REST para las pantallas: no se escribe `fetch()` ni `axios`. La única
@@ -334,7 +363,7 @@ Todo lo suyo vive en carpetas `ApiApp/`. Contrato y carpetas: [api/README.md](ap
 De vuelta, React usa `useForm().post()` / `router.patch()`; el controlador
 responde con un `redirect()`, nunca con JSON. Las props compartidas
 (`HandleInertiaRequests::share()`) son `auth`, `institucion`, `archivos`,
-`flash`, `ziggy` y `apariencia`: una prop de página con uno de esos nombres la
+`flash`, `ziggy`, `apariencia` y `entorno`: una prop de página con uno de esos nombres la
 tapa sin avisar.
 
 ---

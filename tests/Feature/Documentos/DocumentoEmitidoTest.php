@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Documentos;
 
+use App\Enums\OrigenTramite;
 use App\Http\Controllers\Panel\AutorizacionPescaController;
 use App\Models\AprovechamientoPesq;
 use App\Models\Beneficiario;
@@ -122,6 +123,7 @@ class DocumentoEmitidoTest extends TestCase
     private function autorizacion(string $estado = 'aprobado'): AprovechamientoPesq
     {
         $autorizacion = AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => Beneficiario::factory()->create()->id, 'nro' => 1, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 1000, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => $estado, 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),

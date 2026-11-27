@@ -3,6 +3,7 @@
 namespace Tests\Concerns;
 
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
 use App\Models\Beneficiario;
@@ -49,6 +50,7 @@ trait PescadorDePrueba
         static $nro = 0;
 
         return AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $b->id, 'nro' => ++$nro, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => $kilos, 'kilos_disponibles' => $kilos, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => $estado, 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),
@@ -62,6 +64,7 @@ trait PescadorDePrueba
         $asociacion = Asociacion::query()->firstOrCreate(['nombre' => 'Asociación de prueba'], ['sigla' => 'ADP']);
 
         return Carnet::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $b->id, 'asociacion_id' => $asociacion->id, 'aprovechamiento_id' => $cupo?->id,
             'tipo_actor' => $actor, 'monto' => 15, 'estado' => EstadoCarnet::Aprobado, 'nro' => ++$nro,
             'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),

@@ -27,6 +27,11 @@ trait SirebFalso
 
     protected const TARIFA_CARNET_PESCADOR = '01a0f40b-0000-7000-8000-00000000ca02';
 
+    /** La escala de la autorización: SIREB no la usa en simularSireb(); la fila de Aranceles la crea la prueba que la necesita. */
+    protected const SERVICIO_AUTORIZACION = '01a0f40b-0000-7000-8000-00000000a001';
+
+    protected const TARIFA_ESCALA_1000 = '01a0f40b-0000-7000-8000-00000000a002';
+
     /** @var array<string, array<string, mixed>> Las liquidaciones de SIREB, por id. */
     protected array $liquidaciones = [];
 
@@ -50,11 +55,13 @@ trait SirebFalso
             self::TARIFA_SURUBI => ['id' => self::TARIFA_SURUBI, 'etiqueta' => 'Surubí', 'monto' => 0.5, 'estado' => 'activo'],
             self::TARIFA_FAENA => ['id' => self::TARIFA_FAENA, 'etiqueta' => 'Permiso de faena', 'monto' => 15, 'estado' => 'activo'],
             self::TARIFA_CARNET_PESCADOR => ['id' => self::TARIFA_CARNET_PESCADOR, 'etiqueta' => 'Carnet de pescador', 'monto' => 15, 'estado' => 'activo'],
+            self::TARIFA_ESCALA_1000 => ['id' => self::TARIFA_ESCALA_1000, 'etiqueta' => '801 kg hasta 1000 kg', 'monto' => 660, 'estado' => 'activo', 'rango_hasta' => 1000],
         ];
         $servicios = [
             ['id' => self::SERVICIO_GUIA, 'codigo' => 'g', 'nombre' => 'Productos Guia', 'estado' => 'activo', 'tarifas' => [$tarifas[self::TARIFA_SURUBI]]],
             ['id' => self::SERVICIO_FAENA, 'codigo' => 'a', 'nombre' => 'Aranceles', 'estado' => 'activo', 'tarifas' => [$tarifas[self::TARIFA_FAENA]]],
             ['id' => self::SERVICIO_CARNET, 'codigo' => 'c', 'nombre' => 'Carnets', 'estado' => 'activo', 'tarifas' => [$tarifas[self::TARIFA_CARNET_PESCADOR]]],
+            ['id' => self::SERVICIO_AUTORIZACION, 'codigo' => 'au', 'nombre' => 'Autorización', 'estado' => 'activo', 'tarifas' => [$tarifas[self::TARIFA_ESCALA_1000]]],
         ];
 
         Http::fake(function (Request $request) use ($tarifas, $servicios) {

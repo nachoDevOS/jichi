@@ -71,6 +71,10 @@ Route::prefix('v1/portal')->name('api.portal.')->group(function () {
         Route::get('/autorizaciones/{codigo}', [GuiaController::class, 'autorizacion'])
             ->middleware('throttle:20,1,autorizaciones')
             ->name('autorizaciones.show');
+        // La foto del pescador (27/11/2026): mismo tope que la búsqueda, con la que comparte la cuenta.
+        Route::get('/autorizaciones/{codigo}/foto', [GuiaController::class, 'foto'])
+            ->middleware('throttle:20,1,autorizaciones')
+            ->name('autorizaciones.foto');
         Route::post('/guias', [GuiaController::class, 'store'])
             ->middleware(['throttle:10,1,guias', 'idempotente'])
             ->name('guias.store');

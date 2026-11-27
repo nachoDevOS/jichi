@@ -1,3 +1,5 @@
+import type { OrigenTramite } from '@/types';
+
 /**
  * Tipos del portal del beneficiario (/mi-cuenta). Los arma App\Support\ResumenPortal.
  */
@@ -19,6 +21,9 @@ interface PapelBase {
     vista_previa: string | null;
     estado_etiqueta: string;
     estado_color: string;
+    /** Desde dónde se registró (OrigenTramite): ventanilla, portal web o app. */
+    origen_tramite: OrigenTramite | null;
+    origen_tramite_etiqueta: string | null;
     vigente: boolean;
     /** Pendiente de pago: todavía no vale. */
     en_tramite: boolean;

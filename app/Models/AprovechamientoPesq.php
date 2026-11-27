@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoAprovechamiento;
+use App\Enums\OrigenTramite;
 use App\Exceptions\PermisoOperativoException;
 use App\Services\CodigoService;
 use App\Services\CorrelativoService;
@@ -35,6 +36,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'fecha_solicitud',
     'fecha_emision',
     'fecha_vencimiento',
+    'origen_tramite',
 ])]
 class AprovechamientoPesq extends Model
 {
@@ -66,6 +68,7 @@ class AprovechamientoPesq extends Model
             'kilos_disponibles' => 'decimal:2',
             'monto' => 'decimal:2',
             'estado' => EstadoAprovechamiento::class,
+            'origen_tramite' => OrigenTramite::class,
             'fecha_solicitud' => 'date',
             'fecha_emision' => 'date',
             'fecha_vencimiento' => 'date',

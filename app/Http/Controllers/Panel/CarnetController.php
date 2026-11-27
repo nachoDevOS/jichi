@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Panel;
 
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Exceptions\CarnetInvalidoException;
 use App\Http\Controllers\Controller;
@@ -222,6 +223,7 @@ class CarnetController extends Controller
                 Beneficiario::query()->findOrFail($datos['beneficiario_id']),
                 Asociacion::query()->findOrFail($datos['asociacion_id']),
                 TipoActor::from($datos['tipo_actor']),
+                OrigenTramite::Ventanilla,
                 // La fecha de solicitud es hoy: la pone el servidor, no el formulario.
                 now(),
                 // `?? null`: `validated()` devuelve SOLO las claves que vinieron,
@@ -612,6 +614,9 @@ class CarnetController extends Controller
             // Cuándo se cargó, que no es la fecha de solicitud. Es un MOMENTO:
             // va con toIso8601String().
             'registrado_en' => $carnet->created_at?->toIso8601String(),
+            // Desde dónde se registró: ventanilla, portal web o app.
+            'origen_tramite' => $carnet->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $carnet->origen_tramite?->etiqueta(),
 
             /*
              * EL RECIBO, para poder imprimirlo sin entrar a la ficha. Existe

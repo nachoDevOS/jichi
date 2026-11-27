@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { CalendarClock, ExternalLink, Users } from 'lucide-react';
+import { Building2, CalendarClock, ExternalLink, Globe, Smartphone, Users } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
 import { TextoCopiable } from '@/components/comunes/texto-copiable';
@@ -9,6 +9,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useConteo, useMontado } from '@/hooks/use-movimiento';
 import { cn, fecha, fechaHora } from '@/lib/utils';
+import type { OrigenTramite } from '@/types';
 
 /**
  * Las piezas de las fichas de los cuatro trámites (autorización, carnet, faena
@@ -270,6 +271,41 @@ export function TarjetaCodigo({
                     Ver la verificación pública
                 </a>
             )}
+        </div>
+    );
+}
+
+const ICONO_ORIGEN: Record<OrigenTramite, LucideIcon> = { ventanilla: Building2, portal_web: Globe, app: Smartphone };
+
+/** Desde dónde se registró el trámite. La etiqueta llega del servidor (OrigenTramite::etiqueta()). */
+export function OrigenRegistro({
+    origen,
+    etiqueta,
+    compacto = false,
+}: {
+    origen: OrigenTramite | null;
+    etiqueta: string | null;
+    compacto?: boolean;
+}) {
+    if (!origen || !etiqueta) return null;
+    const Icono = ICONO_ORIGEN[origen];
+
+    if (compacto) {
+        return (
+            <span className="mt-0.5 flex items-center gap-1">
+                <Icono className="size-3" aria-hidden />
+                {etiqueta}
+            </span>
+        );
+    }
+
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Registrado desde</span>
+            <span className="inline-flex items-center gap-1.5 font-medium">
+                <Icono className="size-4 text-primary" aria-hidden />
+                {etiqueta}
+            </span>
         </div>
     );
 }

@@ -7,6 +7,7 @@ use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
 use App\Enums\EstadoFaena;
 use App\Enums\EstadoGuia;
+use App\Enums\OrigenTramite;
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
@@ -56,13 +57,15 @@ class ReportePorServicioService
     }
 
     /** Los trámites del servicio solicitados en el rango, del más viejo al más nuevo. */
-    public function consulta(ConceptoArancel $servicio, Carbon $desde, Carbon $hasta, ?string $estado = null): Builder
+    public function consulta(ConceptoArancel $servicio, Carbon $desde, Carbon $hasta, ?string $estado = null, ?OrigenTramite $origen = null): Builder
     {
         $consulta = $this->modelo($servicio)::query();
 
         return $consulta
-            ->whereBetween($consulta->qualifyColumn('fecha_solicitud'), [$desde->toDateString(), $hasta->toDateString()])
+            // Hasta las 23:59:59: SQLite guarda el `date` como «AAAA-MM-DD 00:00:00» y con el día pelado perdía el último día.
+            ->whereBetween($consulta->qualifyColumn('fecha_solicitud'), [$desde->toDateString(), $hasta->toDateTimeString()])
             ->when($estado, fn ($q, $e) => $q->where($q->qualifyColumn('estado'), $e))
+            ->when($origen, fn ($q, OrigenTramite $o) => $q->where($q->qualifyColumn('origen_tramite'), $o->value))
             // Lo que leen fila() y los accesores del nombre y la cédula: si falta, N+1 o un dato en blanco.
             ->with(match ($servicio) {
                 ConceptoArancel::Autorizacion => ['beneficiario', 'recibo'],
@@ -110,7 +113,7 @@ class ReportePorServicioService
             ['fecha', 'Fecha', 'fecha'], ['numero', 'N°', 'texto'],
             ['titular', $servicio === ConceptoArancel::Guia ? 'Comercializador' : 'Titular', 'texto'], ['ci', 'C.I.', 'texto'],
             ...$propias,
-            ['monto', 'Monto (Bs)', 'bs'], ['estado', 'Estado', 'texto'], ['recibo', 'N° recibo', 'texto'],
+            ['monto', 'Monto (Bs)', 'bs'], ['origen', 'Origen', 'texto'], ['estado', 'Estado', 'texto'], ['recibo', 'N° recibo', 'texto'],
         ];
 
         return array_map(fn (array $c): array => ['clave' => $c[0], 'etiqueta' => $c[1], 'formato' => $c[2]], $columnas);
@@ -135,6 +138,7 @@ class ReportePorServicioService
             'ci' => $titular?->documento_identidad,
             ...$propias,
             'monto' => (float) $doc->monto,
+            'origen' => $doc->origen_tramite?->etiqueta(),
             'estado' => $doc->estado->etiqueta(),
             'estado_color' => $doc->estado->color(),
             'recibo' => $doc->recibo?->numero_recibo,

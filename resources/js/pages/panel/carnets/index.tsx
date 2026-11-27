@@ -15,7 +15,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { cn, fecha, fechaHora, hace } from '@/lib/utils';
 import type { OpcionEnum, Paginado } from '@/types';
 import type { CarnetFila } from '@/types/carnets';
-import { abrirDirecto } from '@/components/panel/comunes/ficha';
+import { abrirDirecto, OrigenRegistro } from '@/components/panel/comunes/ficha';
 
 /**
  *  Listado de carnets
@@ -274,6 +274,7 @@ export default function IndiceCarnets({
                                                 <td className="px-3 py-2 text-xs text-muted-foreground">
                                                     {fechaHora(c.registrado_en)}
                                                     <span className="block">{hace(c.registrado_en)}</span>
+                                                    <OrigenRegistro compacto origen={c.origen_tramite} etiqueta={c.origen_tramite_etiqueta} />
                                                 </td>
 
                                                 <td className="px-3 py-2">

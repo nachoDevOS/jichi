@@ -2,7 +2,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowRight, Eye, Fish, Pencil, Plus, Printer, Receipt, Search, Trash2, Truck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Retrato } from '@/components/comunes/retrato';
-import { abrirDirecto } from '@/components/panel/comunes/ficha';
+import { abrirDirecto, OrigenRegistro } from '@/components/panel/comunes/ficha';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -259,6 +259,7 @@ export default function IndiceGuias({
                                                 <td className="px-3 py-2 text-xs text-muted-foreground">
                                                     {fechaHora(g.registrado_en)}
                                                     <span className="block">{hace(g.registrado_en)}</span>
+                                                    <OrigenRegistro compacto origen={g.origen_tramite} etiqueta={g.origen_tramite_etiqueta} />
                                                 </td>
 
                                                 <td className="px-3 py-2">

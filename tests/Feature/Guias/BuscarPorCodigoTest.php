@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Guias;
 
+use App\Enums\OrigenTramite;
 use App\Http\Controllers\Panel\BeneficiarioController;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
@@ -61,6 +62,7 @@ class BuscarPorCodigoTest extends TestCase
     public function test_el_codigo_de_otro_documento_no_encuentra_nada(): void
     {
         $carnet = Carnet::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $this->juan->id,
             'asociacion_id' => Asociacion::query()->create(['nombre' => 'Asociación de prueba', 'sigla' => 'ADP'])->id,
             'tipo_actor' => 'comercializador', 'monto' => 30, 'estado' => 'aprobado', 'nro' => 1,
@@ -101,6 +103,7 @@ class BuscarPorCodigoTest extends TestCase
     private function autorizacion(Beneficiario $b, string $vence, int $nro): AprovechamientoPesq
     {
         $a = AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $b->id, 'nro' => $nro, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 1000, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => 'aprobado', 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),

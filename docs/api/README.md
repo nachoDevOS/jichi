@@ -319,7 +319,14 @@ despreciable para el padrón del SEDAG.
   ver lo de otro. Lo único que viaja es un **código de verificación** (16 caracteres), que es una
   llave, no un id, y se busca siempre junto con el titular del token cuando es de un trámite.
 - **Lo que decide el sistema no viaja desde la app:** el carnet, la autorización (va el
-  código), la piscicultura, los kilos y el precio de la faena. Si la app los manda, se ignoran.
+  código), la piscicultura, los kilos, el precio de la faena y el **origen del trámite**. Si la
+  app los manda, se ignoran.
+- **Desde dónde se registró** (26/11/2026): todo lo que se pide por esta API queda con
+  `origen_tramite = app` (lo pone `ApiApp\FaenaController` / `ApiApp\GuiaController`; los
+  `Pedir*Service` compartidos con la web lo reciben como parámetro). Cada trámite del JSON trae
+  `origen_tramite` y `origen_tramite_etiqueta` ([portal.md](portal.md#el-objeto-documento)).
+  **La app no necesitó cambios**: lee el JSON clave por clave y las nuevas no le molestan;
+  quedan listas para mostrarlas cuando se quiera.
 - **Versión en la URL** (`/v1`). Un cambio que rompa la app va en `/v2`; la app vieja sigue
   andando con `/v1` hasta que se actualice. Agregar un campo nuevo a una respuesta no rompe.
 - **Fechas** en ISO 8601 (`2026-11-19T08:30:00-04:00`); un día suelto, `2026-11-19`.
@@ -439,6 +446,7 @@ todos los de una cuenta compartirían el mismo contador.
 | C | El inicio vuelve: `GET /inicio`, para que la app se parezca al portal web | ✅ 25/11/2026 |
 | C | «Mis pagos» vuelve: `GET /pagos`, con `clase`, `codigo` y `verificar` por recibo; `inicio.pagado` | ✅ 25/11/2026 |
 | C | Descargar el PDF del recibo: `GET /recibos/{codigo}/pdf` → enlace firmado de 5 minutos (S3 o ruta firmada local) | ✅ 26/11/2026 |
+| C | Origen del trámite: lo pedido por la app queda `app`; `origen_tramite` y `origen_tramite_etiqueta` en cada documento | ✅ 26/11/2026 |
 
 **Falta:**
 - Configurar producción ([seguridad.md](seguridad.md) § 2): HTTPS, `APP_DEBUG=false`, etc.

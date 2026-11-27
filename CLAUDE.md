@@ -106,6 +106,11 @@ para no equivocarse:
   sale con los disponibles de ese día. Ver
   [docs/modulos/GUIA-DESCUENTA-CUPO.md](docs/modulos/GUIA-DESCUENTA-CUPO.md).
 
+- **Cada trámite guarda desde dónde se registró** (26/11/2026): `origen_tramite`
+  (`OrigenTramite`: `ventanilla`, `portal_web`, `app`) en las cuatro tablas. Lo pasa el
+  CONTROLADOR de cada entrada al servicio, como parámetro obligatorio; nunca el
+  formulario. Ver [docs/MER.md](docs/MER.md#41-origen-del-trámite-26112026).
+
 Todo eso vive en `app/Services/` (`OtorgarCupoService`, `Emitir*Service`,
 `Revisar*Service`, `LiquidarSirebService`, `ConfirmarPagoService`), en transacciones con
 la fila que contiene el recurso escaso bloqueada. **No se replica en el
@@ -335,13 +340,13 @@ El procedimiento detallado está en
 ## Verificar antes de dar algo por terminado
 
 ```sh
-php artisan test        # las pruebas (107; SIREB simulado: ninguna sale a la red)
+php artisan test        # las pruebas (224; SIREB simulado: ninguna sale a la red)
 npx tsc --noEmit        # tipos de TypeScript
 ./vendor/bin/pint       # formato del PHP
 npm run build           # que el frontend compile
 ```
 
-> **Las pruebas de hoy son 107** (24/11/2026). Empezaron el 13/10/2026 con 29, solo
+> **Las pruebas de hoy son 224** (26/11/2026). Empezaron el 13/10/2026 con 29, solo
 > de la guía; el pago por QR y el webhook están en `tests/Feature/Pagos/`. Las
 > 92 del 12/10/2026 **nunca se commitearon y se perdieron**: la carpeta `tests/`
 > no existía. **`tests/` va en el commit, siempre.** Corren sobre SQLite en
@@ -1034,6 +1039,20 @@ Los tres tienen que pasar.
 
   **La lección no es «imprimir todo» ni «imprimir poco»: es preguntarse qué
   puede cambiar después de que el plástico salga de la impresora.**
+
+- **En la guía, `origen` NO es de dónde vino el trámite: es el lugar de partida del
+  viaje** («origen → destino», `guias_movimiento.origen`, va impreso). El origen del
+  trámite es `origen_tramite` (26/11/2026), y se llama así justamente por eso. Una
+  columna `origen` nueva en las cuatro tablas habría chocado con la de la guía, y
+  `EmitirGuiaService::RENGLONES` copia `origen` del formulario tal cual.
+- **En SQLite una columna `date` se guarda como `'AAAA-MM-DD 00:00:00'`, y un
+  `whereBetween` con días pelados pierde el ÚLTIMO día.** Como texto, `'2026-11-26
+  00:00:00'` es mayor que `'2026-11-26'`: el reporte del mes en curso —que termina
+  HOY— no mostraba lo registrado hoy. PostgreSQL compara fechas y no lo sufre, así que
+  en el servidor no se ve; en desarrollo sobre SQLite y en las pruebas, sí. Lo descubrió
+  una prueba que usaba la fecha de hoy; la vieja usaba fechas a mitad de mes. El límite
+  de arriba va con `->toDateTimeString()` del `endOfDay()` (`23:59:59`), que sirve en
+  los dos motores. Ver `ReportePorServicioService::consulta()`.
 
 ---
 

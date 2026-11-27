@@ -2,6 +2,8 @@
 
 namespace App\Services\ApiApp;
 
+use App\Enums\EstadoFaena;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Enums\TramiteConVigencia;
 use App\Exceptions\PermisoOperativoException;
@@ -10,6 +12,7 @@ use App\Models\Carnet;
 use App\Models\PermisoFaena;
 use App\Services\EmitirFaenaService;
 use App\Support\Vigencia;
+use InvalidArgumentException;
 
 /**
  * ApiApp · COMPARTIDO con el portal web: cambiarlo cambia la app y la web (docs/api/README.md § 4).
@@ -38,6 +41,13 @@ class PedirFaenaService
     {
         $carnet = $this->carnet($beneficiario);
         $motivo = $carnet === null ? self::SIN_CARNET : $carnet->motivoSinPermisos();
+
+        // En línea, una faena a la vez (26/11/2026, pedido del responsable): con una
+        // sin pagar, primero esa. Ventanilla (el panel) no tiene este tope.
+        if ($motivo === null && ($sinPagar = $this->faenaSinPagar($beneficiario)) !== null) {
+            $motivo = "Tiene el permiso de faena N° {$sinPagar->numero_legible} sin pagar. "
+                .'Páguelo primero; después puede pedir otro.';
+        }
         $arancel = $motivo === null ? $this->faenas->arancelDeReferencia()['arancel'] : null;
 
         if ($motivo === null && $arancel === null) {
@@ -69,15 +79,29 @@ class PedirFaenaService
      *
      * @throws PermisoOperativoException con un mensaje para el titular
      */
-    public function pedir(Beneficiario $beneficiario, array $papel): PermisoFaena
+    public function pedir(Beneficiario $beneficiario, array $papel, OrigenTramite $origen): PermisoFaena
     {
+        // Lo comparten el portal web y la app: el controlador de cada uno dice cuál fue.
+        if (! $origen->esEnLinea()) {
+            throw new InvalidArgumentException('Un pedido en línea no puede registrarse como de ventanilla.');
+        }
+
         $datos = $this->datos($beneficiario);
 
         if (! $datos['puede']) {
             throw new PermisoOperativoException($datos['motivo']);
         }
 
-        return $this->faenas->emitir($this->carnet($beneficiario), $papel);
+        return $this->faenas->emitir($this->carnet($beneficiario), $origen, $papel);
+    }
+
+    /** La faena suya que todavía espera el pago (la más vieja), o null. */
+    private function faenaSinPagar(Beneficiario $beneficiario): ?PermisoFaena
+    {
+        return $beneficiario->faenas()
+            ->where('permisos_faena.estado', EstadoFaena::Pendiente)
+            ->orderBy('permisos_faena.nro')
+            ->first();
     }
 
     /** Su carnet de pescador vigente; si no tiene, el último (para decir por qué no sirve). */

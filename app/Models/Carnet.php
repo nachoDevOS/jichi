@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoAprovechamiento;
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Services\CorrelativoService;
 use App\Traits\Auditable;
@@ -37,6 +38,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'fecha_solicitud',
     'fecha_emision',
     'fecha_vencimiento',
+    'origen_tramite',
 ])]
 class Carnet extends Model
 {
@@ -63,6 +65,7 @@ class Carnet extends Model
             'tipo_actor' => TipoActor::class,
             'monto' => 'decimal:2',
             'estado' => EstadoCarnet::class,
+            'origen_tramite' => OrigenTramite::class,
             'fecha_solicitud' => 'date',
             'fecha_emision' => 'date',
             'fecha_vencimiento' => 'date',

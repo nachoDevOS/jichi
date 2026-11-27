@@ -33,6 +33,7 @@ import {
     TarjetaCodigo,
     Td,
     type TonoChip,
+    OrigenRegistro,
 } from '@/components/panel/comunes/ficha';
 import { EstadoPdf, type PdfEmitido } from '@/components/panel/comunes/pdf-emitido';
 import { TarjetaRecaudaciones } from '@/components/panel/pagos/tarjeta-recaudaciones';
@@ -296,6 +297,8 @@ export default function VerGuia({
                             numero={guia.numero_legible}
                             ayuda="Va en el QR de la guía. Con él un control en la ruta comprueba si el traslado está amparado."
                         />
+
+                        <OrigenRegistro origen={guia.origen_tramite} etiqueta={guia.origen_tramite_etiqueta} />
 
                         <LineaTiempo
                             hitos={[

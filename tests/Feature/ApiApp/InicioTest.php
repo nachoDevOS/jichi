@@ -3,6 +3,7 @@
 namespace Tests\Feature\ApiApp;
 
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Jobs\VerificarPagoJob;
 use App\Models\AprovechamientoPesq;
 use App\Models\Asociacion;
@@ -93,6 +94,7 @@ class InicioTest extends TestCase
     public function test_la_autorizacion_vigente_trae_sus_kilos(): void
     {
         $autorizacion = AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $this->ignacio->id, 'nro' => 77, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 700, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => 'aprobado', 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),
@@ -146,6 +148,7 @@ class InicioTest extends TestCase
         $asociacion = Asociacion::query()->firstOrCreate(['nombre' => 'Asociación de prueba'], ['sigla' => 'ADP']);
 
         return Carnet::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => ($de ?? $this->ignacio)->id, 'asociacion_id' => $asociacion->id,
             'tipo_actor' => 'comercializador', 'monto' => 15, 'estado' => EstadoCarnet::Aprobado, 'nro' => ++$nro,
             'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),
@@ -159,6 +162,7 @@ class InicioTest extends TestCase
         static $nro = 0;
         $pescador = Beneficiario::factory()->create();
         $autorizacion = AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $pescador->id, 'nro' => ++$nro, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 1000, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => 'aprobado', 'fecha_solicitud' => now()->toDateString(), 'fecha_emision' => now()->toDateString(),
@@ -169,6 +173,7 @@ class InicioTest extends TestCase
             $carnet,
             ['origen' => 'Trinidad', 'destino' => 'La Paz', 'es_piscicultura' => false, 'aprovechamiento_id' => $autorizacion->id],
             [['tarifa_sireb' => self::TARIFA_SURUBI, 'condicion' => 'fresco_entero', 'cantidad_kg' => $kilos]],
+            OrigenTramite::Ventanilla,
         );
     }
 }

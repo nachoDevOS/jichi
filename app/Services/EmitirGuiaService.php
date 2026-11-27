@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ConceptoArancel;
 use App\Enums\CondicionProducto;
 use App\Enums\EstadoGuia;
+use App\Enums\OrigenTramite;
 use App\Exceptions\PermisoOperativoException;
 use App\Models\AprovechamientoPesq;
 use App\Models\Carnet;
@@ -45,6 +46,8 @@ class EmitirGuiaService
         Carnet $carnet,
         array $datos,
         array $detalles,
+        // Obligatorio, sin default: un camino que se olvide de decirlo no queda marcado «ventanilla».
+        OrigenTramite $origen,
         ?Carbon $solicitud = null,
     ): GuiaMovimiento {
         $solicitud ??= now();
@@ -65,7 +68,7 @@ class EmitirGuiaService
             throw PermisoOperativoException::guiaSinDetalle();
         }
 
-        $guia = DB::transaction(function () use ($carnet, $datos, $renglones, $solicitud): GuiaMovimiento {
+        $guia = DB::transaction(function () use ($carnet, $datos, $renglones, $origen, $solicitud): GuiaMovimiento {
             $kilos = $this->kilosDe($renglones);
             // De qué pescador sale el pescado: se descuenta acá, con su autorización bloqueada.
             $autorizacion = $this->descontarDe($datos, $kilos);
@@ -94,6 +97,8 @@ class EmitirGuiaService
                 // vencimiento los escribe la aprobación.
                 'estado' => EstadoGuia::Pendiente,
                 'fecha_solicitud' => $solicitud->toDateString(),
+                // No confundir con `origen`, que es el lugar de partida del viaje.
+                'origen_tramite' => $origen,
             ]);
 
             // Lo que se cobra es el total del cuadro D, con el descuento de

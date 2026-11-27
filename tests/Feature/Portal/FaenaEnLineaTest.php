@@ -77,6 +77,17 @@ class FaenaEnLineaTest extends TestCase
         $this->assertSame(0, PermisoFaena::query()->count());
     }
 
+    public function test_con_una_faena_sin_pagar_el_portal_tampoco_deja_pedir_otra(): void
+    {
+        $this->pescadorListo($this->cuenta->beneficiario);
+        $this->actingAs($this->cuenta)->post(route('portal.faenas.store'), self::TALONARIO)->assertRedirect();
+
+        // La misma regla que la app (PedirFaenaService): primero pagar la pendiente.
+        $this->actingAs($this->cuenta)->post(route('portal.faenas.store'), self::TALONARIO)
+            ->assertSessionHasErrors('faena');
+        $this->assertSame(1, PermisoFaena::query()->count());
+    }
+
     public function test_el_inicio_web_marca_la_faena_en_linea(): void
     {
         $this->pescadorListo($this->cuenta->beneficiario);

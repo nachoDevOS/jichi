@@ -15,7 +15,7 @@ import LayoutPanel from '@/layouts/layout-panel';
 import { bs, cn, fecha, fechaHora, hace } from '@/lib/utils';
 import type { OpcionEnum, PageProps, Paginado } from '@/types';
 import type { FaenaFila } from '@/types/faenas';
-import { abrirDirecto } from '@/components/panel/comunes/ficha';
+import { abrirDirecto, OrigenRegistro } from '@/components/panel/comunes/ficha';
 
 /**
  *  Listado de permisos de faena
@@ -224,6 +224,7 @@ export default function IndiceFaenas({
                                                 <td className="px-3 py-2 text-xs text-muted-foreground">
                                                     {fechaHora(f.registrado_en)}
                                                     <span className="block">{hace(f.registrado_en)}</span>
+                                                    <OrigenRegistro compacto origen={f.origen_tramite} etiqueta={f.origen_tramite_etiqueta} />
                                                 </td>
 
                                                 <td className="px-3 py-2">

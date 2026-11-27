@@ -135,6 +135,9 @@ export type EstadoFaena = 'pendiente' | 'aprobado' | 'revocado';
 /** Espejo de App\Enums\EstadoGuia. */
 export type EstadoGuia = 'pendiente' | 'aprobado' | 'revocado';
 
+/** Espejo de App\Enums\OrigenTramite: desde dónde se registró el trámite. */
+export type OrigenTramite = 'ventanilla' | 'portal_web' | 'app';
+
 /**
  * Espejo de App\Enums\EstadoAsociacion.
  */

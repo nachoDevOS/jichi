@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoGuia;
 use App\Enums\MedioTransporte;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Enums\TipoTransporte;
 use App\Enums\TramiteConVigencia;
@@ -51,6 +52,7 @@ use Illuminate\Support\Carbon;
     'fecha_solicitud',
     'fecha_emision',
     'fecha_vencimiento',
+    'origen_tramite',
 ])]
 class GuiaMovimiento extends Model
 {
@@ -83,6 +85,7 @@ class GuiaMovimiento extends Model
             'transporte_capacidad_kg' => 'decimal:2',
             'es_piscicultura' => 'boolean',
             'estado' => EstadoGuia::class,
+            'origen_tramite' => OrigenTramite::class,
             'medio_transporte' => MedioTransporte::class,
             'tipo_transporte' => TipoTransporte::class,
             'fecha_solicitud' => 'date',

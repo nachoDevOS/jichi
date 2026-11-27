@@ -391,13 +391,24 @@ boletas en Jichi y la firma de supervisión.)*
 
   **En línea valen las mismas reglas que en el panel** *(decidido por el
   responsable, 19/11/2026)*:
-  1. **Sin tope de pendientes.** La guía descuenta los kilos del pescador al
+  0. **Faena en línea: una a la vez** *(26/11/2026, pedido del responsable)*. Con un
+     permiso de faena **pendiente de pago**, el pescador no pide otro en línea (app ni
+     portal web): «Tiene el permiso de faena N° … sin pagar. Páguelo primero; después
+     puede pedir otro.» (`PedirFaenaService::datos()` / `pedir()`). Ventanilla, sin tope.
+  1. **Sin tope de pendientes** (salvo la faena en línea, arriba). La guía descuenta los kilos del pescador al
      registrarse, como en ventanilla (Paso 5); si nunca se paga, ventanilla la
      elimina y los kilos vuelven.
   2. **El titular no elimina ni corrige** lo que pidió: eliminar (con motivo, que
      queda en la auditoría) y corregir siguen siendo de ventanilla, con sus permisos.
   3. **Sin revisión previa:** queda `pendiente` con su liquidación en SIREB y se
      aprueba sola al validarse el pago (Paso 6).
+- **Cada trámite queda marcado con desde dónde se registró** *(pedido del
+  responsable, 26/11/2026)*: **Ventanilla SEDAG** (lo cargó un funcionario en el
+  panel), **Portal web** (lo pidió el titular en `/mi-cuenta`) o **App BeniDigital**
+  (lo pidió desde el celular). Vale para los cuatro trámites; la autorización y los
+  carnets hoy son siempre de ventanilla. Lo decide el sistema por la puerta por la
+  que entró el pedido, no lo elige nadie en un formulario, y no cambia al corregir.
+  Se ve en la ficha, el listado y los reportes del panel, en el portal y en la app.
 - **Descarga en PDF lo que está vigente hoy** —autorización, faena y guía—, el
   mismo documento que sale en ventanilla. **El carnet no:** si se pierde, se hace la
   reposición en ventanilla. Lo fuera de fecha, revocado, no pagado o sin efecto no se

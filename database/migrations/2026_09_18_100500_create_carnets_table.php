@@ -57,6 +57,8 @@ return new class extends Migration
             $table->date('fecha_solicitud');
             $table->date('fecha_emision')->nullable()->comment('Se llena al aprobar');
             $table->date('fecha_vencimiento')->index()->comment('Índice: lo filtra el scope vigentes()');
+            // Desde dónde se registró: ventanilla, portal web o app. Sin default: lo dice quien lo crea.
+            $table->string('origen_tramite', 20)->comment('OrigenTramite: ventanilla | portal_web | app');
 
             $table->index(['beneficiario_id', 'estado']);
             $table->index(['tipo_actor', 'estado']);

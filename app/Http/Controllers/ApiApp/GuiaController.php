@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\ApiApp;
 
+use App\Enums\OrigenTramite;
+use App\Enums\TipoActor;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ApiApp\PedirGuiaRequest;
@@ -10,6 +12,7 @@ use App\Services\ApiApp\PedirGuiaService;
 use App\Support\ApiApp\ResumenPortal;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * ApiApp · SOLO de la app BeniDigital (docs/api/README.md § 4).
@@ -37,10 +40,32 @@ class GuiaController extends Controller
             : response()->json(['autorizacion' => $autorizacion]);
     }
 
+    /**
+     * La foto del pescador de esa autorización (27/11/2026), para reconocerlo al
+     * comprarle. Solo para quien tiene carnet de comercializador vigente; nunca por
+     * una URL pública. 404 si el código no existe o no tiene foto.
+     */
+    public function foto(Request $request, string $codigo): Response
+    {
+        if ($request->user()->beneficiario?->carnetVigenteDe(TipoActor::Comercializador) === null) {
+            return response()->json(['message' => PedirGuiaService::SIN_CARNET], 403);
+        }
+
+        $bytes = $this->servicio->fotoDelPescador($codigo);
+
+        abort_if($bytes === null, 404);
+
+        return response($bytes, 200, [
+            'Content-Type' => (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) ?: 'application/octet-stream',
+            // Privada: ni proxies ni la caché compartida la guardan.
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
+    }
+
     public function store(PedirGuiaRequest $request): JsonResponse
     {
         try {
-            $guia = $this->servicio->pedir($request->user()->beneficiario, $request->validated());
+            $guia = $this->servicio->pedir($request->user()->beneficiario, $request->validated(), OrigenTramite::App);
         } catch (PermisoOperativoException $e) {
             return response()->json(['message' => $e->getMessage(), 'errors' => ['guia' => [$e->getMessage()]]], 422);
         }

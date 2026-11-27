@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Enums\ConceptoArancel;
+use App\Enums\OrigenTramite;
 use App\Http\Controllers\Controller;
 use App\Models\Configuracion;
 use App\Services\ReportePorServicioService;
@@ -29,13 +30,14 @@ class ReporteController extends Controller
     /** GET /panel/reportes */
     public function index(Request $request): Response
     {
-        [$servicio, $desde, $hasta, $estado] = $this->filtros($request);
-        $consulta = $this->reportes->consulta($servicio, $desde, $hasta, $estado);
+        [$servicio, $desde, $hasta, $estado, $origen] = $this->filtros($request);
+        $consulta = $this->reportes->consulta($servicio, $desde, $hasta, $estado, $origen);
 
         return Inertia::render('panel/reportes/index', [
             'servicios' => array_map(fn (ConceptoArancel $c): array => ['valor' => $c->value, 'etiqueta' => $c->etiqueta()], ConceptoArancel::cases()),
             'estados' => $this->reportes->estados($servicio),
-            'filtros' => ['servicio' => $servicio->value, 'desde' => $desde->toDateString(), 'hasta' => $hasta->toDateString(), 'estado' => $estado],
+            'origenes' => OrigenTramite::opciones(),
+            'filtros' => ['servicio' => $servicio->value, 'desde' => $desde->toDateString(), 'hasta' => $hasta->toDateString(), 'estado' => $estado, 'origen' => $origen?->value],
             'columnas' => $this->reportes->columnas($servicio),
             'totales' => $this->reportes->totales($servicio, $consulta),
             'filas' => $consulta->paginate(self::POR_PAGINA)->withQueryString()
@@ -46,14 +48,14 @@ class ReporteController extends Controller
     /** GET /panel/reportes/excel: todas las filas, con los mismos filtros. */
     public function excel(Request $request): StreamedResponse
     {
-        [$servicio, $desde, $hasta, $estado] = $this->filtros($request);
+        [$servicio, $desde, $hasta, $estado, $origen] = $this->filtros($request);
         $columnas = $this->reportes->columnas($servicio);
 
         return ExportadorCsv::descargar(
             $this->nombre($servicio, $desde, $hasta),
             array_column($columnas, 'etiqueta'),
             // lazy() y no lazyById(): este pagina por id y la consulta ordena por fecha; se saltearía filas.
-            $this->reportes->consulta($servicio, $desde, $hasta, $estado)->lazy(500)
+            $this->reportes->consulta($servicio, $desde, $hasta, $estado, $origen)->lazy(500)
                 ->map(fn ($doc): array => $this->renglon($this->reportes->fila($servicio, $doc), $columnas, csv: true)),
         );
     }
@@ -61,8 +63,8 @@ class ReporteController extends Controller
     /** GET /panel/reportes/pdf: el mismo reporte en papel, A4 apaisado, con membrete y totales. */
     public function pdf(Request $request): RespuestaHttp
     {
-        [$servicio, $desde, $hasta, $estado] = $this->filtros($request);
-        $consulta = $this->reportes->consulta($servicio, $desde, $hasta, $estado);
+        [$servicio, $desde, $hasta, $estado, $origen] = $this->filtros($request);
+        $consulta = $this->reportes->consulta($servicio, $desde, $hasta, $estado, $origen);
         $columnas = $this->reportes->columnas($servicio);
 
         $pdf = Pdf::loadView('documentos.reporte-servicio', [
@@ -71,6 +73,7 @@ class ReporteController extends Controller
             'escudo' => $this->imagenEmbebida('image/recibo-escudo.png'),
             'rango' => 'Del '.$desde->format('d/m/Y').' al '.$hasta->format('d/m/Y'),
             'estado' => $estado ? collect($this->reportes->estados($servicio))->firstWhere('valor', $estado)['etiqueta'] ?? null : null,
+            'origen' => $origen?->etiqueta(),
             'generado' => now()->format('d/m/Y H:i').($request->user() ? ' · '.$request->user()->name : ''),
             'columnas' => $columnas,
             'filas' => $consulta->get()->map(fn ($doc): array => $this->renglon($this->reportes->fila($servicio, $doc), $columnas))->all(),
@@ -88,7 +91,7 @@ class ReporteController extends Controller
         ]);
     }
 
-    /** @return array{0: ConceptoArancel, 1: Carbon, 2: Carbon, 3: ?string} */
+    /** @return array{0: ConceptoArancel, 1: Carbon, 2: Carbon, 3: ?string, 4: ?OrigenTramite} */
     private function filtros(Request $request): array
     {
         $datos = $request->validate([
@@ -96,6 +99,7 @@ class ReporteController extends Controller
             'desde' => ['nullable', 'date'],
             'hasta' => ['nullable', 'date'],
             'estado' => ['nullable', 'string', 'max:20'],
+            'origen' => ['nullable', Rule::enum(OrigenTramite::class)],
         ]);
         $servicio = ConceptoArancel::tryFrom($datos['servicio'] ?? '') ?? ConceptoArancel::Autorizacion;
         [$desde, $hasta] = $this->reportes->periodo($datos['desde'] ?? null, $datos['hasta'] ?? null);
@@ -103,7 +107,7 @@ class ReporteController extends Controller
         // Un estado que no es de ese servicio se ignora: no llega texto libre a la consulta.
         $estado = in_array($datos['estado'] ?? null, array_column($this->reportes->estados($servicio), 'valor'), true) ? $datos['estado'] : null;
 
-        return [$servicio, $desde, $hasta, $estado];
+        return [$servicio, $desde, $hasta, $estado, OrigenTramite::tryFrom($datos['origen'] ?? '')];
     }
 
     private function nombre(ConceptoArancel $servicio, Carbon $desde, Carbon $hasta): string

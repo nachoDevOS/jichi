@@ -57,6 +57,8 @@ return new class extends Migration
             // el desembarque, salida + 30 días. En NULL mientras es una solicitud.
             $table->date('fecha_salida')->nullable();
             $table->date('fecha_desembarque')->nullable()->index()->comment('Techo: salida + 30 días');
+            // Desde dónde se registró: ventanilla, portal web o app. Sin default: lo dice quien lo crea.
+            $table->string('origen_tramite', 20)->comment('OrigenTramite: ventanilla | portal_web | app');
 
             // La consulta caliente: los kilos consumidos del cupo.
             $table->index(['carnet_id', 'estado']);

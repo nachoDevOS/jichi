@@ -3,6 +3,7 @@
 namespace Tests\Feature\Carnets;
 
 use App\Enums\EstadoCarnet;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Exceptions\CarnetInvalidoException;
 use App\Models\AprovechamientoPesq;
@@ -37,7 +38,7 @@ class AutorizacionAprobadaTest extends TestCase
 
         foreach ([null, $pendiente] as $elegida) {
             try {
-                app(EmitirCarnetService::class)->emitir($persona, $this->asociacion, TipoActor::Pescador, cupoElegido: $elegida);
+                app(EmitirCarnetService::class)->emitir($persona, $this->asociacion, TipoActor::Pescador, OrigenTramite::Ventanilla, cupoElegido: $elegida);
                 $this->fail('registró un carnet sobre una autorización sin pagar');
             } catch (CarnetInvalidoException $e) {
                 $this->assertStringContainsString('aprobada', $e->getMessage());
@@ -52,7 +53,7 @@ class AutorizacionAprobadaTest extends TestCase
         $persona = Beneficiario::factory()->create();
         $aprobada = $this->autorizacion($persona, 'aprobado');
 
-        $carnet = app(EmitirCarnetService::class)->emitir($persona, $this->asociacion, TipoActor::Pescador);
+        $carnet = app(EmitirCarnetService::class)->emitir($persona, $this->asociacion, TipoActor::Pescador, OrigenTramite::Ventanilla);
 
         $this->assertSame($aprobada->id, $carnet->aprovechamiento_id);
     }
@@ -61,6 +62,7 @@ class AutorizacionAprobadaTest extends TestCase
     {
         $persona = Beneficiario::factory()->create();
         $carnet = Carnet::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $persona->id, 'asociacion_id' => $this->asociacion->id,
             'aprovechamiento_id' => $this->autorizacion($persona, 'pendiente')->id,
             'tipo_actor' => 'pescador', 'monto' => 15, 'estado' => EstadoCarnet::Pendiente,
@@ -94,6 +96,7 @@ class AutorizacionAprobadaTest extends TestCase
         static $nro = 0;
 
         return AprovechamientoPesq::query()->create([
+            'origen_tramite' => OrigenTramite::Ventanilla,
             'beneficiario_id' => $b->id, 'nro' => ++$nro, 'escala' => '801 kg hasta 1000 kg',
             'volumen_total_kg' => 1000, 'kilos_disponibles' => 1000, 'monto' => 660, 'tipo_embarcacion' => 'Canoa',
             'estado' => $estado, 'fecha_solicitud' => now()->toDateString(),

@@ -37,6 +37,7 @@ Todo lo que pide token tiene además un tope de **60 pedidos por minuto por cuen
 | `POST` | [`/faenas`](#post-faenas--pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/guias/nueva`](#get-guiasnueva--antes-de-pedir-una-guía) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/autorizaciones/{codigo}`](#get-autorizacionescodigo--el-pescador-que-le-vendió) | ✔ | ✘ `403 clave_temporal` |
+| `GET` | [`/autorizaciones/{codigo}/foto`](#get-autorizacionescodigofoto--la-foto-del-pescador-27112026) | ✔ | ✘ `403 clave_temporal` |
 | `POST` | [`/guias`](#post-guias--pedir-una-guía-de-transporte) | ✔ | ✘ `403 clave_temporal` |
 
 ---
@@ -195,6 +196,8 @@ Comunes a todos:
 | `pago` | string \| null | Del trámite abierto: `sin_pago`, `revision`, `validado` o `caida` |
 | `estado_etiqueta` | string | «Pendiente», «Aprobada», «Sin efecto»… |
 | `estado_color` | string | `sky`, `emerald`, `rose`… (la paleta de la web) |
+| `origen_tramite` | string \| null | *(26/11/2026)* Desde dónde se registró: `ventanilla`, `portal_web` o `app`. Lo pone el sistema según la puerta del pedido; lo pedido desde la app trae siempre `app` |
+| `origen_tramite_etiqueta` | string \| null | El mismo dato para mostrar: «Ventanilla SEDAG», «Portal web» o «App BeniDigital» |
 | `vigente` | bool | Vale hoy |
 | `en_tramite` | bool | Abierto: espera el pago |
 | `siguiente_paso` | string \| null | Qué le falta, dicho para el titular |
@@ -359,6 +362,10 @@ el mismo que la página web «Pedir permiso de faena». **Las reglas son las del
 - `kilos`: los libres de su autorización; con esos sale la faena (Paso 4: **no descuenta**).
 - `propietario_sugerido`: como el panel, si la embarcación es suya va su nombre.
 
+- **Una faena en línea a la vez** (26/11/2026): con un permiso de faena pendiente de pago,
+  `puede: false` y `motivo: "Tiene el permiso de faena N° 000013 sin pagar. Páguelo primero;
+  después puede pedir otro."`; `POST /faenas` responde `422` con ese motivo en `errors.faena`.
+
 ## `POST /faenas` — pedir un permiso de faena
 
 `throttle:10,1,faenas` · **`Idempotency-Key` obligatoria** (un UUID por pedido; ver README § 6).
@@ -381,6 +388,8 @@ Idempotency-Key: 6f1c2a9e-4b7d-4e2a-9c1f-0d3b5a7e8f21
 
 - **El carnet no viaja**: es el de pescador vigente de la cuenta del token. Un `carnet_id`
   en el cuerpo se ignora.
+- **El origen no viaja** (26/11/2026): la faena queda con `origen_tramite = app` porque entró
+  por esta API. Un `origen_tramite` en el cuerpo se ignora (`OrigenTramiteTest`).
 - **201** `{ "faena": { …documento… } }`: `pendiente`, con su `codigo_pago` en SIREB. Con ese
   código la app paga el QR en SIREB; después pregunta en `/tramites/{codigo}/estado`. Aparece en
   `/en-curso` y suma a la deuda.
@@ -432,7 +441,8 @@ el titular (con o sin guiones, minúsculas) o la URL de verificación que «tipe
     "kilos_disponibles": 1000,
     "vence": "2026-12-31",
     "vendible": true,
-    "motivo": null
+    "motivo": null,
+    "tiene_foto": true
   }
 }
 ```
@@ -440,7 +450,19 @@ el titular (con o sin guiones, minúsculas) o la URL de verificación que «tipe
 - `pescador`: **abreviado** (`PedirGuiaService::nombreAbreviado()`): lo justo para reconocer a
   quién le compró, sin entregar el nombre completo a quien tenga un código. Sin `id`.
 - `vendible: false` trae `motivo` (`AprovechamientoPesq::motivoSinGuia()`: sin pagar, vencida, revocada).
+- `tiene_foto`: si el pescador tiene foto en su carnet (27/11/2026). La foto **no** viene acá:
+  se pide aparte con `/autorizaciones/{codigo}/foto`.
 - **404** `{ "message": "No encontramos una Autorización de Pesca con ese código. …" }`.
+
+## `GET /autorizaciones/{codigo}/foto` — la foto del pescador (27/11/2026)
+
+Decisión del responsable: el comercializador **ve la cara de quien le vende**, para reconocerlo.
+`throttle:20,1,autorizaciones` (la misma cuenta que la búsqueda). Devuelve **los bytes** de la foto
+del carnet del pescador (`Content-Type` real, `Cache-Control: private`), nunca una URL pública.
+
+- Solo con el **código completo** de la autorización, el que está en el papel del pescador.
+- **403** `{ "message": PedirGuiaService::SIN_CARNET }` sin carnet de comercializador vigente.
+- **404** si el código no existe o el pescador no tiene foto.
 
 ## `POST /guias` — pedir una guía de transporte
 
@@ -462,7 +484,8 @@ el titular (con o sin guiones, minúsculas) o la URL de verificación que «tipe
 
 - **No viajan** `carnet_id`, `aprovechamiento_id` ni `es_piscicultura`: el carnet es el de
   comercializador vigente de la cuenta, la autorización sale del código y la piscicultura es
-  `false` (como el panel). Si vienen, se ignoran.
+  `false` (como el panel). Si vienen, se ignoran. Tampoco `origen_tramite`: queda `app`
+  (26/11/2026). **`origen`** sí viaja y es otra cosa: el lugar de partida del viaje.
 - **201** `{ "guia": { …documento… } }`: `pendiente`, con su `codigo_pago`. **Los kilos ya se
   descontaron** de la autorización del pescador (Paso 5). Se aprueba sola al pagarse (Paso 6).
 - **El mismo pedido repetido** (misma clave, mismos datos): el mismo 201, sin otra guía ni otro

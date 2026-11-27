@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Portal;
 
+use App\Enums\OrigenTramite;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ApiApp\PedirFaenaRequest;
@@ -27,7 +28,7 @@ class FaenaController extends Controller
     public function store(PedirFaenaRequest $request): RedirectResponse
     {
         try {
-            $faena = $this->servicio->pedir($request->user()->beneficiario, $request->validated());
+            $faena = $this->servicio->pedir($request->user()->beneficiario, $request->validated(), OrigenTramite::PortalWeb);
         } catch (PermisoOperativoException $e) {
             return back()->withInput()->withErrors(['faena' => $e->getMessage()]);
         }

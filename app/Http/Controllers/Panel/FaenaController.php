@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Enums\EstadoFaena;
+use App\Enums\OrigenTramite;
 use App\Enums\TramiteConVigencia;
 use App\Exceptions\PermisoOperativoException;
 use App\Http\Controllers\Controller;
@@ -143,6 +144,7 @@ class FaenaController extends Controller
         try {
             $faena = $this->servicio->emitir(
                 Carnet::query()->findOrFail($datos['carnet_id']),
+                OrigenTramite::Ventanilla,
                 // `validated()` devuelve SOLO lo que vino: un nullable que el
                 // formulario no mandó no existe en el arreglo.
                 $datos,
@@ -457,6 +459,9 @@ class FaenaController extends Controller
 
             // Cuándo se cargó la fila. Un MOMENTO: con toIso8601String().
             'registrado_en' => $faena->created_at?->toIso8601String(),
+            // Desde dónde se registró: ventanilla, portal web o app.
+            'origen_tramite' => $faena->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $faena->origen_tramite?->etiqueta(),
 
             // Son DÍAS, no instantes: con toDateString().
             'fecha_solicitud' => $faena->fecha_solicitud?->toDateString(),

@@ -4,6 +4,7 @@ namespace App\Services\ApiApp;
 
 use App\Enums\CondicionProducto;
 use App\Enums\MedioTransporte;
+use App\Enums\OrigenTramite;
 use App\Enums\TipoActor;
 use App\Enums\TipoTransporte;
 use App\Enums\TramiteConVigencia;
@@ -13,8 +14,10 @@ use App\Models\Beneficiario;
 use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Services\EmitirGuiaService;
+use App\Support\Archivos;
 use App\Support\Vigencia;
 use Illuminate\Support\Arr;
+use InvalidArgumentException;
 
 /**
  * ApiApp · COMPARTIDO con el portal web: cambiarlo cambia la app y la web (docs/api/README.md § 4).
@@ -72,9 +75,10 @@ class PedirGuiaService
 
     /**
      * La autorización del pescador que le vendió, por su código. Solo lo que hace
-     * falta para elegirla: nombre abreviado, número y kilos libres. Null si no existe.
+     * falta para elegirla: nombre abreviado, número y kilos libres, y si tiene foto
+     * (27/11/2026: la app la pide aparte, ver fotoDelPescador). Null si no existe.
      *
-     * @return array{numero: string, pescador: string, kilos_disponibles: float, vence: string|null, vendible: bool, motivo: string|null}|null
+     * @return array{numero: string, pescador: string, kilos_disponibles: float, vence: string|null, vendible: bool, motivo: string|null, tiene_foto: bool}|null
      */
     public function autorizacion(string $codigo): ?array
     {
@@ -93,7 +97,25 @@ class PedirGuiaService
             'vence' => $a->fecha_vencimiento?->toDateString(),
             'vendible' => $motivo === null,
             'motivo' => $motivo,
+            'tiene_foto' => self::tieneFoto($a->beneficiario?->foto),
         ];
+    }
+
+    /**
+     * La foto del carnet del pescador de esa autorización (27/11/2026, decisión del
+     * responsable): el comercializador reconoce a quien le vende. Solo con el código
+     * de la autorización, el que está en el papel del pescador. Null si el código no
+     * existe o no tiene foto.
+     */
+    public function fotoDelPescador(string $codigo): ?string
+    {
+        return Archivos::contenido(AprovechamientoPesq::porCodigo($codigo)?->loadMissing('beneficiario')->beneficiario?->foto);
+    }
+
+    /** Como Archivos::contenido: una URL de afuera no se sirve. */
+    private static function tieneFoto(?string $foto): bool
+    {
+        return filled($foto) && ! str_starts_with($foto, 'http://') && ! str_starts_with($foto, 'https://');
     }
 
     /**
@@ -105,8 +127,13 @@ class PedirGuiaService
      *
      * @throws PermisoOperativoException con un mensaje para el titular
      */
-    public function pedir(Beneficiario $beneficiario, array $datos): GuiaMovimiento
+    public function pedir(Beneficiario $beneficiario, array $datos, OrigenTramite $origen): GuiaMovimiento
     {
+        // Lo comparten el portal web y la app: el controlador de cada uno dice cuál fue.
+        if (! $origen->esEnLinea()) {
+            throw new InvalidArgumentException('Un pedido en línea no puede registrarse como de ventanilla.');
+        }
+
         $resumen = $this->datos($beneficiario);
 
         if (! $resumen['puede']) {
@@ -125,6 +152,7 @@ class PedirGuiaService
                 'aprovechamiento_id' => $autorizacion->id,
             ],
             $datos['detalles'],
+            $origen,
         );
     }
 

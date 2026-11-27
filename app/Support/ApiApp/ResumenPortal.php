@@ -45,6 +45,9 @@ class ResumenPortal
             'ya_fue_aprobado' => $a->yaFueAprobado(),
             'estado_etiqueta' => $a->estado->etiqueta(),
             'estado_color' => $a->estado->color(),
+            // Desde dónde se pidió: ventanilla, portal web o app (también lo recibe la app).
+            'origen_tramite' => $a->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $a->origen_tramite?->etiqueta(),
             'vigente' => $a->estaVigente(),
             'en_tramite' => $a->estado->estaAbierto(),
             'siguiente_paso' => self::siguientePaso($a),
@@ -80,6 +83,9 @@ class ResumenPortal
             // «Sin efecto» manda sobre «Aprobado»: su autorización fue revocada.
             'estado_etiqueta' => $c->etiquetaEstado(),
             'estado_color' => $c->colorEstado(),
+            // Desde dónde se pidió: ventanilla, portal web o app (también lo recibe la app).
+            'origen_tramite' => $c->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $c->origen_tramite?->etiqueta(),
             'vigente' => $c->estaVigente(),
             'en_tramite' => $c->estado->estaAbierto(),
             'siguiente_paso' => self::siguientePaso($c),
@@ -114,6 +120,9 @@ class ResumenPortal
             'region' => collect([$f->region_desde, $f->region_hasta])->filter()->implode(' → ') ?: null,
             'estado_etiqueta' => $f->etiquetaEstado(),
             'estado_color' => $f->colorEstado(),
+            // Desde dónde se pidió: ventanilla, portal web o app (también lo recibe la app).
+            'origen_tramite' => $f->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $f->origen_tramite?->etiqueta(),
             'vigente' => $f->estaVigente(),
             'en_tramite' => $f->estado->estaAbierto(),
             'siguiente_paso' => self::siguientePaso($f),
@@ -150,6 +159,9 @@ class ResumenPortal
             'autorizacion_numero' => $g->aprovechamiento?->numeroLegible(),
             'estado_etiqueta' => $g->etiquetaEstado(),
             'estado_color' => $g->colorEstado(),
+            // Desde dónde se pidió: ventanilla, portal web o app (también lo recibe la app).
+            'origen_tramite' => $g->origen_tramite?->value,
+            'origen_tramite_etiqueta' => $g->origen_tramite?->etiqueta(),
             'vigente' => $g->estaVigente(),
             'en_tramite' => $g->estado->estaAbierto(),
             'siguiente_paso' => self::siguientePaso($g),

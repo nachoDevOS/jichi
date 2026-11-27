@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ConceptoArancel;
 use App\Enums\EstadoAprovechamiento;
+use App\Enums\OrigenTramite;
 use App\Enums\TramiteConVigencia;
 use App\Exceptions\CupoInvalidoException;
 use App\Models\AprovechamientoPesq;
@@ -34,11 +35,13 @@ class OtorgarCupoService
         Beneficiario $beneficiario,
         string $tarifaId,
         string $tipoEmbarcacion,
+        // Obligatorio, sin default: un camino que se olvide de decirlo no queda marcado «ventanilla».
+        OrigenTramite $origen,
         ?Carbon $solicitud = null,
     ): AprovechamientoPesq {
         $solicitud ??= now();
 
-        $cupo = DB::transaction(function () use ($beneficiario, $tarifaId, $solicitud, $tipoEmbarcacion): AprovechamientoPesq {
+        $cupo = DB::transaction(function () use ($beneficiario, $tarifaId, $solicitud, $tipoEmbarcacion, $origen): AprovechamientoPesq {
             // `lockForUpdate()` devuelve OTRA instancia: acá solo toma el candado,
             // todo lo demás se lee del modelo que llegó.
             Beneficiario::query()->whereKey($beneficiario->id)->lockForUpdate()->firstOrFail();
@@ -81,6 +84,7 @@ class OtorgarCupoService
                 'fecha_solicitud' => $solicitud->toDateString(),
                 'fecha_emision' => null,
                 'fecha_vencimiento' => $this->vencimientoDe($solicitud),
+                'origen_tramite' => $origen,
             ]);
 
             // Su llave pública, en la misma transacción: sin código, el documento
