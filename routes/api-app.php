@@ -7,9 +7,11 @@ use App\Http\Controllers\ApiApp\FaenaController;
 use App\Http\Controllers\ApiApp\GuiaController;
 use App\Http\Controllers\ApiApp\InicioController;
 use App\Http\Controllers\ApiApp\PagosController;
+use App\Http\Controllers\ApiApp\PapelPdfController;
 use App\Http\Controllers\ApiApp\PerfilController;
 use App\Http\Controllers\ApiApp\ReciboPdfController;
 use App\Http\Controllers\ApiApp\SesionController;
+use App\Http\Controllers\ApiApp\VentasController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -51,6 +53,12 @@ Route::prefix('v1/portal')->name('api.portal.')->group(function () {
         Route::get('/recibos/{codigo}/pdf', ReciboPdfController::class)
             ->middleware('throttle:20,1,recibos')
             ->name('recibos.pdf');
+        // El PDF de un papel suyo vigente hoy (27/11/2026): autorización, faena o guía, nunca el carnet.
+        Route::get('/papeles/{codigo}/pdf', PapelPdfController::class)
+            ->middleware('throttle:20,1,papeles')
+            ->name('papeles.pdf');
+        // «Mis ventas» de su autorización (27/11/2026): vendido, reservado y a quién, como el panel.
+        Route::get('/papeles/{codigo}/ventas', VentasController::class)->name('papeles.ventas');
         // Lo pendiente de pago, con su codigo_pago para pagar el QR en SIREB.
         Route::get('/en-curso', EnCursoController::class)->name('en-curso');
 

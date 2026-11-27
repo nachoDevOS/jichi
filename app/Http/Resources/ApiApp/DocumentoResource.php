@@ -27,8 +27,10 @@ class DocumentoResource extends JsonResource
     {
         return [
             ...Arr::except($this->resource, self::SOLO_WEB),
-            // Vigente hoy: el PDF se podrá bajar por la API (fase 4).
-            'puede_descargar' => ($this->resource['descargar'] ?? null) !== null,
+            // Vigente hoy y no es el carnet: el PDF se baja por `/papeles/{codigo}/pdf`
+            // (27/11/2026). El carnet nunca: perdido, se repone en ventanilla.
+            'puede_descargar' => ($this->resource['descargar'] ?? null) !== null
+                && ($this->resource['clase'] ?? null) !== 'carnet',
         ];
     }
 }

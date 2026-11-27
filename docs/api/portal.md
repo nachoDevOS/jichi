@@ -32,6 +32,8 @@ Todo lo que pide token tiene además un tope de **60 pedidos por minuto por cuen
 | `GET` | [`/en-curso`](#get-en-curso--lo-pendiente-de-pago) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/pagos`](#get-pagos--mis-pagos-vuelve-el-25112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/recibos/{codigo}/pdf`](#get-reciboscodigopdf--bajar-el-pdf-del-recibo-26112026) | ✔ | ✘ `403 clave_temporal` |
+| `GET` | [`/papeles/{codigo}/pdf`](#get-papelescodigopdf--bajar-el-pdf-de-un-papel-vigente-27112026) | ✔ | ✘ `403 clave_temporal` |
+| `GET` | [`/papeles/{codigo}/ventas`](#get-papelescodigoventas--mis-ventas-de-su-autorización-27112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/tramites/{codigo}/estado`](#get-tramitescodigoestado--ya-quedó-aprobado) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/faenas/nueva`](#get-faenasnueva--antes-de-pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
 | `POST` | [`/faenas`](#post-faenas--pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
@@ -207,7 +209,7 @@ Comunes a todos:
 | `dias_restantes` | int \| null | Solo de lo vigente |
 | `motivo_baja` | string \| null | Por qué ya no vale |
 | `debe` | number | Lo que falta pagar |
-| `puede_descargar` | bool | Vigente hoy. La app no descarga PDF (fuera del alcance): se ignora |
+| `puede_descargar` | bool | Vigente hoy y **no es un carnet** (27/11/2026): la app muestra «Descargar» y baja el PDF con `/papeles/{codigo}/pdf` |
 
 Propios de cada clase: autorización (`escala`, `volumen_total_kg`, `kilos_disponibles`),
 carnet (`tipo_actor`, `asociacion`, `cupo_kg`), faena (`numero`, `kilos`, `embarcacion`,
@@ -279,6 +281,56 @@ actual. Solo los suyos (`PagosTest::test_solo_ve_sus_recibos`).
 - `codigo` y `verificar`: el código legible y la dirección del QR de verificación, **los mismos del
   PDF** (`QrVerificacion::url`). La app dibuja con ellos el recibo digital.
 - No lleva `descargar`: la descarga del PDF pide sesión de navegador (`/mi-cuenta`).
+
+## `GET /papeles/{codigo}/pdf` — bajar el PDF de un papel vigente (27/11/2026)
+
+El botón «Descargar» de «Vigente hoy» en la app (`ApiApp\PapelPdfController`). Como el recibo:
+el **PDF oficial** guardado al emitirse, por un **enlace firmado que vence a los 5 minutos**, que la
+app abre fuera, sin el token. Respuesta: `{ "pdf": { "url", "vence_en", "nombre" } }`, con el nombre
+del papel (`autorizacion-000123.pdf`, `permiso-faena-000012.pdf`, `guia-transporte-000034.pdf`).
+Tope: **20 por minuto**.
+
+Las reglas de «Descargar» del portal web (`Portal\DescargarController`):
+- Solo **lo suyo** (`DocumentoDelPortal::buscar`), solo lo **vigente hoy** (`estaVigente()`) y solo
+  **autorización, faena o guía**. **El carnet nunca**: perdido, se revoca y se repone en ventanilla.
+- **404** igual para lo ajeno, lo inexistente, lo pendiente, lo vencido o un carnet: no confirma nada.
+- En `/inicio`, `puede_descargar` dice cuáles: la app no repite la regla.
+
+## `GET /papeles/{codigo}/ventas` — «Mis ventas» de su autorización (27/11/2026)
+
+Lo mismo que la ficha de la autorización en el panel (`Panel\AprovechamientoController::show`),
+para la app (`ApiApp\VentasController`, `Support\ApiApp\VentasDelCupo`). Solo **una autorización
+suya**: lo ajeno, otro papel (un carnet) o lo inexistente da **404**.
+
+```json
+{
+  "ventas": {
+    "numero": "000001",
+    "total_kg": 1000, "vendidos_kg": 200, "reservados_kg": 100, "disponibles_kg": 700,
+    "evolucion": [
+      { "etiqueta": "Otorgada", "fecha": "2026-01-10", "disponible": 1000, "kilos": null, "comprador": null, "por_confirmar": false },
+      { "etiqueta": "Guía 000035", "fecha": "2026-11-27", "disponible": 900, "kilos": 100, "comprador": "María Laura Suárez Soria", "por_confirmar": true },
+      { "etiqueta": "Hoy", "fecha": "2026-11-27", "disponible": 900, "kilos": null, "comprador": null, "por_confirmar": false }
+    ],
+    "guias": [
+      {
+        "numero": "000035", "fecha": "2026-11-27", "comprador": "María Laura Suárez Soria",
+        "kilos": 100, "por_confirmar": true,
+        "productos": [{ "nombre": "Pacú", "condicion": "Fresco/refrigerado — entero", "kilos": 100 }]
+      }
+    ]
+  }
+}
+```
+
+- Como el panel: las guías **pendientes reservan** sus kilos (ya descontados: `por_confirmar`),
+  las demás ya se **vendieron**. La más nueva primero.
+- `evolucion` (27/11/2026): cómo fue bajando lo libre, como el gráfico del panel: «Otorgada», una por
+  guía en el orden en que se registraron (cada una resta su carga) y «Hoy».
+- `comprador`: el **nombre completo** del comercializador, como en el panel (decisión del responsable).
+- **Sin el estado de la guía** (revocada, sin efecto): eso le pasa al comercializador, no al pescador
+  (decisión del responsable, 27/11/2026). Solo `por_confirmar`, porque sus kilos pueden volver.
+- Sin ids.
 
 ## `GET /recibos/{codigo}/pdf` — bajar el PDF del recibo (26/11/2026)
 
