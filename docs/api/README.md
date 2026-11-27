@@ -172,7 +172,7 @@ Hay dos clases de archivos adentro, y el comentario de cada clase dice cuál es:
   y guía, y muestran lo mismo). Tocarlos cambia **las dos**.
 
 ```
-routes/api-app.php                       Las 14 rutas de la app. La incluye routes/api.php
+routes/api-app.php                       Las 21 rutas de la app (27/11/2026). La incluye routes/api.php
                                          (Laravel les pone el prefijo /api).
 
 app/Http/Controllers/ApiApp/             SOLO APP — reciben el pedido, llaman a la lógica, responden JSON
@@ -181,10 +181,14 @@ app/Http/Controllers/ApiApp/             SOLO APP — reciben el pedido, llaman 
   ├── InicioController.php               GET /inicio (como el inicio de la web, + lo pagado en el año)
   ├── PagosController.php                GET /pagos?gestion= («Mis pagos», sin `descargar`)
   ├── ReciboPdfController.php            GET /recibos/{codigo}/pdf (enlace firmado de 5 min al PDF de S3)
+  ├── PapelPdfController.php             GET /papeles/{codigo}/pdf (PDF de autorización, faena o guía vigente; nunca el carnet, 27/11/2026)
+  ├── VentasController.php               GET /papeles/{codigo}/ventas («Mis ventas» de su autorización, 27/11/2026)
+  ├── KilosPorMesController.php          GET /kilos-por-mes (vendido y transportado por mes, 27/11/2026)
+  ├── AnularTramiteController.php        DELETE /tramites/{codigo} (anular su faena o guía pendiente pedida en línea, 27/11/2026)
   ├── EnCursoController.php              GET /en-curso
   ├── EstadoTramiteController.php        GET /tramites/{codigo}/estado (después de pagar en SIREB)
   ├── FaenaController.php                GET /faenas/nueva · POST /faenas
-  ├── GuiaController.php                 GET /guias/nueva · GET /autorizaciones/{codigo} · POST /guias
+  ├── GuiaController.php                 GET /guias/nueva · GET /autorizaciones/{codigo} (+ /foto, 27/11/2026) · POST /guias
   └── PerfilController.php               GET /perfil · GET /perfil/foto («Mi perfil»)
 
 app/Http/Requests/ApiApp/
@@ -195,7 +199,7 @@ app/Http/Requests/ApiApp/
 
 app/Http/Resources/ApiApp/               SOLO APP — EL CONTRATO: el JSON exacto que recibe la app
   ├── CuentaResource.php                 El objeto `cuenta`
-  ├── DocumentoResource.php              Un documento sin las URLs de la web; con `puede_descargar`
+  ├── DocumentoResource.php              Un documento sin las URLs de la web; con `puede_descargar` (sin carnets) y `puede_anular`
   └── PerfilResource.php                 «Mi perfil» sin la URL de la foto; con `tiene_foto`
 
 app/Http/Middleware/ApiApp/
@@ -213,12 +217,17 @@ app/Support/ApiApp/                      COMPARTIDO — lo que ven app y web
   ├── PantallaPortal.php                 Inicio, en curso, papeles y pagos (la app usa inicio y en curso)
   ├── PerfilPortal.php                   «Mis datos» / «Mi perfil»: datos, actividades y cuenta
   ├── ResumenPortal.php                  Cómo se muestra cada documento (estado, deuda, qué falta)
-  └── DocumentoDelPortal.php             Un documento por su código, SOLO si es del titular
-                                         (lo ajeno da null igual que lo inexistente)
+  ├── DocumentoDelPortal.php             Un documento por su código, SOLO si es del titular
+  │                                      (lo ajeno da null igual que lo inexistente)
+  ├── VentasDelCupo.php                  SOLO APP — «Mis ventas» de una autorización, como el panel (27/11/2026)
+  └── KilosPorMes.php                    SOLO APP — vendido y transportado por mes (27/11/2026)
 
 tests/Feature/ApiApp/                    Las pruebas de la API
   ├── SesionTest.php · EnCursoTest.php · FaenaTest.php · GuiaTest.php
-  └── EstadoTramiteTest.php · SeguridadTest.php · PerfilTest.php · InicioTest.php
+  ├── EstadoTramiteTest.php · SeguridadTest.php · PerfilTest.php · InicioTest.php
+  └── PapelPdfTest.php · VentasTest.php · KilosPorMesTest.php · AnularTramiteTest.php (27/11/2026)
+tests/Feature/Pagos/EliminarConPagoTest.php   La MISMA regla al eliminar (panel) y anular (app):
+                                         pago en revisión frena, rechazado no, pagado se aprueba
 
 config/sanctum.php                       Tokens: `guard => []` (solo token, nunca cookies)
 database/migrations/

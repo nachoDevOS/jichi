@@ -31,6 +31,12 @@ class DocumentoResource extends JsonResource
             // (27/11/2026). El carnet nunca: perdido, se repone en ventanilla.
             'puede_descargar' => ($this->resource['descargar'] ?? null) !== null
                 && ($this->resource['clase'] ?? null) !== 'carnet',
+            // «Anular pedido» (27/11/2026): su faena o guía pendiente, pedida en línea y
+            // sin un pago cargado en SIREB. Lo hace AnularTramiteController.
+            'puede_anular' => in_array($this->resource['clase'] ?? null, ['faena', 'guia'], true)
+                && ($this->resource['en_tramite'] ?? false) === true
+                && in_array($this->resource['origen_tramite'] ?? null, ['portal_web', 'app'], true)
+                && in_array($this->resource['pago'] ?? null, ['sin_pago', 'caida'], true),
         ];
     }
 }

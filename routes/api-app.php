@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ApiApp\AnularTramiteController;
 use App\Http\Controllers\ApiApp\CuentaController;
 use App\Http\Controllers\ApiApp\EnCursoController;
 use App\Http\Controllers\ApiApp\EstadoTramiteController;
@@ -69,6 +70,10 @@ Route::prefix('v1/portal')->name('api.portal.')->group(function () {
         Route::get('/tramites/{codigo}/estado', EstadoTramiteController::class)
             ->middleware('throttle:30,1,estado')
             ->name('tramites.estado');
+        // «Anular pedido» (27/11/2026): su faena o guía pendiente pedida en línea, como «Eliminar» del panel.
+        Route::delete('/tramites/{codigo}', AnularTramiteController::class)
+            ->middleware('throttle:10,1,anular')
+            ->name('tramites.anular');
 
         // Trámites en línea (19/11/2026): las reglas del panel, ver PedirFaenaService.
         // Cobran en SIREB: Idempotency-Key obligatoria, para no registrar dos veces lo mismo.

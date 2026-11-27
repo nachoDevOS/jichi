@@ -98,6 +98,11 @@ trait SirebFalso
             }
 
             if (preg_match('#/liquidaciones/([^/]+)/anular$#', $ruta, $m)) {
+                // Como SIREB: una liquidación ya pagada no se anula (27/11/2026).
+                if (($this->liquidaciones[$m[1]]['estado'] ?? null) === 'pagada') {
+                    return Http::response(['codigo' => 'LIQUIDACION_PAGADA', 'mensaje' => 'La liquidación ya está pagada.'], 422);
+                }
+
                 $this->liquidaciones[$m[1]]['estado'] = 'anulada';
 
                 return Http::response(['data' => $this->liquidaciones[$m[1]]]);

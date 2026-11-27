@@ -36,6 +36,7 @@ Todo lo que pide token tiene además un tope de **60 pedidos por minuto por cuen
 | `GET` | [`/kilos-por-mes`](#get-kilos-por-mes--vendido-y-transportado-por-mes-27112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/papeles/{codigo}/ventas`](#get-papelescodigoventas--mis-ventas-de-su-autorización-27112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/tramites/{codigo}/estado`](#get-tramitescodigoestado--ya-quedó-aprobado) | ✔ | ✘ `403 clave_temporal` |
+| `DELETE` | [`/tramites/{codigo}`](#delete-tramitescodigo--anular-su-pedido-27112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/faenas/nueva`](#get-faenasnueva--antes-de-pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
 | `POST` | [`/faenas`](#post-faenas--pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/guias/nueva`](#get-guiasnueva--antes-de-pedir-una-guía) | ✔ | ✘ `403 clave_temporal` |
@@ -592,6 +593,22 @@ del carnet del pescador (`Content-Type` real, `Cache-Control: private`), nunca u
 | Cambiar la clave en la web | Todos sus tokens se borran → `401` |
 | Dar de baja a la persona | `401` con `codigo: acceso_deshabilitado` |
 | 90 días sin usar la app | Ese token vence → `401` → login (con uso, se renueva solo) |
+
+## `DELETE /tramites/{codigo}` — anular su pedido (27/11/2026)
+
+«Anular pedido» de la app (`ApiApp\AnularTramiteController`). `throttle:10,1`. Su faena o guía
+**pendiente**, pedida **en línea** (app o portal web): lo mismo que «Eliminar» del panel
+(`EmitirFaenaService` / `EmitirGuiaService::eliminar`). Primero se anula el cobro en SIREB; la guía
+devuelve sus kilos al pescador. En la auditoría: evento `eliminado`, la cuenta del titular y el motivo
+`Anulado por el titular desde la app`.
+
+- **200** `{ "mensaje": "Anulaste el permiso de faena N° 000012. No se cobra. Ya podés pedir otro." }`
+- **404** si es ajeno, no existe o no es faena ni guía (una guía es del comercializador, no del pescador).
+- **422** `errors.tramite` si ya está aprobado o revocado, o lo registró ventanilla.
+- **409** `{ "codigo": "ya_pagado", "aprobado": true|false }` si ya pagó en SIREB: no se anula y, si el
+  pago está validado, queda aprobado en ese momento.
+- En `/inicio` y `/en-curso`, **`puede_anular`** dice cuándo mostrar el botón: faena o guía pendiente,
+  pedida en línea y sin pago cargado (`pago`: `sin_pago` o `caida`).
 
 ## `GET /tramites/{codigo}/estado` — ¿ya quedó aprobado?
 

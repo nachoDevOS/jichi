@@ -334,8 +334,14 @@ boletas en Jichi y la firma de supervisión.)*
   | Sin pago | Se anula la liquidación y se elimina |
   | Vencida, sin pago | Se elimina sin pedir la anulación (una vencida no se anula) |
   | Pago en revisión | **No se elimina**: «tiene un pago cargado que todavía está en revisión» |
+  | Pago **rechazado** por Recaudaciones (`observado`) *(27/11/2026)* | **Se elimina**: SIREB ya no lo devuelve en la liquidación (solo trae pagos `pendiente`/`confirmado`), así que vuelve a ser **pendiente sin pago**; también se le puede cargar otro pago |
   | Pago validado / pagada | **No se elimina: se aprueba** en ese momento, como con «Verificar pago», y la ficha lo avisa |
   | No responde | **No se elimina**: sin saber si está pagado, no se borra |
+
+  **La misma regla en el panel («Eliminar»), el portal web y la app («Anular pedido»)**: los tres pasan
+  por `EmitirFaenaService` / `EmitirGuiaService::eliminar()` → `LiquidarSirebService::anular()`, que
+  pregunta a SIREB en el momento. La app y el portal web, además, solo para lo pedido en línea por el
+  titular (ver Paso 8). Pruebas: `tests/Feature/Pagos/EliminarConPagoTest.php`.
 
 ## Paso 7 — La verificación pública (código de 16 caracteres)
 
@@ -401,8 +407,12 @@ boletas en Jichi y la firma de supervisión.)*
   1. **Sin tope de pendientes** (salvo la faena en línea, arriba). La guía descuenta los kilos del pescador al
      registrarse, como en ventanilla (Paso 5); si nunca se paga, ventanilla la
      elimina y los kilos vuelven.
-  2. **El titular no elimina ni corrige** lo que pidió: eliminar (con motivo, que
-     queda en la auditoría) y corregir siguen siendo de ventanilla, con sus permisos.
+  2. **El titular no corrige** lo que pidió (eso es de ventanilla). **Anular**, sí
+     *(27/11/2026, decisión del responsable)*: su faena o guía **pendiente**, pedida **en
+     línea** y **sin un pago cargado**, se anula desde la app (`DELETE /tramites/{codigo}`):
+     el mismo «Eliminar» del panel (anula el cobro en SIREB; la guía devuelve sus kilos al
+     pescador), con el motivo fijo «Anulado por el titular desde la app» en la auditoría.
+     Lo registrado en ventanilla, lo aprobado o lo ya pagado no se anula desde la app.
   3. **Sin revisión previa:** queda `pendiente` con su liquidación en SIREB y se
      aprueba sola al validarse el pago (Paso 6).
 - **Cada trámite queda marcado con desde dónde se registró** *(pedido del
