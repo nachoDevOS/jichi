@@ -6,6 +6,7 @@ use App\Http\Controllers\ApiApp\EstadoTramiteController;
 use App\Http\Controllers\ApiApp\FaenaController;
 use App\Http\Controllers\ApiApp\GuiaController;
 use App\Http\Controllers\ApiApp\InicioController;
+use App\Http\Controllers\ApiApp\KilosPorMesController;
 use App\Http\Controllers\ApiApp\PagosController;
 use App\Http\Controllers\ApiApp\PapelPdfController;
 use App\Http\Controllers\ApiApp\PerfilController;
@@ -49,6 +50,8 @@ Route::prefix('v1/portal')->name('api.portal.')->group(function () {
 
         // «Mis pagos» (25/11/2026): sus recibos de una gestión, como en la web.
         Route::get('/pagos', PagosController::class)->name('pagos');
+        // «Kilos por mes» (27/11/2026): vendido (pescador) y transportado (comercializador), para el gráfico del inicio.
+        Route::get('/kilos-por-mes', KilosPorMesController::class)->name('kilos-por-mes');
         // El PDF de un recibo suyo (26/11/2026): un enlace firmado de 5 minutos, no los bytes.
         Route::get('/recibos/{codigo}/pdf', ReciboPdfController::class)
             ->middleware('throttle:20,1,recibos')

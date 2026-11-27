@@ -33,6 +33,7 @@ Todo lo que pide token tiene además un tope de **60 pedidos por minuto por cuen
 | `GET` | [`/pagos`](#get-pagos--mis-pagos-vuelve-el-25112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/recibos/{codigo}/pdf`](#get-reciboscodigopdf--bajar-el-pdf-del-recibo-26112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/papeles/{codigo}/pdf`](#get-papelescodigopdf--bajar-el-pdf-de-un-papel-vigente-27112026) | ✔ | ✘ `403 clave_temporal` |
+| `GET` | [`/kilos-por-mes`](#get-kilos-por-mes--vendido-y-transportado-por-mes-27112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/papeles/{codigo}/ventas`](#get-papelescodigoventas--mis-ventas-de-su-autorización-27112026) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/tramites/{codigo}/estado`](#get-tramitescodigoestado--ya-quedó-aprobado) | ✔ | ✘ `403 clave_temporal` |
 | `GET` | [`/faenas/nueva`](#get-faenasnueva--antes-de-pedir-un-permiso-de-faena) | ✔ | ✘ `403 clave_temporal` |
@@ -295,6 +296,34 @@ Las reglas de «Descargar» del portal web (`Portal\DescargarController`):
   **autorización, faena o guía**. **El carnet nunca**: perdido, se revoca y se repone en ventanilla.
 - **404** igual para lo ajeno, lo inexistente, lo pendiente, lo vencido o un carnet: no confirma nada.
 - En `/inicio`, `puede_descargar` dice cuáles: la app no repite la regla.
+
+## `GET /kilos-por-mes` — vendido y transportado por mes (27/11/2026)
+
+El gráfico «Kilos por mes» del inicio de la app (`ApiApp\KilosPorMesController`,
+`Support\ApiApp\KilosPorMes`). `?gestion=2026` (opcional; por defecto, la actual).
+
+```json
+{
+  "kilos": {
+    "gestion": 2026,
+    "mes_actual": 11,
+    "rubros": [
+      {
+        "clave": "vendido", "etiqueta": "Vendido",
+        "total_kg": 320, "por_confirmar_kg": 100, "guias": 2,
+        "meses": [{ "confirmado": 0, "por_confirmar": 0 }, "… 12 meses …"]
+      }
+    ]
+  }
+}
+```
+
+- **`vendido`** (pescador, si alguna vez tuvo una autorización): las guías pedidas con sus
+  autorizaciones. **`transportado`** (comercializador, si alguna vez tuvo carnet de comercializador):
+  sus guías. Con los dos, el de más kilos primero; con ninguno, `rubros: []`.
+- Por mes según el día en que se pidió la guía. `por_confirmar`: guías sin pagar (sus kilos pueden
+  volver). Cuenta toda guía no eliminada (las revocadas también), como «Mis ventas» y el panel.
+- Solo kilos: sin estados, nombres ni ids.
 
 ## `GET /papeles/{codigo}/ventas` — «Mis ventas» de su autorización (27/11/2026)
 
