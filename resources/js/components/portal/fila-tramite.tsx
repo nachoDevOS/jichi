@@ -1,9 +1,11 @@
-import { AlertTriangle, Check, CheckCircle2, ExternalLink, Eye, Hourglass, QrCode, Search } from 'lucide-react';
+import { router } from '@inertiajs/react';
+import { AlertTriangle, Check, CheckCircle2, ExternalLink, Eye, Hourglass, QrCode, Search, XCircle } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { detalleDocumento, ICONO_DOCUMENTO } from '@/components/portal/documento';
 import { ConMontoResaltado, EstadoChip } from '@/components/portal/piezas';
 import { VentanaPagoQr } from '@/components/portal/ventana-pago-qr';
 import { VisorVistaPrevia } from '@/components/portal/visor-vista-previa';
+import { ConfirmarAccion } from '@/components/ui/confirmar-accion';
 import { cn } from '@/lib/utils';
 import type { PapelPortal } from '@/types/portal';
 
@@ -29,6 +31,21 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
     const actual = tramite.etapa ? PASO_ACTUAL[tramite.etapa] : 0;
     const [viendo, setViendo] = useState(false);
     const [pagando, setPagando] = useState(false);
+    const [anulando, setAnulando] = useState(false);
+    const [procesando, setProcesando] = useState(false);
+
+    /** «Anular pedido» (27/11/2026): la misma regla que la app; el servidor vuelve a «En curso» con el mensaje. */
+    const anular = () => {
+        if (!tramite.codigo) return;
+        setProcesando(true);
+        router.delete(route('portal.tramites.anular', { codigo: tramite.codigo }), {
+            preserveScroll: true,
+            onFinish: () => {
+                setProcesando(false);
+                setAnulando(false);
+            },
+        });
+    };
 
     return (
         <li className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md sm:p-4">
@@ -133,6 +150,17 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
                 </div>
 
                 <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                    {/* Su pedido en línea, todavía sin pagar: lo puede anular para pedir otro. */}
+                    {tramite.puede_anular && tramite.codigo && (
+                        <button
+                            type="button"
+                            onClick={() => setAnulando(true)}
+                            className="flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-bold text-rose-700 transition-colors hover:bg-rose-50"
+                        >
+                            <XCircle className="size-4" />
+                            Anular pedido
+                        </button>
+                    )}
                     {/* Con este código se paga en Recaudaciones. */}
                     {tramite.codigo_pago && (
                         <p className="rounded-full bg-rio-espuma px-3.5 py-2 text-sm text-rio-profundo">
@@ -160,6 +188,22 @@ export function FilaTramite({ tramite }: { tramite: PapelPortal }) {
                     onCerrar={() => setPagando(false)}
                 />
             )}
+
+            <ConfirmarAccion
+                abierto={anulando}
+                titulo="¿Anular el pedido?"
+                descripcion={
+                    <>
+                        {tramite.tipo} {detalleDocumento(tramite)}: no se cobra
+                        {tramite.clase === 'guia' ? ' y los kilos vuelven al pescador' : ''}, y puede pedir otro. No se
+                        puede deshacer.
+                    </>
+                }
+                textoConfirmar="Anular"
+                procesando={procesando}
+                onConfirmar={anular}
+                onCancelar={() => setAnulando(false)}
+            />
 
             {viendo && tramite.vista_previa && (
                 <VisorVistaPrevia url={tramite.vista_previa} titulo={tramite.tipo} onCerrar={() => setViendo(false)} />

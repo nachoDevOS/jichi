@@ -4,12 +4,12 @@ namespace Tests\Feature\ApiApp;
 
 use App\Enums\EstadoFaena;
 use App\Enums\OrigenTramite;
-use App\Http\Controllers\ApiApp\AnularTramiteController;
 use App\Jobs\VerificarPagoJob;
 use App\Models\AprovechamientoPesq;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\User;
+use App\Services\ApiApp\AnularPedidoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
@@ -150,7 +150,7 @@ class AnularTramiteTest extends TestCase
             'auditable_type' => $faena->getMorphClass(),
             'auditable_id' => $faena->id,
             'evento' => 'eliminado',
-            'descripcion' => AnularTramiteController::MOTIVO,
+            'descripcion' => AnularPedidoService::MOTIVO,
             // Quién: la cuenta del titular.
             'user_id' => $this->pescador->id,
         ]);

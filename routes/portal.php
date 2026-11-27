@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Portal\AccesoController;
+use App\Http\Controllers\Portal\AnularPedidoController;
 use App\Http\Controllers\Portal\DescargarController;
 use App\Http\Controllers\Portal\DescargarReciboController;
 use App\Http\Controllers\Portal\EnCursoController;
@@ -60,6 +61,10 @@ Route::prefix('mi-cuenta')->name('portal.')->group(function () {
 
         // El PDF del panel, solo de lo vigente hoy, y solo si es suyo.
         Route::get('/descargar/{codigo}', DescargarController::class)->name('descargar');
+        // «Anular pedido» (27/11/2026): su faena o guía pendiente pedida en línea; la misma regla que la app.
+        Route::delete('/tramites/{codigo}', AnularPedidoController::class)
+            ->middleware('throttle:10,1')
+            ->name('tramites.anular');
         Route::get('/recibos/{codigo}/descargar', DescargarReciboController::class)->name('recibos.descargar');
 
         // Lo abierto se VE con «NO VÁLIDO», no se descarga.

@@ -596,7 +596,9 @@ del carnet del pescador (`Content-Type` real, `Cache-Control: private`), nunca u
 
 ## `DELETE /tramites/{codigo}` — anular su pedido (27/11/2026)
 
-«Anular pedido» de la app (`ApiApp\AnularTramiteController`). `throttle:10,1`. Su faena o guía
+«Anular pedido» de la app (`ApiApp\AnularTramiteController`). `throttle:10,1`. La regla está en
+`Services\ApiApp\AnularPedidoService`, **compartida con el portal web** (`DELETE /mi-cuenta/tramites/{codigo}`,
+`Portal\AnularPedidoController`): lo pedido desde la app se anula también en la web, y al revés. Su faena o guía
 **pendiente**, pedida **en línea** (app o portal web): lo mismo que «Eliminar» del panel
 (`EmitirFaenaService` / `EmitirGuiaService::eliminar`). Primero se anula el cobro en SIREB; la guía
 devuelve sus kilos al pescador. En la auditoría: evento `eliminado`, la cuenta del titular y el motivo

@@ -12,6 +12,7 @@ use App\Models\Carnet;
 use App\Models\GuiaMovimiento;
 use App\Models\PermisoFaena;
 use App\Models\Recibo;
+use App\Services\ApiApp\AnularPedidoService;
 use App\Support\ExpedienteBeneficiario;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -105,6 +106,8 @@ class ResumenPortal
     {
         return [
             'clase' => 'faena',
+            // «Anular pedido» (27/11/2026): su pendiente pedido en línea y sin pago cargado.
+            'puede_anular' => AnularPedidoService::sePuede($f, self::estadoPago($f)),
             'tipo' => 'Permiso de Faena',
             'numero' => $f->numero_legible,
             'codigo' => $f->codigo_legible,
@@ -142,6 +145,8 @@ class ResumenPortal
     {
         return [
             'clase' => 'guia',
+            // «Anular pedido» (27/11/2026): su pendiente pedido en línea y sin pago cargado.
+            'puede_anular' => AnularPedidoService::sePuede($g, self::estadoPago($g)),
             'tipo' => 'Guía Única de Transporte',
             'numero' => $g->numero_legible,
             'codigo' => $g->codigo_legible,

@@ -1,8 +1,9 @@
 import { CalendarClock, ExternalLink } from 'lucide-react';
 import { detalleDocumento, ICONO_DOCUMENTO, kg } from '@/components/portal/documento';
 import { AvisoRetiroCarnet, BotonDescarga, EstadoChip } from '@/components/portal/piezas';
+import { nivelDisponible, porcentaje } from '@/components/panel/comunes/ficha';
 import { cn, fecha, fechaHora } from '@/lib/utils';
-import type { PapelPortal } from '@/types/portal';
+import type { AprovechamientoPortal, PapelPortal } from '@/types/portal';
 
 /** Desde cuántos días se avisa «vence pronto»: contra lo que dura cada uno (la faena, 30 días; la guía, 5). */
 const DIAS_AVISO: Record<PapelPortal['clase'], number> = { aprovechamiento: 30, carnet: 30, faena: 5, guia: 1 };
@@ -57,8 +58,11 @@ export function FilaPapel({ papel }: { papel: PapelPortal }) {
             </div>
 
             {/* El saldo lo bajan las guías de quien le compra; la faena no descuenta. */}
+            {/* Como la ficha del panel (27/11/2026): la barra de lo libre, que se pone ámbar con la mitad o
+                menos y roja con el 20 % o menos, con su texto al lado (nunca solo el color). */}
+            {papel.clase === 'aprovechamiento' && vigente && <BarraKilos papel={papel} />}
             {papel.clase === 'aprovechamiento' && vigente && (
-                <p className="mt-3 text-[11px] font-semibold text-slate-500">
+                <p className="mt-2 text-[11px] font-semibold text-slate-500">
                     Le quedan <span className="text-rio">{kg(papel.kilos_disponibles)}</span> de{' '}
                     {kg(papel.volumen_total_kg)}. Bajan cuando un comercializador le compra con su guía de transporte; el
                     permiso de faena no los descuenta.
@@ -112,5 +116,28 @@ export function FilaPapel({ papel }: { papel: PapelPortal }) {
                 {papel.descargar && <BotonDescarga url={papel.descargar} etiqueta={`Descargar ${papel.tipo} en PDF`} />}
             </div>
         </li>
+    );
+}
+
+/**
+ * Lo libre de la autorización, como la ficha del panel (27/11/2026, `nivelDisponible`): la barra se
+ * pone ámbar con la mitad o menos y roja con el 20 % o menos, con su texto al lado (nunca solo el color).
+ */
+function BarraKilos({ papel }: { papel: AprovechamientoPortal }) {
+    const libre = porcentaje(papel.kilos_disponibles, papel.volumen_total_kg);
+    const nivel = nivelDisponible(libre, true);
+
+    return (
+        <div className="mt-3">
+            <div className="flex items-center justify-between gap-2 text-[11px] font-semibold">
+                <span className="text-slate-500">{Math.round(libre)} % libre</span>
+                {nivel.texto && (
+                    <span className={nivel.tono === 'peligro' ? 'text-red-700' : 'text-amber-700'}>{nivel.texto}</span>
+                )}
+            </div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                <div className={cn('h-full rounded-full transition-[width]', nivel.barra)} style={{ width: `${libre}%` }} />
+            </div>
+        </div>
     );
 }

@@ -15,6 +15,11 @@ interface PapelBase {
     codigo_pago: string | null;
     /** Ofrece «Pagar por QR»: cobro sin pago en la última consulta. Al abrirlo se vuelve a preguntar a SIREB. */
     puede_pagar_qr: boolean;
+    /**
+     * «Anular pedido» (27/11/2026): su faena o guía pendiente, pedida en línea (app o web) y sin un
+     * pago cargado. Lo calcula el servidor (AnularPedidoService::sePuede); al anular, vuelve a mirar SIREB.
+     */
+    puede_anular?: boolean;
     /** El PDF, solo si vale hoy; null si no se imprime. */
     descargar: string | null;
     /** El PDF con «NO VÁLIDO», solo de lo abierto: se ve, no se descarga. */

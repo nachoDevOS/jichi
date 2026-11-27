@@ -413,6 +413,15 @@ boletas en Jichi y la firma de supervisión.)*
      el mismo «Eliminar» del panel (anula el cobro en SIREB; la guía devuelve sus kilos al
      pescador), con el motivo fijo «Anulado por el titular desde la app» en la auditoría.
      Lo registrado en ventanilla, lo aprobado o lo ya pagado no se anula desde la app.
+     **Lo que importa es que lo pidió el beneficiario, no dónde** (27/11/2026): se anula desde
+     la app **o** desde el portal web («En curso»), con la misma regla (`AnularPedidoService`):
+
+     | Lo pidió desde | Anular desde la app | Anular desde el portal web |
+     | --- | --- | --- |
+     | App | ✅ | ✅ |
+     | Portal web | ✅ | ✅ |
+     | Ventanilla (panel) | ❌ lo anula el panel | ❌ lo anula el panel |
+
   3. **Sin revisión previa:** queda `pendiente` con su liquidación en SIREB y se
      aprueba sola al validarse el pago (Paso 6).
 - **Cada trámite queda marcado con desde dónde se registró** *(pedido del

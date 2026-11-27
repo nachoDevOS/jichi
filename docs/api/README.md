@@ -184,7 +184,8 @@ app/Http/Controllers/ApiApp/             SOLO APP — reciben el pedido, llaman 
   ├── PapelPdfController.php             GET /papeles/{codigo}/pdf (PDF de autorización, faena o guía vigente; nunca el carnet, 27/11/2026)
   ├── VentasController.php               GET /papeles/{codigo}/ventas («Mis ventas» de su autorización, 27/11/2026)
   ├── KilosPorMesController.php          GET /kilos-por-mes (vendido y transportado por mes, 27/11/2026)
-  ├── AnularTramiteController.php        DELETE /tramites/{codigo} (anular su faena o guía pendiente pedida en línea, 27/11/2026)
+  ├── AnularTramiteController.php        DELETE /tramites/{codigo} (anular su faena o guía pendiente pedida en línea, 27/11/2026;
+  │                                      la regla, en Services/ApiApp/AnularPedidoService, la comparte con el portal web)
   ├── EnCursoController.php              GET /en-curso
   ├── EstadoTramiteController.php        GET /tramites/{codigo}/estado (después de pagar en SIREB)
   ├── FaenaController.php                GET /faenas/nueva · POST /faenas
@@ -226,6 +227,7 @@ tests/Feature/ApiApp/                    Las pruebas de la API
   ├── SesionTest.php · EnCursoTest.php · FaenaTest.php · GuiaTest.php
   ├── EstadoTramiteTest.php · SeguridadTest.php · PerfilTest.php · InicioTest.php
   └── PapelPdfTest.php · VentasTest.php · KilosPorMesTest.php · AnularTramiteTest.php (27/11/2026)
+tests/Feature/Portal/AnularPedidoTest.php     El cuadro: pedido en la app o la web, se anula en la app o la web
 tests/Feature/Pagos/EliminarConPagoTest.php   La MISMA regla al eliminar (panel) y anular (app):
                                          pago en revisión frena, rechazado no, pagado se aprueba
 
